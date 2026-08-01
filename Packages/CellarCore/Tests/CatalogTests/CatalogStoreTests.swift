@@ -47,8 +47,9 @@ struct CatalogStoreTests {
 
         #expect(store.isReady)
         // Only the first start's refresh loop ran: each payload was asked for
-        // exactly once.
-        await poll { harness.source.requests(for: .formulae).count == 1 }
+        // exactly once. Poll on the casks count — the LATER of the two
+        // sequential fetches — so both requests have happened before asserting.
+        await poll { harness.source.requests(for: .casks).count == 1 }
         #expect(harness.source.requests(for: .formulae).count == 1)
         #expect(harness.source.requests(for: .casks).count == 1)
     }
