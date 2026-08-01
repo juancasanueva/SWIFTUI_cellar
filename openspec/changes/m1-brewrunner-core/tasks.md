@@ -55,21 +55,21 @@ obtain an explicit `size:exception` before starting, or the orchestrator must re
 
 ## Phase 2a: Process seam, streaming, environment, exit
 
-- [ ] 2.1 Create `Sources/BrewProcess/ProcessLaunching.swift`: `ProcessSpec`, `OutputChunk`, `ProcessSignal`, `ProcessLaunching`, `LaunchedProcess`.
-- [ ] 2.2 Create `Tests/BrewProcessTests/Fakes/FakeProcessLauncher.swift` + `FakeProcess.swift`: scripted chunks, recorded `ProcessSpec`s, recorded `(signal, Instant)` pairs, controllable termination.
-- [ ] 2.3 RED (spec: verbatim streaming) `StreamingTests.swift` — line with leading whitespace, emoji, ANSI bytes round-trips byte-identical; a line split across two chunks reassembles; CRLF and missing trailing newline handled.
-- [ ] 2.4 RED (spec: stdout/stderr interleaving) stdout "a", stderr "b", stdout "c" arrive tagged in that exact order; `sequence` is monotonic (I4).
-- [ ] 2.5 RED (spec: stream finishes) after termination the `AsyncStream<LogLine>` finishes exactly once and yields nothing further.
-- [ ] 2.6 GREEN: `Sources/BrewProcess/BrewRunner.swift` — actor skeleton, `start(_:)`, pump `Task` (buffer → split → tag → sequence), operation record owning the pump (I3). Verify: `FAST`.
-- [ ] 2.7 RED (threat: environment inheritance) `EnvironmentTests.swift` — recorded spec contains `HOMEBREW_NO_AUTO_UPDATE=1`, `HOMEBREW_COLOR=0`, `HOMEBREW_NO_EMOJI=1` even when the parent env sets them differently; no `HOMEBREW_NO_INSTALL_FROM_API` key; `PATH`/`HOME` inherited.
-- [ ] 2.8 GREEN: `Sources/BrewProcess/BrewEnvironment.swift` building the explicit env; wire into `BrewRunner.start`.
-- [ ] 2.9 RED (threat: argument composition) an argument containing a space, `;`, and `$(id)` reaches the fake as ONE literal argv element; no `/bin/sh -c` anywhere in the recorded spec.
-- [ ] 2.10 GREEN: pass `BrewCommand.arguments` straight to `ProcessSpec.arguments`. Verify: `FAST`.
-- [ ] 2.11 RED (spec: terminal result) one stdout line then exit 1 ⇒ `BrewExit(status: 1, reason: .exited)` and the line was observable before the exit resolves (D3 — non-zero is not a throw).
-- [ ] 2.12 RED (spec: spawn failure) a launcher that throws ⇒ `BrewProcessError.executableUnavailable` / `.launchFailed`, no crash, no partial operation leaked.
-- [ ] 2.13 GREEN: `BrewOperation.exit()` + launch-failure mapping in `BrewRunner`. Verify: `FAST`.
-- [ ] 2.14 GREEN: `Sources/BrewProcess/SystemProcess.swift` — `Foundation.Process` + `Mutex<State>`, two readability handlers into ONE continuation, single `finish()` after both EOFs and reap (D1, I1); `SystemProcessLauncher`.
-- [ ] 2.15 Integration test `SystemProcessTests.swift`: `/bin/echo` through `SystemProcessLauncher` yields the expected `LogLine` and exit 0. Verify: `FAST`.
+- [x] 2.1 Create `Sources/BrewProcess/ProcessLaunching.swift`: `ProcessSpec`, `OutputChunk`, `ProcessSignal`, `ProcessLaunching`, `LaunchedProcess`.
+- [x] 2.2 Create `Tests/BrewProcessTests/Fakes/FakeProcessLauncher.swift` + `FakeProcess.swift`: scripted chunks, recorded `ProcessSpec`s, recorded `(signal, Instant)` pairs, controllable termination.
+- [x] 2.3 RED (spec: verbatim streaming) `StreamingTests.swift` — line with leading whitespace, emoji, ANSI bytes round-trips byte-identical; a line split across two chunks reassembles; CRLF and missing trailing newline handled.
+- [x] 2.4 RED (spec: stdout/stderr interleaving) stdout "a", stderr "b", stdout "c" arrive tagged in that exact order; `sequence` is monotonic (I4).
+- [x] 2.5 RED (spec: stream finishes) after termination the `AsyncStream<LogLine>` finishes exactly once and yields nothing further.
+- [x] 2.6 GREEN: `Sources/BrewProcess/BrewRunner.swift` — actor skeleton, `start(_:)`, pump `Task` (buffer → split → tag → sequence), operation record owning the pump (I3). Verify: `FAST`.
+- [x] 2.7 RED (threat: environment inheritance) `EnvironmentTests.swift` — recorded spec contains `HOMEBREW_NO_AUTO_UPDATE=1`, `HOMEBREW_COLOR=0`, `HOMEBREW_NO_EMOJI=1` even when the parent env sets them differently; no `HOMEBREW_NO_INSTALL_FROM_API` key; `PATH`/`HOME` inherited.
+- [x] 2.8 GREEN: `Sources/BrewProcess/BrewEnvironment.swift` building the explicit env; wire into `BrewRunner.start`.
+- [x] 2.9 RED (threat: argument composition) an argument containing a space, `;`, and `$(id)` reaches the fake as ONE literal argv element; no `/bin/sh -c` anywhere in the recorded spec.
+- [x] 2.10 GREEN: pass `BrewCommand.arguments` straight to `ProcessSpec.arguments`. Verify: `FAST`.
+- [x] 2.11 RED (spec: terminal result) one stdout line then exit 1 ⇒ `BrewExit(status: 1, reason: .exited)` and the line was observable before the exit resolves (D3 — non-zero is not a throw).
+- [x] 2.12 RED (spec: spawn failure) a launcher that throws ⇒ `BrewProcessError.executableUnavailable` / `.launchFailed`, no crash, no partial operation leaked.
+- [x] 2.13 GREEN: `BrewOperation.exit()` + launch-failure mapping in `BrewRunner`. Verify: `FAST`.
+- [x] 2.14 GREEN: `Sources/BrewProcess/SystemProcess.swift` — `Foundation.Process` + `Mutex<State>`, two readability handlers into ONE continuation, single `finish()` after both EOFs and reap (D1, I1); `SystemProcessLauncher`.
+- [x] 2.15 Integration test `SystemProcessTests.swift`: `/bin/echo` through `SystemProcessLauncher` yields the expected `LogLine` and exit 0. Verify: `FAST`.
 
 ## Phase 2b: Cancellation escalation and FIFO gate
 
