@@ -47,11 +47,11 @@ obtain an explicit `size:exception` before starting, or the orchestrator must re
 
 ## Phase 1: CellarCore package scaffold
 
-- [ ] 1.1 Create `Packages/CellarCore/Package.swift`: tools 6.0, `platforms: [.macOS("26.0")]`, target `BrewProcess` + test target `BrewProcessTests`, `swiftSettings: [.swiftLanguageMode(.v6)]`. Verify: `swift package dump-package --package-path Packages/CellarCore` emits valid JSON.
-- [ ] 1.2 RED: add `Tests/BrewProcessTests/LogLineTests.swift` asserting `LogLine(stream:text:sequence:)` equality and `Sendable` value semantics. Verify: `FAST` fails to compile (type missing).
-- [ ] 1.3 GREEN: create `Sources/BrewProcess/LogLine.swift`, `BrewCommand.swift`, `BrewExit.swift` (value types per design). Verify: `FAST` passes.
-- [ ] 1.4 Create `Sources/BrewProcess/BrewErrors.swift` with `BrewProcessError` + `BrewValidationError` cases from the design taxonomy.
-- [ ] 1.5 Create `cellar.xcodeproj/xcshareddata/xcschemes/CellarCore.xcscheme`.
+- [x] 1.1 Create `Packages/CellarCore/Package.swift`: tools 6.0, `platforms: [.macOS("26.0")]`, target `BrewProcess` + test target `BrewProcessTests`, `swiftSettings: [.swiftLanguageMode(.v6)]`. Verify: `swift package dump-package --package-path Packages/CellarCore` emits valid JSON.
+- [x] 1.2 RED: add `Tests/BrewProcessTests/LogLineTests.swift` asserting `LogLine(stream:text:sequence:)` equality and `Sendable` value semantics. Verify: `FAST` fails to compile (type missing).
+- [x] 1.3 GREEN: create `Sources/BrewProcess/LogLine.swift`, `BrewCommand.swift`, `BrewExit.swift` (value types per design). Verify: `FAST` passes.
+- [x] 1.4 Create `Sources/BrewProcess/BrewErrors.swift` with `BrewProcessError` + `BrewValidationError` cases from the design taxonomy.
+- [x] 1.5 Create `cellar.xcodeproj/xcshareddata/xcschemes/CellarCore.xcscheme`.
 
 ## Phase 2a: Process seam, streaming, environment, exit
 
