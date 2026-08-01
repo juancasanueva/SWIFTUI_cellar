@@ -102,8 +102,8 @@ obtain an explicit `size:exception` before starting, or the orchestrator must re
 
 ## Phase 4: App wiring and verification
 
-- [ ] 4.1 Add `XCLocalSwiftPackageReference "Packages/CellarCore"` + `BrewProcess` product dependency to target `cellar` in `project.pbxproj`. Verify: `BUILD`.
-- [ ] 4.2 `cellar/cellarApp.swift`: own a `BrewDetectionStore`; `.task { await store.refresh() }` and refresh on `NSApplication.didBecomeActiveNotification`.
-- [ ] 4.3 `cellar/ContentView.swift`: render `BrewDetectionState` as text only (path, prefix, version, advisory, invalid reason, absent guidance). No onboarding UI.
-- [ ] 4.4 Verify the full gate: `FAST` (zero concurrency warnings) then `BUILD` then `FULL`, all green.
-- [ ] 4.5 Launch the app and confirm the detected brew state renders (runtime harness for Unit 6); record the result.
+- [x] 4.1 Add `XCLocalSwiftPackageReference "Packages/CellarCore"` + `BrewProcess` product dependency to target `cellar` in `project.pbxproj`. Verify: `BUILD`.
+- [x] 4.2 `cellar/cellarApp.swift`: own a `BrewDetectionStore`; `.task { await store.refresh() }` and refresh on `NSApplication.didBecomeActiveNotification`.
+- [x] 4.3 `cellar/ContentView.swift`: render `BrewDetectionState` as text only (path, prefix, version, advisory, invalid reason, absent guidance). No onboarding UI.
+- [x] 4.4 Verify the full gate: `FAST` (zero concurrency warnings) then `BUILD` then `FULL`, all green.
+- [x] 4.5 Launch the app and confirm the detected brew state renders (runtime harness for Unit 6); record the result.
