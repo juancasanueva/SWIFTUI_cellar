@@ -52,19 +52,19 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 1: Domain models + tolerant decode (CS5, PD1, PD4, PD5, PD6)
 
-- [ ] 1.1 RED `Tests/CatalogTests/CatalogModelsTests.swift`: `PackageID` equality/hashing distinguishes `(formula, docker)` from `(cask, docker)` (PS1). GREEN: `Sources/Catalog/CatalogModels.swift` — `PackageKind`, `PackageID`, `CatalogPackage`, `CatalogSnapshot`, `CatalogState`. Verify: `FAST --filter CatalogModels`.
-- [ ] 1.2 Extend `CatalogPackage` beyond design to satisfy PD4 and PD2: add `deprecationDate: Date?`, `disableDate: Date?`, and model each dependency entry so it can be marked unresolvable when absent from the snapshot. RED test first in `CatalogModelsTests`.
-- [ ] 1.3 RED `Tests/CatalogTests/DecodeTests.swift`: cask `name: ["iTerm2"]` → display name `iTerm2` (CS5). GREEN: `Sources/Catalog/Wire/CaskWire.swift`.
-- [ ] 1.4 RED: `"desc": null` and `"caveats": null` decode as absent, not empty string (CS5, PD1). GREEN: `Sources/Catalog/Wire/FormulaWire.swift` with `decodeIfPresent` throughout.
-- [ ] 1.5 RED: `uses_from_macos: ["curl", {"llvm": ["build"]}]` decodes both elements and retains the record (CS5). GREEN: `Sources/Catalog/Wire/Lossy.swift` — `UsesFromMacOS` either-type.
-- [ ] 1.6 RED: a record carrying unmodelled keys decodes successfully (CS5). GREEN: confirm wire types declare only the ~18 projected keys.
-- [ ] 1.7 RED: a 100-record payload with 3 malformed records yields 97 records and `skippedRecordCount == 3` (CS5). GREEN: `Sources/Catalog/Wire/Lossy.swift` — `LossyArray`.
-- [ ] 1.8 RED: a payload with zero usable records throws `.malformedPayload`; an unreadable envelope throws too (CS5/D6). GREEN: `Sources/Catalog/CatalogDecoder.swift` zero-record guard.
-- [ ] 1.9 RED `Tests/CatalogTests/ProjectionTests.swift`: formula `wget` projection reports desc/homepage/license/version/tap/kind and all flag fields (PD1); cask `iterm2` reports display name/kind/version/homepage/tap `homebrew/cask` (PD1). GREEN: projection in `CatalogDecoder.swift`.
-- [ ] 1.10 RED: deprecated record exposes flag + reason + date; disabled likewise; healthy record reports both flags false and all four reason/date fields absent (PD4). GREEN.
-- [ ] 1.11 RED: every persisted record's tap is `homebrew/core` or `homebrew/cask`; a third-party-tap name is a plain not-found and no error (PD6). GREEN: tap filter in projection.
-- [ ] 1.12 RED: build and runtime dependency lists are flat, direct, declaration-ordered, not deduped across lists; a dependency absent from the snapshot is listed by name and marked unresolvable (PD2). GREEN.
-- [ ] 1.13 RED `Tests/CatalogTests/CatalogMemoryTests.swift`: generate a synthetic 40 MB `formula.json` into a temp dir, measure `phys_footprint` via `task_info(TASK_VM_INFO)` around decode; assert peak delta ≤ 300 MB and retained delta ≤ 40 MB (D8). GREEN: `mappedIfSafe` + sequential per-resource scopes + `autoreleasepool` + immediate raw-download deletion. Verify: `FAST --filter CatalogMemory`.
+- [x] 1.1 RED `Tests/CatalogTests/CatalogModelsTests.swift`: `PackageID` equality/hashing distinguishes `(formula, docker)` from `(cask, docker)` (PS1). GREEN: `Sources/Catalog/CatalogModels.swift` — `PackageKind`, `PackageID`, `CatalogPackage`, `CatalogSnapshot`, `CatalogState`. Verify: `FAST --filter CatalogModels`.
+- [x] 1.2 Extend `CatalogPackage` beyond design to satisfy PD4 and PD2: add `deprecationDate: Date?`, `disableDate: Date?`, and model each dependency entry so it can be marked unresolvable when absent from the snapshot. RED test first in `CatalogModelsTests`.
+- [x] 1.3 RED `Tests/CatalogTests/DecodeTests.swift`: cask `name: ["iTerm2"]` → display name `iTerm2` (CS5). GREEN: `Sources/Catalog/Wire/CaskWire.swift`.
+- [x] 1.4 RED: `"desc": null` and `"caveats": null` decode as absent, not empty string (CS5, PD1). GREEN: `Sources/Catalog/Wire/FormulaWire.swift` with `decodeIfPresent` throughout.
+- [x] 1.5 RED: `uses_from_macos: ["curl", {"llvm": ["build"]}]` decodes both elements and retains the record (CS5). GREEN: `Sources/Catalog/Wire/Lossy.swift` — `UsesFromMacOS` either-type.
+- [x] 1.6 RED: a record carrying unmodelled keys decodes successfully (CS5). GREEN: confirm wire types declare only the ~18 projected keys.
+- [x] 1.7 RED: a 100-record payload with 3 malformed records yields 97 records and `skippedRecordCount == 3` (CS5). GREEN: `Sources/Catalog/Wire/Lossy.swift` — `LossyArray`.
+- [x] 1.8 RED: a payload with zero usable records throws `.malformedPayload`; an unreadable envelope throws too (CS5/D6). GREEN: `Sources/Catalog/CatalogDecoder.swift` zero-record guard.
+- [x] 1.9 RED `Tests/CatalogTests/ProjectionTests.swift`: formula `wget` projection reports desc/homepage/license/version/tap/kind and all flag fields (PD1); cask `iterm2` reports display name/kind/version/homepage/tap `homebrew/cask` (PD1). GREEN: projection in `CatalogDecoder.swift`.
+- [x] 1.10 RED: deprecated record exposes flag + reason + date; disabled likewise; healthy record reports both flags false and all four reason/date fields absent (PD4). GREEN.
+- [x] 1.11 RED: every persisted record's tap is `homebrew/core` or `homebrew/cask`; a third-party-tap name is a plain not-found and no error (PD6). GREEN: tap filter in projection.
+- [x] 1.12 RED: build and runtime dependency lists are flat, direct, declaration-ordered, not deduped across lists; a dependency absent from the snapshot is listed by name and marked unresolvable (PD2). GREEN.
+- [x] 1.13 RED `Tests/CatalogTests/CatalogMemoryTests.swift`: generate a synthetic 40 MB `formula.json` into a temp dir, measure `phys_footprint` via `task_info(TASK_VM_INFO)` around decode; assert peak delta ≤ 300 MB and retained delta ≤ 40 MB (D8). GREEN: `mappedIfSafe` + sequential per-resource scopes + `autoreleasepool` + immediate raw-download deletion. Verify: `FAST --filter CatalogMemory`.
 
 ## Phase 2: Persistence (CS3, CS6)
 
