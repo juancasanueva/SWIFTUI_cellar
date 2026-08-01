@@ -86,19 +86,19 @@ obtain an explicit `size:exception` before starting, or the orchestrator must re
 
 ## Phase 3: Brew detection
 
-- [ ] 3.1 RED `BrewVersionTests.swift` — parameterized `@Test` over `Homebrew 6.0.14-38-g1f3abf4`, `Homebrew 4.0.0`, `Homebrew 3.6.21`, `/bin/echo` noise, empty string; plus `Comparable` ordering.
-- [ ] 3.2 GREEN: `Sources/BrewProcess/BrewVersion.swift` with pure `parse(_:)`. Verify: `FAST`.
-- [ ] 3.3 Create `Sources/BrewProcess/BrewLocation.swift` (`BrewPrefix`, `BrewInstallation`, `Advisory`, `BrewDetectionState`, `BrewLocating`, `ExecutableProbing`) and `Tests/.../Fakes/FakeExecutableProbe.swift`.
-- [ ] 3.4 RED (spec: precedence) both prefixes exist ⇒ `.detected` at `/opt/homebrew/bin/brew` with `.appleSilicon`; only `/usr/local` ⇒ `.intelCarryOver`.
-- [ ] 3.5 RED (spec: Rosetta advisory) `.intelCarryOver` carries `advisories.contains(.rosettaPrefix)` and nothing is disabled or degraded.
-- [ ] 3.6 RED (spec: absent) nothing found, no configured path ⇒ `.absent` with install guidance; resolves without throwing.
-- [ ] 3.7 RED (threat: executable classification) one test per `BrewValidationError`: non-executable ⇒ `.notExecutable`; `/bin/echo` printing `git version 2.4.0` ⇒ `.notHomebrew`; `Homebrew 3.6.21` ⇒ `.versionTooOld(found:minimum: 4.0.0)`; symlink resolved before probing.
-- [ ] 3.8 RED (spec: custom precedence + no fallback) valid custom `Homebrew 4.2.0` wins over an existing native prefix; invalid custom ⇒ `.invalid`, NEVER `.detected` at a probed prefix (D6). Also: detection runs no mutating brew command.
-- [ ] 3.9 RED configured path that no longer exists ⇒ `.configuredPathMissing(URL)`.
-- [ ] 3.10 GREEN: `Sources/BrewProcess/DefaultBrewLocator.swift` + `DefaultExecutableProbe`. Verify: `FAST`.
-- [ ] 3.11 RED `BrewDetectionStoreTests.swift` — launch evaluation publishes exactly one state; `absent` → brew appears → refresh publishes a transition to detected; single-flight `refresh()` collapses concurrent calls.
-- [ ] 3.12 GREEN: `Sources/BrewProcess/BrewDetectionStore.swift` (`@MainActor @Observable`, single-flight). Verify: `FAST`.
-- [ ] 3.13 Integration (detection-gated `.enabled(if:)`): real `brew --version` streams ≥1 ordered `LogLine` and exits 0; a bad subcommand yields non-zero exit AND stderr lines. Skip, never fail, when brew is absent.
+- [x] 3.1 RED `BrewVersionTests.swift` — parameterized `@Test` over `Homebrew 6.0.14-38-g1f3abf4`, `Homebrew 4.0.0`, `Homebrew 3.6.21`, `/bin/echo` noise, empty string; plus `Comparable` ordering.
+- [x] 3.2 GREEN: `Sources/BrewProcess/BrewVersion.swift` with pure `parse(_:)`. Verify: `FAST`.
+- [x] 3.3 Create `Sources/BrewProcess/BrewLocation.swift` (`BrewPrefix`, `BrewInstallation`, `Advisory`, `BrewDetectionState`, `BrewLocating`, `ExecutableProbing`) and `Tests/.../Fakes/FakeExecutableProbe.swift`.
+- [x] 3.4 RED (spec: precedence) both prefixes exist ⇒ `.detected` at `/opt/homebrew/bin/brew` with `.appleSilicon`; only `/usr/local` ⇒ `.intelCarryOver`.
+- [x] 3.5 RED (spec: Rosetta advisory) `.intelCarryOver` carries `advisories.contains(.rosettaPrefix)` and nothing is disabled or degraded.
+- [x] 3.6 RED (spec: absent) nothing found, no configured path ⇒ `.absent` with install guidance; resolves without throwing.
+- [x] 3.7 RED (threat: executable classification) one test per `BrewValidationError`: non-executable ⇒ `.notExecutable`; `/bin/echo` printing `git version 2.4.0` ⇒ `.notHomebrew`; `Homebrew 3.6.21` ⇒ `.versionTooOld(found:minimum: 4.0.0)`; symlink resolved before probing.
+- [x] 3.8 RED (spec: custom precedence + no fallback) valid custom `Homebrew 4.2.0` wins over an existing native prefix; invalid custom ⇒ `.invalid`, NEVER `.detected` at a probed prefix (D6). Also: detection runs no mutating brew command.
+- [x] 3.9 RED configured path that no longer exists ⇒ `.configuredPathMissing(URL)`.
+- [x] 3.10 GREEN: `Sources/BrewProcess/DefaultBrewLocator.swift` + `DefaultExecutableProbe`. Verify: `FAST`.
+- [x] 3.11 RED `BrewDetectionStoreTests.swift` — launch evaluation publishes exactly one state; `absent` → brew appears → refresh publishes a transition to detected; single-flight `refresh()` collapses concurrent calls.
+- [x] 3.12 GREEN: `Sources/BrewProcess/BrewDetectionStore.swift` (`@MainActor @Observable`, single-flight). Verify: `FAST`.
+- [x] 3.13 Integration (detection-gated `.enabled(if:)`): real `brew --version` streams ≥1 ordered `LogLine` and exits 0; a bad subcommand yields non-zero exit AND stderr lines. Skip, never fail, when brew is absent.
 
 ## Phase 4: App wiring and verification
 
