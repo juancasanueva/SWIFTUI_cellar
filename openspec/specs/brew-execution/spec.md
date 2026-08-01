@@ -44,12 +44,14 @@ MUST be tagged as `stdout` or `stderr`. Emission order MUST be preserved as read
 
 ### Requirement: Terminal result and exit handling
 
-An operation MUST end in exactly one terminal outcome: normal exit (any status, including
-non-zero), cancelled, or spawn failure. A process that exits — successfully or not — MUST be
-reported as a `BrewExit` **value** carrying the exit status and a reason of `exited`; a non-zero
-status MUST NOT be raised as a thrown error, because `brew` uses exit codes semantically. Only
-launch faults and an unresponsive cancellation are errors. The result MUST NOT be delivered before
-all lines produced by the process are observable.
+An operation MUST end in exactly one terminal outcome: normal exit (any status, including non-zero),
+cancelled, spawn failure, or unresponsive cancellation — the last meaning the process did not exit
+even after the `SIGTERM` escalation. Exactly two of those outcomes are errors: spawn failure and
+unresponsive cancellation. A process that exits — successfully or not — MUST be reported as a
+`BrewExit` **value** carrying the exit status and a reason of `exited`; a non-zero status MUST NOT be
+raised as a thrown error, because `brew` uses exit codes semantically. A process that stops during
+cancellation escalation MUST be reported as cancelled, which is likewise a value and not an error.
+The result MUST NOT be delivered before all lines produced by the process are observable.
 
 #### Scenario: Non-zero exit is reported as a value carrying its status
 
@@ -126,3 +128,7 @@ Every type crossing an isolation boundary (`LogLine`, results, errors, configura
   scenario previously said a non-zero exit "fails with an error carrying exit code 1". Amended to
   value semantics — the runner reports `BrewExit(status:reason:)` and does not throw — matching
   approved design decision D3 and the shipped implementation.
+- **Editorial reconciliation (change `m1-catalog-browse`, 2026-08-01)**: "Terminal result and exit
+  handling" enumerated three terminal outcomes while the following clause treated unresponsive
+  cancellation as a fourth. Amended to name all four explicitly and to state which two are errors.
+  No behavioural change; scenarios carried over verbatim.

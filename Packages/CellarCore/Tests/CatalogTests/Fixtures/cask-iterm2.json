@@ -1,0 +1,93 @@
+{
+ "token": "iterm2",
+ "full_token": "iterm2",
+ "old_tokens": [],
+ "tap": "homebrew/cask",
+ "name": [
+  "iTerm2"
+ ],
+ "desc": "Terminal emulator as alternative to Apple's Terminal app",
+ "homepage": "https://iterm2.com/",
+ "url": "https://iterm2.com/downloads/stable/iTerm2-3_6_11.zip",
+ "url_specs": {},
+ "version": "3.6.11",
+ "autobump": true,
+ "no_autobump_message": null,
+ "skip_livecheck": false,
+ "installed": null,
+ "installed_time": null,
+ "bundle_version": null,
+ "bundle_short_version": null,
+ "pinned": false,
+ "pinned_version": null,
+ "outdated": false,
+ "sha256": "36e78c5049560eaa8e122224f6652eb4b229c61cd5e7332d6d25b5c36f7398e7",
+ "artifacts": [
+  {
+   "app": [
+    "iTerm.app"
+   ],
+   "target": "/Applications/iTerm.app"
+  },
+  {
+   "zap": [
+    {
+     "trash": [
+      "~/Library/Application Scripts/com.googlecode.iterm2.iTermFileProvider",
+      "~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.googlecode.iterm2.itermai.sfl*",
+      "~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.googlecode.iterm2.sfl*",
+      "~/Library/Application Support/iTerm",
+      "~/Library/Application Support/iTerm2",
+      "~/Library/Caches/com.googlecode.iterm2",
+      "~/Library/Containers/com.googlecode.iterm2.iTermFileProvider",
+      "~/Library/Containers/iTermAI",
+      "~/Library/Cookies/com.googlecode.iterm2.binarycookies",
+      "~/Library/HTTPStorages/com.googlecode.iterm2",
+      "~/Library/HTTPStorages/com.googlecode.iterm2.binarycookies",
+      "~/Library/Preferences/com.googlecode.iterm2.plist",
+      "~/Library/Preferences/com.googlecode.iterm2.private.plist",
+      "~/Library/Saved Application State/com.googlecode.iterm2*.savedState",
+      "~/Library/WebKit/com.googlecode.iterm2"
+     ]
+    }
+   ]
+  }
+ ],
+ "caveats": null,
+ "caveats_rosetta": null,
+ "depends_on": {
+  "macos": {
+   ">=": [
+    "12"
+   ]
+  }
+ },
+ "conflicts_with": {
+  "cask": [
+   "iterm2@beta",
+   "iterm2@nightly"
+  ]
+ },
+ "container": null,
+ "rename": [],
+ "auto_updates": true,
+ "deprecated": false,
+ "deprecation_date": null,
+ "deprecation_reason": null,
+ "deprecation_replacement_formula": null,
+ "deprecation_replacement_cask": null,
+ "deprecate_args": null,
+ "disabled": false,
+ "disable_date": null,
+ "disable_reason": null,
+ "disable_replacement_formula": null,
+ "disable_replacement_cask": null,
+ "disable_args": null,
+ "tap_git_head": "9e3e25ea17f9890efbe102aed73ef3a090557e91",
+ "languages": [],
+ "ruby_source_path": "Casks/i/iterm2.rb",
+ "ruby_source_checksum": {
+  "sha256": "c5cd110e5dabf28727f1788609d800fb180273c85a5a635ea53f0a9f23b20700"
+ },
+ "variations": {}
+}

@@ -7,7 +7,7 @@
 
 import AppKit
 import BrewProcess
-import SwiftData
+import Catalog
 import SwiftUI
 
 @main
@@ -16,22 +16,14 @@ struct cellarApp: App {
     /// the same evaluation.
     @State private var brewDetection = BrewDetectionStore()
 
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    /// The catalog, likewise owned once. There is no `ModelContainer` any more:
+    /// the catalog is derived data with its own on-disk format, and nothing in
+    /// this milestone stores anything a user could lose.
+    @State private var catalog = CatalogStore(directory: CatalogStore.defaultDirectory())
 
     var body: some Scene {
         WindowGroup {
-            ContentView(brewDetection: brewDetection)
+            ContentView(brewDetection: brewDetection, catalog: catalog)
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
                 // from a terminal while Cellar was in the background.
@@ -44,7 +36,10 @@ struct cellarApp: App {
                         await brewDetection.refresh()
                     }
                 }
+                // Long-lived: `start()` loads the cache and then runs the
+                // refresh schedule for as long as the scene exists, so closing
+                // the window cancels the loop structurally.
+                .task { await catalog.start() }
         }
-        .modelContainer(sharedModelContainer)
     }
 }
