@@ -133,6 +133,7 @@ public enum CatalogDecoder {
     public static func link(
         formulae: DecodedResource,
         casks: DecodedResource,
+        analytics: AnalyticsIndex? = nil,
         generatedAt: Date
     ) -> CatalogSnapshot {
         // Only formulae can satisfy a formula's dependency edge.
@@ -146,10 +147,18 @@ public enum CatalogDecoder {
             )
         }
 
+        var packages = linkedFormulae + casks.packages
+        // An absent index means the analytics fetch failed. Leaving the carried
+        // over counts alone is the graceful degradation: a stale count beats
+        // wiping every number off the UI over one failed request.
+        if let analytics {
+            packages = packages.map { $0.replacingInstallCount(analytics.count(for: $0.id)) }
+        }
+
         return CatalogSnapshot(
             generatedAt: generatedAt,
             skippedRecordCount: formulae.skippedRecordCount + casks.skippedRecordCount,
-            packages: linkedFormulae + casks.packages
+            packages: packages
         )
     }
 

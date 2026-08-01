@@ -22,7 +22,10 @@ struct SyncEngineTests {
         #expect(snapshot.packages.map(\.name).sorted() == ["git", "iterm2", "wget"])
         #expect(harness.source.requests(for: .formulae).count == 1)
         #expect(harness.source.requests(for: .casks).count == 1)
-        #expect(harness.source.requests.allSatisfy { $0.resource != .analyticsFormula })
+        // The two analytics endpoints are asked once each and are allowed to
+        // fail; here they are unscripted, so they do.
+        #expect(harness.source.requests(for: .analyticsFormula).count == 1)
+        #expect(harness.source.requests(for: .analyticsCask).count == 1)
     }
 
     // MARK: - Conditional revalidation (CS2)
@@ -35,7 +38,8 @@ struct SyncEngineTests {
 
         _ = await harness.engine.sync()
 
-        #expect(harness.source.requests.count == 2)
+        // Two payload resources plus the two analytics endpoints.
+        #expect(harness.source.requests.count == 4)
         #expect(harness.source.requests.allSatisfy { ($0.validators?.isEmpty ?? true) })
     }
 

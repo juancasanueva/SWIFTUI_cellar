@@ -93,10 +93,10 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 4: Analytics join (CS9, PD5)
 
-- [ ] 4.1 RED `Tests/CatalogTests/AnalyticsTests.swift`: `"count": "2,808,879"` parses to `2808879` under a locale using `.` as group separator (CS9). GREEN: `Sources/Catalog/AnalyticsIndex.swift` — strip `,`, no `NumberFormatter`.
-- [ ] 4.2 RED: formula vs cask item keys resolve to the right namespace; a package with no entry has an absent count distinct from `0` (CS9, PD5). GREEN.
-- [ ] 4.3 RED: payload sync succeeds while analytics fetch fails ⇒ sync reports success, snapshot persists, every record has an absent count (CS9). GREEN: analytics join is non-fatal.
-- [ ] 4.4 RED: the projection exposes the count together with window = 365 days, metric (installs-on-request for formulae / installs for casks), and a lower-bound flag; never as an absolute total (PD5). GREEN. Verify: `FAST --filter Analytics`.
+- [x] 4.1 RED `Tests/CatalogTests/AnalyticsTests.swift`: `"count": "2,808,879"` parses to `2808879` under a locale using `.` as group separator (CS9). GREEN: `Sources/Catalog/AnalyticsIndex.swift` — strip `,`, no `NumberFormatter`.
+- [x] 4.2 RED: formula vs cask item keys resolve to the right namespace; a package with no entry has an absent count distinct from `0` (CS9, PD5). GREEN.
+- [x] 4.3 RED: payload sync succeeds while analytics fetch fails ⇒ sync reports success, snapshot persists, every record has an absent count (CS9). GREEN: analytics join is non-fatal.
+- [x] 4.4 RED: the projection exposes the count together with window = 365 days, metric (installs-on-request for formulae / installs for casks), and a lower-bound flag; never as an absolute total (PD5). GREEN. Verify: `FAST --filter Analytics`.
 
 **Unit 1 gate**: `swift test --package-path Packages/CellarCore` all green; record the measured slim-projection size ratio in `design.md` Open Questions.
 

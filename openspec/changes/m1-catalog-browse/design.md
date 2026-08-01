@@ -279,6 +279,10 @@ schema drops the `ModelContainer` entirely for this milestone; a stale local dev
       the `Catalog` target with `.swiftLanguageMode(.v6)`. One syntax constraint: the attribute must
       precede the modifier — `@concurrent nonisolated func` compiles, `nonisolated @concurrent func`
       is a parse error. The `Task.detached(priority: .utility)` fallback is **not** used.
-- [ ] Slim-projection size ratio — measured at the Unit 1 gate. Input sizes captured on 2026-08-01:
+- [x] **Slim-projection size ratio — MEASURED (Unit 1 gate).** Live inputs captured 2026-08-01:
       `formula.json` 31,022,015 B (8,529 records) + `cask.json` 16,773,799 B (7,671 records)
-      = 47.8 MB for 16,200 records.
+      = 47,795,814 B for 16,200 records, 0 skipped. The persisted `catalog.json` is
+      **6,862,330 B (6.54 MB)** — a **7.0× reduction**, slightly above the estimated 4–6 MB band.
+      The overhead is the analytics join (16,191 of 16,200 records carry a count) plus the
+      per-edge `PackageDependency` objects that make PD2's unresolvable marking possible. Well
+      inside the D8 retained budget; no action taken.

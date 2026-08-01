@@ -174,9 +174,13 @@ public actor CatalogSyncEngine {
                 return succeed(with: snapshot, at: now)
             }
 
+            let analytics = await fetchAnalytics(into: staging, carryingOver: previousSnapshot)
+            try checkCancellation()
+
             let snapshot = CatalogDecoder.link(
                 formulae: decoded[.formula] ?? carriedOver(.formula, from: previousSnapshot),
                 casks: decoded[.cask] ?? carriedOver(.cask, from: previousSnapshot),
+                analytics: analytics,
                 generatedAt: now
             )
             try store.persist(
@@ -206,6 +210,47 @@ public actor CatalogSyncEngine {
             packages: snapshot.packages.filter { $0.kind == kind },
             skippedRecordCount: 0
         )
+    }
+
+    /// Acquires the two analytics endpoints, never fatally.
+    ///
+    /// Analytics is decoration: a catalog with no install counts is still a
+    /// complete, searchable catalog, so a failure here must not cost the user
+    /// the 47 MB of payload that already arrived (catalog-sync CS9). A namespace
+    /// that fails keeps whatever count the previous snapshot held, because a
+    /// slightly stale number beats blanking the column.
+    ///
+    /// No retry: this data is optional, and a backoff storm for it would delay
+    /// the snapshot that is not.
+    private func fetchAnalytics(
+        into directory: URL,
+        carryingOver previous: CatalogSnapshot?
+    ) async -> AnalyticsIndex {
+        var index = AnalyticsIndex()
+        for resource in CatalogResource.analyticsResources {
+            do {
+                let outcome = try await source.fetch(resource, validators: nil, into: directory)
+                guard case .downloaded(let payload) = outcome else {
+                    index = index.merging(Self.counts(of: resource.kind, in: previous))
+                    continue
+                }
+                index = index.merging(
+                    try await CatalogDecoder.decodeAnalytics(at: payload.fileURL, kind: resource.kind)
+                )
+            } catch {
+                index = index.merging(Self.counts(of: resource.kind, in: previous))
+            }
+        }
+        return index
+    }
+
+    private static func counts(of kind: PackageKind, in snapshot: CatalogSnapshot?) -> AnalyticsIndex {
+        guard let snapshot else { return AnalyticsIndex() }
+        var counts: [PackageID: Int] = [:]
+        for package in snapshot.packages where package.kind == kind {
+            if let count = package.installCount365d { counts[package.id] = count }
+        }
+        return AnalyticsIndex(counts: counts)
     }
 
     private func succeed(
@@ -250,6 +295,9 @@ extension CatalogResource {
     /// join.
     public static let payloadResources: [CatalogResource] = [.formulae, .casks]
 
+    /// The two optional install-count endpoints.
+    public static let analyticsResources: [CatalogResource] = [.analyticsFormula, .analyticsCask]
+
     var kind: PackageKind {
         switch self {
         case .formulae, .analyticsFormula: .formula
@@ -288,5 +336,15 @@ extension CatalogDecoder {
         case .analyticsFormula, .analyticsCask:
             throw CatalogSyncError.malformedPayload
         }
+    }
+
+    /// Decodes a staged analytics payload off the caller's executor.
+    @concurrent
+    public static func decodeAnalytics(at url: URL, kind: PackageKind) async throws -> AnalyticsIndex {
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
+            throw CatalogSyncError.malformedPayload
+        }
+        return try AnalyticsIndex.decode(data, kind: kind)
     }
 }
