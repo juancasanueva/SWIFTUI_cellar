@@ -93,6 +93,29 @@ struct CatalogStoreTests {
         #expect(store.results.map(\.name).sorted() == ["curl", "iterm2", "wget"])
     }
 
+    @Test("The store reports how many packages are indexed, not how many match")
+    func packageCountIsTheWholeCatalog() async throws {
+        let store = try await Self.populated()
+
+        #expect(store.packageCount == 4)
+
+        store.query = "wget"
+
+        #expect(store.results.count == 1)
+        #expect(store.packageCount == 4)
+    }
+
+    @Test("An empty store reports zero indexed packages")
+    func emptyStoreReportsZero() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+
+        await store.loadCache()
+
+        #expect(store.packageCount == 0)
+        #expect(store.isReady)
+    }
+
     // MARK: - Reranking (D4)
 
     @Test("Setting the query reranks synchronously, with no await in between")

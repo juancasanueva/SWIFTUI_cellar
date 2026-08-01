@@ -18,6 +18,8 @@ public final class CatalogStore {
     /// settled the enumeration's name as `CatalogSyncStatus` and one vocabulary
     /// is worth more than two.
     public private(set) var syncStatus: CatalogSyncStatus = .idle
+    /// How many packages the loaded snapshot holds, regardless of the query.
+    public private(set) var packageCount = 0
     /// Whether the store can answer queries at all.
     ///
     /// Becomes true as soon as the cache has been consulted — with or without a
@@ -135,6 +137,7 @@ public final class CatalogStore {
 
     private func adopt(_ snapshot: CatalogSnapshot) {
         index = PackageSearchIndex(snapshot: snapshot)
+        packageCount = index.recordCount
         rerank()
     }
 

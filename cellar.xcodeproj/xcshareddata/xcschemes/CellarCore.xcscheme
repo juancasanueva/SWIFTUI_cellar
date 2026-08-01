@@ -20,6 +20,20 @@
                ReferencedContainer = "container:Packages/CellarCore">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "Catalog"
+               BuildableName = "Catalog"
+               BlueprintName = "Catalog"
+               ReferencedContainer = "container:Packages/CellarCore">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -36,6 +50,16 @@
                BlueprintIdentifier = "BrewProcessTests"
                BuildableName = "BrewProcessTests"
                BlueprintName = "BrewProcessTests"
+               ReferencedContainer = "container:Packages/CellarCore">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "CatalogTests"
+               BuildableName = "CatalogTests"
+               BlueprintName = "CatalogTests"
                ReferencedContainer = "container:Packages/CellarCore">
             </BuildableReference>
          </TestableReference>

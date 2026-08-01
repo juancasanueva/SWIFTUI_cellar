@@ -129,18 +129,18 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 8: Browse UI (no pbxproj edits — file-system-synchronized groups)
 
-- [ ] 8.1 Create `cellar/Shell/AppSection.swift` (sections enum) and extract the existing detection summary verbatim into `cellar/Home/BrewDetectionSummary.swift` + `cellar/Home/HomeView.swift`.
-- [ ] 8.2 Rewrite `cellar/ContentView.swift` as the `NavigationSplitView` shell (sidebar → Browse list → detail).
-- [ ] 8.3 Create `cellar/Browse/BrowseView.swift` + `cellar/Browse/PackageRow.swift` — searchable list bound to `CatalogStore.results`, badging deprecated/disabled (PS4).
-- [ ] 8.4 Create `cellar/Browse/CatalogFilterBar.swift` — kind, `excludeDeprecated`, `excludeDisabled` (PS4).
-- [ ] 8.5 Create `cellar/Browse/PackageDetailView.swift` — every PD1 field, both dependency lists, dependents, deprecation/disabled reasons and dates, install count rendered with its 365-day lower-bound caption; absent count renders "not reported" (PD1–PD5).
-- [ ] 8.6 Create `cellar/Browse/SyncBanner.swift` — first-run/empty-cache banner and `failed(...)` state, with cached results still visible (CS8).
-- [ ] 8.7 Modify `cellar/cellarApp.swift`: drop `Schema([Item.self])` and the `ModelContainer`, own a `CatalogStore`, `.task { await catalog.start() }`. Delete `cellar/Item.swift`.
+- [x] 8.1 Create `cellar/Shell/AppSection.swift` (sections enum) and extract the existing detection summary verbatim into `cellar/Home/BrewDetectionSummary.swift` + `cellar/Home/HomeView.swift`.
+- [x] 8.2 Rewrite `cellar/ContentView.swift` as the `NavigationSplitView` shell (sidebar → Browse list → detail).
+- [x] 8.3 Create `cellar/Browse/BrowseView.swift` + `cellar/Browse/PackageRow.swift` — searchable list bound to `CatalogStore.results`, badging deprecated/disabled (PS4).
+- [x] 8.4 Create `cellar/Browse/CatalogFilterBar.swift` — kind, `excludeDeprecated`, `excludeDisabled` (PS4).
+- [x] 8.5 Create `cellar/Browse/PackageDetailView.swift` — every PD1 field, both dependency lists, dependents, deprecation/disabled reasons and dates, install count rendered with its 365-day lower-bound caption; absent count renders "not reported" (PD1–PD5).
+- [x] 8.6 Create `cellar/Browse/SyncBanner.swift` — first-run/empty-cache banner and `failed(...)` state, with cached results still visible (CS8).
+- [x] 8.7 Modify `cellar/cellarApp.swift`: drop `Schema([Item.self])` and the `ModelContainer`, own a `CatalogStore`, `.task { await catalog.start() }`. Delete `cellar/Item.swift`.
 
 ## Phase 9: Xcode project link (atomic unit)
 
-- [ ] 9.1 Apply all four `cellar.xcodeproj/project.pbxproj` hunks as **one commit**: `PBXBuildFile` `Catalog in Frameworks` (`BC0000010000000000000004`), append to `PBXFrameworksBuildPhase` `BCDBE978…` `files`, append to target `cellar` `packageProductDependencies`, and `XCSwiftPackageProductDependency` `productName = Catalog` (`BC0000010000000000000005`). Never split across PR slices. Rollback: `git checkout main -- cellar.xcodeproj/project.pbxproj`.
-- [ ] 9.2 Modify `cellar.xcodeproj/xcshareddata/xcschemes/CellarCore.xcscheme`: build entry for `Catalog`, testable entry for `CatalogTests`. Verify: `FULL` builds and links.
+- [x] 9.1 Apply all four `cellar.xcodeproj/project.pbxproj` hunks as **one commit**: `PBXBuildFile` `Catalog in Frameworks` (`BC0000010000000000000004`), append to `PBXFrameworksBuildPhase` `BCDBE978…` `files`, append to target `cellar` `packageProductDependencies`, and `XCSwiftPackageProductDependency` `productName = Catalog` (`BC0000010000000000000005`). Never split across PR slices. Rollback: `git checkout main -- cellar.xcodeproj/project.pbxproj`.
+- [x] 9.2 Modify `cellar.xcodeproj/xcshareddata/xcschemes/CellarCore.xcscheme`: build entry for `Catalog`, testable entry for `CatalogTests`. Verify: `FULL` builds and links.
 
 ## Phase 10: Editorial deltas + verification gate
 
