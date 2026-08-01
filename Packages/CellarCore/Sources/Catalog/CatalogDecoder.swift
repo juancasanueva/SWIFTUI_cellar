@@ -138,12 +138,13 @@ public enum CatalogDecoder {
     ) -> CatalogSnapshot {
         // Only formulae can satisfy a formula's dependency edge.
         let formulaNames = Set(formulae.packages.map(\.name))
+        let dependents = invert(formulae.packages, within: formulaNames)
 
         let linkedFormulae = formulae.packages.map { package in
             package.replacingEdges(
                 dependencies: resolve(package.dependencies, against: formulaNames),
                 buildDependencies: resolve(package.buildDependencies, against: formulaNames),
-                dependents: package.dependents
+                dependents: dependents[package.name]?.sorted() ?? []
             )
         }
 
@@ -167,6 +168,32 @@ public enum CatalogDecoder {
         against names: Set<String>
     ) -> [PackageDependency] {
         edges.map { PackageDependency(name: $0.name, isResolvable: names.contains($0.name)) }
+    }
+
+    /// Inverts every declared edge once, at sync time.
+    ///
+    /// "Required by" is not published; it only exists as the transpose of the
+    /// dependency graph. Computing it here costs one pass over ~8,500 records
+    /// per sync instead of a full scan on every detail view (package-detail PD3).
+    ///
+    /// Build and runtime edges both count — ignoring build edges would hide most
+    /// of what a low-level library is actually used by — but they collapse to one
+    /// entry, because "git needs gettext" is a single fact from gettext's side.
+    /// Edges pointing outside the snapshot create nothing at all.
+    private static func invert(
+        _ packages: [CatalogPackage],
+        within names: Set<String>
+    ) -> [String: Set<String>] {
+        var dependents: [String: Set<String>] = [:]
+        dependents.reserveCapacity(names.count)
+
+        for package in packages {
+            for edge in package.dependencies + package.buildDependencies {
+                guard names.contains(edge.name), edge.name != package.name else { continue }
+                dependents[edge.name, default: []].insert(package.name)
+            }
+        }
+        return dependents
     }
 
     // MARK: - Projection

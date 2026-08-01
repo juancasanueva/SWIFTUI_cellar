@@ -114,10 +114,10 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 6: Dependents inversion + detail resolution (PD3, PD1)
 
-- [ ] 6.1 RED `Tests/CatalogTests/DependentsTests.swift`: `git` → `pcre2` runtime edge makes `git` a dependent of `pcre2` (PD3). GREEN: inversion pass in `CatalogDecoder.swift`, run once at sync time.
-- [ ] 6.2 RED: build-only edge (`wget` → `pkgconf`) also produces a dependent (PD3). GREEN.
-- [ ] 6.3 RED: a leaf (cask `iterm2`) reports an empty dependents list, not absent; an edge to a name absent from the snapshot creates no dependents entry and the sync still succeeds (PD3). GREEN.
-- [ ] 6.4 RED `Tests/CatalogTests/DetailTests.swift`: detail lookup for `(formula, nosuchpackage)` returns not-found and throws nothing (PD1). GREEN: `PackageSearchIndex.package(_:)`. Verify: `FAST --filter "Dependents\|Detail"`.
+- [x] 6.1 RED `Tests/CatalogTests/DependentsTests.swift`: `git` → `pcre2` runtime edge makes `git` a dependent of `pcre2` (PD3). GREEN: inversion pass in `CatalogDecoder.swift`, run once at sync time.
+- [x] 6.2 RED: build-only edge (`wget` → `pkgconf`) also produces a dependent (PD3). GREEN.
+- [x] 6.3 RED: a leaf (cask `iterm2`) reports an empty dependents list, not absent; an edge to a name absent from the snapshot creates no dependents entry and the sync still succeeds (PD3). GREEN.
+- [x] 6.4 RED `Tests/CatalogTests/DetailTests.swift`: detail lookup for `(formula, nosuchpackage)` returns not-found and throws nothing (PD1). GREEN: `PackageSearchIndex.package(_:)`. Verify: `FAST --filter "Dependents\|Detail"`.
 
 ## Phase 7: CatalogStore façade (CS7, CS8)
 
