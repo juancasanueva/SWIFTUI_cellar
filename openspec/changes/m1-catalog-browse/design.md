@@ -41,6 +41,10 @@ An 8 ms budget is cheaper than an async hop, and it eliminates out-of-order as-y
 per-keystroke cancellation logic. The p95 test *is* the licence for this decision: if the assertion
 breaks, escalate to the char-bitmask pre-gate, then trigrams, then an off-main hop — in that order.
 
+**Measured at apply time** (`swift test -c release --filter SearchLatency`, 15,500 records,
+1,000 samples): **p95 = 1.02 ms**, median 0.96 ms, max 1.70 ms — roughly 8× headroom under the
+ceiling. No escalation step was needed (task 5.9 discharged without action).
+
 ### D5 — Poll-and-compare scheduling, not a 24 h sleep
 
 The refresh loop sleeps `pollGranularity` (15 min) on an injected `any Clock<Duration>` and compares
