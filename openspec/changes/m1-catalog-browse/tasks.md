@@ -121,9 +121,9 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 7: CatalogStore façade (CS7, CS8)
 
-- [ ] 7.1 RED `Tests/CatalogTests/CatalogStoreTests.swift` (`@MainActor`): `start()` loads a cached snapshot then runs the refresh loop; `isReady` and `syncState` publish transitions (CS8). GREEN: `Sources/Catalog/CatalogStore.swift` `@MainActor @Observable`.
-- [ ] 7.2 RED: setting `query` or `filters` reranks synchronously on the main actor with no async hop and no stale out-of-order result (D4). GREEN.
-- [ ] 7.3 RED: `refreshNow()` joins an in-flight sync (single-flight, mirroring `BrewDetectionStore`) (CS7). GREEN. Verify: `FAST --filter CatalogStore`.
+- [x] 7.1 RED `Tests/CatalogTests/CatalogStoreTests.swift` (`@MainActor`): `start()` loads a cached snapshot then runs the refresh loop; `isReady` and `syncState` publish transitions (CS8). GREEN: `Sources/Catalog/CatalogStore.swift` `@MainActor @Observable`.
+- [x] 7.2 RED: setting `query` or `filters` reranks synchronously on the main actor with no async hop and no stale out-of-order result (D4). GREEN.
+- [x] 7.3 RED: `refreshNow()` joins an in-flight sync (single-flight, mirroring `BrewDetectionStore`) (CS7). GREEN. Verify: `FAST --filter CatalogStore`.
 
 **Unit 2 gate**: `FAST` all green **and** `REL` green.
 
