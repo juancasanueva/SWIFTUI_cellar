@@ -45,7 +45,7 @@ struct PackageTextTests {
     func yieldsASCIIBytes() {
         let bytes = PackageText.normalize("115浏览器 Browser")
         #expect(bytes.allSatisfy { $0 == 0x20 || ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x7A) })
-        #expect(String(decoding: bytes, as: UTF8.self) == "115 browser")
+        #expect(PackageText.normalizedString("115浏览器 Browser") == "115 browser")
     }
 
     @Test("An empty or separator-only string normalises to nothing")

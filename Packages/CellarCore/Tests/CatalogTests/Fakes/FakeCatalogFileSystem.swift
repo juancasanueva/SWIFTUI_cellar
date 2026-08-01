@@ -14,7 +14,7 @@ final class FakeCatalogFileSystem: CatalogFileSystem, Sendable {
         case createDirectory(String)
         case write(String)
         case replace(destination: String, staged: String)
-        case move(from: String, to: String)
+        case move(source: String, destination: String)
         case remove(String)
     }
 
@@ -37,7 +37,7 @@ final class FakeCatalogFileSystem: CatalogFileSystem, Sendable {
             $0.operations.compactMap { operation in
                 switch operation {
                 case .replace(let destination, _): destination
-                case .move(_, let to): to
+                case .move(_, let destination): destination
                 default: nil
                 }
             }
@@ -109,7 +109,7 @@ final class FakeCatalogFileSystem: CatalogFileSystem, Sendable {
 
     func moveItem(at source: URL, to destination: URL) throws {
         try state.withLock {
-            $0.operations.append(.move(from: source.path, to: destination.path))
+            $0.operations.append(.move(source: source.path, destination: destination.path))
             guard let data = $0.files[source.path] else {
                 throw CocoaError(.fileNoSuchFile)
             }

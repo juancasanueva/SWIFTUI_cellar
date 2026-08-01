@@ -144,7 +144,7 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 10: Editorial deltas + verification gate
 
-- [ ] 10.1 Apply the `brew-execution` MODIFIED requirement (four terminal outcomes) to `openspec/specs/brew-execution/spec.md`, scenarios carried over verbatim.
-- [ ] 10.2 Apply the `brew-detection` MODIFIED requirement (`configuredPathMissing` vs `invalid(notExecutable)` THEN block) to `openspec/specs/brew-detection/spec.md`.
-- [ ] 10.3 Manual apply-time integration checklist: real cold sync against the live endpoints, observed peak RSS, and the recorded `curl -sI` validator result from 0.3. Record outcomes in the apply report.
-- [ ] 10.4 Final gate: `FAST` green, `REL` green, `FULL` green, `swiftlint` clean on new files. Record every command and its exact result.
+- [x] 10.1 Apply the `brew-execution` MODIFIED requirement (four terminal outcomes) to `openspec/specs/brew-execution/spec.md`, scenarios carried over verbatim.
+- [x] 10.2 Apply the `brew-detection` MODIFIED requirement (`configuredPathMissing` vs `invalid(notExecutable)` THEN block) to `openspec/specs/brew-detection/spec.md`.
+- [x] 10.3 Manual apply-time integration checklist: real cold sync against the live endpoints, observed peak RSS, and the recorded `curl -sI` validator result from 0.3. Record outcomes in the apply report.
+- [x] 10.4 Final gate: `FAST` green, `REL` green, `FULL` green, `swiftlint` clean on new files. Record every command and its exact result.

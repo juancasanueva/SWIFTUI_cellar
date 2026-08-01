@@ -91,39 +91,13 @@ public struct HTTPCatalogSource: CatalogSource {
             throw CatalogSyncError.offline
         }
 
-        guard let http = response as? HTTPURLResponse else {
-            try? FileManager.default.removeItem(at: downloaded)
-            throw CatalogSyncError.malformedPayload
-        }
-
-        // Checked before the temp file is touched: a 304 from `download(for:)`
-        // yields an empty file, which would decode as an empty catalog.
-        if http.statusCode == 304 {
-            try? FileManager.default.removeItem(at: downloaded)
+        guard let http = try classify(response, downloaded: downloaded) else {
             return .notModified
         }
 
-        guard (200...299).contains(http.statusCode) else {
-            try? FileManager.default.removeItem(at: downloaded)
-            throw CatalogSyncError.httpStatus(http.statusCode)
-        }
-
-        let byteCount = (try? FileManager.default
-            .attributesOfItem(atPath: downloaded.path)[.size] as? Int) ?? 0
-        guard byteCount <= byteLimit else {
-            try? FileManager.default.removeItem(at: downloaded)
-            throw CatalogSyncError.malformedPayload
-        }
-
+        let byteCount = try size(of: downloaded)
         let destination = directory.appendingPathComponent("\(resource.rawValue).json")
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: downloaded, to: destination)
-        } catch {
-            try? FileManager.default.removeItem(at: downloaded)
-            throw CatalogSyncError.persistence
-        }
+        try stage(downloaded, at: destination, in: directory)
 
         return .downloaded(
             FetchedPayload(
@@ -136,5 +110,47 @@ public struct HTTPCatalogSource: CatalogSource {
                 byteCount: byteCount
             )
         )
+    }
+
+    /// The response when there is a body worth keeping, or `nil` for a 304.
+    ///
+    /// The status is judged before the temp file is opened: a 304 from
+    /// `download(for:)` yields an *empty* file, which would decode as an empty
+    /// catalog and wipe a perfectly good snapshot (design D7).
+    private func classify(_ response: URLResponse, downloaded: URL) throws -> HTTPURLResponse? {
+        guard let http = response as? HTTPURLResponse else {
+            try? FileManager.default.removeItem(at: downloaded)
+            throw CatalogSyncError.malformedPayload
+        }
+        if http.statusCode == 304 {
+            try? FileManager.default.removeItem(at: downloaded)
+            return nil
+        }
+        guard (200...299).contains(http.statusCode) else {
+            try? FileManager.default.removeItem(at: downloaded)
+            throw CatalogSyncError.httpStatus(http.statusCode)
+        }
+        return http
+    }
+
+    private func size(of downloaded: URL) throws -> Int {
+        let byteCount = (try? FileManager.default
+            .attributesOfItem(atPath: downloaded.path)[.size] as? Int) ?? 0
+        guard byteCount <= byteLimit else {
+            try? FileManager.default.removeItem(at: downloaded)
+            throw CatalogSyncError.malformedPayload
+        }
+        return byteCount
+    }
+
+    private func stage(_ downloaded: URL, at destination: URL, in directory: URL) throws {
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: downloaded, to: destination)
+        } catch {
+            try? FileManager.default.removeItem(at: downloaded)
+            throw CatalogSyncError.persistence
+        }
     }
 }

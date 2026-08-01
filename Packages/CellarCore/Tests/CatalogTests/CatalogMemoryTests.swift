@@ -128,13 +128,13 @@ enum MemoryProbe {
 
     /// Samples the footprint from a plain thread, because the work being
     /// measured is a synchronous CPU burst that would starve a cooperative pool.
-    final class Sampler: Sendable {
-        private struct State {
-            var peak: UInt64 = 0
-            var running = false
-        }
+    struct SamplerState {
+        var peak: UInt64 = 0
+        var running = false
+    }
 
-        private let state: Mutex<State> = Mutex(State())
+    final class Sampler: Sendable {
+        private let state: Mutex<SamplerState> = Mutex(SamplerState())
 
         func start() {
             state.withLock {

@@ -46,6 +46,9 @@ public enum PackageText {
 
     /// The normalised form as a `String`, for assertions and display.
     public static func normalizedString(_ input: String) -> String {
+        // `normalize` guarantees ASCII bytes, so this decode cannot fail and a
+        // failable initialiser would only add an optional nobody can hit.
+        // swiftlint:disable:next optional_data_string_conversion
         String(decoding: normalize(input), as: UTF8.self)
     }
 

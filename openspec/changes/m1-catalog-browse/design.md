@@ -78,6 +78,13 @@ before the temp file is touched (a 304 from `download(for:)` yields an empty fil
    temp dir (no repo cost), records `phys_footprint` via `task_info(TASK_VM_INFO)` around the decode,
    and asserts **peak delta ≤ 300 MB** and **post-decode retained delta ≤ 40 MB**.
 
+**Live measurement (task 10.3, 2026-08-01)** — a real cold sync against `formulae.brew.sh` through
+`HTTPCatalogSource`, sampled every 3 ms: **peak `phys_footprint` delta 177.2 MB** for the full
+47.8 MB of payload (16,200 records, 0 skipped) in **2.56 s**, staging purged, `catalog.json`
+7,114,578 B. The immediately following revalidation sync completed in **0.158 s** with no body
+transferred. Note the origin emits **weak** ETags (`W/"6a6e37f1-fff2a7"`); replaying them verbatim
+still produced 304s.
+
 ## Data Flow
 
     CatalogSource ──download(for:)──▶ staging/*.json ──mappedIfSafe──▶ CatalogDecoder

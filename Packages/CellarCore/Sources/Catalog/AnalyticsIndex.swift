@@ -67,31 +67,36 @@ public struct AnalyticsIndex: Sendable, Equatable {
         return Int(digits)
     }
 
-    // MARK: - Wire
+}
 
-    private struct AnalyticsPayload: Decodable {
-        let items: [Item]
+// MARK: - Wire
 
-        struct Item: Decodable {
-            let formula: String?
-            let cask: String?
-            let count: String
+/// The ranked-endpoint envelope. Everything outside `items` is header material
+/// the join does not need.
+private struct AnalyticsPayload: Decodable {
+    let items: [AnalyticsItem]
+}
 
-            func name(for kind: PackageKind) -> String? {
-                switch kind {
-                case .formula: formula
-                case .cask: cask
-                }
-            }
+/// One ranked entry. Which of `formula` and `cask` is populated depends on the
+/// endpoint, so the caller supplies the kind rather than the payload declaring it.
+private struct AnalyticsItem: Decodable {
+    let formula: String?
+    let cask: String?
+    let count: String
 
-            init(from decoder: any Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                formula = try container.decodeIfPresent(String.self, forKey: .formula)
-                cask = try container.decodeIfPresent(String.self, forKey: .cask)
-                count = try container.decodeIfPresent(String.self, forKey: .count) ?? ""
-            }
-
-            enum CodingKeys: String, CodingKey { case formula, cask, count }
+    func name(for kind: PackageKind) -> String? {
+        switch kind {
+        case .formula: formula
+        case .cask: cask
         }
     }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        formula = try container.decodeIfPresent(String.self, forKey: .formula)
+        cask = try container.decodeIfPresent(String.self, forKey: .cask)
+        count = try container.decodeIfPresent(String.self, forKey: .count) ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey { case formula, cask, count }
 }

@@ -239,11 +239,11 @@ struct SyncEngineTests {
         #expect(snapshot.packages.count == 2)
 
         let finalStatus = await harness.engine.status
-        guard case .succeeded(let at) = finalStatus else {
+        guard case .succeeded(let instant) = finalStatus else {
             Issue.record("expected succeeded, got \(finalStatus)")
             return
         }
-        #expect(at == harness.time.now)
+        #expect(instant == harness.time.now)
     }
 
     @Test("A failed first sync is observable and throws nothing")

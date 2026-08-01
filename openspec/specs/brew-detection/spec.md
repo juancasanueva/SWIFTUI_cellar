@@ -109,10 +109,9 @@ see transitions.
 
 - GIVEN the current state is `custom` at a configured path
 - WHEN that path no longer exists and detection re-evaluates
-- THEN observers receive a transition off `custom` to `configuredPathMissing`,
-  `invalid(notExecutable)`, or `absent`
-- AND a path that has vanished entirely is reported as `configuredPathMissing`, distinct from a
-  path that still exists but is not executable
+- THEN observers receive a transition off `custom` to `configuredPathMissing`
+- AND a path that still exists but is not executable is instead reported as
+  `invalid(notExecutable)`, distinct from `configuredPathMissing`
 
 ## Provenance
 
@@ -125,3 +124,7 @@ see transitions.
 - Open documentation nit (verify S1, not resolved at archive): the spec vocabulary
   `native` / `rosettaCarryOver` corresponds to the code's `BrewPrefix.appleSilicon` /
   `.intelCarryOver`. Semantically identical; unify in a later change.
+- **Editorial reconciliation (change `m1-catalog-browse`, 2026-08-01)**: the "Disappearing configured
+  path" scenario asserted a three-way outcome enumeration in its THEN block alongside the AND clause
+  that disambiguates it. Amended so the THEN block states the single outcome and the AND clause
+  contrasts it with `invalid(notExecutable)`. No behavioural change.

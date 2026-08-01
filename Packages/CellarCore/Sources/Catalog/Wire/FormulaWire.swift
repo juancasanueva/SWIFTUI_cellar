@@ -27,15 +27,10 @@ struct FormulaWire: Decodable, Sendable {
     let disableReason: String?
     let disableDate: String?
 
+    /// Synthesised on purpose: an optional stored property already decodes as
+    /// "absent or null", which is exactly the tolerance this needs.
     struct Versions: Decodable, Sendable {
         let stable: String?
-
-        init(from decoder: any Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            stable = try container.decodeIfPresent(String.self, forKey: .stable)
-        }
-
-        enum CodingKeys: String, CodingKey { case stable }
     }
 
     init(from decoder: any Decoder) throws {

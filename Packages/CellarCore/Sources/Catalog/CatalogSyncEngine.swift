@@ -120,44 +120,11 @@ public actor CatalogSyncEngine {
             let staging = try store.prepareStaging()
             defer { store.purgeStaging() }
 
-            var sources = previousState?.sources ?? [:]
-            var decoded: [PackageKind: DecodedResource] = [:]
-            var skipped = 0
-            var changed = false
-
-            for resource in CatalogResource.payloadResources {
-                let stored = previousState?.sources[resource]?.validators
-                let outcome = try await fetch(
-                    resource,
-                    validators: stored.flatMap { $0.isEmpty ? nil : $0 },
-                    into: staging
-                )
-
-                switch outcome {
-                case .notModified:
-                    // Revalidated, not re-downloaded: the payload stands, only
-                    // its freshness moves (catalog-sync CS2).
-                    sources[resource]?.downloadedAt = timeSource.now
-
-                case .downloaded(let payload):
-                    changed = true
-                    publish(.decoding)
-                    let resource$ = try await CatalogDecoder.decode(resource, at: payload.fileURL)
-                    decoded[resource.kind] = resource$
-                    skipped += resource$.skippedRecordCount
-                    sources[resource] = SourceState(
-                        validators: payload.validators,
-                        downloadedAt: timeSource.now,
-                        recordCount: resource$.packages.count,
-                        byteCount: payload.byteCount
-                    )
-                }
-                try checkCancellation()
-            }
-
+            let acquired = try await acquirePayloads(previousState: previousState, into: staging)
+            let sources = acquired.sources
             let now = timeSource.now
 
-            guard changed || previousSnapshot == nil else {
+            guard acquired.changed || previousSnapshot == nil else {
                 // Nothing moved. Writing the snapshot again would be 4 MB of
                 // pointless I/O; the sidecar still has to record the new
                 // `downloadedAt` or the next launch re-checks immediately.
@@ -178,8 +145,8 @@ public actor CatalogSyncEngine {
             try checkCancellation()
 
             let snapshot = CatalogDecoder.link(
-                formulae: decoded[.formula] ?? carriedOver(.formula, from: previousSnapshot),
-                casks: decoded[.cask] ?? carriedOver(.cask, from: previousSnapshot),
+                formulae: acquired.decoded[.formula] ?? carriedOver(.formula, from: previousSnapshot),
+                casks: acquired.decoded[.cask] ?? carriedOver(.cask, from: previousSnapshot),
                 analytics: analytics,
                 generatedAt: now
             )
@@ -188,7 +155,7 @@ public actor CatalogSyncEngine {
                 state: CatalogState(
                     sources: sources,
                     lastSuccessAt: now,
-                    skippedRecordCount: skipped
+                    skippedRecordCount: acquired.skippedRecordCount
                 )
             )
             return succeed(with: snapshot, at: now)
@@ -197,6 +164,58 @@ public actor CatalogSyncEngine {
             publish(.failed(failure))
             return .failure(failure)
         }
+    }
+
+    /// What one pass over the two payload resources produced.
+    private struct AcquiredPayloads {
+        var sources: [CatalogResource: SourceState]
+        var decoded: [PackageKind: DecodedResource] = [:]
+        var skippedRecordCount = 0
+        /// False when every resource revalidated as unchanged.
+        var changed = false
+    }
+
+    /// Fetches and decodes each payload resource in turn.
+    ///
+    /// Sequential on purpose: two mapped 30 MB payloads alive at once would
+    /// double the decode peak for no benefit (design D8).
+    private func acquirePayloads(
+        previousState: CatalogState?,
+        into staging: URL
+    ) async throws -> AcquiredPayloads {
+        var acquired = AcquiredPayloads(sources: previousState?.sources ?? [:])
+
+        for resource in CatalogResource.payloadResources {
+            let stored = previousState?.sources[resource]?.validators
+            let outcome = try await fetch(
+                resource,
+                validators: stored.flatMap { $0.isEmpty ? nil : $0 },
+                into: staging
+            )
+
+            switch outcome {
+            case .notModified:
+                // Revalidated, not re-downloaded: the payload stands, only its
+                // freshness moves (catalog-sync CS2).
+                acquired.sources[resource]?.downloadedAt = timeSource.now
+
+            case .downloaded(let payload):
+                acquired.changed = true
+                publish(.decoding)
+                let projected = try await CatalogDecoder.decode(resource, at: payload.fileURL)
+                acquired.decoded[resource.kind] = projected
+                acquired.skippedRecordCount += projected.skippedRecordCount
+                acquired.sources[resource] = SourceState(
+                    validators: payload.validators,
+                    downloadedAt: timeSource.now,
+                    recordCount: projected.packages.count,
+                    byteCount: payload.byteCount
+                )
+            }
+            try checkCancellation()
+        }
+
+        return acquired
     }
 
     /// A resource the origin says is unchanged still has to appear in the new

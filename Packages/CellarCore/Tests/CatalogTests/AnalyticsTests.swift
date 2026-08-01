@@ -77,9 +77,9 @@ struct AnalyticsTests {
             generatedAt: Date(timeIntervalSince1970: 0)
         )
 
-        let gh = try #require(snapshot.packages.first { $0.name == "gh" })
+        let ghFormula = try #require(snapshot.packages.first { $0.name == "gh" })
         let obscure = try #require(snapshot.packages.first { $0.name == "obscure" })
-        #expect(gh.installCount365d == 2_809_017)
+        #expect(ghFormula.installCount365d == 2_809_017)
         #expect(obscure.installCount365d == nil)
         #expect(obscure.installCount == nil)
     }
@@ -120,9 +120,9 @@ struct AnalyticsTests {
         let result = await harness.engine.sync()
 
         let snapshot = try #require(result.value)
-        let gh = try #require(snapshot.packages.first { $0.name == "gh" })
+        let ghFormula = try #require(snapshot.packages.first { $0.name == "gh" })
         let obscure = try #require(snapshot.packages.first { $0.name == "obscure" })
-        #expect(gh.installCount365d == 2_809_017)
+        #expect(ghFormula.installCount365d == 2_809_017)
         #expect(obscure.installCount365d == nil)
     }
 
@@ -130,8 +130,8 @@ struct AnalyticsTests {
 
     @Test("A formula count is published as a 365-day installs-on-request lower bound")
     func formulaCountCarriesItsSemantics() throws {
-        let gh = CatalogPackage.stub(kind: .formula, name: "gh", installCount365d: 2_808_879)
-        let count = try #require(gh.installCount)
+        let ghFormula = CatalogPackage.stub(kind: .formula, name: "gh", installCount365d: 2_808_879)
+        let count = try #require(ghFormula.installCount)
 
         #expect(count.value == 2_808_879)
         #expect(count.windowDays == 365)
