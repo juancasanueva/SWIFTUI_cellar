@@ -21,6 +21,7 @@ struct SearchIndexTests {
         #expect(index.normalizedDescription(at: 1) == PackageText.normalize("Café-friendly editor"))
 
         #expect(index.search("openssl").map(\.id.name) == ["openssl@3"])
+        #expect(index.search("OpenSSL").map(\.id.name) == ["openssl@3"])
         #expect(index.search("cafe").map(\.id.name) == ["visual-studio-code"])
     }
 

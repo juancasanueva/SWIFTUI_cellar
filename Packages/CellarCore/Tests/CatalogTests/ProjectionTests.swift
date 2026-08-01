@@ -133,7 +133,7 @@ struct ProjectionTests {
 
         let pcre2 = try #require(snapshot.packages.first { $0.name == "pcre2" })
         // No transitive edge of pcre2 leaked into git's own lists.
-        #expect(pcre2.dependencies.isEmpty == false || pcre2.dependencies.isEmpty)
+        #expect(pcre2.dependencies.isEmpty)
         #expect(Set(git.dependencies.map(\.name)).isDisjoint(with: ["libedit", "bzip2"]))
     }
 
