@@ -76,20 +76,20 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 3: Sync engine (CS1, CS2, CS4, CS7, CS8)
 
-- [ ] 3.1 Add `Tests/CatalogTests/Fakes/FakeCatalogSource.swift` — scripted `CatalogFetchOutcome` per resource, records every request and its validators. GREEN with `Sources/Catalog/CatalogSource.swift` protocol.
-- [ ] 3.2 RED `Tests/CatalogTests/SyncEngineTests.swift`: sync completes with brew absent, no brew process spawned; exactly one request per source kind, transport never touched directly (CS1). GREEN: `Sources/Catalog/CatalogSyncEngine.swift` actor skeleton + staging lifecycle.
-- [ ] 3.3 RED: first sync (no persisted state) sends neither `If-Modified-Since` nor `If-None-Match` (CS2). GREEN.
-- [ ] 3.4 RED: both sources unchanged ⇒ no body read, no new snapshot, previous snapshot still served, `downloadedAt` advanced (CS2). GREEN: check `statusCode == 304` before touching the temp file (D7).
-- [ ] 3.5 RED: changed payload with validator `V2` persists a new snapshot recording `V2`; `lastModified` round-trips as the **raw header string**, never through a `DateFormatter` (CS2/D7). GREEN.
-- [ ] 3.6 GREEN-only: `Sources/Catalog/CatalogSource.swift` `HTTPCatalogSource` sets `configuration.urlCache = nil` **and** `request.cachePolicy = .reloadIgnoringLocalCacheData` (D7), uses `download(for:)` (CS1 streaming), and enforces the 128 MB `payloadTooLarge` cap.
-- [ ] 3.7 RED: transport error with a 15,000-record cache ⇒ `.offline`, cache still answers queries (CS4). GREEN.
-- [ ] 3.8 RED: `503` retried twice then succeeds (3 requests); `404` requested once and reports `.httpStatus(404)`; `429` is retried (CS4). GREEN: `Sources/Catalog/CatalogRefreshPolicy.swift` retry/backoff values.
-- [ ] 3.9 RED: non-JSON body ⇒ `.malformedPayload`, persisted snapshot unchanged (CS4). GREEN.
-- [ ] 3.10 RED: cancellation mid-sync reports `.cancelled` and purges the staging directory; staging is also purged on success and on failure. GREEN.
-- [ ] 3.11 RED `Tests/CatalogTests/SchedulerTests.swift` on `TestClock` + `FakeTimeSource`: snapshot 2 h old ⇒ no request on load; 30 h old ⇒ background sync starts while cached records keep being served, replaced only on success (CS7). GREEN: poll-and-compare loop at 15 min `pollGranularity` (D5).
-- [ ] 3.12 RED: manual refresh with a 2 h-old snapshot issues a sync; a second manual refresh during an in-flight sync joins it rather than starting a second (CS7, single-flight). GREEN.
-- [ ] 3.13 RED: wake-from-sleep — advancing the fake time source by 30 h across a paused clock triggers exactly one sync (D5). GREEN.
-- [ ] 3.14 RED: cold launch with no cache resolves immediately to zero results without blocking, status is `downloading` or `decoding`; on success status becomes `succeeded(at:)` and results are non-zero; a failed first sync reports `failed(.offline)` and throws nothing (CS8). GREEN: status publication through every phase. Verify: `FAST --filter "SyncEngine\|Scheduler"`.
+- [x] 3.1 Add `Tests/CatalogTests/Fakes/FakeCatalogSource.swift` — scripted `CatalogFetchOutcome` per resource, records every request and its validators. GREEN with `Sources/Catalog/CatalogSource.swift` protocol.
+- [x] 3.2 RED `Tests/CatalogTests/SyncEngineTests.swift`: sync completes with brew absent, no brew process spawned; exactly one request per source kind, transport never touched directly (CS1). GREEN: `Sources/Catalog/CatalogSyncEngine.swift` actor skeleton + staging lifecycle.
+- [x] 3.3 RED: first sync (no persisted state) sends neither `If-Modified-Since` nor `If-None-Match` (CS2). GREEN.
+- [x] 3.4 RED: both sources unchanged ⇒ no body read, no new snapshot, previous snapshot still served, `downloadedAt` advanced (CS2). GREEN: check `statusCode == 304` before touching the temp file (D7).
+- [x] 3.5 RED: changed payload with validator `V2` persists a new snapshot recording `V2`; `lastModified` round-trips as the **raw header string**, never through a `DateFormatter` (CS2/D7). GREEN.
+- [x] 3.6 GREEN-only: `Sources/Catalog/CatalogSource.swift` `HTTPCatalogSource` sets `configuration.urlCache = nil` **and** `request.cachePolicy = .reloadIgnoringLocalCacheData` (D7), uses `download(for:)` (CS1 streaming), and enforces the 128 MB `payloadTooLarge` cap.
+- [x] 3.7 RED: transport error with a 15,000-record cache ⇒ `.offline`, cache still answers queries (CS4). GREEN.
+- [x] 3.8 RED: `503` retried twice then succeeds (3 requests); `404` requested once and reports `.httpStatus(404)`; `429` is retried (CS4). GREEN: `Sources/Catalog/CatalogRefreshPolicy.swift` retry/backoff values.
+- [x] 3.9 RED: non-JSON body ⇒ `.malformedPayload`, persisted snapshot unchanged (CS4). GREEN.
+- [x] 3.10 RED: cancellation mid-sync reports `.cancelled` and purges the staging directory; staging is also purged on success and on failure. GREEN.
+- [x] 3.11 RED `Tests/CatalogTests/SchedulerTests.swift` on `TestClock` + `FakeTimeSource`: snapshot 2 h old ⇒ no request on load; 30 h old ⇒ background sync starts while cached records keep being served, replaced only on success (CS7). GREEN: poll-and-compare loop at 15 min `pollGranularity` (D5).
+- [x] 3.12 RED: manual refresh with a 2 h-old snapshot issues a sync; a second manual refresh during an in-flight sync joins it rather than starting a second (CS7, single-flight). GREEN.
+- [x] 3.13 RED: wake-from-sleep — advancing the fake time source by 30 h across a paused clock triggers exactly one sync (D5). GREEN.
+- [x] 3.14 RED: cold launch with no cache resolves immediately to zero results without blocking, status is `downloading` or `decoding`; on success status becomes `succeeded(at:)` and results are non-zero; a failed first sync reports `failed(.offline)` and throws nothing (CS8). GREEN: status publication through every phase. Verify: `FAST --filter "SyncEngine\|Scheduler"`.
 
 ## Phase 4: Analytics join (CS9, PD5)
 

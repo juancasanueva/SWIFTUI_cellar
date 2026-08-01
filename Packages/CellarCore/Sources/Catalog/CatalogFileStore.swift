@@ -66,6 +66,19 @@ public struct CatalogFileStore: Sendable {
         }
     }
 
+    /// Publishes only the sidecar.
+    ///
+    /// The path a fully revalidated sync takes: nothing about the 4 MB snapshot
+    /// changed, but its freshness did (catalog-sync CS2).
+    public func persistState(_ state: CatalogState) throws {
+        do {
+            try fileSystem.createDirectory(at: directory)
+            try publish(try encoder.encode(state), to: stateURL, stagedAs: "catalog-state.json.new")
+        } catch {
+            throw CatalogSyncError.persistence
+        }
+    }
+
     private func publish(_ data: Data, to destination: URL, stagedAs name: String) throws {
         let staged = directory.appendingPathComponent(name)
         try fileSystem.write(data, to: staged)
