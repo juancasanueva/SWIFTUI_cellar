@@ -1,0 +1,206 @@
+{
+ "name": "wget",
+ "full_name": "wget",
+ "tap": "homebrew/core",
+ "oldnames": [],
+ "aliases": [],
+ "versioned_formulae": [],
+ "desc": "Internet file retriever",
+ "license": "GPL-3.0-or-later",
+ "homepage": "https://www.gnu.org/software/wget/",
+ "versions": {
+  "stable": "1.25.0",
+  "head": "HEAD",
+  "bottle": true
+ },
+ "urls": {
+  "stable": {
+   "url": "https://ftpmirror.gnu.org/gnu/wget/wget-1.25.0.tar.gz",
+   "tag": null,
+   "revision": null,
+   "using": null,
+   "checksum": "766e48423e79359ea31e41db9e5c289675947a7fcf2efdcedb726ac9d0da3784"
+  },
+  "head": {
+   "url": "https://git.savannah.gnu.org/git/wget.git",
+   "branch": "master",
+   "using": null
+  }
+ },
+ "patches": [],
+ "revision": 0,
+ "version_scheme": 0,
+ "compatibility_version": 1,
+ "autobump": true,
+ "no_autobump_message": null,
+ "skip_livecheck": false,
+ "bottle": {
+  "stable": {
+   "rebuild": 2,
+   "root_url": "https://ghcr.io/v2/homebrew/core",
+   "files": {
+    "arm64_tahoe": {
+     "cellar": "/opt/homebrew/Cellar",
+     "url": "https://ghcr.io/v2/homebrew/core/wget/blobs/sha256:27e15ca14afaaa7c2016bba7a098452cf66d1d8a74330ed6195a0b6ae7a4dada",
+     "sha256": "27e15ca14afaaa7c2016bba7a098452cf66d1d8a74330ed6195a0b6ae7a4dada"
+    },
+    "arm64_sequoia": {
+     "cellar": "/opt/homebrew/Cellar",
+     "url": "https://ghcr.io/v2/homebrew/core/wget/blobs/sha256:aa19cf5de262d5b67631af8288cce233a075c251c68050a1e73699314a911e7b",
+     "sha256": "aa19cf5de262d5b67631af8288cce233a075c251c68050a1e73699314a911e7b"
+    },
+    "arm64_sonoma": {
+     "cellar": "/opt/homebrew/Cellar",
+     "url": "https://ghcr.io/v2/homebrew/core/wget/blobs/sha256:ebac9bd5e93603af8d3dcf3cfed9924f773e0fa5f8a827c12c69ad07cc80a6de",
+     "sha256": "ebac9bd5e93603af8d3dcf3cfed9924f773e0fa5f8a827c12c69ad07cc80a6de"
+    },
+    "sonoma": {
+     "cellar": "/usr/local/Cellar",
+     "url": "https://ghcr.io/v2/homebrew/core/wget/blobs/sha256:32e76ca0ef4b26d7022dd1cad7621e8cd9bccca7677b7d4646d30d2fa009f413",
+     "sha256": "32e76ca0ef4b26d7022dd1cad7621e8cd9bccca7677b7d4646d30d2fa009f413"
+    },
+    "arm64_linux": {
+     "cellar": "/home/linuxbrew/.linuxbrew/Cellar",
+     "url": "https://ghcr.io/v2/homebrew/core/wget/blobs/sha256:f6e698ad339b9d9398f9769ad46ffa999809e9e07ab0e6d9a1537ec136dbaf01",
+     "sha256": "f6e698ad339b9d9398f9769ad46ffa999809e9e07ab0e6d9a1537ec136dbaf01"
+    },
+    "x86_64_linux": {
+     "cellar": "/home/linuxbrew/.linuxbrew/Cellar",
+     "url": "https://ghcr.io/v2/homebrew/core/wget/blobs/sha256:8f58b44e7482ee12e910df582cf43a4dadb808e4db70bfc760aaf258942652a5",
+     "sha256": "8f58b44e7482ee12e910df582cf43a4dadb808e4db70bfc760aaf258942652a5"
+    }
+   }
+  }
+ },
+ "pour_bottle_only_if": null,
+ "keg_only": false,
+ "keg_only_reason": null,
+ "options": [],
+ "build_dependencies": [
+  "pkgconf"
+ ],
+ "dependencies": [
+  "libidn2",
+  "libpsl",
+  "openssl@3",
+  "gettext",
+  "libunistring"
+ ],
+ "test_dependencies": [],
+ "recommended_dependencies": [],
+ "optional_dependencies": [],
+ "uses_from_macos": [],
+ "uses_from_macos_bounds": [],
+ "requirements": [],
+ "conflicts_with": [],
+ "conflicts_with_reasons": [],
+ "link_overwrite": [],
+ "caveats": null,
+ "installed": [],
+ "linked_keg": null,
+ "pinned": false,
+ "outdated": false,
+ "deprecated": false,
+ "deprecation_date": null,
+ "deprecation_reason": null,
+ "deprecation_replacement_formula": null,
+ "deprecation_replacement_cask": null,
+ "deprecate_args": null,
+ "disabled": false,
+ "disable_date": null,
+ "disable_reason": null,
+ "disable_replacement_formula": null,
+ "disable_replacement_cask": null,
+ "disable_args": null,
+ "post_install_steps": [],
+ "post_install_defined": false,
+ "service": null,
+ "tap_git_head": "efaaa1bcd4e3547562a40024931c615d60382bcf",
+ "ruby_source_path": "Formula/w/wget.rb",
+ "ruby_source_checksum": {
+  "sha256": "425a3e77651a0727104aa9c057dd61c9fd207d34191e4ead6392e71369b3f307"
+ },
+ "head_dependencies": {
+  "build_dependencies": [
+   "autoconf",
+   "automake",
+   "xz",
+   "pkgconf"
+  ],
+  "dependencies": [
+   "libidn2",
+   "libpsl",
+   "openssl@3",
+   "gettext",
+   "libunistring"
+  ],
+  "test_dependencies": [],
+  "recommended_dependencies": [],
+  "optional_dependencies": [],
+  "uses_from_macos": [],
+  "uses_from_macos_bounds": []
+ },
+ "variations": {
+  "x86_64_linux": {
+   "dependencies": [
+    "libidn2",
+    "libpsl",
+    "openssl@3",
+    "util-linux",
+    "zlib-ng-compat"
+   ],
+   "head_dependencies": {
+    "build_dependencies": [
+     "autoconf",
+     "automake",
+     "xz",
+     "pkgconf"
+    ],
+    "dependencies": [
+     "libidn2",
+     "libpsl",
+     "openssl@3",
+     "util-linux",
+     "zlib-ng-compat"
+    ],
+    "test_dependencies": [],
+    "recommended_dependencies": [],
+    "optional_dependencies": [],
+    "uses_from_macos": [],
+    "uses_from_macos_bounds": []
+   }
+  },
+  "arm64_linux": {
+   "dependencies": [
+    "libidn2",
+    "libpsl",
+    "openssl@3",
+    "util-linux",
+    "zlib-ng-compat"
+   ],
+   "head_dependencies": {
+    "build_dependencies": [
+     "autoconf",
+     "automake",
+     "xz",
+     "pkgconf"
+    ],
+    "dependencies": [
+     "libidn2",
+     "libpsl",
+     "openssl@3",
+     "util-linux",
+     "zlib-ng-compat"
+    ],
+    "test_dependencies": [],
+    "recommended_dependencies": [],
+    "optional_dependencies": [],
+    "uses_from_macos": [],
+    "uses_from_macos_bounds": []
+   }
+  }
+ },
+ "executables": [
+  "wget"
+ ]
+}
