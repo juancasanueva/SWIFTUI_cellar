@@ -2,35 +2,63 @@ import Foundation
 
 /// Runs `brew` commands and publishes their output as it arrives.
 ///
-/// The runner owns process lifetime and stream plumbing; it deliberately owns
-/// no parsing or presentation. Every subprocess reaches the outside world
-/// through the injected `ProcessLaunching` seam, so the whole actor is testable
-/// without spawning anything.
+/// The runner owns process lifetime, serialization, and stream plumbing; it
+/// deliberately owns no parsing or presentation. Every subprocess reaches the
+/// outside world through the injected `ProcessLaunching` seam, so the whole
+/// actor is testable without spawning anything, and every grace period runs on
+/// the injected `Clock`, so cancellation is testable without waiting.
 public actor BrewRunner {
     private struct OperationRecord {
-        let process: any LaunchedProcess
+        /// Held for the operation's lifetime on purpose: an `AsyncStream` that
+        /// nobody retains terminates as `.cancelled`, which would silently
+        /// cancel an operation whose caller only cares about `exit()`.
+        let lines: AsyncStream<LogLine>
+        let continuation: AsyncStream<LogLine>.Continuation
+        var process: (any LaunchedProcess)?
         /// Invariant I3: the pump is unstructured but owned by this record and
         /// cancelled when the operation ends.
-        let pump: Task<Void, Never>
+        var pump: Task<Void, Never>?
+        /// Completes only once the operation has a terminal result.
+        var completion: Task<Void, Never>?
         var resolvedExit: BrewExit?
+        var fault: BrewProcessError?
+        /// Set before a signal is delivered, so the terminal result can be
+        /// reported as cancelled rather than as a plain signal death.
+        var cancellationSignal: Int32?
+        var isCancelling = false
     }
 
     private let installation: BrewInstallation
     private let launcher: any ProcessLaunching
+    private let policy: CancellationPolicy
+    private let clock: any Clock<Duration>
     private var operations: [UUID: OperationRecord] = [:]
+    /// The gate task of the most recently submitted mutation (design D5).
+    private var mutationTail: Task<Void, Never>?
 
     public init(
         installation: BrewInstallation,
-        launcher: any ProcessLaunching = SystemProcessLauncher()
+        launcher: any ProcessLaunching = SystemProcessLauncher(),
+        policy: CancellationPolicy = .default,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.installation = installation
         self.launcher = launcher
+        self.policy = policy
+        self.clock = clock
     }
 
-    /// How many operations the runner is still tracking. Test-facing.
+    /// How many operations the runner is tracking. Test-facing.
     var activeOperationCount: Int { operations.count }
 
-    /// Spawns `command` and returns a handle to its output.
+    // MARK: - Starting work
+
+    /// Starts `command` and returns a handle to its output.
+    ///
+    /// A `.read` spawns immediately, so an unusable executable is reported to
+    /// the caller straight away. A `.mutate` joins the FIFO gate and spawns when
+    /// its turn comes, which is what makes a queued mutation cancellable before
+    /// it ever touches Homebrew.
     public func start(_ command: BrewCommand) async throws(BrewProcessError) -> BrewOperation {
         let spec = ProcessSpec(
             executableURL: installation.executableURL,
@@ -38,23 +66,127 @@ public actor BrewRunner {
             environment: BrewEnvironment.current()
         )
 
+        let id = UUID()
+        let (lines, continuation) = AsyncStream<LogLine>.makeStream()
+
+        switch command.kind {
+        case .read:
+            let process: any LaunchedProcess
+            do {
+                process = try launcher.launch(spec)
+            } catch {
+                // Nothing is recorded before the launch attempt, so a failed
+                // spawn leaves no half-built operation behind.
+                throw Self.mapLaunchFailure(error, executableURL: installation.executableURL)
+            }
+            install(id: id, process: process, lines: lines, continuation: continuation)
+
+        case .mutate:
+            enqueueMutation(id: id, spec: spec, lines: lines, continuation: continuation)
+        }
+
+        return BrewOperation(id: id, lines: lines, runner: self)
+    }
+
+    /// Puts a mutation at the end of the FIFO gate.
+    ///
+    /// Invariant I2: the tail is read **and** replaced synchronously, before
+    /// this method's first `await` — in fact it never suspends at all — so actor
+    /// reentrancy cannot reorder the queue no matter how the callers interleave.
+    private func enqueueMutation(
+        id: UUID,
+        spec: ProcessSpec,
+        lines: AsyncStream<LogLine>,
+        continuation: AsyncStream<LogLine>.Continuation
+    ) {
+        let predecessor = mutationTail
+        operations[id] = OperationRecord(lines: lines, continuation: continuation)
+
+        let gate = Task { [self] in
+            await predecessor?.value
+            await runQueuedMutation(id: id, spec: spec)
+        }
+        mutationTail = gate
+        operations[id]?.completion = gate
+
+        installConsumerCancellation(for: id, on: continuation)
+    }
+
+    /// Runs one gated mutation and holds the gate until it is terminal.
+    private func runQueuedMutation(id: UUID, spec: ProcessSpec) async {
+        guard let record = operations[id], record.resolvedExit == nil else {
+            // Cancelled while queued: never spawn anything.
+            return
+        }
+
         let process: any LaunchedProcess
         do {
             process = try launcher.launch(spec)
         } catch {
-            // Nothing was recorded before the launch attempt, so a failure
-            // leaves no half-built operation behind.
-            throw Self.mapLaunchFailure(error, executableURL: installation.executableURL)
+            operations[id]?.fault = Self.mapLaunchFailure(
+                error,
+                executableURL: installation.executableURL
+            )
+            operations[id]?.resolvedExit = BrewExit(status: 127, reason: .exited)
+            record.continuation.finish()
+            return
         }
 
-        let (lines, continuation) = AsyncStream<LogLine>.makeStream()
-        let pump = Self.startPump(reading: process, into: continuation)
-
-        let id = UUID()
-        operations[id] = OperationRecord(process: process, pump: pump)
-
-        return BrewOperation(id: id, lines: lines, runner: self)
+        let pump = Self.startPump(reading: process, into: record.continuation)
+        operations[id]?.process = process
+        operations[id]?.pump = pump
+        await drive(id)
     }
+
+    /// Records a launched process and starts pumping its output.
+    private func install(
+        id: UUID,
+        process: any LaunchedProcess,
+        lines: AsyncStream<LogLine>,
+        continuation: AsyncStream<LogLine>.Continuation
+    ) {
+        let pump = Self.startPump(reading: process, into: continuation)
+        operations[id] = OperationRecord(
+            lines: lines,
+            continuation: continuation,
+            process: process,
+            pump: pump
+        )
+        // Safe to assign after the fact: this method never suspends, so the
+        // task body cannot observe the record before the assignment lands.
+        operations[id]?.completion = Task { await self.drive(id) }
+
+        installConsumerCancellation(for: id, on: continuation)
+    }
+
+    /// Cancelling the task consuming `lines` cancels the operation itself.
+    private func installConsumerCancellation(
+        for id: UUID,
+        on continuation: AsyncStream<LogLine>.Continuation
+    ) {
+        continuation.onTermination = { [weak self] termination in
+            guard case .cancelled = termination, let self else { return }
+            Task { await self.cancel(id) }
+        }
+    }
+
+    /// Waits for the operation to finish and stores its terminal result.
+    private func drive(_ id: UUID) async {
+        guard let pump = operations[id]?.pump, let process = operations[id]?.process else { return }
+
+        // Awaiting the pump first is what guarantees the ordering contract: the
+        // result is never delivered before the output is observable.
+        await pump.value
+        guard operations[id]?.resolvedExit == nil else { return }
+
+        let exit = await process.waitForTermination()
+        // Computed before the assignment: writing through `operations[id]` while
+        // the right-hand side also reads it would overlap exclusive access.
+        let result = terminalResult(exit, for: id)
+        operations[id]?.resolvedExit = result
+    }
+
+    // MARK: - Results
 
     /// The terminal result of `id`, once every line it produced is observable.
     ///
@@ -65,14 +197,102 @@ public actor BrewRunner {
         }
         if let resolved = record.resolvedExit { return resolved }
 
-        // Awaiting the pump first is what guarantees the ordering contract:
-        // the result is never delivered before the output is observable.
-        await record.pump.value
-        let exit = await record.process.waitForTermination()
-
-        operations[id]?.resolvedExit = exit
-        return exit
+        await record.completion?.value
+        return operations[id]?.resolvedExit ?? BrewExit(status: 0, reason: .exited)
     }
+
+    /// An out-of-band fault, if the operation hit one. `nil` for every normal
+    /// run, including a cancelled one.
+    func fault(of id: UUID) -> BrewProcessError? {
+        operations[id]?.fault
+    }
+
+    /// Reports a run Cellar cancelled as cancelled, whatever the OS said.
+    private func terminalResult(_ exit: BrewExit, for id: UUID) -> BrewExit {
+        guard let signal = operations[id]?.cancellationSignal else { return exit }
+        return BrewExit(status: exit.status, reason: .cancelled(signal: signal))
+    }
+
+    // MARK: - Cancellation
+
+    /// Stops `id`, escalating `SIGINT` → `SIGTERM` and never further (D4).
+    public func cancel(_ id: BrewOperation.ID) async {
+        guard let record = operations[id],
+              record.resolvedExit == nil,
+              record.isCancelling == false
+        else { return }
+        operations[id]?.isCancelling = true
+
+        guard let process = record.process, let pump = record.pump else {
+            // Still queued behind another mutation: resolve it here so it never
+            // spawns, and let the gate hand over to whoever is next.
+            operations[id]?.resolvedExit = BrewExit(
+                status: 128 + SIGINT,
+                reason: .cancelled(signal: SIGINT)
+            )
+            record.continuation.finish()
+            return
+        }
+
+        if await escalate(.interrupt, to: process, id: id, pump: pump, grace: policy.interruptGrace) {
+            return
+        }
+        if await escalate(.terminate, to: process, id: id, pump: pump, grace: policy.terminateGrace) {
+            return
+        }
+
+        // The process ignored both signals. Stop consuming it, report the fault,
+        // and leave it alone: SIGKILL is not an option (D4).
+        pump.cancel()
+        operations[id]?.fault = .cancelledUnresponsive(after: policy.totalGrace)
+        operations[id]?.resolvedExit = BrewExit(
+            status: 128 + SIGTERM,
+            reason: .cancelled(signal: SIGTERM)
+        )
+    }
+
+    /// Delivers one signal and reports whether the process stopped within
+    /// `grace`.
+    private func escalate(
+        _ signal: ProcessSignal,
+        to process: any LaunchedProcess,
+        id: UUID,
+        pump: Task<Void, Never>,
+        grace: Duration
+    ) async -> Bool {
+        operations[id]?.cancellationSignal = signal.posixValue
+        try? process.send(signal)
+        return await completes(pump, within: grace)
+    }
+
+    /// Races the output pump against the grace period on the injected clock.
+    ///
+    /// The pump finishing is the signal that the process is gone: both the real
+    /// and the fake process end their output stream exactly at termination.
+    private func completes(_ pump: Task<Void, Never>, within grace: Duration) async -> Bool {
+        let (outcomes, continuation) = AsyncStream<Bool>.makeStream()
+        let clock = self.clock
+
+        let watcher = Task.detached {
+            await pump.value
+            continuation.yield(true)
+            continuation.finish()
+        }
+        let timer = Task.detached {
+            try? await clock.sleep(for: grace)
+            continuation.yield(false)
+            continuation.finish()
+        }
+        defer {
+            watcher.cancel()
+            timer.cancel()
+        }
+
+        for await outcome in outcomes { return outcome }
+        return false
+    }
+
+    // MARK: - Plumbing
 
     /// Drains raw chunks into whole, tagged, sequenced lines (design D2).
     private static func startPump(
@@ -137,5 +357,15 @@ public struct BrewOperation: Sendable, Identifiable {
     /// The terminal result, available only after every line is observable.
     public func exit() async -> BrewExit {
         await runner.exit(of: id)
+    }
+
+    /// An out-of-band fault, if one occurred. `nil` for every normal run.
+    public func fault() async -> BrewProcessError? {
+        await runner.fault(of: id)
+    }
+
+    /// Stops the operation, escalating `SIGINT` → `SIGTERM`.
+    public func cancel() async {
+        await runner.cancel(id)
     }
 }

@@ -65,6 +65,22 @@ struct SystemProcessTests {
         #expect(exit == BrewExit(status: 1, reason: .exited))
     }
 
+    @Test("Cancelling a real /bin/sleep delivers SIGINT and reports cancelled", .timeLimit(.minutes(1)))
+    func realCancellationDeliversInterrupt() async throws {
+        let runner = BrewRunner(
+            installation: installation(at: "/bin/sleep"),
+            launcher: SystemProcessLauncher()
+        )
+
+        let operation = try await runner.start(.read(["30"]))
+        await operation.cancel()
+        let exit = await operation.exit()
+
+        #expect(exit.reason == .cancelled(signal: SIGINT))
+        #expect(exit.isCancelled)
+        #expect(await operation.fault() == nil)
+    }
+
     @Test("Spawning a path that does not exist reports executableUnavailable")
     func missingBinaryReportsUnavailable() async {
         let missing = "/opt/homebrew/bin/definitely-not-a-real-binary"

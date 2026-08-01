@@ -73,16 +73,16 @@ obtain an explicit `size:exception` before starting, or the orchestrator must re
 
 ## Phase 2b: Cancellation escalation and FIFO gate
 
-- [ ] 2.16 RED (spec: cooperative cancel) fake exits during `interruptGrace` ⇒ recorded signals == `[.interrupt]`, outcome `.cancelled(SIGINT)`, never a failure. Use an injected test `Clock` — no wall-clock sleeps.
-- [ ] 2.17 RED (spec: escalation) fake ignores SIGINT ⇒ signals == `[.interrupt, .terminate]` after the grace advance, outcome cancelled.
-- [ ] 2.18 RED (design D4) fake ignores both ⇒ `BrewProcessError.cancelledUnresponsive(after:)`; no SIGKILL is ever sent.
-- [ ] 2.19 RED cancelling the CONSUMING Swift task triggers the identical escalation path.
-- [ ] 2.20 GREEN: `CancellationPolicy` (.default 3s/2s) + escalation in `BrewRunner.cancel(_:)` with the injected clock. Verify: `FAST`.
-- [ ] 2.21 RED (spec: FIFO) 3 `.mutate` commands never overlap and start in submission order (fakes gated on continuations).
-- [ ] 2.22 RED (spec: concurrent reads) a `.read` starts and completes while a mutation is in flight.
-- [ ] 2.23 RED (spec: queued cancel) cancelling queued mutation B spawns no process and B reports cancelled.
-- [ ] 2.24 GREEN: FIFO gate in `BrewRunner` — tail assigned synchronously before the first `await` (D5, I2); document I1–I4 as code comments. Verify: `FAST`.
-- [ ] 2.25 Integration: launch `/bin/sleep 30` via `SystemProcessLauncher`, cancel, assert `.cancelled(SIGINT)` within a generous deadline (never skipped).
+- [x] 2.16 RED (spec: cooperative cancel) fake exits during `interruptGrace` ⇒ recorded signals == `[.interrupt]`, outcome `.cancelled(SIGINT)`, never a failure. Use an injected test `Clock` — no wall-clock sleeps.
+- [x] 2.17 RED (spec: escalation) fake ignores SIGINT ⇒ signals == `[.interrupt, .terminate]` after the grace advance, outcome cancelled.
+- [x] 2.18 RED (design D4) fake ignores both ⇒ `BrewProcessError.cancelledUnresponsive(after:)`; no SIGKILL is ever sent.
+- [x] 2.19 RED cancelling the CONSUMING Swift task triggers the identical escalation path.
+- [x] 2.20 GREEN: `CancellationPolicy` (.default 3s/2s) + escalation in `BrewRunner.cancel(_:)` with the injected clock. Verify: `FAST`.
+- [x] 2.21 RED (spec: FIFO) 3 `.mutate` commands never overlap and start in submission order (fakes gated on continuations).
+- [x] 2.22 RED (spec: concurrent reads) a `.read` starts and completes while a mutation is in flight.
+- [x] 2.23 RED (spec: queued cancel) cancelling queued mutation B spawns no process and B reports cancelled.
+- [x] 2.24 GREEN: FIFO gate in `BrewRunner` — tail assigned synchronously before the first `await` (D5, I2); document I1–I4 as code comments. Verify: `FAST`.
+- [x] 2.25 Integration: launch `/bin/sleep 30` via `SystemProcessLauncher`, cancel, assert `.cancelled(SIGINT)` within a generous deadline (never skipped).
 
 ## Phase 3: Brew detection
 

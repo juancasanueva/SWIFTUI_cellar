@@ -24,6 +24,7 @@ struct ArgumentCompositionTests {
         let runner = BrewRunner(installation: .fixture, launcher: launcher)
 
         _ = try await runner.start(.mutate(["upgrade", "ripgrep"]))
+        await launcher.waitForLaunches(atLeast: 1)
 
         let spec = try #require(launcher.recordedSpecs.first)
         #expect(spec.executableURL == BrewInstallation.fixture.executableURL)
@@ -38,6 +39,7 @@ struct ArgumentCompositionTests {
         let runner = BrewRunner(installation: .fixture, launcher: launcher)
 
         _ = try await runner.start(.mutate(arguments))
+        await launcher.waitForLaunches(atLeast: 1)
 
         #expect(launcher.recordedSpecs.first?.arguments == arguments)
     }
