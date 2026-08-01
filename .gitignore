@@ -1,0 +1,15 @@
+# Local AI runtime state
+.atl/
+.codegraph/
+
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
