@@ -29,6 +29,30 @@ struct CatalogStoreTests {
         #expect(store.package(PackageID(kind: .cask, name: "iterm2"))?.displayName == "Iterm2")
     }
 
+    @Test("A second start() is a no-op while the first is running")
+    func secondStartDoesNotDoubleConsume() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+
+        let store = CatalogStore(engine: harness.engine)
+        let first = Task { await store.start() }
+        defer { first.cancel() }
+        await poll { store.isReady }
+
+        // A second window's `.task` calls start() again. The engine's event
+        // stream has exactly one iterator, so this must return without starting
+        // a second consumer or refresh loop — not trap.
+        await store.start()
+
+        #expect(store.isReady)
+        // Only the first start's refresh loop ran: each payload was asked for
+        // exactly once.
+        await poll { harness.source.requests(for: .formulae).count == 1 }
+        #expect(harness.source.requests(for: .formulae).count == 1)
+        #expect(harness.source.requests(for: .casks).count == 1)
+    }
+
     @Test("A cold launch is ready immediately with zero results and a live status")
     func coldLaunchIsNonBlocking() async throws {
         let harness = try SyncHarness()

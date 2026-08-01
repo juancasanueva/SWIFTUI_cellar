@@ -45,6 +45,7 @@ public final class CatalogStore {
     @ObservationIgnored private let engine: CatalogSyncEngine
     @ObservationIgnored private let resultLimit: Int
     @ObservationIgnored private var index = PackageSearchIndex()
+    @ObservationIgnored private var isRunning = false
 
     public init(engine: CatalogSyncEngine, resultLimit: Int = 200) {
         self.engine = engine
@@ -87,6 +88,13 @@ public final class CatalogStore {
     /// the refresh loop when the scene goes away — no `deinit` bookkeeping, no
     /// detached task outliving its window.
     public func start() async {
+        // The engine's event stream supports exactly one iterator; a second
+        // window's `.task` must not start a second one (or a second refresh
+        // loop). The first caller owns both until its scene is torn down.
+        guard !isRunning else { return }
+        isRunning = true
+        defer { isRunning = false }
+
         await loadCache()
 
         await withTaskGroup(of: Void.self) { group in

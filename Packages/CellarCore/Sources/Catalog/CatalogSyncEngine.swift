@@ -120,7 +120,14 @@ public actor CatalogSyncEngine {
             let staging = try store.prepareStaging()
             defer { store.purgeStaging() }
 
-            let acquired = try await acquirePayloads(previousState: previousState, into: staging)
+            let acquired = try await acquirePayloads(
+                previousState: previousState,
+                // Validators certify the payload behind `previousSnapshot`. If that
+                // snapshot cannot be read, a 304 would leave nothing to rebuild
+                // from, so the fetch must be unconditional (catalog-sync CS6).
+                revalidatable: previousSnapshot != nil,
+                into: staging
+            )
             let sources = acquired.sources
             let now = timeSource.now
 
@@ -181,12 +188,13 @@ public actor CatalogSyncEngine {
     /// double the decode peak for no benefit (design D8).
     private func acquirePayloads(
         previousState: CatalogState?,
+        revalidatable: Bool,
         into staging: URL
     ) async throws -> AcquiredPayloads {
         var acquired = AcquiredPayloads(sources: previousState?.sources ?? [:])
 
         for resource in CatalogResource.payloadResources {
-            let stored = previousState?.sources[resource]?.validators
+            let stored = revalidatable ? previousState?.sources[resource]?.validators : nil
             let outcome = try await fetch(
                 resource,
                 validators: stored.flatMap { $0.isEmpty ? nil : $0 },

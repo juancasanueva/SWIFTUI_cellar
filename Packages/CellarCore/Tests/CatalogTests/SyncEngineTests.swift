@@ -111,6 +111,37 @@ struct SyncEngineTests {
         #expect(snapshot.packages.map(\.name).sorted() == ["curl", "iterm2", "wget"])
     }
 
+    @Test("A readable sidecar with an unreadable snapshot forces an unconditional re-download")
+    func unreadableSnapshotDisablesRevalidation() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(
+            .payload(Payload.formulae(["wget"]), validators: ConditionalValidators(etag: "V1")),
+            for: .formulae
+        )
+        harness.source.script(
+            .payload(Payload.casks(["iterm2"]), validators: ConditionalValidators(etag: "C1")),
+            for: .casks
+        )
+        _ = await harness.engine.sync()
+
+        // The sidecar survives but the snapshot it certifies does not — the
+        // crash-window state a 304 cannot rebuild from.
+        try Data("not json".utf8).write(to: harness.store.snapshotURL)
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+
+        let result = await harness.engine.sync()
+
+        // The stored validators must NOT go out: with no readable snapshot a
+        // revalidated 304 would persist an empty catalog as success.
+        #expect(harness.source.requests(for: .formulae).last?.validators == nil)
+        #expect(harness.source.requests(for: .casks).last?.validators == nil)
+        let snapshot = try #require(result.value)
+        #expect(snapshot.packages.map(\.name).sorted() == ["iterm2", "wget"])
+        let persisted = try #require(try harness.store.loadSnapshot())
+        #expect(persisted.packages.isEmpty == false)
+    }
+
     // MARK: - Failure never erases the cache (CS4)
 
     @Test("A transport error keeps a large cached catalog answering")
