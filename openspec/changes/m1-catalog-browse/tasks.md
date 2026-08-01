@@ -68,11 +68,11 @@ Feature-branch-chain bases if chosen: PR 1 → `feature/m1-catalog-browse`; PR 2
 
 ## Phase 2: Persistence (CS3, CS6)
 
-- [ ] 2.1 RED `Tests/CatalogTests/FileStoreTests.swift`: a write failing midway leaves the previous snapshot readable and reports `.persistence` (CS3). GREEN: `Sources/Catalog/CatalogFileSystem.swift` (protocol + `DefaultCatalogFileSystem`) and `Sources/Catalog/CatalogFileStore.swift` using `replaceItemAt`.
-- [ ] 2.2 RED: `FakeCatalogFileSystem` records write order — `catalog.json` MUST be replaced before `catalog-state.json` (D3). GREEN. Add `Tests/CatalogTests/Fakes/FakeCatalogFileSystem.swift` with injectable write/replace failures.
-- [ ] 2.3 RED: state sidecar round-trips per source `schemaVersion`, validators (`etag`, `lastModified`), `downloadedAt`, `recordCount` for 7,000 formulae / 8,500 casks (CS6). GREEN — rename design's `fetchedAt` to `downloadedAt` to match the spec.
-- [ ] 2.4 RED: a sidecar with a higher `schemaVersion` reports no usable cache, throws nothing, and schedules a full sync (CS6). GREEN: schema-version gate.
-- [ ] 2.5 RED: a package present in the old snapshot but absent from the new payload disappears from lookup and search; no tombstones or merging (CS3). GREEN: full-replace persist path. Verify: `FAST --filter FileStore`.
+- [x] 2.1 RED `Tests/CatalogTests/FileStoreTests.swift`: a write failing midway leaves the previous snapshot readable and reports `.persistence` (CS3). GREEN: `Sources/Catalog/CatalogFileSystem.swift` (protocol + `DefaultCatalogFileSystem`) and `Sources/Catalog/CatalogFileStore.swift` using `replaceItemAt`.
+- [x] 2.2 RED: `FakeCatalogFileSystem` records write order — `catalog.json` MUST be replaced before `catalog-state.json` (D3). GREEN. Add `Tests/CatalogTests/Fakes/FakeCatalogFileSystem.swift` with injectable write/replace failures.
+- [x] 2.3 RED: state sidecar round-trips per source `schemaVersion`, validators (`etag`, `lastModified`), `downloadedAt`, `recordCount` for 7,000 formulae / 8,500 casks (CS6). GREEN — rename design's `fetchedAt` to `downloadedAt` to match the spec.
+- [x] 2.4 RED: a sidecar with a higher `schemaVersion` reports no usable cache, throws nothing, and schedules a full sync (CS6). GREEN: schema-version gate.
+- [x] 2.5 RED: a package present in the old snapshot but absent from the new payload disappears from lookup and search; no tombstones or merging (CS3). GREEN: full-replace persist path. Verify: `FAST --filter FileStore`.
 
 ## Phase 3: Sync engine (CS1, CS2, CS4, CS7, CS8)
 
