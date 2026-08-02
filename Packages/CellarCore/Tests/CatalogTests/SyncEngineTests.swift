@@ -449,6 +449,40 @@ struct SyncEngineTests {
         #expect(FileManager.default.fileExists(atPath: harness.store.snapshotURL.path) == false)
     }
 
+    @Test("Recovery from a poisoned snapshot is unconditional")
+    func poisonedSnapshotForcesAnUnconditionalFetch() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(
+            .payload(Payload.formulae(["wget"]), validators: ConditionalValidators(etag: "V1")),
+            for: .formulae
+        )
+        harness.source.script(
+            .payload(Payload.casks(["iterm2"]), validators: ConditionalValidators(etag: "C1")),
+            for: .casks
+        )
+        _ = await harness.engine.sync()
+        // Genuine validators for both sources are on disk...
+        let state = try #require(try harness.store.loadState())
+        #expect(state.sources[.formulae]?.validators.etag == "V1")
+        #expect(state.sources[.casks]?.validators.etag == "C1")
+
+        // ...certifying a snapshot that is now degenerate.
+        try harness.poisonSnapshot()
+        harness.source.script(.payload(Payload.formulae(["wget", "curl"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+
+        let result = await harness.engine.sync()
+
+        // No conditional request: replaying the validators would be answered 304
+        // and leave the machine on the poisoned catalog forever. This falls out
+        // of the read guard through the existing CS6 `revalidatable` path — no
+        // branch was added for it.
+        #expect(harness.source.requests(for: .formulae).last?.validators == nil)
+        #expect(harness.source.requests(for: .casks).last?.validators == nil)
+        #expect(result.value?.packages.map(\.name).sorted() == ["curl", "iterm2", "wget"])
+        #expect(try harness.store.loadSnapshot()?.packages.count == 3)
+    }
+
     // MARK: - Staging lifecycle
 
     @Test("Cancellation mid-sync reports cancelled and purges staging")
@@ -565,6 +599,37 @@ struct SyncHarness {
             timeSource: time,
             policy: policy
         )
+    }
+
+    /// A second engine over the same directory, source and clocks.
+    ///
+    /// The event stream buffers, so a store attached to an engine that already
+    /// synced would replay that snapshot. A launch has to start clean.
+    func freshEngine(policy: CatalogRefreshPolicy = CatalogRefreshPolicy(backoff: .zero))
+        -> CatalogSyncEngine {
+        CatalogSyncEngine(
+            store: store,
+            source: source,
+            clock: clock,
+            timeSource: time,
+            policy: policy
+        )
+    }
+
+    /// Overwrites `catalog.json` with a well-formed, current-schema snapshot
+    /// holding zero packages, leaving the sidecar and its validators intact.
+    ///
+    /// The exact on-disk state defect #7 describes: readable, certified by
+    /// stored validators, and useless.
+    func poisonSnapshot() throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        let poisoned = CatalogSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            skippedRecordCount: 0,
+            packages: []
+        )
+        try encoder.encode(poisoned).write(to: store.snapshotURL)
     }
 }
 

@@ -279,6 +279,60 @@ struct CatalogStoreTests {
         #expect(store.results.map(\.name).sorted() == ["curl", "iterm2", "wget"])
     }
 
+    @Test("A poisoned snapshot on disk launches as an ordinary cold start")
+    func poisonedSnapshotLaunchesAsAColdStart() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        _ = await harness.engine.sync()
+        try harness.poisonSnapshot()
+        harness.source.script(.payload(Payload.formulae(["wget", "curl"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        // Past the shelf life, so the launch actually refreshes.
+        harness.time.advance(by: 90_000)
+
+        // Each engine is a fresh one over the same directory: this is a *launch*,
+        // so it must not inherit the buffered events of the sync that set the
+        // fixture up.
+        //
+        // The load is exercised on its own first, with no refresh loop racing
+        // it, so "the poisoned snapshot was not served" is an observation rather
+        // than a coin flip.
+        let loading = CatalogStore(engine: harness.freshEngine())
+        await loading.loadCache()
+        #expect(loading.isReady)
+        #expect(loading.packageCount == 0)
+        #expect(loading.results.isEmpty)
+        #expect(loading.syncStatus == .idle, "the discarded snapshot was reported")
+
+        let store = CatalogStore(engine: harness.freshEngine())
+        let statuses = Recorder()
+        let running = Task { await store.start() }
+        defer { running.cancel() }
+        let watcher = Task { @MainActor in
+            var last = store.syncStatus
+            statuses.record("\(last)")
+            while store.results.isEmpty {
+                if store.syncStatus != last {
+                    last = store.syncStatus
+                    statuses.record("\(last)")
+                }
+                await Task.yield()
+            }
+        }
+
+        await poll { store.results.count == 3 }
+        await watcher.value
+
+        #expect(store.results.map(\.name).sorted() == ["curl", "iterm2", "wget"])
+        // Silent, per Q1: the ordinary progression, never a failure raised for
+        // the snapshot that was thrown away.
+        #expect(
+            statuses.labels.contains { $0.hasPrefix("failed") } == false,
+            "cold launch over a poisoned snapshot reported \(statuses.labels)"
+        )
+    }
+
     // MARK: - Reranking (D4)
 
     @Test("Setting the query reranks synchronously, with no await in between")
