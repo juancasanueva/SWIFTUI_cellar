@@ -26,20 +26,32 @@ public final class OperationCenter {
     public private(set) var items: [ActivityItem] = []
 
     /// The confirmation currently awaiting an answer, if any.
-    public private(set) var pendingConfirmation: ConfirmationRequest?
+    ///
+    /// `internal(set)` rather than `private(set)` only because the confirmation
+    /// surface lives one file over, in `OperationCenterBulk.swift`. No surface
+    /// outside this module can write it.
+    public internal(set) var pendingConfirmation: ConfirmationRequest?
 
     @ObservationIgnored private let gate: InstalledMutationGate?
+    /// Where a terminal outcome's durable record goes.
+    ///
+    /// Defaulted to the no-op so an app with no store configured behaves exactly
+    /// as it did before history existed — and so reverting the feature is one
+    /// injection away (installation-history IH7 sc1).
+    @ObservationIgnored private let history: any HistoryRecording
     @ObservationIgnored private let launcherFactory: (BrewInstallation) -> any ProcessLaunching
     @ObservationIgnored private var runner: BrewRunner?
     @ObservationIgnored private var installation: BrewInstallation?
 
     public init(
         gate: InstalledMutationGate? = nil,
+        history: any HistoryRecording = NoHistoryRecording(),
         launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
             SystemProcessLauncher()
         }
     ) {
         self.gate = gate
+        self.history = history
         self.launcherFactory = launcherFactory
     }
 
@@ -132,9 +144,16 @@ public final class OperationCenter {
     /// Never throws and never blocks. With no runner attached the item comes
     /// back already terminal and already explained, because a silent no-op
     /// would leave the user watching for something that will never happen.
+    ///
+    /// `versions` is the transition Cellar **intends**, captured here rather
+    /// than observed at the terminal: the durable record then says what was
+    /// attempted, and its outcome says whether it happened (design D7).
     @discardableResult
-    public func submit(_ command: MutationCommand) -> ActivityItem {
-        let item = ActivityItem(id: UUID(), command: command)
+    public func submit(
+        _ command: MutationCommand,
+        versions: VersionTransition? = nil
+    ) -> ActivityItem {
+        let item = ActivityItem(id: UUID(), command: command, versions: versions)
         items.append(item)
 
         guard let runner else {
@@ -157,36 +176,6 @@ public final class OperationCenter {
             await self?.run(command, for: item, on: runner)
         }
         return item
-    }
-
-    /// Expands a selection into one ordinary upgrade per package.
-    ///
-    /// There is no `upgradeSelected` command: the fan-out happens here, at the
-    /// call site, so every selected package gets its own queue item, log,
-    /// copy-command, cancel and terminal outcome — and a mid-batch failure
-    /// attributes to exactly one package (design D1, user ruling 2026-08-02).
-    @discardableResult
-    public func submitUpgrades(for ids: [PackageID]) -> [ActivityItem] {
-        ids.compactMap { id in
-            MutationCommand.naming(id, MutationCommand.upgrade).map { submit($0) }
-        }
-    }
-
-    /// The same, over everything the inventory reports as outdated.
-    ///
-    /// The outdated set comes from `InstalledInventory` rather than being
-    /// re-derived, so the exclusion of self-updating casks agrees with the
-    /// inventory's own derivation (M2-1 II4/II5). Pinned packages are excluded
-    /// too and **no unpin is submitted on their behalf**: brew's own defaults
-    /// skip them, and defeating that would upgrade something the user
-    /// explicitly held back (package-mutation PM2).
-    @discardableResult
-    public func submitUpgradesForOutdated(in inventory: InstalledInventory) -> [ActivityItem] {
-        submitUpgrades(
-            for: inventory.packages
-                .filter { $0.isOutdated && !$0.isPinned }
-                .map(\.id)
-        )
     }
 
     // MARK: - One operation, start to finish
@@ -236,17 +225,35 @@ public final class OperationCenter {
         finish(item, with: .classify(exit: exit, fault: fault, log: item.log))
     }
 
-    /// Settles an item exactly once and pays the re-snapshot it owes.
+    /// Settles an item exactly once, pays the re-snapshot it owes, and records
+    /// the one durable entry that outcome earns.
     ///
     /// Idempotent on purpose: a cancel and a terminal exit can race, and paying
     /// the gate twice for one operation would produce 2N re-snapshots for a
-    /// batch of N.
+    /// batch of N. That same idempotence is what makes "exactly one history
+    /// entry per terminal outcome" true **by construction** rather than by
+    /// discipline (operation-activity OA6, design D7).
     private func finish(_ item: ActivityItem, with outcome: MutationOutcome) {
         guard item.outcome == nil else { return }
         item.settle(outcome)
         // Every terminal outcome owes exactly one re-snapshot — success, both
         // typed failures, a plain failure and a cancellation alike (PM6).
         gate?.end()
+        // Last, and deliberately: recording is a **side effect** of the outcome,
+        // never a precondition of it. The protocol is synchronous and
+        // non-throwing, so an absent or failing recorder cannot change what this
+        // operation reported or delay the re-snapshot it already paid (IH7).
+        history.record(
+            HistoryDraft(
+                id: item.id,
+                date: Date(),
+                packageID: item.packageID,
+                verb: item.command.verb,
+                versions: item.versions,
+                outcome: outcome,
+                argv: item.arguments
+            )
+        )
     }
 
     // MARK: - Cancel
@@ -280,46 +287,6 @@ public final class OperationCenter {
         if !item.isStartInFlight {
             finish(item, with: .cancelled)
         }
-    }
-
-    // MARK: - Confirmation (design D6)
-
-    /// A destructive command waiting for an explicit yes.
-    ///
-    /// It carries the **typed** command, so confirming submits exactly what was
-    /// shown: there is no path from the rendered string back to argv.
-    public struct ConfirmationRequest: Identifiable, Sendable, Equatable {
-        public let id: UUID
-        public let command: MutationCommand
-
-        /// The exact command that will run, character for character.
-        public var displayCommand: String { command.displayCommand }
-    }
-
-    /// Asks for confirmation, when this command needs one.
-    ///
-    /// Returns `nil` for everything that does not — install, reinstall,
-    /// upgrade, upgrade-all, pin and unpin — so a caller can treat "no request"
-    /// as "submit directly" without restating the rule (product Q2).
-    public func request(_ command: MutationCommand) -> ConfirmationRequest? {
-        guard command.requiresConfirmation else { return nil }
-        let request = ConfirmationRequest(id: UUID(), command: command)
-        pendingConfirmation = request
-        return request
-    }
-
-    /// Submits the confirmed command. Nothing was enqueued before this point.
-    @discardableResult
-    public func confirm(_ request: ConfirmationRequest) -> ActivityItem? {
-        guard pendingConfirmation == request else { return nil }
-        pendingConfirmation = nil
-        return submit(request.command)
-    }
-
-    /// Spawns nothing, enqueues nothing, leaves the inventory untouched.
-    public func decline(_ request: ConfirmationRequest) {
-        guard pendingConfirmation == request else { return }
-        pendingConfirmation = nil
     }
 
     // MARK: - Summary (operation-activity OA5)

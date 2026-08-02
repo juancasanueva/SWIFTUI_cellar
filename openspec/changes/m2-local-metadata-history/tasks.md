@@ -342,26 +342,26 @@ sight. This is what keeps Phase 8's views rule-free.
 
 ## Phase 6: `OperationCenter` — history funnel, bulk fan-out, one derived set (D7, D8 — OA6, PM3, PM8, IH1–IH2, IH7, II14) — ≈ 650 lines
 
-- [ ] 6.1 RED `Tests/BrewClientTests/OperationCenterHistoryTests.swift` (OA6 sc1–2; IH1 sc1–2): an
+- [x] 6.1 RED `Tests/BrewClientTests/OperationCenterHistoryTests.swift` (OA6 sc1–2; IH1 sc1–2): an
   install for the cask `iterm2` exiting 0 submits **exactly one** draft carrying the cask identity,
   the install verb, the successful outcome and the argv `install --cask iterm2`; a mutation exiting
   non-zero, one ending in the typed **busy** failure and one **cancelled** while running each submit
   exactly one draft **naming its own outcome**, not a generic one.
-- [ ] 6.2 RED `OperationCenterHistoryTests` (OA6 sc3; IH1 sc3): a pending mutation and a running
+- [x] 6.2 RED `OperationCenterHistoryTests` (OA6 sc3; IH1 sc3): a pending mutation and a running
   mutation each have **no** draft submitted; nothing is written before the terminal outcome.
-- [ ] 6.3 RED `OperationCenterHistoryTests` (OA6 sc4; IH7 sc1–2): with **no** recorder configured,
+- [x] 6.3 RED `OperationCenterHistoryTests` (OA6 sc4; IH7 sc1–2): with **no** recorder configured,
   and separately with a recorder that **fails on every write**, the operation's reported outcome and
   log are identical to a working-recorder run, **exactly one** inventory re-snapshot is forced, and
   nothing is thrown into the operation's path.
-- [ ] 6.4 GREEN `Sources/BrewClient/OperationCenter.swift`: a `HistoryRecording` injection defaulting
+- [x] 6.4 GREEN `Sources/BrewClient/OperationCenter.swift`: a `HistoryRecording` injection defaulting
   to `NoHistoryRecording`, with `record(_:)` called from `finish(_:with:)` — already the single,
   idempotent terminal funnel that pays the gate exactly once, which makes "exactly one entry per
   terminal outcome" true **by construction** rather than by discipline.
-- [ ] 6.5 RED `OperationCenterHistoryTests` (IH1 argv/versions; IH2 sc1): `submit(_:versions:)`
+- [x] 6.5 RED `OperationCenterHistoryTests` (IH1 argv/versions; IH2 sc1): `submit(_:versions:)`
   records the transition Cellar **intended at submission** (`installedVersion` → `catalogVersion`),
   never one observed after; and `upgradeAll` writes **one grouped entry** with `name == ""`, no
   versions, verb `upgradeAll`, argv `["upgrade"]` — with **no** inventory-snapshot diffing anywhere.
-- [ ] 6.6 GREEN `submit(_:versions:)` and `submitUpgrades(for:in:)` deriving `VersionTransition` from
+- [x] 6.6 GREEN `submit(_:versions:)` and `submitUpgrades(for:in:)` deriving `VersionTransition` from
   the inventory they are already handed. Record the rejected alternative: diffing an inventory
   snapshot either side needs a re-snapshot to land before the write, makes the entry depend on watcher
   timing, and is exactly the per-package attribution settled decision R1 declines.

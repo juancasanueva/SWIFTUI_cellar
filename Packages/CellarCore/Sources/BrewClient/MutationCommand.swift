@@ -200,6 +200,26 @@ public enum MutationCommand: Sendable, Equatable {
         }
     }
 
+    /// The verb this command is recorded and searched under.
+    ///
+    /// Deliberately **not** `arguments[0]`: `zap` and an ordinary uninstall both
+    /// lower to `uninstall`, and a history row that called them the same thing
+    /// would make the destructive one unfindable. `upgradeAll` names the grouped
+    /// operation rather than the single package upgrade it shares a verb with
+    /// (installation-history IH1, IH5).
+    public var verb: String {
+        switch self {
+        case .install: Verb.install.rawValue
+        case .uninstall: Verb.uninstall.rawValue
+        case .reinstall: Verb.reinstall.rawValue
+        case .upgrade: Verb.upgrade.rawValue
+        case .zap: "zap"
+        case .upgradeAll: "upgradeAll"
+        case .pin: Verb.pin.rawValue
+        case .unpin: Verb.unpin.rawValue
+        }
+    }
+
     /// The argv vector, excluding the `brew` executable itself.
     public var arguments: [String] {
         switch self {

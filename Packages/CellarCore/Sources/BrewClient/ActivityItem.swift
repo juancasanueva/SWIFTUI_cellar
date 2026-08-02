@@ -64,6 +64,14 @@ public final class ActivityItem: Identifiable {
     /// from bytes the subprocess wrote.
     public let command: MutationCommand
 
+    /// The version move Cellar **intended** when it submitted this command.
+    ///
+    /// Captured here at submission rather than observed at the terminal, so the
+    /// durable record cannot depend on whether a re-snapshot happened to land
+    /// first (design D7). `nil` whenever either end is unknown: half a
+    /// transition reads as data loss rather than as absence.
+    @ObservationIgnored let versions: VersionTransition?
+
     /// Where the queue says this operation is. Set by `OperationCenter` from
     /// the one `QueueSnapshot`, so the summary and the detail listing cannot
     /// disagree (OA5).
@@ -77,9 +85,10 @@ public final class ActivityItem: Identifiable {
     /// its presence *is* what "terminal" means for this item.
     public private(set) var outcome: MutationOutcome?
 
-    init(id: UUID, command: MutationCommand) {
+    init(id: UUID, command: MutationCommand, versions: VersionTransition? = nil) {
         self.id = id
         self.command = command
+        self.versions = versions
     }
 
     // MARK: - What the views render

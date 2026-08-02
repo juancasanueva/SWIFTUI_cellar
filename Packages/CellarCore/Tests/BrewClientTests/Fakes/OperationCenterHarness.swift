@@ -17,15 +17,27 @@ struct CenterHarness {
     let launcher: ControllableProcessLauncher
     let gate: InstalledMutationGate
     let center: OperationCenter
+    /// The drafts the centre submitted, when the harness's own recorder is the
+    /// one wired in. A test that injects `history:` reads that one instead.
+    let recorder: RecordingHistoryRecorder
 
     static let wget = PackageID(kind: .formula, name: "wget")
     static let git = PackageID(kind: .formula, name: "git")
     static let iterm = PackageID(kind: .cask, name: "iterm2")
 
-    init(attached: Bool = true, honoursInterrupt: Bool = true) {
+    init(
+        attached: Bool = true,
+        honoursInterrupt: Bool = true,
+        history: (any HistoryRecording)? = nil
+    ) {
         launcher = ControllableProcessLauncher(honoursInterrupt: honoursInterrupt)
         gate = InstalledMutationGate()
-        center = OperationCenter(gate: gate, launcherFactory: { [launcher] _ in launcher })
+        recorder = RecordingHistoryRecorder()
+        center = OperationCenter(
+            gate: gate,
+            history: history ?? recorder,
+            launcherFactory: { [launcher] _ in launcher }
+        )
         if attached {
             center.attach(installation: TestInstallation.appleSilicon)
         }
