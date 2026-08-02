@@ -35,14 +35,14 @@ struct OperationCenterProjectionTests {
 
         #expect(harness.gate.isMutating, "the gate did not open for the batch")
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(
             harness.gate.isMutating,
             "the gate closed after the first item while two were still queued"
         )
 
-        await harness.finish(call: 1)
-        await harness.finish(call: 2)
+        try await harness.finish(call: 1)
+        try await harness.finish(call: 2)
 
         #expect(harness.gate.isMutating == false, "the gate stayed open after the last terminal")
         #expect(terminals.withLock { $0 } == 3, "N terminals did not produce N re-snapshots")
@@ -64,7 +64,7 @@ struct OperationCenterProjectionTests {
         await harness.settle()
 
         _ = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
-        await harness.finish(call: 0, status: status)
+        try await harness.finish(call: 0, status: status)
 
         #expect(terminals.withLock { $0 } == 1)
         watcher.cancel()
@@ -91,7 +91,7 @@ struct OperationCenterProjectionTests {
         #expect(pending.outcome == .cancelled)
         #expect(terminals.withLock { $0 } == 1)
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(terminals.withLock { $0 } == 2)
         #expect(running.outcome == .succeeded)
         watcher.cancel()
@@ -117,7 +117,7 @@ struct OperationCenterProjectionTests {
         let git = try #require(PackageTarget(CenterHarness.git))
         #expect(pending.message == MutationOutcome.cancelled.message(for: .uninstall(git)))
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
     }
 
     /// Queue control is cancel-only: I2 stays immutable and no surface reorders
@@ -136,15 +136,15 @@ struct OperationCenterProjectionTests {
             #expect(pending.controls.contains(absent) == false)
         }
 
-        await harness.finish(call: 0)
-        await harness.finish(call: 1)
+        try await harness.finish(call: 0)
+        try await harness.finish(call: 1)
     }
 
     @Test("A terminal item offers no cancel, only copy")
     func aTerminalItemOffersNoCancel() async throws {
         let harness = CenterHarness()
         let item = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
 
         #expect(item.isCancellable == false)
         #expect(item.controls.contains(.cancel) == false)
@@ -178,7 +178,7 @@ struct OperationCenterProjectionTests {
 
         #expect(item.displayCommand == request.displayCommand)
         #expect(item.arguments == ["uninstall", "--formula", "wget"])
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
     }
 
     @Test("A non-destructive command needs no confirmation and submits directly")
@@ -191,7 +191,7 @@ struct OperationCenterProjectionTests {
 
         #expect(item.arguments == ["install", "--formula", "wget"])
         #expect(harness.center.pendingConfirmation == nil)
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
     }
 
     // MARK: - Summary and detail agree (OA5 sc1–3)
@@ -211,7 +211,7 @@ struct OperationCenterProjectionTests {
         #expect(summary.runningCommand == "brew install --formula wget")
         #expect(summary.pendingCount == 2)
 
-        for index in 0..<3 { await harness.finish(call: index) }
+        for index in 0..<3 { try await harness.finish(call: index) }
     }
 
     @Test("An empty centre and an all-terminal centre both report idle")
@@ -223,7 +223,7 @@ struct OperationCenterProjectionTests {
         #expect(harness.center.summary.running == nil)
 
         _ = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
 
         #expect(harness.center.summary.isBusy == false, "an all-terminal centre claimed work")
         #expect(harness.center.summary.pendingCount == 0)
@@ -266,9 +266,9 @@ struct OperationCenterProjectionTests {
         await harness.settle()
         check("one cancelled")
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         check("head terminal")
-        await harness.finish(call: 1)
+        try await harness.finish(call: 1)
         check("all terminal")
     }
 
@@ -311,7 +311,7 @@ struct OperationCenterProjectionTests {
         #expect(harness.center.isAvailable)
 
         let item = harness.center.submit(.install(PackageTarget(CenterHarness.git)!))
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
 
         #expect(item.outcome == .succeeded)
         #expect(harness.launcher.launchCount == 1)
@@ -330,7 +330,7 @@ struct OperationCenterProjectionTests {
 
         #expect(inFlight.isTerminal == false, "repointing brew abandoned an in-flight item")
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(inFlight.outcome == .succeeded)
 
         // And the next submission goes to the new installation.
@@ -340,6 +340,6 @@ struct OperationCenterProjectionTests {
             harness.launcher.recordedSpecs.last?.executableURL
                 == TestInstallation.intel.executableURL
         )
-        await harness.finish(call: 1)
+        try await harness.finish(call: 1)
     }
 }

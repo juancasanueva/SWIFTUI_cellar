@@ -31,7 +31,7 @@ struct OperationCenterRetentionTests {
         let harness = CenterHarness()
 
         let item = harness.center.submit(.install(PackageTarget(CenterHarness.iterm)!))
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(item.outcome == .succeeded)
 
         // Settling drops the item's own handle, so the runner may retire the
@@ -42,7 +42,7 @@ struct OperationCenterRetentionTests {
         // mention the first operation — the same shape a retired record has.
         harness.center.attach(installation: TestInstallation.intel)
         let later = harness.center.submit(.install(PackageTarget(CenterHarness.git)!))
-        await harness.finish(call: 1)
+        try await harness.finish(call: 1)
         #expect(later.outcome == .succeeded)
         await harness.settle()
 

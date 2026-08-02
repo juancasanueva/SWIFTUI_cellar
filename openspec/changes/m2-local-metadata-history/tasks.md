@@ -188,25 +188,25 @@ cases produce. 40–60 mechanical test edits are expected and accepted.
 
 Absorbed follow-ups 2 and 5. Bulk multi-select (Phase 6) multiplies the exposure, so this precedes it.
 
-- [ ] 3.1 RED `Tests/BrewClientTests/OperationCenterTests.swift` (OA4 sc4): a running mutation whose
+- [x] 3.1 RED `Tests/BrewClientTests/OperationCenterTests.swift` (OA4 sc4): a running mutation whose
   queue has been detached (`attach(installation: nil)`) is, on cancel, **signalled through the
   ordinary cancellation escalation** and reported cancelled **only once the process has stopped** —
   not settled immediately.
-- [ ] 3.2 RED `OperationCenterTests` (OA4 sc5): with the same detached running mutation and another
+- [x] 3.2 RED `OperationCenterTests` (OA4 sc5): with the same detached running mutation and another
   pending behind it, cancelling before the process stops starts **nothing** and forces **no**
   inventory re-snapshot; both happen exactly once when the real terminal outcome arrives. The gate is
   paid exactly once.
-- [ ] 3.3 RED `OperationCenterTests`: repointing brew mid-flight and then cancelling reaches the
+- [x] 3.3 RED `OperationCenterTests`: repointing brew mid-flight and then cancelling reaches the
   **original** runner — the one that produced the item's `BrewOperation` — not the centre's current
   one.
-- [ ] 3.4 GREEN `Sources/BrewClient/{OperationCenter,ActivityItem}.swift` (D10): `cancel(_:)` sets
+- [x] 3.4 GREEN `Sources/BrewClient/{OperationCenter,ActivityItem}.swift` (D10): `cancel(_:)` sets
   `isCancelRequested`, delivers to `item.operation` when it exists, and otherwise finishes as
   cancelled **only** when `!item.isStartInFlight` — a start in flight is replayed by `run(_:for:on:)`,
   which already guards at entry and after start. Keep this hunk in a **separate commit** from 1.9.
-- [ ] 3.5 RED `Tests/BrewClientTests/Fakes/OperationCenterHarness.swift` (D11): drive
+- [x] 3.5 RED `Tests/BrewClientTests/Fakes/OperationCenterHarness.swift` (D11): drive
   `finish(call:)` past a poll timeout and assert the harness reports a **named failed expectation**
   rather than crashing the whole suite by indexing `launchedProcesses[index]`.
-- [ ] 3.6 GREEN the harness: `try #require(...)` the process is present, with `Testing`'s
+- [x] 3.6 GREEN the harness: `try #require(...)` the process is present, with `Testing`'s
   `sourceLocation` passed through so the failure names the calling test.
   Verify: `FAST --filter "OperationCenter\|Cancellation"`.
 

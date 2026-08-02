@@ -92,6 +92,17 @@ final class ControllableProcessLauncher: ProcessLaunching, Sendable {
     }
 
     private let state = Mutex(State())
+    /// Whether the processes it hands out stop on `SIGINT`.
+    ///
+    /// `false` is what makes "signalled, but not yet stopped" an observable
+    /// state at all: with a process that dies the instant it is interrupted,
+    /// "reported cancelled only once the process has stopped" and "reported
+    /// cancelled immediately" look identical (operation-activity OA4).
+    private let honoursInterrupt: Bool
+
+    init(honoursInterrupt: Bool = true) {
+        self.honoursInterrupt = honoursInterrupt
+    }
 
     /// Every spec passed to `launch(_:)`, in order.
     var recordedSpecs: [ProcessSpec] { state.withLock { $0.specs } }
@@ -112,7 +123,7 @@ final class ControllableProcessLauncher: ProcessLaunching, Sendable {
         let outcome = state.withLock { state -> Result<ControllableProcess, any Error> in
             state.specs.append(spec)
             if let error = state.launchError { return .failure(error) }
-            let process = ControllableProcess()
+            let process = ControllableProcess(honoursInterrupt: honoursInterrupt)
             state.launched.append(process)
             return .success(process)
         }
@@ -130,10 +141,12 @@ final class ControllableProcess: LaunchedProcess, Sendable {
 
     private let state = Mutex(State())
     private let continuation: AsyncStream<OutputChunk>.Continuation
+    private let honoursInterrupt: Bool
 
     let output: AsyncStream<OutputChunk>
 
-    init() {
+    init(honoursInterrupt: Bool = true) {
+        self.honoursInterrupt = honoursInterrupt
         (output, continuation) = AsyncStream<OutputChunk>.makeStream()
     }
 
@@ -158,7 +171,7 @@ final class ControllableProcess: LaunchedProcess, Sendable {
     func send(_ signal: ProcessSignal) throws {
         state.withLock { $0.signals.append(signal) }
         // Honours SIGINT, like a well-behaved `brew`.
-        if signal == .interrupt {
+        if signal == .interrupt, honoursInterrupt {
             terminate(with: BrewExit(status: 128 + SIGINT, reason: .signalled(SIGINT)))
         }
     }

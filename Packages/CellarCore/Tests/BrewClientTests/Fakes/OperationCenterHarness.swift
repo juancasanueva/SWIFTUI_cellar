@@ -1,5 +1,6 @@
 import CellarTestSupport
 import Foundation
+import Testing
 
 @testable import BrewClient
 @testable import BrewProcess
@@ -21,8 +22,8 @@ struct CenterHarness {
     static let git = PackageID(kind: .formula, name: "git")
     static let iterm = PackageID(kind: .cask, name: "iterm2")
 
-    init(attached: Bool = true) {
-        launcher = ControllableProcessLauncher()
+    init(attached: Bool = true, honoursInterrupt: Bool = true) {
+        launcher = ControllableProcessLauncher(honoursInterrupt: honoursInterrupt)
         gate = InstalledMutationGate()
         center = OperationCenter(gate: gate, launcherFactory: { [launcher] _ in launcher })
         if attached {
@@ -48,10 +49,28 @@ struct CenterHarness {
     }
 
     /// Terminates the `index`-th spawned process and lets the centre observe it.
-    func finish(call index: Int, status: Int32 = 0) async {
-        await launcher.waitForLaunches(atLeast: index + 1)
-        launcher.launchedProcesses[index]
-            .terminate(with: BrewExit(status: status, reason: .exited))
+    ///
+    /// `TestPoll.until` returns **silently** on timeout, so the shipped version
+    /// of this method indexed `launchedProcesses[index]` on a process that might
+    /// never have been launched. A timing regression therefore trapped and took
+    /// the whole suite down with it, naming nothing. `#require` turns that into
+    /// one named failed expectation, attributed to the calling test through
+    /// `sourceLocation` (design D11).
+    func finish(
+        call index: Int,
+        status: Int32 = 0,
+        timeout: Duration = .seconds(5),
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async throws {
+        await TestPoll.until(timeout: timeout, self.launcher.launchCount >= index + 1)
+        let process = try #require(
+            launcher.launchedProcesses.indices.contains(index)
+                ? launcher.launchedProcesses[index]
+                : nil,
+            "no process was launched for call \(index) within \(timeout)",
+            sourceLocation: sourceLocation
+        )
+        process.terminate(with: BrewExit(status: status, reason: .exited))
         await settle()
     }
 }

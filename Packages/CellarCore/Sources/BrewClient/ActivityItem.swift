@@ -51,6 +51,15 @@ public final class ActivityItem: Identifiable {
     /// publishing it would wake every observer twice per operation.
     @ObservationIgnored internal var operation: BrewOperation?
 
+    /// True between `submit` handing the command to `run(_:for:on:)` and that
+    /// method obtaining — or failing to obtain — a handle.
+    ///
+    /// It is the difference between "there is nothing to cancel yet" and "there
+    /// will never be anything to cancel". A cancel during the window is replayed
+    /// by `run(_:for:on:)`, which guards at entry and again after start; a cancel
+    /// outside it, with no handle, means no runner ever existed (design D10).
+    @ObservationIgnored internal var isStartInFlight = false
+
     /// The typed command. Everything displayed is rendered from this, never
     /// from bytes the subprocess wrote.
     public let command: MutationCommand

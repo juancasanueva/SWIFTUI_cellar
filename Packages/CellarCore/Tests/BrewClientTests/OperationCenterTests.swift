@@ -34,7 +34,7 @@ struct OperationCenterTests {
         #expect(item.displayCommand == "brew install --cask iterm2")
         #expect(pendingCopy == "brew install --cask iterm2")
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
 
         #expect(item.id == id, "the identity changed between states")
         #expect(item.copyText == pendingCopy, "copy text differed once terminal")
@@ -50,7 +50,7 @@ struct OperationCenterTests {
         await harness.settle()
 
         #expect(item.arguments == ["install", "--cask", "iterm2"])
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(item.arguments == ["install", "--cask", "iterm2"])
 
         // And that is the vector that reached the process seam.
@@ -77,7 +77,7 @@ struct OperationCenterTests {
 
         // Readable while still running, which is the point of streaming.
         #expect(item.isTerminal == false)
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(item.log.count == 3, "the terminal outcome dropped the log")
     }
 
@@ -109,7 +109,7 @@ struct OperationCenterTests {
         // Still verbatim and still tagged.
         #expect(item.log.allSatisfy { $0.stream == .stdout })
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
     }
 
     // MARK: - Per-package fan-out (PM2 sc2 — the settled shape)
@@ -138,7 +138,7 @@ struct OperationCenterTests {
             #expect(names.count == 1, "an argv named \(names.count) packages")
         }
 
-        for index in 0..<3 { await harness.finish(call: index) }
+        for index in 0..<3 { try await harness.finish(call: index) }
     }
 
     /// The reason the fan-out was chosen over kind-grouped argv: attribution.
@@ -148,9 +148,9 @@ struct OperationCenterTests {
         let items = harness.center.submitUpgrades(for: [CenterHarness.wget, CenterHarness.git, CenterHarness.iterm])
         await harness.settle()
 
-        await harness.finish(call: 0, status: 0)
-        await harness.finish(call: 1, status: 1)
-        await harness.finish(call: 2, status: 0)
+        try await harness.finish(call: 0, status: 0)
+        try await harness.finish(call: 1, status: 1)
+        try await harness.finish(call: 2, status: 0)
 
         #expect(items[0].outcome == .succeeded)
         #expect(items[1].outcome == .failed(status: 1))
@@ -187,8 +187,8 @@ struct OperationCenterTests {
         let all = harness.center.submit(.upgradeAll)
         #expect(all.arguments == ["upgrade"])
 
-        await harness.finish(call: 0)
-        await harness.finish(call: 1)
+        try await harness.finish(call: 0)
+        try await harness.finish(call: 1)
     }
 
 }

@@ -149,6 +149,10 @@ public final class OperationCenter {
         // N re-snapshots (design D7).
         gate?.begin()
 
+        // Marked before the task is created, so a cancel arriving between here
+        // and `run(_:for:on:)` is replayed rather than settling an operation
+        // that is about to exist (design D10).
+        item.isStartInFlight = true
         Task { [weak self] in
             await self?.run(command, for: item, on: runner)
         }
@@ -194,6 +198,7 @@ public final class OperationCenter {
     ) async {
         // Cancelled between `submit` and here: never spawn it.
         guard !item.isCancelRequested else {
+            item.isStartInFlight = false
             finish(item, with: .cancelled)
             return
         }
@@ -202,6 +207,7 @@ public final class OperationCenter {
         do {
             operation = try await runner.start(command.brewCommand)
         } catch {
+            item.isStartInFlight = false
             finish(item, with: .launchFailed)
             return
         }
@@ -210,6 +216,7 @@ public final class OperationCenter {
         // the runner that produced it, and the execution layer's record cannot
         // be retired underneath a caller that can still ask about it (D6, D10).
         item.operation = operation
+        item.isStartInFlight = false
 
         // A cancel that arrived while the submission was in flight has nothing
         // to act on yet, so it is replayed here rather than lost.
@@ -251,16 +258,28 @@ public final class OperationCenter {
     /// (M1 D4) and this only exposes them. Queue control is cancel-only: there
     /// is deliberately no reorder and no remove (product Q6, and the FIFO
     /// invariant stays immutable).
+    ///
+    /// Delivery goes through the item's **own** handle rather than through the
+    /// centre's current runner (design D10). A `brew` that has been detached or
+    /// repointed since submission therefore changes nothing: the operation is
+    /// signalled on the runner that spawned it, and the item settles as
+    /// cancelled only when that process actually stops — so the gate is paid,
+    /// and the re-snapshot forced, exactly once and only at the real terminal
+    /// outcome (operation-activity OA4).
     public func cancel(_ item: ActivityItem) {
         guard item.isCancellable else { return }
         item.isCancelRequested = true
 
-        guard let operationID = item.operationID, let runner else {
-            // Not spawned yet, and now it never will be.
-            finish(item, with: .cancelled)
+        if let operation = item.operation {
+            Task { await operation.cancel() }
             return
         }
-        Task { await runner.cancel(operationID) }
+        // No handle. If a start is in flight, `run(_:for:on:)` replays the
+        // request — it guards at entry and again after start. Only a submission
+        // that never had a runner is terminal here.
+        if !item.isStartInFlight {
+            finish(item, with: .cancelled)
+        }
     }
 
     // MARK: - Confirmation (design D6)
