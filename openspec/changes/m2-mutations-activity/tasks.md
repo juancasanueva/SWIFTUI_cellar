@@ -155,7 +155,7 @@ Independent of the mutation command layer; reviewable standalone.
 
 ## Phase 3: Mutation vocabulary and argv (D1, D2 — PM1, PM2, PM3, PM7) — ≈ 500 lines
 
-- [ ] 3.1 RED `Tests/BrewClientTests/MutationCommandTests.swift`, parameterised over every case —
+- [x] 3.1 RED `Tests/BrewClientTests/MutationCommandTests.swift`, parameterised over every case —
   **threat: subprocess argument composition**. Assert the exact recorded `ProcessSpec.arguments`:
   `install --formula wget` (PM1 sc1), `install --cask iterm2` (sc2), `uninstall --cask iterm2`
   (sc3), `reinstall/pin/unpin --formula git` (sc4), `upgrade --formula wget` (PM2 sc1),
@@ -163,28 +163,28 @@ Independent of the mutation command layer; reviewable standalone.
   no `--greedy` variant, no `--force`** (PM2 sc3). Also: `kind == .mutate` on every one of them; no
   invocation carries both kind flags; the `docker` collision resolves by flag, never by brew's token
   disambiguation (PM1 sc5).
-- [ ] 3.2 GREEN `Sources/BrewClient/MutationCommand.swift`: the `MutationCommand` enum (D1),
+- [x] 3.2 GREEN `Sources/BrewClient/MutationCommand.swift`: the `MutationCommand` enum (D1),
   `FormulaID` / `CaskID` with failable `init?(_ id: PackageID)`, and `var arguments: [String]`
   lowering to `BrewCommand.mutate([…])`. The kind flag is explicit on all six package-naming verbs —
   **including `pin`/`unpin`**, confirmed by live `brew pin --help` / `brew unpin --help` on 6.0.14.
   There is no per-verb exception.
-- [ ] 3.3 RED `MutationCommandTests` — **threat: subprocess argument composition (option injection)**:
+- [x] 3.3 RED `MutationCommandTests` — **threat: subprocess argument composition (option injection)**:
   a name that is empty or begins with `-` is **refused at construction**, so no argv is ever built
   from it. Separately: `zap` is **unrepresentable** for a formula and `pin` for a cask — the failable
   wrapper is the proof, not a runtime `guard` (threat: irreversible mutation scope).
-- [ ] 3.4 GREEN the failable factories on `MutationCommand` (D2). This is the one place option
+- [x] 3.4 GREEN the failable factories on `MutationCommand` (D2). This is the one place option
   injection could enter, so it is a rejection at the type boundary, not a validation deeper in.
-- [ ] 3.5 RED `MutationCommandTests` — **threat: irreversible mutation scope**: `requiresConfirmation`
+- [x] 3.5 RED `MutationCommandTests` — **threat: irreversible mutation scope**: `requiresConfirmation`
   is `true` for exactly `.uninstall` and `.zap` and `false` for install, reinstall, upgrade,
   `upgradeAll`, pin and unpin (PM3 sc4). `displayCommand` renders
   `"brew " + arguments.joined(separator: " ")` and matches the argv character for character
   (PM3 sc1, sc3; OA2 sc1).
-- [ ] 3.6 GREEN `requiresConfirmation` and `displayCommand` on `MutationCommand` (D6).
-- [ ] 3.7 RED `MutationCommandTests` — **threat: display string is never a source of argv**: assert
+- [x] 3.6 GREEN `requiresConfirmation` and `displayCommand` on `MutationCommand` (D6).
+- [x] 3.7 RED `MutationCommandTests` — **threat: display string is never a source of argv**: assert
   no public API accepts a command *string* and produces argv; the only argv producer is
   `MutationCommand.arguments` over the typed cases. A structural/grep-style assertion is acceptable
   here; the point is that `displayCommand` is one-way.
-- [ ] 3.8 GREEN: no production change expected. A failure here means a string→argv path leaked in.
+- [x] 3.8 GREEN: no production change expected. A failure here means a string→argv path leaked in.
   Verify: `FAST --filter MutationCommand`.
 
 ## Phase 4: Outcome classification (D5 — PM4, PM5, PM6) — ≈ 400 lines
