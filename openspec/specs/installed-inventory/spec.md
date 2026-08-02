@@ -208,6 +208,12 @@ MUST use the same outdated derivation as the installed list, so self-updating ca
 from it too. When the inventory is unavailable or empty, the filters MUST render disabled and MUST
 NOT alter the results a user would otherwise see.
 
+While browse is showing an installed-driven mode — installed or outdated — the catalog-only filter
+controls (package kind, deprecated, disabled) MUST either apply to that mode's visible results
+exactly as they apply to catalog results, or be rendered disabled for that mode. A control that is
+enabled but cannot change the visible results is forbidden: every enabled control MUST be honoured,
+and every control that is not honoured MUST be visibly unavailable.
+
 #### Scenario: The installed filter narrows browse results
 
 - GIVEN a catalog containing `wget` and `curl`, and an inventory containing only `wget`
@@ -239,6 +245,21 @@ NOT alter the results a user would otherwise see.
 - GIVEN the catalog query's declared filter set
 - WHEN it is enumerated
 - THEN it contains no installed, not-installed or outdated predicate
+
+#### Scenario: No catalog filter control is enabled but inert under the installed mode
+
+- GIVEN browse in the installed mode over an inventory holding one formula and one cask, one of them
+  deprecated
+- WHEN the kind, deprecated and disabled controls are inspected
+- THEN each control is either reported unavailable for that mode, or changes the visible results
+  when it is applied
+
+#### Scenario: The outdated mode obeys the same rule
+
+- GIVEN browse in the outdated mode over an inventory holding one outdated formula and one outdated
+  cask
+- WHEN the kind control is applied to casks only
+- THEN either the control was reported unavailable for that mode, or only the cask remains
 
 ### Requirement: Brew absent or invalid yields an empty inventory and read-only guidance
 
@@ -278,6 +299,21 @@ be taken at that mutation's terminal outcome. Overlapping refresh requests MUST 
 one refresh genuinely in flight; a request that arrives after that refresh has settled MUST take a
 fresh snapshot rather than be handed the settled one.
 
+Mutation suppression MUST be evaluated at the moment a re-snapshot would actually start, not only
+when a signal arrives and when the quiet window opens. A quiet window that opened before a mutation
+began MUST NOT fire a re-snapshot while that mutation is in flight; it MUST be folded into the single
+re-snapshot owed at the mutation's terminal outcome.
+
+An acquisition already in flight MUST NOT be used to answer a change signal that arrived after that
+acquisition started: such a signal MUST invalidate the in-flight result for freshness purposes and
+cause a further re-snapshot once the quiet window elapses, so the inventory converges on state
+observed at or after the newest signal.
+
+Resetting the inventory to a detection-driven state — for example clearing it because detection
+reported brew absent — while an acquisition is in flight MUST NOT strand that acquisition. The
+inventory MUST remain able to run and publish a later refresh, and MUST NOT stay stuck in the
+cleared state after a subsequent successful refresh.
+
 #### Scenario: An external install is reflected without user action
 
 - GIVEN a running inventory and a change source under test control
@@ -304,6 +340,30 @@ fresh snapshot rather than be handed the settled one.
 - WHEN a refresh is requested afterwards and the payload is now `P2`
 - THEN a second invocation is performed
 - AND the inventory reflects `P2`
+
+#### Scenario: A window opened before a mutation began does not fire during it
+
+- GIVEN a change signal that opened the quiet window
+- WHEN a Cellar-initiated mutation begins before that window elapses, and the window then elapses
+  while the mutation is still in flight
+- THEN no re-snapshot runs while the mutation is in flight
+- AND exactly one re-snapshot runs at the mutation's terminal outcome
+
+#### Scenario: A signal during an acquisition is not answered by that acquisition
+
+- GIVEN an acquisition in flight against snapshot payload `P1`
+- WHEN a change signal is emitted after that acquisition started and the underlying payload is now
+  `P2`
+- THEN a further invocation is performed after the quiet window
+- AND the inventory reflects `P2`, not `P1`
+
+#### Scenario: Resetting during an acquisition does not strand the inventory
+
+- GIVEN an acquisition in flight that has not yet settled
+- WHEN the inventory is reset to the brew-absent state before it settles, and detection later
+  reports a valid installation and a refresh is requested
+- THEN that refresh performs an invocation and publishes its snapshot
+- AND the inventory does not remain empty
 
 ### Requirement: Refresh loops are owned for the app's lifetime
 
@@ -364,6 +424,51 @@ one; at most one loop of each kind runs per launch.
   strand the in-flight acquisition. Both are latent until `m2-mutations-installed` (M2-2) drives the
   `isMutating` flag with real mutations; the requirement text is unchanged and all four scenarios are
   COMPLIANT. Tracked in the M2-1 archive report's follow-up register, not as a spec gap.
+  **Closed by `m2-mutations-activity`** — see the amendment below, which specifies the behaviour the
+  note described as a gap.
+- **Amended by change `m2-mutations-activity` (archived `2026-08-02`, PRD milestone **M2**, slice
+  M2-2)**: **2 MODIFIED** requirements replaced as whole blocks, adding **5 scenarios**.
+  11 requirements / 34 scenarios → **11 requirements / 39 scenarios**. Nothing was added, removed or
+  renamed; the other nine requirements are byte-identical. Both amendments close behavioural gaps the
+  M2-1 archive routed to M2-2 — they were latent because nothing drove the mutation gate with a real
+  mutation, and M2-2 is the change that does.
+  - **"Installed-state filters are composed, never pushed into the search index"** gained the rule
+    that catalog-only controls (kind, deprecated, disabled) under the installed and outdated browse
+    modes MUST either apply or render disabled, plus 2 scenarios. Previously the requirement governed
+    only the three installed-state filters and said nothing about the catalog-only controls shown
+    beside them, so those controls rendered **enabled but inert** under installed and outdated modes
+    (M2-1 follow-up 1). Delivered as `InstalledBrowse.rows(filters:)` — the parameter is *required*,
+    not defaulted, so no call site can silently ignore the controls — with `kinds` read from
+    `InstalledPackage.kind` (the inventory is authoritative) and deprecated/disabled applied as
+    catalog predicates through the existing catalog-lookup decoration, where **no catalog record ⇒
+    not excluded**, preserving this capability's own "an unmatched installed package is still listed"
+    principle.
+  - **"External changes invalidate the inventory, debounced and coalesced"** gained three paragraphs
+    and 3 scenarios covering (a) suppression re-checked at the moment a re-snapshot would start, so a
+    window opened before a mutation began cannot fire during it (M2-1 follow-up 3); (b)
+    invalidation-after-start, so an in-flight acquisition never answers a signal that arrived after it
+    started and the inventory can no longer settle on pre-change state (M2-1 follow-up 2); (c) reset
+    during acquisition not stranding the slot, so the inventory cannot stay stuck empty after a later
+    successful refresh (M2-1 follow-up 4). Delivered as a stored, cancellable debounce task with a
+    post-sleep gate re-check, a monotonic `invalidationCount` with a per-acquisition mark that a
+    joiner must match, and a `clear(to:)` that cancels and vacates the in-flight slot **before**
+    bumping the publication ordinal.
+- **Verification note on the mutation gate's depth** (`m2-mutations-activity` verify ruling 1,
+  2026-08-02): "exactly one re-snapshot at that mutation's terminal outcome" is satisfied by a
+  **depth-counted** gate — `begin()` per submission, `end()` per terminal, floor zero, always
+  yielding. A selected upgrade fans out into N independent operations, so N terminals owe N
+  re-snapshots while `isMutating` must still cover the whole batch. One-begin-per-batch would drop
+  the depth to zero after the first terminal and reopen suppression mid-batch, violating this
+  requirement's suppression clause.
+- **Verification note on post-terminal signals** (`m2-mutations-activity` verify ruling 2,
+  2026-08-02): a change signal produced by a mutation's own writes but arriving **after** its
+  terminal outcome falls outside the suppression clause, which is scoped to "while a mutation is in
+  flight". It is then correctly governed by the ordinary external-change clauses — not parsed,
+  debounced into exactly one refresh. Conforming, not a violation; a short post-terminal grace window
+  would absorb the redundant probe and is carried as a follow-up, not a spec gap.
+- **`package-mutation` owns the mutation side of this contract.** Its requirement "Every terminal
+  outcome forces one re-snapshot, and cancel is reported honestly" is the counterpart to the
+  suppression clause here; the two are written to be read together and must not drift.
 - **Verification note for "Installed-state filters are composed, never pushed into the search
   index" and "Refresh loops are owned for the app's lifetime"** (verify WARNING 2, 2026-08-02): the
   rule side (`InstalledBrowse.isFilterEnabled`, `LoopOwner`) is unit-tested in the package; the app

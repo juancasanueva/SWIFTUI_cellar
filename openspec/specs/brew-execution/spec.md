@@ -90,6 +90,14 @@ At most one mutating operation MAY be in flight. Queued mutations MUST run FIFO.
 MUST NOT be blocked by an in-flight mutation. A mutation cancelled while queued MUST NOT spawn a
 process.
 
+Every submitted operation MUST be assigned a stable identity at submission time. That identity MUST
+NOT change for the lifetime of the operation, MUST distinguish two otherwise identical submissions
+of the same command, and MUST carry the exact argv the operation was submitted with. The runner MUST
+expose a read-only enumeration of its operations — each with its identity, its argv, and its state
+(pending, running, or terminal) — with pending mutations enumerated in the FIFO order they will run.
+Enumerating MUST NOT start, delay, reorder, cancel or otherwise perturb any operation, and MUST NOT
+block on one in flight.
+
 #### Scenario: Two mutations never overlap
 
 - GIVEN mutation A is in flight
@@ -107,6 +115,27 @@ process.
 - GIVEN mutation B is queued behind in-flight mutation A
 - WHEN B is cancelled before A finishes
 - THEN no process is spawned for B and B reports cancelled
+
+#### Scenario: Queued mutations are enumerable before they run
+
+- GIVEN mutation A is in flight and mutations B then C are submitted
+- WHEN the runner's operations are enumerated
+- THEN A is reported running, and B and C are reported pending in the order B then C
+- AND each entry carries the argv its operation was submitted with
+
+#### Scenario: An operation's identity is stable and distinguishes identical submissions
+
+- GIVEN the same command submitted twice
+- WHEN both operations are enumerated while pending, while running, and once terminal
+- THEN each operation keeps one identity across all three states
+- AND the two identities are different from each other
+
+#### Scenario: Enumerating does not perturb scheduling
+
+- GIVEN mutation A in flight with mutations B and C queued behind it
+- WHEN the operations are enumerated repeatedly while A runs
+- THEN no additional process is spawned
+- AND the start order after A completes is still B then C
 
 ### Requirement: Swift 6 concurrency and platform baseline
 
@@ -132,3 +161,21 @@ Every type crossing an isolation boundary (`LogLine`, results, errors, configura
   handling" enumerated three terminal outcomes while the following clause treated unresponsive
   cancellation as a fourth. Amended to name all four explicitly and to state which two are errors.
   No behavioural change; scenarios carried over verbatim.
+- **Amended by change `m2-mutations-activity` (archived `2026-08-02`, PRD milestone **M2**, slice
+  M2-2)**: **1 MODIFIED** requirement replaced as a whole block — "Serialized mutations with
+  concurrent reads" — adding **3 scenarios**. 6 requirements / 12 scenarios → **6 requirements / 15
+  scenarios**. Nothing was added, removed or renamed; the other five requirements are byte-identical.
+  Previously the requirement stated only the serialization rules and held the operation set as a
+  private runner detail: the queue was neither enumerable nor identity-stable, so pending items and
+  per-operation argv could not be observed at all. PRD §3.10 requires visible pending items and the
+  exact command per operation, and neither was answerable. The amendment is **purely additive
+  observability**: the FIFO gate, the read/mutation split, the SIGINT→SIGTERM escalation and the
+  SIGKILL ban (M1 D3/D4) are unchanged, and the implementation stores only `command` and `ordinal`
+  per record — operation phase is *derived* from the process and resolved exit, never stored twice,
+  so it cannot drift.
+- **`operation-activity` consumes this projection and must not fork it.** That capability's
+  "The operation queue is enumerable, ordered, and carries each operation's argv" is written as a
+  consumer of the identity established here; it MUST NOT introduce a second, competing notion of
+  operation identity. Duplicate submissions of the same command are permitted and are told apart by
+  identity rather than deduplicated (`m2-mutations-activity` verify ruling 3, 2026-08-02) — which is
+  exactly what "MUST distinguish two otherwise identical submissions" buys.
