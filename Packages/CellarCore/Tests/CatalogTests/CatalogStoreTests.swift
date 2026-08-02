@@ -119,6 +119,7 @@ struct CatalogStoreTests {
         harness.source.script(.notModified, for: .casks)
         await store.refreshNow()
 
+        await poll { store.results.count == 3 }
         #expect(store.results.map(\.name).sorted() == ["curl", "iterm2", "wget"])
     }
 
