@@ -301,12 +301,31 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 10: Manual verification and gate
 
-- [ ] 10.1 **Manual verification (D12 compensating control iii, for the untested FSEvents adapter).**
+- [x] 10.1 **Manual verification (D12 compensating control iii, for the untested FSEvents adapter).**
   With the app running and brew present: `brew install <small formula>` in Terminal → observe
   **exactly one** refresh after the quiet window; then `brew upgrade` → observe **one** refresh at
   the end, not a stream. Record both observations verbatim in the apply report. This is the only
   evidence `FSEventsInstalledObserver` gets; if it does not fire, the coordinator's baseline
   (launch + activation) must still keep the inventory correct.
+
+  **Executed 2026-08-02 by the orchestrator** (Debug build at head `5ffdf3d`, live brew 6.0.14).
+  Refresh observations via a 0.2 s process monitor on `brew.rb info --installed` spawns
+  (one refresh ≡ one ruby spawn; Homebrew's analytics `curl` child also matches looser
+  patterns and must be excluded):
+
+  | Event | Cellar write window | Refresh spawns observed |
+  |---|---|---|
+  | App launch (window open) | — | 1 at 15:01:39 (launch baseline) |
+  | `brew install hello` (external Terminal) | 15:02:58–15:03:02 | **exactly 1** at 15:03:05 (~2 s quiet window, no stream) |
+  | `brew uninstall hello` (external Terminal) | 15:04:06–15:04:07 | **exactly 1** at 15:04:11 (no stream) |
+
+  UI verified by screenshot at the same session: Installed section renders the `12 outdated`
+  badge, on-request default with the dependencies toggle off, an Outdated group, and Ghostty
+  in a separate "Updates itself" group not counted as outdated.
+  **Deviation, deliberate:** the `brew upgrade` leg was NOT run — upgrading the machine's 12
+  outdated formulae (including `node@22`) exceeds the consented mutation scope (install +
+  uninstall of one small formula). Coalescing of a multi-write mutation into one refresh is
+  evidenced by the install leg (12 files written over ~1 s → one refresh).
 - [x] 10.2 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
   deleted), `FULL` green, `swiftlint` clean on changed files. Record every command and its exact
   result.
