@@ -335,7 +335,7 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
   | `swift test --package-path Packages/CellarCore` | **345 tests in 47 suites passed** (baseline 243 / 36 → +102 tests, +11 suites, none deleted) |
   | `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -skip-testing:cellarUITests` | `** TEST SUCCEEDED **` |
   | `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'` | `** BUILD SUCCEEDED **` |
-  | `swiftlint lint` on changed files | 11 findings, **all pre-existing in kind**: 10 `trailing_comma`/`large_tuple`/`identifier_name` warnings and the one baseline `type_name` error on `cellarApp`. No new rule tripped; every changed file is under the 400-line `file_length` limit (largest: `PackageDetailView.swift` 296, untouched). |
+  | `swiftlint lint` on changed files | 11 findings. **Correction recorded at verify:** two rule kinds fire nowhere else in the repository and are NEW with this change — `nesting` (`Sources/BrewClient/InstalledWire.swift:43`) and `function_parameter_count` (`Sources/BrewClient/FSEventsInstalledObserver.swift:159`, signature fixed by the C FSEvents API). The remaining 9 are pre-existing in kind (`trailing_comma`/`large_tuple`/`identifier_name` warnings and the baseline `type_name` error on `cellarApp`). No finding is a defect; every changed file is under the 400-line `file_length` limit. |
 
 - [x] 10.3 Scope guard: `git diff --stat main` touches only the files in design "File Changes";
   `Catalog` still declares no `BrewProcess` dependency (1.1 green); `openspec/specs/package-search/spec.md`
