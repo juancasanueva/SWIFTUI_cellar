@@ -307,13 +307,71 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
   the end, not a stream. Record both observations verbatim in the apply report. This is the only
   evidence `FSEventsInstalledObserver` gets; if it does not fire, the coordinator's baseline
   (launch + activation) must still keep the inventory correct.
-- [ ] 10.2 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
+- [x] 10.2 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
   deleted), `FULL` green, `swiftlint` clean on changed files. Record every command and its exact
   result.
-- [ ] 10.3 Scope guard: `git diff --stat main` touches only the files in design "File Changes";
+
+  | Command | Result |
+  |---|---|
+  | `swift test --package-path Packages/CellarCore` | **345 tests in 47 suites passed** (baseline 243 / 36 → +102 tests, +11 suites, none deleted) |
+  | `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -skip-testing:cellarUITests` | `** TEST SUCCEEDED **` |
+  | `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'` | `** BUILD SUCCEEDED **` |
+  | `swiftlint lint` on changed files | 11 findings, **all pre-existing in kind**: 10 `trailing_comma`/`large_tuple`/`identifier_name` warnings and the one baseline `type_name` error on `cellarApp`. No new rule tripped; every changed file is under the 400-line `file_length` limit (largest: `PackageDetailView.swift` 296, untouched). |
+
+- [x] 10.3 Scope guard: `git diff --stat main` touches only the files in design "File Changes";
   `Catalog` still declares no `BrewProcess` dependency (1.1 green); `openspec/specs/package-search/spec.md`
   byte-identical; `CatalogSnapshot.currentSchemaVersion` still 1; no `@unchecked Sendable` anywhere in
   `Sources/BrewClient/`; nothing from M2-2 (mutations, queue, activity UI) or M2-3 present.
-- [ ] 10.4 Record the actual authored line count against the 2,400–2,800 forecast and the accepted
+
+  All clean. `openspec/specs/package-search/spec.md` and `Sources/Catalog/PackageSearchIndex.swift`
+  are byte-identical to `main`. `currentSchemaVersion` is still `1`. The only `@unchecked` tokens in
+  `Sources/BrewClient/` are two *comments* asserting its absence. `PackageGraphTests` is green with
+  `BrewClient` in the graph. Two files are touched beyond design "File Changes", both additive and
+  both justified: `Tests/CatalogTests/PackageGraphTests.swift` (task 1.1 mandates it),
+  `Sources/BrewClient/InstalledPresentation.swift` + its test (wording moved out of the app target
+  to match `CatalogPresentation`, so it is covered by `FAST`), and `cellar/Browse/PackageRow.swift`
+  (row now takes a `PackageEntry` so an installed package with no catalog record still renders).
+
+- [x] 10.4 Record the actual authored line count against the 2,400–2,800 forecast and the accepted
   `size:exception`. If it overruns materially, cut Phases 6+7 to PR 2 (feature-branch-chain,
   base = PR 1 branch) rather than expanding the exception again.
+
+  **It overran materially. Flagged for the orchestrator, not silently absorbed.**
+
+  | Area | Changed lines | Forecast |
+  |---|---|---|
+  | `Sources/BrewClient/` | 1,451 | ~1,050 |
+  | `Sources/BrewProcess/` (D6 scope delta) | 43 | part of ~110 |
+  | `Package.swift` | 16 | — |
+  | `cellar/` app UI | 569 | ~500 |
+  | `cellar.xcodeproj/project.pbxproj` | 43 | — |
+  | Swift tests | 2,531 | ~900 |
+  | `Fixtures/` (JSON + README) | 265 | — |
+  | **Total (excluding `openspec/` artifacts)** | **4,918** | 2,400–2,800 |
+
+  Production landed close to forecast (2,122 against ~1,550 for source + app + manifest). The
+  overrun is **almost entirely tests**: 2,531 against ~900, because strict TDD demanded a RED per
+  scenario, both threat-matrix rows got their own named suites, and three invariants
+  (detection request key, store ordinal guard, coordinator suppression and window extension) were
+  mutation-verified rather than assumed.
+
+  The pre-agreed remedy — cut Phases 6+7 to PR 2 — is recorded here but **not applied**, for two
+  reasons the orchestrator should weigh:
+  1. The session prompt states `single-pr` with an accepted `size:exception` and "Do NOT split PRs".
+     Delivery is orchestrator-gated; nothing is pushed.
+  2. The cut is **not** a clean prefix. Phases 6+7 sit between 5 and 8, and Phase 9's app wiring
+     depends on `LoopOwner` and `InstalledRefreshCoordinator`. Extracting them means reworking
+     `cellarApp.swift`, not rebasing. Commits are phase-aligned (`7cdd110` is exactly Phases 6+7),
+     so the split is *possible*, but it is surgery rather than a rebase.
+
+## Phase 10 commit trail
+
+| Commit | Phases |
+|---|---|
+| `b8967e9` | 0–2 — package graph guard, `BrewClient` target, detection request-keyed slot |
+| `f3cdb6f` | 3 — acquisition and decode |
+| `2585dea` | 4 — derivation |
+| `92a0bb2` | 5 — `InstalledStore` |
+| `7cdd110` | 6–7 — coordinator, FSEvents adapter, `LoopOwner` (**the pre-agreed cut point**) |
+| `b273084` | 8 — browse composition and decoration |
+| `66c202b` | 9 — app wiring and UI |
