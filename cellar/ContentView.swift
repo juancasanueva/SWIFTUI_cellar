@@ -8,6 +8,7 @@
 import BrewClient
 import BrewProcess
 import Catalog
+import Persistence
 import SwiftUI
 
 /// The three-column shell: sections, list, detail.
@@ -20,6 +21,10 @@ struct ContentView: View {
     let catalog: CatalogStore
     let installed: InstalledStore
     let operations: OperationCenter
+    /// Favorites, notes and snoozes. Passed down as a store rather than as a
+    /// snapshot because the rows write to it as well as read from it.
+    let metadata: MetadataStore
+    let history: HistoryStore
 
     @State private var section: AppSection = .browse
     @State private var selection: PackageID?
@@ -61,14 +66,26 @@ struct ContentView: View {
                     installed: installed,
                     catalog: catalog,
                     operations: operations,
+                    metadata: metadata,
                     selection: $selection
                 )
                 .navigationSplitViewColumnWidth(min: 300, ideal: 380)
+            case .history:
+                HistoryView(history: history)
+                    .navigationSplitViewColumnWidth(min: 320, ideal: 460)
             }
         } detail: {
             switch section {
             case .home:
                 BrewDetectionSummary(state: brewDetection.state)
+            case .history:
+                // The list column already carries the whole record; a second
+                // pane would only repeat it.
+                ContentUnavailableView(
+                    "History",
+                    systemImage: AppSection.history.systemImage,
+                    description: Text("Every package change Cellar made, newest first.")
+                )
             case .browse, .installed:
                 // The same detail view for both: a package is a package, and
                 // the catalog record is the thing worth reading about it.
@@ -76,6 +93,7 @@ struct ContentView: View {
                     catalog: catalog,
                     installed: installed,
                     operations: operations,
+                    metadata: metadata,
                     id: selection,
                     selection: $selection
                 )
@@ -89,6 +107,8 @@ struct ContentView: View {
         brewDetection: BrewDetectionStore(),
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
         installed: InstalledStore(),
-        operations: OperationCenter()
+        operations: OperationCenter(),
+        metadata: MetadataStore(container: nil),
+        history: HistoryStore(container: nil)
     )
 }

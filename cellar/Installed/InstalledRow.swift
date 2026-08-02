@@ -5,6 +5,7 @@
 
 import BrewClient
 import Catalog
+import Persistence
 import SwiftUI
 
 /// One installed package.
@@ -16,10 +17,14 @@ import SwiftUI
 struct InstalledRow: View {
     let entry: PackageEntry
     let operations: OperationCenter
+    /// Optional so a preview, and a launch whose store would not open, both
+    /// render the row in full with the star simply absent.
+    var metadata: MetadataStore?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
+                if metadata != nil { star }
                 Text(entry.displayName)
                     .font(.body)
                     .lineLimit(1)
@@ -41,6 +46,29 @@ struct InstalledRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Reads `PackageMetadata.isFavorite` and writes through the store.
+    ///
+    /// **Disabled with the reason attached** when the store is unavailable,
+    /// rather than hidden or silently inert: an affordance that does nothing
+    /// when pressed is the failure mode a degraded store must not produce
+    /// (design D4, local-package-metadata LPM6).
+    @ViewBuilder
+    private var star: some View {
+        if let metadata {
+            let isFavorite = metadata.snapshot[entry.id]?.isFavorite == true
+            Button {
+                metadata.setFavorite(!isFavorite, for: entry.id)
+            } label: {
+                Image(systemName: isFavorite ? "star.fill" : "star")
+                    .foregroundStyle(isFavorite ? .yellow : .secondary)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!metadata.availability.isAvailable)
+            .help(metadata.availability.reason ?? (isFavorite ? "Remove from favorites" : "Add to favorites"))
+            .accessibilityLabel(isFavorite ? "Favorite" : "Not a favorite")
+        }
     }
 
     private var badges: [InstalledBadge] {

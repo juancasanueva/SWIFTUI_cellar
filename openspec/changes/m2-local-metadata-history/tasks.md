@@ -427,36 +427,36 @@ sight. This is what keeps Phase 8's views rule-free.
 Views own **no rules**: everything they read is a pure function or a computed property proven in
 Phases 5–7.
 
-- [ ] 8.1 `cellar.xcodeproj/project.pbxproj`: add one `XCSwiftPackageProductDependency` for
+- [x] 8.1 `cellar.xcodeproj/project.pbxproj`: add one `XCSwiftPackageProductDependency` for
   `Persistence` (the `BrewClient` precedent). New source folders need **no** edit — objectVersion 77
   synchronized groups, verified in M2-2 task 8.1. Verify: `xcodebuild build`.
-- [ ] 8.2 `cellar/cellarApp.swift` + `cellar/ContentView.swift`: own `MetadataStore` and
+- [x] 8.2 `cellar/cellarApp.swift` + `cellar/ContentView.swift`: own `MetadataStore` and
   `HistoryStore` as `@State` (the `CatalogStore` precedent) and inject them down. **No
   `.modelContainer(…)` scene modifier and no `@Query`** — adding the modifier later stays a one-line
   option if `@Query` is ever wanted (D3).
-- [ ] 8.3 `cellar/Shell/AppSection.swift` + `ContentView.swift`: add the `.history` sidebar section.
+- [x] 8.3 `cellar/Shell/AppSection.swift` + `ContentView.swift`: add the `.history` sidebar section.
   Favorites is a **filter bar entry, not a sidebar section** (settled Q4).
-- [ ] 8.4 `cellar/Installed/InstalledRow.swift`: star toggle reading `PackageMetadata.isFavorite`,
+- [x] 8.4 `cellar/Installed/InstalledRow.swift`: star toggle reading `PackageMetadata.isFavorite`,
   writing through `MetadataStore.setFavorite(id:)`. Disabled with the reason attached when
   availability is `.unavailable` (D4).
-- [ ] 8.5 `cellar/Installed/InstalledFilterBar.swift`: the favorites filter chip, disabled when no
+- [x] 8.5 `cellar/Installed/InstalledFilterBar.swift`: the favorites filter chip, disabled when no
   metadata is available; the outdated count reads `InstalledBrowse.upgradableIDs` — **the same
   projection the bulk action submits** (II14).
-- [ ] 8.6 `cellar/Installed/InstalledListView.swift`: multi-select. Keep the native
+- [x] 8.6 `cellar/Installed/InstalledListView.swift`: multi-select. Keep the native
   `List(selection:)` `Set<PackageID>` binding for shift/⌘ range selection, VoiceOver and Select All,
   and recover order **beside** it in `@State private var order: [PackageID]` maintained in
   `.onChange(of: selected)` — remove deselected ids in place, then append newly added ids **in
   displayed-row order**, never in `Set` iteration order (which is unstable across launches and would
   make the submission sequence non-reproducible). `order` is the **only** thing `BulkSelection` and
   the confirmation sheet read. The detail binding is written only when `order.count == 1`.
-- [ ] 8.7 `cellar/Installed/BulkActionBar.swift` (create): upgrade and uninstall only, labelled from
+- [x] 8.7 `cellar/Installed/BulkActionBar.swift` (create): upgrade and uninstall only, labelled from
   `BulkSelection`, unavailable rather than inert for an empty or ineligible selection.
-- [ ] 8.8 `cellar/Activity/MutationConfirmation.swift`: render the multi-command form — one sheet
+- [x] 8.8 `cellar/Activity/MutationConfirmation.swift`: render the multi-command form — one sheet
   listing **every** selected package's `displayCommand` verbatim (PM3 sc5).
-- [ ] 8.9 `cellar/Browse/PackageDetailView.swift`: notes editor (plain `TextEditor`, **no Markdown
+- [x] 8.9 `cellar/Browse/PackageDetailView.swift`: notes editor (plain `TextEditor`, **no Markdown
   rendering, no length cap**), star toggle, and the snooze control that stores the currently offered
   version. Unsnooze restores the badge on the next read.
-- [ ] 8.10 Create `cellar/History/HistoryView.swift` and `cellar/History/HistoryRow.swift`: the
+- [x] 8.10 Create `cellar/History/HistoryView.swift` and `cellar/History/HistoryRow.swift`: the
   searchable newest-first list over `HistoryStore`, per-row copy of `commandText`, **no per-entry
   delete control** (IH6 sc4), and a single confirmed all-or-nothing **Clear history** action.
   Verify: `FULL` — builds, links, and the History section renders empty with no store.

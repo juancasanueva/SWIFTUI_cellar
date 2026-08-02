@@ -5,6 +5,7 @@
 
 import BrewClient
 import Catalog
+import Persistence
 import SwiftUI
 
 /// What this machine has installed.
@@ -17,29 +18,45 @@ struct InstalledListView: View {
     let installed: InstalledStore
     let catalog: CatalogStore
     let operations: OperationCenter
+    let metadata: MetadataStore
     @Binding var selection: PackageID?
 
     /// Off by default: a machine with 160 packages installed usually has ~40
     /// the user chose and 120 that came along for the ride.
     @State private var includeDependencies = false
+    @State private var favoritesOnly = false
+
+    /// The native multi-select binding. A `Set` cannot carry order.
+    @State private var selected: Set<PackageID> = []
+    /// The ordered truth, maintained beside it — and the **only** thing the bulk
+    /// bar, the confirmation and the submission ever read (design D8).
+    @State private var order: [PackageID] = []
 
     var body: some View {
         VStack(spacing: 0) {
             InstalledFilterBar(
                 includeDependencies: $includeDependencies,
-                outdatedCount: installed.inventory.outdatedCount,
+                favoritesOnly: $favoritesOnly,
+                upgradableCount: upgradableIDs.count,
+                isFavoritesEnabled: browse.isFavoritesFilterEnabled(metadata: lookup),
                 state: installed.state
             )
-            if !outdated.isEmpty {
+            if !bulk.isEmpty {
+                BulkActionBar(
+                    selection: bulk,
+                    operations: operations,
+                    inventory: installed.inventory
+                )
+            } else if !upgradableIDs.isEmpty {
                 bulkUpgradeBar
             }
             Divider()
 
-            List(selection: $selection) {
+            List(selection: $selected) {
                 if !outdated.isEmpty {
                     Section("Outdated") {
                         ForEach(outdated) { entry in
-                            InstalledRow(entry: entry, operations: operations).tag(entry.id)
+                            row(entry)
                         }
                     }
                 }
@@ -49,13 +66,13 @@ struct InstalledListView: View {
                     // something that is not broken (product decision Q3).
                     Section("Updates itself") {
                         ForEach(selfUpdating) { entry in
-                            InstalledRow(entry: entry, operations: operations).tag(entry.id)
+                            row(entry)
                         }
                     }
                 }
                 Section(includeDependencies ? "All packages" : "Installed on request") {
                     ForEach(rest) { entry in
-                        InstalledRow(entry: entry, operations: operations).tag(entry.id)
+                        row(entry)
                     }
                 }
             }
@@ -64,6 +81,16 @@ struct InstalledListView: View {
                     InstalledEmptyState(state: installed.state)
                 }
             }
+            .onChange(of: selected) { _, current in
+                reconcileOrder(with: current)
+            }
+            .onChange(of: entries) { _, _ in
+                // A package that has left the inventory leaves the selection at
+                // the next refresh, rather than producing an operation for
+                // something the app no longer lists (II13 sc3).
+                let live = Set(entries.map(\.id))
+                selected = selected.intersection(live)
+            }
         }
         // No manual refresh control: the inventory refreshes at launch, on
         // activation, and within the quiet window of any external change, so a
@@ -71,7 +98,30 @@ struct InstalledListView: View {
         .navigationTitle(AppSection.installed.title)
     }
 
-    /// The two bulk entry points.
+    private func row(_ entry: PackageEntry) -> some View {
+        InstalledRow(entry: entry, operations: operations, metadata: metadata)
+            .tag(entry.id)
+    }
+
+    /// Keeps `order` a faithful, ordered view of `selected`.
+    ///
+    /// Two steps, and the split is the whole point. Deselections are removed
+    /// **in place**, so everything still selected keeps its relative order. New
+    /// ids are appended in **displayed-row order**, never in `Set` iteration
+    /// order — which is unstable across launches and would make the submission
+    /// sequence non-reproducible. A single click adds exactly one id, so click
+    /// order is click order; a shift-click or Select All adds many at once, and
+    /// those arrive as the list shows them.
+    private func reconcileOrder(with current: Set<PackageID>) {
+        order.removeAll { !current.contains($0) }
+        let added = entries.map(\.id).filter { current.contains($0) && !order.contains($0) }
+        order.append(contentsOf: added)
+        // The detail column follows a single selection only: two selected
+        // packages have no one package to show.
+        selection = order.count == 1 ? order.first : nil
+    }
+
+    /// The two bulk entry points offered when nothing is selected.
     ///
     /// "Upgrade outdated" fans out into one operation per package, so each gets
     /// its own log, cancel and terminal outcome; "Upgrade all" is the single
@@ -105,30 +155,49 @@ struct InstalledListView: View {
         InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
     }
 
+    /// `nil` when there is no metadata to compose, which is exactly what makes
+    /// a cold or unavailable store degrade to M2-1 behaviour with no branch.
+    private var lookup: MetadataLookup? {
+        metadata.availability.isAvailable ? metadata.snapshot.lookup : nil
+    }
+
     private var entries: [PackageEntry] {
         browse.entries(
             includingDependencies: includeDependencies,
-            catalogLookup: { catalog.package($0) }
+            catalogLookup: { catalog.package($0) },
+            metadata: lookup,
+            favoritesOnly: favoritesOnly
         )
     }
 
-    private var outdated: [PackageEntry] {
-        entries.filter { $0.installed?.isOutdated == true }
+    /// The one projection the label, this section, the badge and the submission
+    /// all read.
+    private var upgradableIDs: [PackageID] {
+        browse.upgradableIDs(includingDependencies: includeDependencies, metadata: lookup)
     }
 
-    /// Everything a bulk upgrade would submit — the one projection the label,
-    /// the button and the submission all read (II14).
-    private var upgradableIDs: [PackageID] {
-        browse.upgradableIDs(includingDependencies: includeDependencies)
+    private var bulk: BulkSelection {
+        BulkSelection(selection: order, entries: entries, metadata: lookup)
+    }
+
+    /// Snoozed packages leave this section — and the count above it — through
+    /// the same set, so the two cannot disagree (II12).
+    private var outdated: [PackageEntry] {
+        let eligible = browse.outdatedIDs(metadata: lookup)
+        return entries.filter { eligible.contains($0.id) }
     }
 
     private var selfUpdating: [PackageEntry] {
         entries.filter { $0.installed?.hasNewerVersion == true }
     }
 
+    /// A snooze never removes a package from the list: it suppresses a badge and
+    /// a count, and hiding the row would take the package out of reach entirely
+    /// (LPM5 sc5, II12 sc4).
     private var rest: [PackageEntry] {
-        entries.filter {
-            $0.installed?.isOutdated != true && $0.installed?.hasNewerVersion != true
+        let outdatedIDs = Set(outdated.map(\.id))
+        return entries.filter {
+            !outdatedIDs.contains($0.id) && $0.installed?.hasNewerVersion != true
         }
     }
 }
@@ -139,6 +208,7 @@ struct InstalledListView: View {
         installed: InstalledStore(),
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
         operations: OperationCenter(),
+        metadata: MetadataStore(container: nil),
         selection: $selection
     )
 }

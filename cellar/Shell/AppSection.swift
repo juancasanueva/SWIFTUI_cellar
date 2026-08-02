@@ -13,6 +13,12 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case home
     case browse
     case installed
+    /// The durable record of every mutation Cellar performed.
+    ///
+    /// Favorites is deliberately **not** here: it is a filter chip on the
+    /// Installed list, because a favorite is a lens on what you have rather
+    /// than a separate place (settled Q4).
+    case history
 
     var id: String { rawValue }
 
@@ -21,6 +27,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .home: "Home"
         case .browse: "Browse"
         case .installed: "Installed"
+        case .history: "History"
         }
     }
 
@@ -29,6 +36,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .home: "house"
         case .browse: "square.grid.2x2"
         case .installed: "shippingbox"
+        case .history: "clock.arrow.circlepath"
         }
     }
 }
