@@ -29,6 +29,8 @@ public actor CatalogSyncEngine {
     private struct InFlightSync {
         let token: Int
         let task: Task<Result<CatalogSnapshot, CatalogSyncError>, Never>
+        /// A cancelled slot is drainable but never joinable.
+        var isCancelled = false
     }
 
     private var inFlight: InFlightSync?
@@ -85,7 +87,13 @@ public actor CatalogSyncEngine {
     /// were fresh (design D3).
     @discardableResult
     public func sync() async -> Result<CatalogSnapshot, CatalogSyncError> {
-        if let current = inFlight { return await current.task.value }
+        while let current = inFlight {
+            guard current.isCancelled else { return await current.task.value }
+            // A cancelled run is not joinable, and it is still unwinding: its
+            // `defer { store.purgeStaging() }` would delete a successor's
+            // download. Drain it, then start fresh work on an empty staging dir.
+            _ = await current.task.value
+        }
 
         nextSyncToken += 1
         let token = nextSyncToken
@@ -112,7 +120,14 @@ public actor CatalogSyncEngine {
     }
 
     /// Cancels the sync in flight, if any.
+    ///
+    /// Marks the slot rather than emptying it. Emptying immediately would let a
+    /// fresh sync start while the cancelled one is still unwinding, and the old
+    /// task's `defer { store.purgeStaging() }` would then delete the new run's
+    /// in-flight download. The mark keeps the invariant — nobody is satisfied by
+    /// cancelled work — without opening that race (design D3).
     public func cancel() {
+        inFlight?.isCancelled = true
         inFlight?.task.cancel()
     }
 

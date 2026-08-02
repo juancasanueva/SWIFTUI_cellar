@@ -274,6 +274,61 @@ struct SyncEngineTests {
         #expect(followUp.value?.packages.map(\.name).sorted() == ["curl", "iterm2", "wget"])
     }
 
+    @Test("A caller arriving after a cancellation starts fresh work instead of inheriting it")
+    func cancelledSyncDoesNotAnswerALaterCaller() async throws {
+        let harness = try SyncHarness()
+        let gate = Gate()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.source.onFetch { await gate.wait() }
+
+        let cancelled = Task { await harness.engine.sync() }
+        await gate.waitForWaiters(atLeast: 1)
+        await harness.engine.cancel()
+
+        // What the fresh work must see, so a pass cannot come from re-reading
+        // whatever the cancelled attempt had already staged.
+        harness.source.script(.payload(Payload.formulae(["wget", "curl"])), for: .formulae)
+        let successor = Task { await harness.engine.sync() }
+        await Self.settle()
+        gate.open()
+
+        #expect(await cancelled.value.error == .cancelled)
+
+        let successorResult = await successor.value
+        #expect(successorResult.error != .cancelled)
+        #expect(successorResult.value?.packages.map(\.name).sorted() == ["curl", "iterm2", "wget"])
+    }
+
+    @Test("The cancelled run finishes purging staging before its successor stages anything")
+    func cancelledRunUnwindsBeforeItsSuccessorStages() async throws {
+        let harness = try SyncHarness(recording: true)
+        let recorder = try #require(harness.recorder)
+        let gate = Gate()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.source.onFetch { await gate.wait() }
+
+        let cancelled = Task { await harness.engine.sync() }
+        await gate.waitForWaiters(atLeast: 1)
+        await harness.engine.cancel()
+        let successor = Task { await harness.engine.sync() }
+        await Self.settle()
+        gate.open()
+
+        _ = await cancelled.value
+        _ = await successor.value
+
+        // Interleaved staging would read create, create, purge, purge — and the
+        // cancelled run's `defer { purgeStaging() }` would take the successor's
+        // download with it.
+        #expect(
+            recorder.stagingLifecycle(at: harness.store.stagingURL) == [
+                .created, .purged, .created, .purged,
+            ]
+        )
+    }
+
     // MARK: - Staging lifecycle
 
     @Test("Cancellation mid-sync reports cancelled and purges staging")
@@ -363,12 +418,23 @@ struct SyncHarness {
     let clock: TestClock
     let time: FakeTimeSource
     let engine: CatalogSyncEngine
+    /// Non-nil when the store was wired to the in-memory recorder instead of the
+    /// real temp directory — the seam an ordering assertion needs.
+    let recorder: FakeCatalogFileSystem?
 
-    init(policy: CatalogRefreshPolicy = CatalogRefreshPolicy(backoff: .zero)) throws {
+    init(
+        policy: CatalogRefreshPolicy = CatalogRefreshPolicy(backoff: .zero),
+        recording: Bool = false
+    ) throws {
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("cellar-sync-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        store = CatalogFileStore(directory: directory)
+        recorder = recording ? FakeCatalogFileSystem() : nil
+        store = if let recorder {
+            CatalogFileStore(directory: directory, fileSystem: recorder)
+        } else {
+            CatalogFileStore(directory: directory)
+        }
         source = FakeCatalogSource()
         clock = TestClock()
         time = FakeTimeSource()
