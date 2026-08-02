@@ -81,10 +81,16 @@ public actor BrewRunner {
             environment: BrewEnvironment.current()
         )
 
-        let id = UUID()
         nextOrdinal += 1
-        let ordinal = nextOrdinal
         let (lines, continuation) = AsyncStream<LogLine>.makeStream()
+        let submission = Submission(
+            id: UUID(),
+            command: command,
+            ordinal: nextOrdinal,
+            lines: lines,
+            continuation: continuation
+        )
+        let id = submission.id
 
         switch command.kind {
         case .read:
@@ -96,24 +102,10 @@ public actor BrewRunner {
                 // spawn leaves no half-built operation behind.
                 throw Self.mapLaunchFailure(error, executableURL: installation.executableURL)
             }
-            install(
-                id: id,
-                command: command,
-                ordinal: ordinal,
-                process: process,
-                lines: lines,
-                continuation: continuation
-            )
+            install(submission, process: process)
 
         case .mutate:
-            enqueueMutation(
-                id: id,
-                command: command,
-                ordinal: ordinal,
-                spec: spec,
-                lines: lines,
-                continuation: continuation
-            )
+            enqueueMutation(submission, spec: spec)
         }
 
         return BrewOperation(id: id, lines: lines, runner: self)
@@ -124,22 +116,10 @@ public actor BrewRunner {
     /// Invariant I2: the tail is read **and** replaced synchronously, before
     /// this method's first `await` — in fact it never suspends at all — so actor
     /// reentrancy cannot reorder the queue no matter how the callers interleave.
-    private func enqueueMutation(
-        id: UUID,
-        command: BrewCommand,
-        ordinal: Int,
-        spec: ProcessSpec,
-        lines: AsyncStream<LogLine>,
-        continuation: AsyncStream<LogLine>.Continuation
-    ) {
+    private func enqueueMutation(_ submission: Submission, spec: ProcessSpec) {
+        let id = submission.id
         let predecessor = mutationTail
-        operations[id] = OperationRecord(
-            id: id,
-            command: command,
-            ordinal: ordinal,
-            lines: lines,
-            continuation: continuation
-        )
+        operations[id] = submission.record()
 
         let gate = Task { [self] in
             await predecessor?.value
@@ -148,7 +128,7 @@ public actor BrewRunner {
         mutationTail = gate
         operations[id]?.completion = gate
 
-        installConsumerCancellation(for: id, on: continuation)
+        installConsumerCancellation(for: id, on: submission.continuation)
         publish()
     }
 
@@ -181,29 +161,15 @@ public actor BrewRunner {
     }
 
     /// Records a launched process and starts pumping its output.
-    private func install(
-        id: UUID,
-        command: BrewCommand,
-        ordinal: Int,
-        process: any LaunchedProcess,
-        lines: AsyncStream<LogLine>,
-        continuation: AsyncStream<LogLine>.Continuation
-    ) {
-        let pump = Self.startPump(reading: process, into: continuation)
-        operations[id] = OperationRecord(
-            id: id,
-            command: command,
-            ordinal: ordinal,
-            lines: lines,
-            continuation: continuation,
-            process: process,
-            pump: pump
-        )
+    private func install(_ submission: Submission, process: any LaunchedProcess) {
+        let id = submission.id
+        let pump = Self.startPump(reading: process, into: submission.continuation)
+        operations[id] = submission.record(process: process, pump: pump)
         // Safe to assign after the fact: this method never suspends, so the
         // task body cannot observe the record before the assignment lands.
         operations[id]?.completion = Task { await self.drive(id) }
 
-        installConsumerCancellation(for: id, on: continuation)
+        installConsumerCancellation(for: id, on: submission.continuation)
         publish()
     }
 

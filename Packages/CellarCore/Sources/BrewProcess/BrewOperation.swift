@@ -1,5 +1,34 @@
 import Foundation
 
+/// Everything decided about an operation at the moment it is submitted.
+///
+/// It exists so the two paths out of `start(_:)` — spawn now, or join the FIFO
+/// gate — take one value rather than six positional arguments each. Both build
+/// their `OperationRecord` from it, so the two paths cannot drift apart in what
+/// they record.
+struct Submission {
+    let id: UUID
+    let command: BrewCommand
+    let ordinal: Int
+    let lines: AsyncStream<LogLine>
+    let continuation: AsyncStream<LogLine>.Continuation
+
+    func record(
+        process: (any LaunchedProcess)? = nil,
+        pump: Task<Void, Never>? = nil
+    ) -> OperationRecord {
+        OperationRecord(
+            id: id,
+            command: command,
+            ordinal: ordinal,
+            lines: lines,
+            continuation: continuation,
+            process: process,
+            pump: pump
+        )
+    }
+}
+
 /// Everything `BrewRunner` tracks about one submitted operation.
 ///
 /// It lives beside the handle rather than inside the actor purely so

@@ -378,17 +378,66 @@ Views own **no rules**: everything they read is a computed property proven in Ph
   Record each observation verbatim in the apply report. Do **not** exercise sudo-requiring casks or
   a real lock conflict: both are covered by probe #7097's captured strings, and neither is inside
   the consented mutation scope.
-- [ ] 9.2 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
+- [x] 9.2 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
   deleted), `FULL` green, `swiftlint` on changed files with new findings separated from the 11
   pre-existing ones. Every changed file **under 400 lines** — check `BrewRunner.swift` and
   `OperationCenter.swift` explicitly. Record every command and its exact result.
-- [ ] 9.3 Scope guard: `git diff --stat main` touches only the files in design "File Changes" (plus
+
+  **Results.**
+  - `swift test --package-path Packages/CellarCore` → **432 tests in 56 suites passed**
+    (Phase 0 baseline was 345 in 47; +87 tests, +9 suites, none deleted).
+  - `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'
+    -skip-testing:cellarUITests` → **TEST SUCCEEDED**.
+  - `xcodebuild clean build -project cellar.xcodeproj -scheme cellar` → **BUILD SUCCEEDED**, and the
+    build log shows the new `cellar/Activity/*.swift` compiled into the target.
+  - `swiftlint` → **33 source findings, exactly the Phase 0 count. Zero new.** (The two entries that
+    differ from the baseline snapshot are the *same* pre-existing findings at shifted line numbers:
+    `FSEventsInstalledObserver` `function_parameter_count` 159→185, `CancellationTests`
+    `large_tuple` 13→14.) The tasks text's "11 pre-existing" matches no measurement taken here —
+    the repo has **no `.swiftlint.yml`**, and a bare `swiftlint` run reports 85 findings of which 52
+    are inside `Packages/CellarCore/.build/**` generated code. 33 is the source-file count, on
+    `main` and on this branch alike.
+  - Every changed file is under 400 lines. `BrewRunner.swift` **332**,
+    `OperationCenter.swift` **313**. Four test files and one production file needed splitting to get
+    there — see 9.4.
+- [x] 9.3 Scope guard: `git diff --stat main` touches only the files in design "File Changes" (plus
   `InstalledObserverTests.swift`, which task 2.9 mandates); `Catalog` still declares no `BrewProcess`
   dependency (`PackageGraphTests` green); `CellarTestSupport` declares **no** dependencies and is
   linked by no app target; exactly one `TestClock` exists in the repo; no `@unchecked Sendable` in
   `Sources/BrewClient/` or `Sources/CellarTestSupport/`; nothing from M2-3 (favorites, notes, history,
   persistence) present.
-- [ ] 9.4 Record the actual authored line count against the 4,000–5,000 forecast and the accepted
+
+  **Results.** All hold. `Catalog` declares no dependencies (`PackageGraphTests` green inside the 432).
+  `CellarTestSupport` declares no dependencies and is a `.target`, not a product, so no app target
+  links it. Exactly one `class TestClock` in the repo. No `@unchecked Sendable` conformance anywhere
+  in `Sources/` — the two textual hits in `FSEventsInstalledObserver.swift` are both inside comments
+  arguing that none exists. No favorites, notes, history or persistence anywhere.
+
+  Files beyond the design's "File Changes", each with its reason:
+  - `Tests/BrewClientTests/InstalledObserverTests.swift` — mandated by 2.9.
+  - `Tests/CatalogTests/Fakes/FakeTimeSource.swift` — the `CatalogTests` `TestClock.swift` also held
+    `FakeTimeSource`, which is a wall-clock seam and not a `Clock`; the file was `git mv`d and reduced.
+  - `Tests/BrewClientTests/Fakes/{RecordingProcessLauncher,OperationCenterHarness}.swift` — the
+    controllable launcher Phase 7 needs, and the harness the two centre suites share.
+  - `Tests/BrewClientTests/{InstalledFilterComposition,InstalledStoreFreshness,InstalledRefreshDefect}Tests.swift`
+    and `OperationCenterProjectionTests.swift` — file-length splits, see 9.4.
+  - `Tests/{BrewProcess,Catalog}Tests/**` import edits — the `CellarTestSupport` use sites from 1.3.
+  - `cellar/Activity/MutationMenu.swift` — the per-package affordance the design implied but did not
+    name as its own file.
+- [x] 9.4 Record the actual authored line count against the 4,000–5,000 forecast and the accepted
   `size:exception`. If it overruns materially, the pre-agreed cut is **Phases 1 + 2** (D9 + D8) as
   PR 1 — a clean prefix, unlike M2-1's mid-stack cut — leaving Phases 3–8 as PR 2 on a
   feature-branch-chain with base = PR 1 branch.
+
+  **Result: 4,538 changed lines** (4,180 insertions + 358 deletions) excluding `openspec/`.
+  Against the 4,000–5,000 forecast that is **inside the band** and inside the 5,200 attempt-ledger
+  cap, so the pre-agreed Phases 1+2 cut was **not** taken. With `openspec/` artifacts the branch is
+  6,031 changed lines across 55 files. This is the largest change in the project's history and the
+  accepted `size:exception` is what carries it.
+
+  Forecast accuracy, for the next milestone's calibration: the estimate held at the total but not
+  per phase. Phase 6 production ran ~2× its ~45-line estimate, which pushed `BrewRunner.swift` to
+  412 and forced `OperationRecord` out into `BrewOperation.swift` on top of the planned D11 move.
+  Test files overran hardest: `OperationCenterTests` reached 567 lines and tripped
+  `type_body_length` at **error** severity, and three inventory suites breached `file_length`. All
+  five were split as pure moves with the test count unchanged at 432 either side.
