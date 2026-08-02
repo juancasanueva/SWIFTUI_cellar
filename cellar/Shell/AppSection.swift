@@ -12,6 +12,7 @@ import SwiftUI
 enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case home
     case browse
+    case installed
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "Home"
         case .browse: "Browse"
+        case .installed: "Installed"
         }
     }
 
@@ -26,6 +28,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "house"
         case .browse: "square.grid.2x2"
+        case .installed: "shippingbox"
         }
     }
 }

@@ -7,7 +7,8 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "BrewProcess", targets: ["BrewProcess"]),
-        .library(name: "Catalog", targets: ["Catalog"])
+        .library(name: "Catalog", targets: ["Catalog"]),
+        .library(name: "BrewClient", targets: ["BrewClient"])
     ],
     targets: [
         .target(
@@ -28,6 +29,19 @@ let package = Package(
         .testTarget(
             name: "CatalogTests",
             dependencies: ["Catalog"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // The only target that sees both libraries. The edge is one-directional:
+        // nothing depends back on it, so `Catalog` stays brew-free (design D1).
+        .target(
+            name: "BrewClient",
+            dependencies: ["BrewProcess", "Catalog"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "BrewClientTests",
+            dependencies: ["BrewClient"],
             resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )

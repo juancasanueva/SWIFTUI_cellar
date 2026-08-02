@@ -3,16 +3,22 @@
 //  cellar
 //
 
+import BrewClient
 import Catalog
 import SwiftUI
 
-/// The three predicates the persisted catalog can actually answer.
+/// The catalog predicates, plus the installed-state mode.
 ///
-/// There is no "installed" or "outdated" toggle here, and that is not an
-/// omission: the catalog is the published index, and it has no idea what this
-/// machine has installed (package-search PS4).
+/// The two are not the same kind of thing and are not stored together:
+/// `SearchFilters` is answered by the published index, while the installed-state
+/// mode is *composed* above it from the local snapshot. The catalog still has no
+/// idea what this machine has installed (package-search PS4) — this bar simply
+/// renders both controls next to each other.
 struct CatalogFilterBar: View {
     @Binding var filters: SearchFilters
+    @Binding var mode: InstalledFilterMode
+    /// False when there is no inventory, which forces the mode to `all`.
+    let isInstalledFilterEnabled: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -24,6 +30,20 @@ struct CatalogFilterBar: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
+
+            Picker("Installed state", selection: $mode) {
+                ForEach(InstalledFilterMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+            .disabled(!isInstalledFilterEnabled)
+            .help(
+                isInstalledFilterEnabled
+                    ? "Filter by what this machine has installed"
+                    : "Needs Homebrew: Cellar cannot tell what is installed without it"
+            )
 
             Toggle("Hide deprecated", isOn: $filters.excludeDeprecated)
                 .toggleStyle(.checkbox)
@@ -69,5 +89,6 @@ struct CatalogFilterBar: View {
 
 #Preview {
     @Previewable @State var filters = SearchFilters()
-    return CatalogFilterBar(filters: $filters)
+    @Previewable @State var mode = InstalledFilterMode.all
+    return CatalogFilterBar(filters: $filters, mode: $mode, isInstalledFilterEnabled: true)
 }

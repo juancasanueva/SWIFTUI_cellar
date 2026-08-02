@@ -3,6 +3,7 @@
 //  cellar
 //
 
+import BrewClient
 import Catalog
 import SwiftUI
 
@@ -12,9 +13,16 @@ import SwiftUI
 /// the main actor as the query changes, so there is no debounce, no loading
 /// spinner per keystroke, and no chance of an older query's results arriving
 /// last (design D4).
+///
+/// Installed state is composed on top of those results rather than pushed into
+/// the index. The rule lives in `InstalledBrowse`, in `BrewClient`, where it is
+/// unit-tested; this view only owns the picker.
 struct BrowseView: View {
     let catalog: CatalogStore
+    let installed: InstalledStore
     @Binding var selection: PackageID?
+
+    @State private var mode: InstalledFilterMode = .all
 
     var body: some View {
         @Bindable var catalog = catalog
@@ -23,15 +31,19 @@ struct BrowseView: View {
             SyncBanner(status: catalog.syncStatus, packageCount: catalog.packageCount) {
                 Task { await catalog.refreshNow() }
             }
-            CatalogFilterBar(filters: $catalog.filters)
+            CatalogFilterBar(
+                filters: $catalog.filters,
+                mode: $mode,
+                isInstalledFilterEnabled: browse.isFilterEnabled
+            )
             Divider()
 
-            List(catalog.results, selection: $selection) { package in
-                PackageRow(package: package)
-                    .tag(package.id)
+            List(rows, selection: $selection) { entry in
+                PackageRow(entry: entry)
+                    .tag(entry.id)
             }
             .overlay {
-                if catalog.results.isEmpty {
+                if rows.isEmpty {
                     EmptyResults(query: catalog.query, isReady: catalog.isReady)
                 }
             }
@@ -52,6 +64,19 @@ struct BrowseView: View {
                 .disabled(catalog.syncStatus.isBusy)
             }
         }
+    }
+
+    private var browse: InstalledBrowse {
+        InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+    }
+
+    private var rows: [PackageEntry] {
+        browse.rows(
+            mode: mode,
+            query: catalog.query,
+            catalogResults: catalog.results,
+            catalogLookup: { catalog.package($0) }
+        )
     }
 }
 
@@ -79,6 +104,7 @@ private struct EmptyResults: View {
     @Previewable @State var selection: PackageID?
     return BrowseView(
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
+        installed: InstalledStore(),
         selection: $selection
     )
 }

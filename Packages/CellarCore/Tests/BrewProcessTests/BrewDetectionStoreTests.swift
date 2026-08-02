@@ -198,4 +198,79 @@ struct BrewDetectionStoreTests {
 
         #expect(store.state == .absent)
     }
+
+    // MARK: - Request-keyed coalescing
+
+    private static let pathA = URL(fileURLWithPath: "/opt/a/bin/brew")
+    private static let pathB = URL(fileURLWithPath: "/opt/b/bin/brew")
+
+    private func detected(at path: URL) -> BrewDetectionState {
+        .detected(
+            BrewInstallation(
+                executableURL: path,
+                prefix: .custom(path),
+                version: BrewVersion(major: 4, minor: 2, patch: 0)
+            )
+        )
+    }
+
+    private func pathKeyedLocator() -> FakeBrewLocator {
+        FakeBrewLocator(
+            resultsByPath: [
+                Self.pathA: detected(at: Self.pathA),
+                Self.pathB: detected(at: Self.pathB)
+            ],
+            gated: true
+        )
+    }
+
+    @Test("A configured path changed mid-evaluation is not answered by the previous path")
+    func changedPathIsNotAnsweredByTheEvaluationInFlight() async {
+        let locator = pathKeyedLocator()
+        let store = BrewDetectionStore(locator: locator, configuredPath: Self.pathA)
+
+        let first = Task { await store.refresh() }
+        await locator.waitForCalls(atLeast: 1)
+
+        store.configuredPath = Self.pathB
+        let second = Task { await store.refresh() }
+        await locator.waitForCalls(atLeast: 2)
+
+        // The locator was genuinely asked about B; joining A's evaluation would
+        // have left `configuredPaths` holding nothing but A.
+        #expect(locator.callCount(for: Self.pathB) >= 1)
+
+        locator.release(Self.pathB)
+        await second.value
+        #expect(store.state == detected(at: Self.pathB))
+
+        // A settles last, on purpose: its answer is stale the moment B was
+        // asked, and the ordinal guard is the only thing that keeps it out.
+        locator.release(Self.pathA)
+        await first.value
+        await settle()
+
+        #expect(store.state == detected(at: Self.pathB))
+        #expect(locator.callCount(for: Self.pathA) == 1)
+    }
+
+    @Test("Two callers asking about the same path still coalesce onto one probe")
+    func identicalRequestsStillCoalesce() async {
+        let locator = pathKeyedLocator()
+        let store = BrewDetectionStore(locator: locator, configuredPath: Self.pathA)
+
+        let first = Task { await store.refresh() }
+        await locator.waitForCalls(atLeast: 1)
+        let second = Task { await store.refresh() }
+        await settle()
+
+        #expect(locator.callCount == 1)
+
+        locator.release(Self.pathA)
+        await first.value
+        await second.value
+
+        #expect(locator.callCount == 1)
+        #expect(store.state == detected(at: Self.pathA))
+    }
 }
