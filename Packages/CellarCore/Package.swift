@@ -8,7 +8,8 @@ let package = Package(
     products: [
         .library(name: "BrewProcess", targets: ["BrewProcess"]),
         .library(name: "Catalog", targets: ["Catalog"]),
-        .library(name: "BrewClient", targets: ["BrewClient"])
+        .library(name: "BrewClient", targets: ["BrewClient"]),
+        .library(name: "Persistence", targets: ["Persistence"])
     ],
     targets: [
         // Test-only helpers shared by the three test targets (design D9, M2-0 D5).
@@ -52,6 +53,20 @@ let package = Package(
             name: "BrewClientTests",
             dependencies: ["BrewClient", "CellarTestSupport"],
             resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // The outermost node of the graph (design D1): it sees `BrewClient` so the
+        // history draft -> row mapping stays testable in CellarCore, and **nothing
+        // depends back on it**, which is what keeps `Catalog` brew-free (CS1) and
+        // keeps SwiftData out of every other target.
+        .target(
+            name: "Persistence",
+            dependencies: ["BrewClient"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "PersistenceTests",
+            dependencies: ["Persistence", "CellarTestSupport"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]

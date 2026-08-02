@@ -1,0 +1,217 @@
+# Delta for installation-history
+
+New capability — there is no `openspec/specs/installation-history/spec.md` yet. Delta summary:
+**7 ADDED requirements / 21 scenarios**. Nothing is MODIFIED, REMOVED or RENAMED.
+
+A durable, append-only record of every mutation Cellar itself performed — date, package, verb,
+version from→to, outcome and the exact argv — its searchable projection, its keep-all retention, and
+the manual all-or-nothing clear action. Owned by `Packages/CellarCore`.
+
+This capability owns **what is recorded, how long it is kept, and how it is queried**. When a
+terminal outcome occurs, and the one-record-per-terminal-outcome obligation, are owned by
+`operation-activity` and referenced here, never restated. The execution layer's own bounded in-memory
+records are owned by `brew-execution` and are a different thing entirely: this store is the durable
+one.
+
+Binding product decisions, settled before this delta was written (Engram `#7111`, user-confirmed
+2026-08-02) and stated below as facts, not open questions:
+
+- **"Upgrade All" is one grouped entry** — no per-package attribution and no inventory-snapshot
+  diffing.
+- **History records Cellar-submitted mutations only** — externally detected brew changes are
+  deliberately not logged, even though the change observer makes them visible.
+- **Clear history is all-or-nothing with a confirmation** — selective row deletion is out of scope.
+- **Retention is keep-all** — nothing is auto-evicted by age or by count.
+
+## ADDED Requirements
+
+### Requirement: Every mutation Cellar performs writes exactly one durable entry
+
+Each mutation Cellar submits MUST produce exactly one history entry — never zero and never two — at
+that operation's terminal outcome. The entry MUST carry the date it reached that outcome, the package
+identity it acted on when it has one, the mutation verb, the version it moved from and the version it
+moved to when both are known, its outcome, and the exact argv the operation ran. Success, failure
+(including the typed sudo and busy failures) and cancellation MUST each be recorded. Nothing MUST be
+written before the operation reaches a terminal outcome. Entries MUST survive an app relaunch.
+
+#### Scenario: A successful mutation writes one complete entry
+
+- GIVEN an install submitted for the cask `iterm2` that exits with status 0
+- WHEN it reaches its terminal outcome
+- THEN exactly one history entry exists for it
+- AND it carries the cask identity, the install verb, the successful outcome and the argv
+  `install --cask iterm2`
+
+#### Scenario: Failed and cancelled mutations are recorded too
+
+- GIVEN one mutation that exits non-zero, one that ends in the typed busy failure, and one that is
+  cancelled while running
+- WHEN each reaches its terminal outcome
+- THEN exactly one entry exists for each
+- AND each entry names its own outcome rather than a generic one
+
+#### Scenario: Nothing is written before the terminal outcome
+
+- GIVEN a mutation that has been submitted and is still running
+- WHEN the history is read
+- THEN it contains no entry for that operation
+
+#### Scenario: History survives a relaunch
+
+- GIVEN three recorded entries
+- WHEN the store is closed and reopened against the same location
+- THEN all three entries are present with their original fields
+
+### Requirement: A grouped upgrade is one entry; a fanned-out selection is one entry per package
+
+"Upgrade all" MUST be recorded as a single entry for the whole grouped operation, carrying the argv
+that ran and naming no package identity. The capability MUST NOT derive per-package entries for it by
+diffing inventory snapshots either side of the operation. A selected bulk action, which the mutation
+capability expands into one invocation per selected package, MUST therefore produce one entry per
+selected package, each naming exactly that package.
+
+#### Scenario: Upgrade all is one grouped entry
+
+- GIVEN an upgrade-all operation that upgraded several packages and exited successfully
+- WHEN the history is read
+- THEN exactly one entry was written for it, carrying the argv `upgrade`
+- AND it names no package identity, and no per-package entries were derived from an inventory diff
+
+#### Scenario: A bulk selection produces one entry per package
+
+- GIVEN a bulk upgrade over the formulae `wget` and `git` and the cask `iterm2`, in that order
+- WHEN all three operations reach their terminal outcomes
+- THEN exactly three entries exist, one naming each package, each carrying its own single-package
+  argv
+
+### Requirement: Only mutations submitted through Cellar are recorded
+
+The history MUST record mutations Cellar itself submitted. A change made outside the app MUST NOT
+produce an entry, even though the app detects it: an external change signal, and the re-snapshot it
+triggers, MUST write nothing. Read-only probes — inventory refreshes, catalog syncs, detection —
+MUST write nothing.
+
+#### Scenario: An externally installed package is not logged
+
+- GIVEN a running inventory and a change source under test control
+- WHEN the underlying snapshot gains a package and a change signal is emitted, and the quiet window
+  elapses
+- THEN the inventory lists the new package
+- AND the history contains no entry for it
+
+#### Scenario: Read-only work writes nothing
+
+- GIVEN an empty history
+- WHEN an inventory refresh, a catalog sync and a brew detection all complete
+- THEN the history is still empty
+
+### Requirement: History is append-only and never auto-evicted
+
+Retention MUST be keep-all: the capability MUST NOT impose an entry-count cap, an age cap, a rotation
+policy or any other automatic eviction. An entry MUST NOT be rewritten or amended once written — a
+later operation on the same package MUST append a new entry rather than update the previous one.
+Retention here MUST be independent of the execution layer's own bounded in-memory records: retiring
+those records MUST NOT remove or alter any history entry.
+
+#### Scenario: Nothing is evicted as entries accumulate
+
+- GIVEN a history to which a large number of entries has been appended across several sessions
+- WHEN the history is read
+- THEN every appended entry is still present
+- AND no entry was removed by age or by count
+
+#### Scenario: A later mutation appends rather than amends
+
+- GIVEN an entry recording an install of the formula `wget`
+- WHEN `wget` is later uninstalled and that operation reaches its terminal outcome
+- THEN two entries exist for `wget`
+- AND the first entry's fields are unchanged
+
+#### Scenario: Retiring an execution record does not touch history
+
+- GIVEN a recorded entry whose operation's execution-layer record has been retired
+- WHEN the history is read
+- THEN the entry is still present with all of its fields
+
+### Requirement: History is searchable and ordered newest first
+
+The history MUST be readable as an ordered projection, newest entry first. It MUST support a text
+search that matches at least the package name, the mutation verb and the argv, case-insensitively. An
+empty search MUST return every entry. A search matching nothing MUST return an empty result without
+removing, hiding or altering any stored entry.
+
+#### Scenario: Entries are ordered newest first
+
+- GIVEN three entries recorded in a known order
+- WHEN the history projection is read with an empty search
+- THEN all three are returned, most recent first
+
+#### Scenario: Searching by package name narrows the list
+
+- GIVEN entries for `wget` and for `iterm2`
+- WHEN the history is searched for `WGET`
+- THEN only the `wget` entry is returned
+
+#### Scenario: Searching by verb narrows the list
+
+- GIVEN one install entry and one uninstall entry
+- WHEN the history is searched for `uninstall`
+- THEN only the uninstall entry is returned
+
+#### Scenario: A search matching nothing is empty and non-destructive
+
+- GIVEN a history of three entries
+- WHEN it is searched for a term matching none of them, and then searched again with an empty term
+- THEN the first search returns nothing and the second returns all three
+
+### Requirement: Clear history is a single confirmed all-or-nothing action
+
+Clearing the history MUST require an explicit confirmation before anything is deleted. A confirmed
+clear MUST remove every entry and MUST remove nothing else — locally stored favorites, notes and
+snoozes MUST be untouched. Declining MUST delete nothing. The capability MUST NOT offer selective or
+per-entry deletion.
+
+#### Scenario: A confirmed clear empties the history
+
+- GIVEN a history of several entries
+- WHEN clear is requested and confirmed
+- THEN the history is empty
+
+#### Scenario: Declining deletes nothing
+
+- GIVEN a history of several entries and a pending clear confirmation
+- WHEN the confirmation is declined
+- THEN every entry is still present
+
+#### Scenario: Clearing history leaves local metadata intact
+
+- GIVEN stored favorites, notes and snoozes alongside a non-empty history
+- WHEN clear is requested and confirmed
+- THEN the history is empty
+- AND every favorite, note and snooze is still readable with its original value
+
+#### Scenario: No per-entry delete affordance exists
+
+- WHEN the controls the history projection exposes for a single entry are enumerated
+- THEN no delete or remove control is present for that entry
+
+### Requirement: A recording failure never changes a mutation's outcome
+
+Recording MUST be a side effect of a terminal outcome, never a precondition of it. If the recorder is
+absent, unavailable, or fails while writing, the operation MUST still reach and report its own
+terminal outcome unchanged, the forced inventory re-snapshot owed at that outcome MUST still happen
+exactly once, and nothing MUST be thrown into the operation's path.
+
+#### Scenario: An absent recorder does not affect the operation
+
+- GIVEN no history recorder is configured
+- WHEN a mutation reaches a successful terminal outcome
+- THEN it is reported as successful and exactly one inventory re-snapshot is forced
+- AND nothing is thrown
+
+#### Scenario: A failing recorder does not affect the operation
+
+- GIVEN a recorder that fails on every write
+- WHEN a mutation reaches its terminal outcome
+- THEN the operation's reported outcome is identical to the same run with a working recorder
+- AND exactly one inventory re-snapshot is forced
