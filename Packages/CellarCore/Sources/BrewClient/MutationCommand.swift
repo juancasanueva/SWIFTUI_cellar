@@ -25,6 +25,32 @@ import Catalog
 // into arguments. That is what keeps the rendering incapable of changing what
 // runs.
 
+/// A package identity, proven safe to put in argv (design D9).
+///
+/// The four package-naming cases take this rather than a bare `PackageID`, so
+/// an unvalidated command is **unrepresentable** rather than merely discouraged.
+/// M2-2 made the same claim while two app-target call sites built cases straight
+/// from a raw identity; fixing those two would have left the third one to come.
+/// A guard the compiler enforces does not have a third one to come.
+public struct PackageTarget: Sendable, Hashable {
+    public let id: PackageID
+
+    public var kind: PackageKind { id.kind }
+    public var name: String { id.name }
+
+    /// Fails when the name could be read by brew as an option rather than as a
+    /// package. The single gate: `FormulaID` and `CaskID` are expressed over it,
+    /// so `isSafe` has exactly one definition.
+    public init?(_ id: PackageID) {
+        guard MutationName.isSafe(id.name) else { return nil }
+        self.id = id
+    }
+
+    public init?(kind: PackageKind, name: String) {
+        self.init(PackageID(kind: kind, name: name))
+    }
+}
+
 /// A formula, proven to be one.
 ///
 /// The wrapper exists so "pin a cask" is unrepresentable rather than validated
@@ -32,14 +58,15 @@ import Catalog
 /// "neither kind selected". It does no argv work: the kind flag comes from the
 /// `PackageID` like every other command's.
 public struct FormulaID: Sendable, Hashable {
-    public let id: PackageID
+    public let target: PackageTarget
 
+    public var id: PackageID { target.id }
     public var name: String { id.name }
 
     /// Fails when `id` is a cask, or when its name could be read as an option.
     public init?(_ id: PackageID) {
-        guard id.kind == .formula, MutationName.isSafe(id.name) else { return nil }
-        self.id = id
+        guard id.kind == .formula, let target = PackageTarget(id) else { return nil }
+        self.target = target
     }
 
     public init?(name: String) {
@@ -51,14 +78,15 @@ public struct FormulaID: Sendable, Hashable {
 ///
 /// `--zap` is cask-only in brew, so a formula literally cannot spell it.
 public struct CaskID: Sendable, Hashable {
-    public let id: PackageID
+    public let target: PackageTarget
 
+    public var id: PackageID { target.id }
     public var name: String { id.name }
 
     /// Fails when `id` is a formula, or when its name could be read as an option.
     public init?(_ id: PackageID) {
-        guard id.kind == .cask, MutationName.isSafe(id.name) else { return nil }
-        self.id = id
+        guard id.kind == .cask, let target = PackageTarget(id) else { return nil }
+        self.target = target
     }
 
     public init?(name: String) {
@@ -87,10 +115,10 @@ enum MutationName {
 /// mid-batch failure attributes to exactly one package (design D1, user ruling
 /// 2026-08-02).
 public enum MutationCommand: Sendable, Equatable {
-    case install(PackageID)
-    case uninstall(PackageID)
-    case reinstall(PackageID)
-    case upgrade(PackageID)
+    case install(PackageTarget)
+    case uninstall(PackageTarget)
+    case reinstall(PackageTarget)
+    case upgrade(PackageTarget)
     /// `brew uninstall --cask --zap` — cask-only, and separately confirmed.
     case zap(CaskID)
     /// Plain `brew upgrade`: no name, no kind flag, brew's own defaults
@@ -102,31 +130,31 @@ public enum MutationCommand: Sendable, Equatable {
     // MARK: - Failable construction
 
     public static func install(formula name: String) -> MutationCommand? {
-        FormulaID(name: name).map { .install($0.id) }
+        FormulaID(name: name).map { .install($0.target) }
     }
 
     public static func install(cask name: String) -> MutationCommand? {
-        CaskID(name: name).map { .install($0.id) }
+        CaskID(name: name).map { .install($0.target) }
     }
 
     public static func uninstall(formula name: String) -> MutationCommand? {
-        FormulaID(name: name).map { .uninstall($0.id) }
+        FormulaID(name: name).map { .uninstall($0.target) }
     }
 
     public static func uninstall(cask name: String) -> MutationCommand? {
-        CaskID(name: name).map { .uninstall($0.id) }
+        CaskID(name: name).map { .uninstall($0.target) }
     }
 
     public static func reinstall(formula name: String) -> MutationCommand? {
-        FormulaID(name: name).map { .reinstall($0.id) }
+        FormulaID(name: name).map { .reinstall($0.target) }
     }
 
     public static func upgrade(formula name: String) -> MutationCommand? {
-        FormulaID(name: name).map { .upgrade($0.id) }
+        FormulaID(name: name).map { .upgrade($0.target) }
     }
 
     public static func upgrade(cask name: String) -> MutationCommand? {
-        CaskID(name: name).map { .upgrade($0.id) }
+        CaskID(name: name).map { .upgrade($0.target) }
     }
 
     public static func zap(cask name: String) -> MutationCommand? {
@@ -151,9 +179,9 @@ public enum MutationCommand: Sendable, Equatable {
     /// name and silently recurse.
     public static func naming(
         _ id: PackageID,
-        _ build: (PackageID) -> MutationCommand
+        _ build: (PackageTarget) -> MutationCommand
     ) -> MutationCommand? {
-        MutationName.isSafe(id.name) ? build(id) : nil
+        PackageTarget(id).map(build)
     }
 
     // MARK: - Projection
@@ -161,8 +189,8 @@ public enum MutationCommand: Sendable, Equatable {
     /// The package this command acts on, when it acts on one.
     public var packageID: PackageID? {
         switch self {
-        case .install(let id), .uninstall(let id), .reinstall(let id), .upgrade(let id):
-            id
+        case .install(let target), .uninstall(let target), .reinstall(let target), .upgrade(let target):
+            target.id
         case .zap(let cask):
             cask.id
         case .pin(let formula), .unpin(let formula):
@@ -175,22 +203,22 @@ public enum MutationCommand: Sendable, Equatable {
     /// The argv vector, excluding the `brew` executable itself.
     public var arguments: [String] {
         switch self {
-        case .install(let id):
-            [Verb.install.rawValue] + Self.target(id)
-        case .uninstall(let id):
-            [Verb.uninstall.rawValue] + Self.target(id)
-        case .reinstall(let id):
-            [Verb.reinstall.rawValue] + Self.target(id)
-        case .upgrade(let id):
-            [Verb.upgrade.rawValue] + Self.target(id)
+        case .install(let target):
+            [Verb.install.rawValue] + Self.vector(naming: target.id)
+        case .uninstall(let target):
+            [Verb.uninstall.rawValue] + Self.vector(naming: target.id)
+        case .reinstall(let target):
+            [Verb.reinstall.rawValue] + Self.vector(naming: target.id)
+        case .upgrade(let target):
+            [Verb.upgrade.rawValue] + Self.vector(naming: target.id)
         case .zap(let cask):
             [Verb.uninstall.rawValue, Flag.cask.rawValue, Flag.zap.rawValue, cask.name]
         case .upgradeAll:
             [Verb.upgrade.rawValue]
         case .pin(let formula):
-            [Verb.pin.rawValue] + Self.target(formula.id)
+            [Verb.pin.rawValue] + Self.vector(naming: formula.id)
         case .unpin(let formula):
-            [Verb.unpin.rawValue] + Self.target(formula.id)
+            [Verb.unpin.rawValue] + Self.vector(naming: formula.id)
         }
     }
 
@@ -240,7 +268,7 @@ public enum MutationCommand: Sendable, Equatable {
 
     /// The kind flag and the name, in that order. The single place a package
     /// becomes two argv elements.
-    private static func target(_ id: PackageID) -> [String] {
+    private static func vector(naming id: PackageID) -> [String] {
         let flag: Flag = switch id.kind {
         case .formula: .formula
         case .cask: .cask

@@ -66,7 +66,9 @@ struct PackageDetailView: View {
             MutationMenu(center: operations, entry: entry)
                 .menuStyle(.borderlessButton)
                 .fixedSize()
-            CopyCommandButton(text: MutationCommand.install(package.id).displayCommand)
+            if let target = PackageTarget(package.id) {
+                CopyCommandButton(text: MutationCommand.install(target).displayCommand)
+            }
             if let guidance = operations.unavailableGuidance {
                 Text(guidance)
                     .font(.caption)

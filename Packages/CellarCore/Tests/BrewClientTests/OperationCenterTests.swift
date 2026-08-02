@@ -23,7 +23,7 @@ struct OperationCenterTests {
     @Test("A submission produces one item whose identity and copy text never change")
     func aSubmissionProducesOneStableItem() async throws {
         let harness = CenterHarness()
-        let command = MutationCommand.install(CenterHarness.iterm)
+        let command = MutationCommand.install(PackageTarget(CenterHarness.iterm)!)
 
         let item = harness.center.submit(command)
         await harness.settle()
@@ -46,7 +46,7 @@ struct OperationCenterTests {
     @Test("The item carries the exact argv in every state")
     func theItemCarriesTheExactArgv() async throws {
         let harness = CenterHarness()
-        let item = harness.center.submit(.install(CenterHarness.iterm))
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.iterm)!))
         await harness.settle()
 
         #expect(item.arguments == ["install", "--cask", "iterm2"])
@@ -62,7 +62,7 @@ struct OperationCenterTests {
     @Test("The log drains verbatim, tagged, in emission order")
     func theLogDrainsVerbatim() async throws {
         let harness = CenterHarness()
-        let item = harness.center.submit(.install(CenterHarness.wget))
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
         await harness.launcher.waitForLaunches(atLeast: 1)
         let process = harness.launcher.launchedProcesses[0]
 
@@ -84,7 +84,7 @@ struct OperationCenterTests {
     @Test("The 2,001st line evicts the oldest and raises the truncation marker")
     func theLogRingEvictsTheOldest() async throws {
         let harness = CenterHarness()
-        let item = harness.center.submit(.install(CenterHarness.wget))
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
         await harness.launcher.waitForLaunches(atLeast: 1)
         let process = harness.launcher.launchedProcesses[0]
 
@@ -114,7 +114,7 @@ struct OperationCenterTests {
 
     // MARK: - Per-package fan-out (PM2 sc2 — the settled shape)
 
-    /// The user ruling: a selected upgrade is N ordinary `.upgrade(id)`
+    /// The user ruling: a selected upgrade is N ordinary `.upgrade(PackageTarget(id)!)`
     /// submissions, not one grouped invocation. There is no `upgradeSelected`
     /// case anywhere in the API.
     @Test("A selection fans out into exactly one operation per package, in order")

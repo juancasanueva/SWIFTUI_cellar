@@ -31,13 +31,13 @@ struct MutationCommandTests {
     }
 
     static let argvCases: [ArgvCase] = [
-        ArgvCase(command: .install(wget), argv: ["install", "--formula", "wget"]),
-        ArgvCase(command: .install(iterm), argv: ["install", "--cask", "iterm2"]),
-        ArgvCase(command: .uninstall(iterm), argv: ["uninstall", "--cask", "iterm2"]),
-        ArgvCase(command: .uninstall(wget), argv: ["uninstall", "--formula", "wget"]),
-        ArgvCase(command: .reinstall(git), argv: ["reinstall", "--formula", "git"]),
-        ArgvCase(command: .upgrade(wget), argv: ["upgrade", "--formula", "wget"]),
-        ArgvCase(command: .upgrade(iterm), argv: ["upgrade", "--cask", "iterm2"]),
+        ArgvCase(command: .install(PackageTarget(wget)!), argv: ["install", "--formula", "wget"]),
+        ArgvCase(command: .install(PackageTarget(iterm)!), argv: ["install", "--cask", "iterm2"]),
+        ArgvCase(command: .uninstall(PackageTarget(iterm)!), argv: ["uninstall", "--cask", "iterm2"]),
+        ArgvCase(command: .uninstall(PackageTarget(wget)!), argv: ["uninstall", "--formula", "wget"]),
+        ArgvCase(command: .reinstall(PackageTarget(git)!), argv: ["reinstall", "--formula", "git"]),
+        ArgvCase(command: .upgrade(PackageTarget(wget)!), argv: ["upgrade", "--formula", "wget"]),
+        ArgvCase(command: .upgrade(PackageTarget(iterm)!), argv: ["upgrade", "--cask", "iterm2"]),
         ArgvCase(
             command: .zap(CaskID(iterm)!),
             argv: ["uninstall", "--cask", "--zap", "iterm2"]
@@ -62,8 +62,8 @@ struct MutationCommandTests {
     /// disambiguation (PM1 sc5). `docker` is the live example.
     @Test("A token in both namespaces is disambiguated by the flag, never by brew")
     func bothNamespaceTokensAreDisambiguatedByFlag() {
-        let cask = MutationCommand.install(PackageID(kind: .cask, name: "docker"))
-        let formula = MutationCommand.install(PackageID(kind: .formula, name: "docker"))
+        let cask = MutationCommand.install(PackageTarget(PackageID(kind: .cask, name: "docker"))!)
+        let formula = MutationCommand.install(PackageTarget(PackageID(kind: .formula, name: "docker"))!)
 
         #expect(cask.arguments == ["install", "--cask", "docker"])
         #expect(formula.arguments == ["install", "--formula", "docker"])
@@ -112,7 +112,7 @@ struct MutationCommandTests {
     /// through the process seam rather than asserted twice off the same array.
     @Test("The argv that reaches the process seam is the argv that was inspected")
     func spawnedArgvMatchesTheInspectedArgv() async throws {
-        let command = MutationCommand.uninstall(Self.iterm)
+        let command = MutationCommand.uninstall(PackageTarget(Self.iterm)!)
         let launcher = RecordingProcessLauncher()
         let runner = BrewRunner(installation: TestInstallation.appleSilicon, launcher: launcher)
 
@@ -192,7 +192,9 @@ struct MutationCommandTests {
     @Test("Install, reinstall, upgrade, upgrade-all, pin and unpin never confirm")
     func nonDestructiveCommandsNeverConfirm() {
         let safe: [MutationCommand] = [
-            .install(Self.wget), .reinstall(Self.git), .upgrade(Self.iterm),
+            .install(PackageTarget(Self.wget)!),
+            .reinstall(PackageTarget(Self.git)!),
+            .upgrade(PackageTarget(Self.iterm)!),
             .upgradeAll, .pin(FormulaID(Self.git)!), .unpin(FormulaID(Self.git)!)
         ]
 
@@ -212,7 +214,7 @@ struct MutationCommandTests {
     @Test("The display command is stable and pasteable for the destructive cases")
     func displayCommandForTheDestructiveCases() {
         #expect(
-            MutationCommand.uninstall(Self.wget).displayCommand
+            MutationCommand.uninstall(PackageTarget(Self.wget)!).displayCommand
                 == "brew uninstall --formula wget"
         )
         #expect(
@@ -258,12 +260,12 @@ struct MutationCommandTests {
     /// typed `PackageID`, which a string cannot become without a parser.
     @Test("Argv is only ever produced from typed cases")
     func argvIsOnlyProducedFromTypedCases() {
-        let rendered = MutationCommand.uninstall(Self.iterm).displayCommand
+        let rendered = MutationCommand.uninstall(PackageTarget(Self.iterm)!).displayCommand
         #expect(rendered == "brew uninstall --cask iterm2")
 
         // The rendered form carries the kind as a flag, and the only way back to
         // a command is to name the kind again in the type system.
-        let rebuilt = MutationCommand.uninstall(PackageID(kind: .cask, name: "iterm2"))
+        let rebuilt = MutationCommand.uninstall(PackageTarget(PackageID(kind: .cask, name: "iterm2"))!)
         #expect(rebuilt.displayCommand == rendered)
         #expect(rebuilt.arguments == ["uninstall", "--cask", "iterm2"])
     }

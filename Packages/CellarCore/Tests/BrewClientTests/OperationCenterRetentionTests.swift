@@ -30,7 +30,7 @@ struct OperationCenterRetentionTests {
     func terminalItemsSurviveRecordRetirement() async throws {
         let harness = CenterHarness()
 
-        let item = harness.center.submit(.install(CenterHarness.iterm))
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.iterm)!))
         await harness.finish(call: 0)
         #expect(item.outcome == .succeeded)
 
@@ -41,7 +41,7 @@ struct OperationCenterRetentionTests {
         // Repointing gives the centre a runner whose queue snapshots never
         // mention the first operation — the same shape a retired record has.
         harness.center.attach(installation: TestInstallation.intel)
-        let later = harness.center.submit(.install(CenterHarness.git))
+        let later = harness.center.submit(.install(PackageTarget(CenterHarness.git)!))
         await harness.finish(call: 1)
         #expect(later.outcome == .succeeded)
         await harness.settle()

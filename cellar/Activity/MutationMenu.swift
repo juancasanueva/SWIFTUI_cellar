@@ -19,16 +19,25 @@ struct MutationMenu: View {
     let center: OperationCenter
     let entry: PackageEntry
 
+    /// The entry's identity, proven safe to put in argv.
+    ///
+    /// `nil` only for a name brew could read as an option, in which case every
+    /// package-naming affordance is simply absent — an unvalidated command is
+    /// not representable, so there is nothing to disable (design D9, PM9).
+    private var target: PackageTarget? { PackageTarget(entry.id) }
+
     var body: some View {
         Menu {
-            if entry.isInstalled {
-                installedActions
-            } else {
-                action("Install", .install(entry.id))
-            }
-            Divider()
-            Button("Copy install command") {
-                copy(MutationCommand.install(entry.id).displayCommand)
+            if let target {
+                if entry.isInstalled {
+                    installedActions(target)
+                } else {
+                    action("Install", .install(target))
+                }
+                Divider()
+                Button("Copy install command") {
+                    copy(MutationCommand.install(target).displayCommand)
+                }
             }
         } label: {
             Label("Package actions", systemImage: "ellipsis.circle")
@@ -39,11 +48,11 @@ struct MutationMenu: View {
     }
 
     @ViewBuilder
-    private var installedActions: some View {
+    private func installedActions(_ target: PackageTarget) -> some View {
         if entry.installed?.isOutdated == true {
-            action("Upgrade", .upgrade(entry.id))
+            action("Upgrade", .upgrade(target))
         }
-        action("Reinstall", .reinstall(entry.id))
+        action("Reinstall", .reinstall(target))
 
         if let formula = FormulaID(entry.id) {
             if entry.installed?.isPinned == true {
@@ -57,7 +66,7 @@ struct MutationMenu: View {
 
         // Destructive, and therefore confirmed. Zap is its own choice; an
         // ordinary uninstall never implies it.
-        action("Uninstall…", .uninstall(entry.id))
+        action("Uninstall…", .uninstall(target))
         if let cask = CaskID(entry.id) {
             action("Uninstall and Zap…", .zap(cask))
         }

@@ -120,35 +120,35 @@ risk gate — but it still runs first, and it is where G2/G3/G4 are answered in 
 
 Absorbed follow-up 4. Lands before any history write depends on it (proposal Dependencies).
 
-- [ ] 1.1 RED `Tests/BrewProcessTests/RetentionTests.swift` (BE1 sc7) with `FakeProcessLauncher`:
+- [x] 1.1 RED `Tests/BrewProcessTests/RetentionTests.swift` (BE1 sc7) with `FakeProcessLauncher`:
   after N operations have each reached a terminal outcome **and** had their results drained, the
   number of records the runner holds is bounded rather than growing with N.
-- [ ] 1.2 RED `RetentionTests` (**R1** — BE1 sc9): with one running operation, one pending operation
+- [x] 1.2 RED `RetentionTests` (**R1** — BE1 sc9): with one running operation, one pending operation
   and several drained terminal ones, retirement leaves the running and pending operations enumerated
   in their original order, and spawns, cancels or restarts nothing.
-- [ ] 1.3 RED `RetentionTests` (**R2** — BE1 sc8): a terminal operation whose result has **not** been
+- [x] 1.3 RED `RetentionTests` (**R2** — BE1 sc8): a terminal operation whose result has **not** been
   awaited is still answered by `exit(of:)`, and `fault(of:)` still answers, after its `process`,
   `pump`, `completion`, `continuation` and `lines` have been released.
-- [ ] 1.4 RED `RetentionTests` (**R3** — release by ownership): a record survives while a
+- [x] 1.4 RED `RetentionTests` (**R3** — release by ownership): a record survives while a
   `BrewOperation` handle is alive and is removed only after that handle is released; a retired
   operation is never reported pending or running and is never re-spawned, re-queued or resurrected.
   Also assert the 200-cap over already-released compacted records, oldest ordinal first.
-- [ ] 1.5 GREEN `Sources/BrewProcess/BrewOperation.swift`: `BrewOperation` becomes a `final class`
+- [x] 1.5 GREEN `Sources/BrewProcess/BrewOperation.swift`: `BrewOperation` becomes a `final class`
   with all stored properties immutable and `Sendable` (so the type stays `Sendable`) whose `deinit`
   hands its id back to the runner. This is what makes "a record can only be removed when no caller
   can still ask about it" **structural, not probabilistic**.
-- [ ] 1.6 GREEN `Sources/BrewProcess/BrewRunner.swift`: R1/R2/R3 as three ordered rules plus
+- [x] 1.6 GREEN `Sources/BrewProcess/BrewRunner.swift`: R1/R2/R3 as three ordered rules plus
   `release(_:)`. Rejected alternatives are recorded in the file header — an explicit `retire(id)`
   call (correctness would depend on every consumer remembering it) and a plain LRU on terminal
   records (evicts by count, the exact timing bet the constraint forbids).
-- [ ] 1.7 RED `Tests/BrewProcessTests/QueueProjectionTests.swift` (BE1 sc10 — follow-up 4b): an
+- [x] 1.7 RED `Tests/BrewProcessTests/QueueProjectionTests.swift` (BE1 sc10 — follow-up 4b): an
   observer of the runner's queue phase sees **one** change for the transition into a phase and none
   for repeated yields of the same value.
-- [ ] 1.8 RED `Tests/BrewClientTests/OperationCenterProjectionTests.swift` (OA1 sc5): a terminal,
+- [x] 1.8 RED `Tests/BrewClientTests/OperationCenterProjectionTests.swift` (OA1 sc5): a terminal,
   fully drained operation whose execution-layer record has been **retired** is still listed by the
   centre with its identity, its argv and its terminal outcome. This makes M2-2's incidental tolerance
   in `apply(_:)` load-bearing and tested.
-- [ ] 1.9 GREEN `Sources/BrewClient/{OperationCenter,ActivityItem}.swift`: `apply(_:)` guards the
+- [x] 1.9 GREEN `Sources/BrewClient/{OperationCenter,ActivityItem}.swift`: `apply(_:)` guards the
   write with `if item.queuePhase != phase { item.queuePhase = phase }` (`OperationSnapshot.Phase` is
   already `Equatable`), and `ActivityItem` holds its own `BrewOperation` **exactly while it is
   cancellable**, dropping it in `settle(_:)` — the release rule D6 depends on.
@@ -159,26 +159,26 @@ Absorbed follow-up 4. Lands before any history write depends on it (proposal Dep
 Absorbed follow-up 3. Lands before history, because `HistoryDraft` carries the verb and argv these
 cases produce. 40–60 mechanical test edits are expected and accepted.
 
-- [ ] 2.1 RED `Tests/BrewClientTests/MutationCommandTests.swift` (PM9 sc1–2) — **threat: subprocess
+- [x] 2.1 RED `Tests/BrewClientTests/MutationCommandTests.swift` (PM9 sc1–2) — **threat: subprocess
   argument composition (option injection)**: `PackageTarget(_:)` returns `nil` for a name that is
   empty, whitespace-only, or begins with `-` (`--force`), so **no argv containing it is produced or
   spawned** and nothing is enqueued.
-- [ ] 2.2 RED `MutationCommandTests` (PM9 sc3) — enumerate every public way to obtain a
+- [x] 2.2 RED `MutationCommandTests` (PM9 sc3) — enumerate every public way to obtain a
   `MutationCommand`: each one applies the same identity validation, and no alternate constructor,
   initializer or convenience overload produces a command from an unvalidated `PackageID`.
-- [ ] 2.3 RED `MutationCommandTests` — the four retyped cases keep their **exact** argv:
+- [x] 2.3 RED `MutationCommandTests` — the four retyped cases keep their **exact** argv:
   `install --formula wget`, `uninstall --cask iterm2`, `reinstall --formula git`,
   `upgrade --formula wget`. Retyping is a compile-time change with **zero** argv consequence.
-- [ ] 2.4 GREEN `Sources/BrewClient/MutationCommand.swift`: `public struct PackageTarget: Sendable,
+- [x] 2.4 GREEN `Sources/BrewClient/MutationCommand.swift`: `public struct PackageTarget: Sendable,
   Hashable` with `init?(_ id: PackageID)` guarding on `MutationName.isSafe`; `install`, `uninstall`,
   `reinstall`, `upgrade` retyped from `PackageID` to `PackageTarget`. `FormulaID`/`CaskID` are
   re-expressed over it so `isSafe` has **one** definition. `naming(_:_:)` keeps its signature and its
   callers — the guard is now enforced by the type, not by remembering to use it.
-- [ ] 2.5 Mechanical churn: update every existing use site
+- [x] 2.5 Mechanical churn: update every existing use site
   (`.install(Self.wget)` → `.install(PackageTarget(Self.wget)!)`) across `MutationCommandTests`,
   `OperationCenterTests`, `OperationCenterProjectionTests`, `ClassificationTests` and
   `Tests/BrewProcessTests/ArgumentCompositionTests.swift`. Verify the `@Test` count is unchanged.
-- [ ] 2.6 Close the two known bypasses the retype now makes compile errors:
+- [x] 2.6 Close the two known bypasses the retype now makes compile errors:
   `cellar/Activity/MutationMenu.swift:27` (`.install(entry.id)`) and
   `cellar/Browse/PackageDetailView.swift:69` (`MutationCommand.install(package.id).displayCommand`).
   Both become `PackageTarget`-mediated; an unvalidated command is unrepresentable.
