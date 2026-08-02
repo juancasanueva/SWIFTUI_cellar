@@ -189,40 +189,40 @@ Independent of the mutation command layer; reviewable standalone.
 
 ## Phase 4: Outcome classification (D5 — PM4, PM5, PM6) — ≈ 400 lines
 
-- [ ] 4.1 RED `Tests/BrewClientTests/ClassificationTests.swift` (PM5 sc1) — the live-probed surface
+- [x] 4.1 RED `Tests/BrewClientTests/ClassificationTests.swift` (PM5 sc1) — the live-probed surface
   (#7097): stderr carrying ``Error: A `brew uninstall hello` process has already locked
   /opt/homebrew/Cellar/hello.`` followed by `Please wait for it to finish or terminate it to
   continue.` with exit 1 → `.busy`, and the message tells the user Homebrew is busy in another
   terminal.
-- [ ] 4.2 RED `ClassificationTests` (PM5 sc2) — **threat: untrusted subprocess payload**: the same
+- [x] 4.2 RED `ClassificationTests` (PM5 sc2) — **threat: untrusted subprocess payload**: the same
   busy text naming an **unrelated** command still classifies busy, **and that command name never
   appears in the rendered text**. Per probe #7097 brew names its own invocation, not the real holder,
   so parsing a holder out of it would print a lie.
-- [ ] 4.3 RED `ClassificationTests` (PM5 sc3): exit 1 with output containing neither lock phrase is
+- [x] 4.3 RED `ClassificationTests` (PM5 sc3): exit 1 with output containing neither lock phrase is
   `.failed`, never `.busy`.
-- [ ] 4.4 GREEN `Sources/BrewClient/MutationOutcome.swift`: the `MutationOutcome` enum and the pure
+- [x] 4.4 GREEN `Sources/BrewClient/MutationOutcome.swift`: the `MutationOutcome` enum and the pure
   `static func classify(exit:fault:stderrTail:) -> MutationOutcome`. Order: `fault` →
   `.launchFailed` / `.abandoned(after:)`; `exit.isCancelled` → `.cancelled`; `exit.isSuccess` →
   `.succeeded`; then signature matching on the **last 20 `.stderr` lines only**.
-- [ ] 4.5 RED `ClassificationTests` (PM4 sc1) — **threat: privilege boundary**: output carrying
+- [x] 4.5 RED `ClassificationTests` (PM4 sc1) — **threat: privilege boundary**: output carrying
   `sudo: no tty present`, `sudo: a password is required` or `Password:` with a non-zero exit →
   `.needsPrivileges`, whose guidance echoes the exact command to run in Terminal and names the
   package. Assert there is **no** in-app credential surface, no retry, and no escalation path
   anywhere in the outcome's API.
-- [ ] 4.6 RED `ClassificationTests` (PM4 sc3) — **threat: untrusted payload, adversarial**: a
+- [x] 4.6 RED `ClassificationTests` (PM4 sc3) — **threat: untrusted payload, adversarial**: a
   *successful* run whose stdout happens to contain `Password:` inside package output is **not**
   `.needsPrivileges`; an unrecognised non-zero failure degrades to `.failed(status:)` with the full
   log preserved verbatim and untruncated; a multi-megabyte log classifies in bounded time because
   only the 20-line tail is scanned.
-- [ ] 4.7 GREEN the sudo and fallback branches. Record in the file header the two safety properties
+- [x] 4.7 GREEN the sudo and fallback branches. Record in the file header the two safety properties
   that make the heuristic acceptable: classification changes **only the sentence shown** — never a
   retry, an escalation or an argv — so a false positive is a wrong message and a false negative
   degrades to `.failed` with the log on screen.
-- [ ] 4.8 RED `ClassificationTests` (PM6): `.cancelled` and `.abandoned` are never misread as
+- [x] 4.8 RED `ClassificationTests` (PM6): `.cancelled` and `.abandoned` are never misread as
   failure; the cancelled message is **one generic sentence for every command**, does not claim the
   change was undone, and admits possible partial state (PM6 sc3). `.abandoned` — mapped from the
   existing `.cancelledUnresponsive` fault — gets its own distinct sentence.
-- [ ] 4.9 GREEN the cancel/abandon messaging on `MutationOutcome` (D6).
+- [x] 4.9 GREEN the cancel/abandon messaging on `MutationOutcome` (D6).
   Verify: `FAST --filter Classification`.
 
 ## Phase 5: `BrewRunner` pure-move split (D11) — ≈ 120 lines — **no behaviour change**
