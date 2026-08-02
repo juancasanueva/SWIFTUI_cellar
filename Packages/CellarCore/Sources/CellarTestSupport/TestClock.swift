@@ -1,23 +1,34 @@
 import Synchronization
 
-/// A manually advanced `Clock` so cancellation-escalation tests never sleep on
-/// the wall clock.
+/// A manually advanced `Clock` so time-dependent tests never sleep on the wall
+/// clock.
 ///
 /// `sleep(until:)` suspends until `advance(by:)` moves `now` past the deadline,
-/// which makes grace periods instantaneous and deterministic.
-final class TestClock: Clock, Sendable {
-    struct Instant: InstantProtocol {
-        var offset: Duration
+/// which makes debounce windows and grace periods instantaneous and
+/// deterministic.
+///
+/// This is the single copy (design D9). It previously existed three times —
+/// once per test target — because separate test targets cannot share code and
+/// the `CellarTestSupport` extraction (M2-0 D5) was deferred twice. The target
+/// imports only `Synchronization`, so it needs no dependencies and no test
+/// target gains an edge by depending on it.
+public final class TestClock: Clock, Sendable {
+    public struct Instant: InstantProtocol {
+        public var offset: Duration
 
-        func advanced(by duration: Duration) -> Instant {
+        public init(offset: Duration) {
+            self.offset = offset
+        }
+
+        public func advanced(by duration: Duration) -> Instant {
             Instant(offset: offset + duration)
         }
 
-        func duration(to other: Instant) -> Duration {
+        public func duration(to other: Instant) -> Duration {
             other.offset - offset
         }
 
-        static func < (lhs: Instant, rhs: Instant) -> Bool {
+        public static func < (lhs: Instant, rhs: Instant) -> Bool {
             lhs.offset < rhs.offset
         }
     }
@@ -36,13 +47,15 @@ final class TestClock: Clock, Sendable {
 
     private let state = Mutex(State())
 
-    var now: Instant { state.withLock { $0.now } }
-    var minimumResolution: Duration { .zero }
+    public init() {}
+
+    public var now: Instant { state.withLock { $0.now } }
+    public var minimumResolution: Duration { .zero }
 
     /// How many tasks are currently suspended in `sleep(until:)`.
-    var sleeperCount: Int { state.withLock { $0.sleepers.count } }
+    public var sleeperCount: Int { state.withLock { $0.sleepers.count } }
 
-    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+    public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
         try await withCheckedThrowingContinuation { continuation in
             let alreadyDue = state.withLock { state -> Bool in
                 guard state.now < deadline else { return true }
@@ -57,7 +70,7 @@ final class TestClock: Clock, Sendable {
     }
 
     /// Moves time forward and resumes every sleeper whose deadline has passed.
-    func advance(by duration: Duration) async {
+    public func advance(by duration: Duration) async {
         let due = state.withLock { state -> [Sleeper] in
             state.now = state.now.advanced(by: duration)
             let reached = state.sleepers.filter { $0.deadline <= state.now }
@@ -70,23 +83,7 @@ final class TestClock: Clock, Sendable {
 
     /// Suspends until at least `count` tasks are waiting on this clock, so a
     /// test can advance time without racing the code that starts sleeping.
-    func waitForSleepers(atLeast count: Int = 1) async {
+    public func waitForSleepers(atLeast count: Int = 1) async {
         await TestPoll.until(sleeperCount >= count)
-    }
-}
-
-/// Bounded cooperative polling shared by the fakes.
-///
-/// Yields until `condition` holds or a generous wall-clock deadline passes, so
-/// a broken expectation fails on its assertion instead of hanging the suite.
-enum TestPoll {
-    static func until(
-        timeout: Duration = .seconds(5),
-        _ condition: @autoclosure () -> Bool
-    ) async {
-        let deadline = ContinuousClock.now.advanced(by: timeout)
-        while !condition(), ContinuousClock.now < deadline {
-            await Task.yield()
-        }
     }
 }

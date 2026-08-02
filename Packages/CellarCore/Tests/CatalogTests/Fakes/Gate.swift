@@ -1,3 +1,4 @@
+import CellarTestSupport
 import Synchronization
 
 /// A one-shot barrier a test opens by hand.

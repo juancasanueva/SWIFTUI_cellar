@@ -11,13 +11,22 @@ let package = Package(
         .library(name: "BrewClient", targets: ["BrewClient"])
     ],
     targets: [
+        // Test-only helpers shared by the three test targets (design D9, M2-0 D5).
+        // It declares **no dependencies** — `TestClock` needs only `Synchronization`
+        // and `TestPoll` only the stdlib — which is exactly what lets it exist
+        // without giving any test target an edge it must not have. It is a
+        // `.target` and not a product, so nothing links it into the app.
+        .target(
+            name: "CellarTestSupport",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .target(
             name: "BrewProcess",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "BrewProcessTests",
-            dependencies: ["BrewProcess"],
+            dependencies: ["BrewProcess", "CellarTestSupport"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         // Deliberately no dependency on `BrewProcess`: catalog acquisition must
@@ -28,7 +37,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CatalogTests",
-            dependencies: ["Catalog"],
+            dependencies: ["Catalog", "CellarTestSupport"],
             resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
@@ -41,7 +50,7 @@ let package = Package(
         ),
         .testTarget(
             name: "BrewClientTests",
-            dependencies: ["BrewClient"],
+            dependencies: ["BrewClient", "CellarTestSupport"],
             resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
