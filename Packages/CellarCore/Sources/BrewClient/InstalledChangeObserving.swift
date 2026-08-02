@@ -22,6 +22,14 @@ public protocol InstalledChangeObserving: Sendable {
 @MainActor
 @Observable
 public final class InstalledMutationGate {
+    /// How many mutations are currently in flight.
+    ///
+    /// A depth rather than a flag, because M2-2 submits batches: a selected
+    /// upgrade over three packages is three operations, and a flag would report
+    /// "not mutating" the moment the first of them settled — re-opening the
+    /// suppression window while brew was still writing (design D7).
+    @ObservationIgnored private var depth = 0
+
     public private(set) var isMutating = false
 
     /// One element per mutation that reached a terminal outcome.
@@ -33,14 +41,22 @@ public final class InstalledMutationGate {
     }
 
     public func begin() {
+        depth += 1
         isMutating = true
     }
 
-    /// Ends the mutation, whatever its outcome. Success and failure both
+    /// Ends one mutation, whatever its outcome. Success and failure both
     /// invalidate the snapshot.
+    ///
+    /// The terminal is yielded **unconditionally**, even when the depth is
+    /// already zero. That asymmetry is deliberate: the previous
+    /// `guard isMutating` swallowed every end past the first, so a batch of N
+    /// produced N−1 re-snapshots and the last mutation's effect could stay
+    /// invisible until something else happened to invalidate the inventory. One
+    /// wasted refresh is a far cheaper mistake than a stale list.
     public func end() {
-        guard isMutating else { return }
-        isMutating = false
+        depth = max(0, depth - 1)
+        isMutating = depth > 0
         continuation.yield()
     }
 }

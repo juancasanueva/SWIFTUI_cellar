@@ -278,61 +278,61 @@ breach SwiftLint's 400-line `file_length`.
 Touches `InstalledChangeObserving.swift` a second time (Phase 2 owns D8a, this phase owns D7); keep
 the two hunks in separate commits so each reviews on its own terms.
 
-- [ ] 7.1 RED `Tests/BrewClientTests/OperationCenterTests.swift` (`@MainActor`, fake launcher):
+- [x] 7.1 RED `Tests/BrewClientTests/OperationCenterTests.swift` (`@MainActor`, fake launcher):
   submitting one command produces one `ActivityItem` whose id, `displayCommand` and copy text are
   stable from pending through terminal, and whose copy text is **identical** at both points
   (OA2 sc1–2).
-- [ ] 7.2 GREEN `Sources/BrewClient/ActivityItem.swift`: id, command, display string, derived phase,
+- [x] 7.2 GREEN `Sources/BrewClient/ActivityItem.swift`: id, command, display string, derived phase,
   bounded log, outcome — plus the presentation rules the views will read (which sentence, whether
   cancel is offered, whether confirmation is required). Every rule is a computed property here, not
   in the app target (D10), so it is `FAST`-testable.
-- [ ] 7.3 RED `OperationCenterTests`: the log drains into a **2,000-line ring**; the 2,001st line
+- [x] 7.3 RED `OperationCenterTests`: the log drains into a **2,000-line ring**; the 2,001st line
   evicts the oldest and a truncation marker becomes visible; lines stay verbatim and stream-tagged
   (OA3 sc3).
-- [ ] 7.4 GREEN the ring buffer and marker on `ActivityItem`.
-- [ ] 7.5 RED `OperationCenterTests` (**D1 fan-out — the settled per-package shape**): a selection of
+- [x] 7.4 GREEN the ring buffer and marker on `ActivityItem`.
+- [x] 7.5 RED `OperationCenterTests` (**D1 fan-out — the settled per-package shape**): a selection of
   `[formula wget, formula git, cask iterm2]` in that order fans out into **exactly three**
   operations with argvs `upgrade --formula wget`, `upgrade --formula git`, `upgrade --cask iterm2`,
   in selection order, each its own queue item — and **no argv names more than one package**
   (PM2 sc2). There is no `upgradeSelected` case anywhere in the API.
-- [ ] 7.6 RED `OperationCenterTests` (**per-item attribution obligation**): with the same three-item
+- [x] 7.6 RED `OperationCenterTests` (**per-item attribution obligation**): with the same three-item
   fan-out where the middle operation fails, the failure attributes to `git` **only** — `wget` and
   `iterm2` reach their own terminal outcomes independently and are not marked failed.
-- [ ] 7.7 GREEN `Sources/BrewClient/OperationCenter.swift`: `@MainActor @Observable`, built on the
+- [x] 7.7 GREEN `Sources/BrewClient/OperationCenter.swift`: `@MainActor @Observable`, built on the
   `InstalledStore` exemplar. `submit(_:)` per command; a selection is expanded by the caller-facing
   helper into N `.upgrade(id)` submissions. Per submission: one drain task over `operation.lines`,
   `await operation.exit()`, `classify`, settle the gate.
-- [ ] 7.8 RED `OperationCenterTests` (PM2 sc4): a pinned formula is named in neither the `upgradeAll`
+- [x] 7.8 RED `OperationCenterTests` (PM2 sc4): a pinned formula is named in neither the `upgradeAll`
   argv nor the selected-upgrade expansion over the outdated set, and **no unpin is submitted on its
   behalf**.
-- [ ] 7.9 GREEN the outdated-set source for selected upgrade, taking `InstalledInventory.outdatedIDs`
+- [x] 7.9 GREEN the outdated-set source for selected upgrade, taking `InstalledInventory.outdatedIDs`
   (which already excludes self-updating casks, M2-1 II4/II5) so the exclusion agrees with the
   inventory's own derivation.
-- [ ] 7.10 RED `OperationCenterTests` (PM6 sc1–2; II10 sc3): the gate `begin()`s once for a batch and
+- [x] 7.10 RED `OperationCenterTests` (PM6 sc1–2; II10 sc3): the gate `begin()`s once for a batch and
   `end()`s per item; **N terminals produce exactly N re-snapshots**, never N−1 and never 2N; a quiet
   window between two queued mutations wastes no refresh; success, `.failed`, `.busy`,
   `.needsPrivileges` and `.cancelled` each force exactly one.
-- [ ] 7.11 GREEN `Sources/BrewClient/InstalledChangeObserving.swift` (D7): `InstalledMutationGate`
+- [x] 7.11 GREEN `Sources/BrewClient/InstalledChangeObserving.swift` (D7): `InstalledMutationGate`
   keeps its API and gains a depth — `begin()` increments, `end()` decrements with a floor of zero and
   **always** yields one terminal. `isMutating` therefore covers the whole batch. Overlapping
   refreshes are absorbed by `InstalledStore`'s single-flight slot and ordinal guard (M2-1 D6).
-- [ ] 7.12 RED `OperationCenterTests` (OA4 sc1, sc3; PM3 sc2): cancelling a **pending** item spawns
+- [x] 7.12 RED `OperationCenterTests` (OA4 sc1, sc3; PM3 sc2): cancelling a **pending** item spawns
   nothing and renders the one generic partial-state sentence; the controls the center exposes for a
   pending item contain cancel and **no reorder, move or remove**; declining a confirmation submits
   nothing and spawns nothing.
-- [ ] 7.13 GREEN cancel and the confirmation gate on `OperationCenter` (D6). Queue control is
+- [x] 7.13 GREEN cancel and the confirmation gate on `OperationCenter` (D6). Queue control is
   cancel-only; I2 stays immutable.
-- [ ] 7.14 RED `OperationCenterTests` (OA5 sc1–3): the summary projection reports in-flight, names
+- [x] 7.14 RED `OperationCenterTests` (OA5 sc1–3): the summary projection reports in-flight, names
   the running operation and the pending count; an empty center and an all-terminal center both
   report **idle** with a pending count of 0; across any sequence of submissions, cancellations and
   terminals the summary's running operation and pending count **always agree** with the detail
   listing, because both derive from the one `QueueSnapshot`.
-- [ ] 7.15 GREEN the summary and detail projections on `OperationCenter`.
-- [ ] 7.16 RED `OperationCenterTests` (PM7 sc1–3): with no runner attached, a submission becomes a
+- [x] 7.15 GREEN the summary and detail projections on `OperationCenter`.
+- [x] 7.16 RED `OperationCenterTests` (PM7 sc1–3): with no runner attached, a submission becomes a
   **terminal item reporting unavailable** — not a silent no-op, nothing thrown, nothing spawned; the
   rejection reason is available as read-only guidance; after `attach(installation:)` a later
   submission runs normally **without an app restart**.
-- [ ] 7.17 GREEN `attach(installation:)`: builds the runner on arrival, and repointing `brew` builds
+- [x] 7.17 GREEN `attach(installation:)`: builds the runner on arrival, and repointing `brew` builds
   a new one while in-flight items keep the old runner alive until they settle.
   Verify: `FAST --filter "OperationCenter\|ActivityItem"`.
 
