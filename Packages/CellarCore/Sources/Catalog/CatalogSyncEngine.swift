@@ -21,7 +21,18 @@ public actor CatalogSyncEngine {
     private let policy: CatalogRefreshPolicy
 
     public private(set) var status: CatalogSyncStatus = .idle
-    private var inFlight: Task<Result<CatalogSnapshot, CatalogSyncError>, Never>?
+
+    /// The one sync that may be joined, together with the token that owns it.
+    ///
+    /// Keyed by a token so a settling task can only ever vacate *its own* entry:
+    /// without it, a slow unwind could clear a slot a newer sync already took.
+    private struct InFlightSync {
+        let token: Int
+        let task: Task<Result<CatalogSnapshot, CatalogSyncError>, Never>
+    }
+
+    private var inFlight: InFlightSync?
+    private var nextSyncToken = 0
 
     /// Status transitions and new snapshots, in order, for a single observer.
     public nonisolated let events: AsyncStream<CatalogSyncEvent>
@@ -68,16 +79,29 @@ public actor CatalogSyncEngine {
     ///
     /// Single-flight for the same reason `BrewDetectionStore.refresh()` is: a
     /// window regaining focus can fire in bursts, and two concurrent 47 MB
-    /// downloads help nobody.
+    /// downloads help nobody. Only work *genuinely in flight* may be joined: the
+    /// task vacates its own slot from inside its body, so the slot is empty
+    /// before any joiner resumes and nobody is handed a settled result as if it
+    /// were fresh (design D3).
     @discardableResult
     public func sync() async -> Result<CatalogSnapshot, CatalogSyncError> {
-        if let inFlight { return await inFlight.value }
+        if let current = inFlight { return await current.task.value }
 
-        let task = Task { await self.performSync() }
-        inFlight = task
-        let result = await task.value
+        nextSyncToken += 1
+        let token = nextSyncToken
+        // Creation and assignment are one actor turn with no suspension between
+        // them, so the body cannot settle before the slot exists.
+        let task = Task {
+            defer { self.vacate(token) }
+            return await self.performSync()
+        }
+        inFlight = InFlightSync(token: token, task: task)
+        return await task.value
+    }
+
+    private func vacate(_ token: Int) {
+        guard inFlight?.token == token else { return }
         inFlight = nil
-        return result
     }
 
     /// Syncs only when the persisted catalog is past `staleAfter`.
@@ -89,7 +113,7 @@ public actor CatalogSyncEngine {
 
     /// Cancels the sync in flight, if any.
     public func cancel() {
-        inFlight?.cancel()
+        inFlight?.task.cancel()
     }
 
     /// Wakes every `pollGranularity` and syncs when the wall clock says the

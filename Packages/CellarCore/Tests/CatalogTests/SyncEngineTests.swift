@@ -3,8 +3,13 @@ import Testing
 
 @testable import Catalog
 
-@Suite("Catalog sync engine")
+@Suite("Catalog sync engine", .timeLimit(.minutes(1)))
 struct SyncEngineTests {
+    /// Lets every pending continuation run without depending on wall-clock time.
+    static func settle() async {
+        for _ in 0..<100 { await Task.yield() }
+    }
+
     // MARK: - Acquisition through the seam (CS1)
 
     @Test("A sync succeeds with no brew present and asks each source exactly once")
@@ -210,6 +215,63 @@ struct SyncEngineTests {
         #expect(snapshot.packages.map(\.name).sorted() == ["iterm2", "wget"])
         // Malformed is not retryable: one request, no backoff storm.
         #expect(harness.source.requests(for: .formulae).count == 2)
+    }
+
+    // MARK: - Single flight (CSA2)
+
+    @Test("Two callers waiting on one gated sync perform exactly one acquisition")
+    func concurrentCallersCoalesceOntoOneSync() async throws {
+        let harness = try SyncHarness()
+        let gate = Gate()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.source.onFetch { await gate.wait() }
+
+        let first = Task { await harness.engine.sync() }
+        await gate.waitForWaiters(atLeast: 1)
+        let second = Task { await harness.engine.sync() }
+        await Self.settle()
+
+        // A second acquisition here would mean the join never happened.
+        #expect(harness.source.requests(for: .formulae).count == 1)
+
+        gate.open()
+        let firstResult = await first.value
+        let secondResult = await second.value
+
+        #expect(firstResult.value?.packages.map(\.name).sorted() == ["iterm2", "wget"])
+        #expect(secondResult.value?.packages.map(\.name).sorted() == ["iterm2", "wget"])
+        #expect(harness.source.requests(for: .formulae).count == 1)
+    }
+
+    @Test("A joiner resuming from a settled sync starts fresh work rather than re-reading it")
+    func settledSyncDoesNotAnswerALaterCaller() async throws {
+        let harness = try SyncHarness()
+        let gate = Gate()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.source.onFetch { await gate.wait() }
+
+        // The joiner asks again the instant its join resumes — the exact window
+        // in which the settled task is still parked in the coalescing slot.
+        let first = Task { await harness.engine.sync() }
+        await gate.waitForWaiters(atLeast: 1)
+        let second = Task { () -> Result<CatalogSnapshot, CatalogSyncError> in
+            _ = await harness.engine.sync()
+            return await harness.engine.sync()
+        }
+        await Self.settle()
+
+        // P2: what the *second* acquisition must see.
+        harness.source.script(.payload(Payload.formulae(["wget", "curl"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        gate.open()
+
+        _ = await first.value
+        let followUp = await second.value
+
+        #expect(harness.source.requests(for: .formulae).count == 2)
+        #expect(followUp.value?.packages.map(\.name).sorted() == ["curl", "iterm2", "wget"])
     }
 
     // MARK: - Staging lifecycle
