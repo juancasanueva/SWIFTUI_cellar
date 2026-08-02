@@ -240,36 +240,36 @@ breach SwiftLint's 400-line `file_length`.
 
 ## Phase 6: Queue projection (D3 — BE1, OA1, OA3, OA4) — ≈ 390 lines
 
-- [ ] 6.1 RED `Tests/BrewProcessTests/QueueProjectionTests.swift` (BE1 sc4, sc6; OA1 sc1) with
+- [x] 6.1 RED `Tests/BrewProcessTests/QueueProjectionTests.swift` (BE1 sc4, sc6; OA1 sc1) with
   `FakeProcessLauncher`: mutation A in flight, B then C submitted → enumeration reports A running and
   B, C pending **in submission order**, each entry carrying the argv its operation was submitted
   with. Enumerating repeatedly while A runs spawns nothing extra and does not change the post-A start
   order (BE1 sc6 — enumeration is read-only and never blocks on the in-flight operation).
-- [ ] 6.2 GREEN `Sources/BrewProcess/OperationSnapshot.swift`: `OperationSnapshot` (`id`, `command`,
+- [x] 6.2 GREEN `Sources/BrewProcess/OperationSnapshot.swift`: `OperationSnapshot` (`id`, `command`,
   `Phase`), `Phase { pending, running, terminal(BrewExit, fault:) }`, and `QueueSnapshot`. Phase is
   **derived** — `resolvedExit != nil ? .terminal : process != nil ? .running : .pending` — and never
   stored, so it cannot drift from `process`/`resolvedExit`.
-- [ ] 6.3 GREEN `Sources/BrewProcess/BrewRunner.swift`: `OperationRecord` gains exactly two stored
+- [x] 6.3 GREEN `Sources/BrewProcess/BrewRunner.swift`: `OperationRecord` gains exactly two stored
   fields, `let command: BrewCommand` and `let ordinal: Int`, plus a `snapshot()` projection ordered
   by ordinal. The FIFO gate (I2), the SIGINT→SIGTERM policy and the SIGKILL ban (M1 D4) are untouched.
-- [ ] 6.4 RED `QueueProjectionTests` (BE1 sc5; OA1 sc2, sc4): the same command submitted twice yields
+- [x] 6.4 RED `QueueProjectionTests` (BE1 sc5; OA1 sc2, sc4): the same command submitted twice yields
   two **different** identities, each stable across pending → running → terminal; a terminal operation
   stays enumerable afterwards with its outcome, and enumerating it restarts nothing.
-- [ ] 6.5 GREEN: identity is the existing per-operation `UUID`, asserted stable — expected to be a
+- [x] 6.5 GREEN: identity is the existing per-operation `UUID`, asserted stable — expected to be a
   no-op on the runner. A failure here means identity is being minted per enumeration.
-- [ ] 6.6 RED `QueueProjectionTests` (OA1 sc3; OA3 sc1–2): the snapshot carries verbatim argv while
+- [x] 6.6 RED `QueueProjectionTests` (OA1 sc3; OA3 sc1–2): the snapshot carries verbatim argv while
   pending **and** once terminal; a running operation's lines are readable before it exits, tagged
   stdout/stderr, in emission order, with no trimming, reordering, deduplication or prefixing.
-- [ ] 6.7 RED `QueueProjectionTests`: a **slow consumer** of the `queue` stream sees the newest
+- [x] 6.7 RED `QueueProjectionTests`: a **slow consumer** of the `queue` stream sees the newest
   snapshot rather than a backlog, and the actor is never back-pressured by it.
-- [ ] 6.8 GREEN the `queue: AsyncStream<QueueSnapshot>` made in `init` with `.bufferingNewest(1)`,
+- [x] 6.8 GREEN the `queue: AsyncStream<QueueSnapshot>` made in `init` with `.bufferingNewest(1)`,
   one stored continuation, yielded at the five sites where phase already changes: enqueue, install,
   spawn, terminal, cancel. `queue` is a `nonisolated let` of `Sendable` elements, so reading it
   crosses no isolation. Dropping an intermediate state snapshot is lossless by construction.
-- [ ] 6.9 RED `QueueProjectionTests` (BE1 sc3; OA4 sc1–2): cancelling a **pending** operation spawns
+- [x] 6.9 RED `QueueProjectionTests` (BE1 sc3; OA4 sc1–2): cancelling a **pending** operation spawns
   no process and resolves it cancelled; cancelling the **running** one reports cancelled rather than
   failed and the next pending operation then starts.
-- [ ] 6.10 GREEN: expected to be a no-op on the runner — M1 already guarantees both. A failure here
+- [x] 6.10 GREEN: expected to be a no-op on the runner — M1 already guarantees both. A failure here
   means the projection perturbed scheduling.
   Verify: `FAST --filter "QueueProjection\|Serialization\|Cancellation"`.
 

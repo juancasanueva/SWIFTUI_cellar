@@ -1,5 +1,57 @@
 import Foundation
 
+/// Everything `BrewRunner` tracks about one submitted operation.
+///
+/// It lives beside the handle rather than inside the actor purely so
+/// `BrewRunner.swift` stays under the 400-line limit (design D11). The
+/// dictionary that holds these records stays `private` to the actor, so the
+/// projection is still derived in the same file as the state it describes.
+struct OperationRecord {
+    /// The operation's stable identity, mirrored here so the record can project
+    /// itself without the dictionary key being passed back in.
+    let id: UUID
+    /// The argv this operation was submitted with, so the projection can carry
+    /// it verbatim without the caller having to remember it.
+    let command: BrewCommand
+    /// Submission order, so a `[UUID: …]` dictionary can be rendered in the
+    /// order brew will actually run things.
+    let ordinal: Int
+    /// Held for the operation's lifetime on purpose: an `AsyncStream` that
+    /// nobody retains terminates as `.cancelled`, which would silently cancel an
+    /// operation whose caller only cares about `exit()`.
+    let lines: AsyncStream<LogLine>
+    let continuation: AsyncStream<LogLine>.Continuation
+    var process: (any LaunchedProcess)?
+    /// Invariant I3: the pump is unstructured but owned by this record and
+    /// cancelled when the operation ends.
+    var pump: Task<Void, Never>?
+    /// Completes only once the operation has a terminal result.
+    var completion: Task<Void, Never>?
+    var resolvedExit: BrewExit?
+    var fault: BrewProcessError?
+    /// Set before a signal is delivered, so the terminal result can be reported
+    /// as cancelled rather than as a plain signal death.
+    var cancellationSignal: Int32?
+    var isCancelling = false
+
+    /// The read-only view of this record.
+    ///
+    /// The phase is **derived** here and stored nowhere: `resolvedExit` answers
+    /// "terminal?", `process` answers "spawned?", and the two together are the
+    /// whole truth. Storing a third field would let the projection drift from
+    /// the state it describes (design D3).
+    var projection: OperationSnapshot {
+        let phase: OperationSnapshot.Phase = if let resolvedExit {
+            .terminal(resolvedExit, fault: fault)
+        } else if process != nil {
+            .running
+        } else {
+            .pending
+        }
+        return OperationSnapshot(id: id, command: command, phase: phase)
+    }
+}
+
 /// A handle to one running `brew` invocation.
 public struct BrewOperation: Sendable, Identifiable {
     public let id: UUID
