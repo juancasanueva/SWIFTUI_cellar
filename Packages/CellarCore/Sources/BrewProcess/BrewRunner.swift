@@ -7,13 +7,25 @@ import Foundation
 /// outside world through the injected `ProcessLaunching` seam, so the whole
 /// actor is testable without spawning anything, and every grace period runs on
 /// the injected `Clock`, so cancellation is testable without waiting.
+///
+/// Records are retained under the three ordered rules documented on
+/// `OperationRecord` (design D6, brew-execution BE1): `compact(_:)`,
+/// `release(_:)` and `evictRetiredRecords()`.
 public actor BrewRunner {
+    /// Compacted-and-released records kept for enumeration; the true bound is
+    /// `live handles + this` (see `OperationRecord`'s retention notes).
+    public static let defaultRetainedTerminalRecords = 200
+
     private let installation: BrewInstallation
     private let launcher: any ProcessLaunching
     private let policy: CancellationPolicy
     private let clock: any Clock<Duration>
+    private let retainedTerminalRecords: Int
     private var operations: [UUID: OperationRecord] = [:]
     private var nextOrdinal = 0
+    /// The last snapshot handed to `queue`, so an unchanged phase is not
+    /// republished (BE1 sc10, design D6 follow-up 4b).
+    private var lastPublished: QueueSnapshot?
     /// The gate task of the most recently submitted mutation (design D5).
     private var mutationTail: Task<Void, Never>?
 
@@ -30,12 +42,14 @@ public actor BrewRunner {
         installation: BrewInstallation,
         launcher: any ProcessLaunching = SystemProcessLauncher(),
         policy: CancellationPolicy = .default,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        retainedTerminalRecords: Int = BrewRunner.defaultRetainedTerminalRecords
     ) {
         self.installation = installation
         self.launcher = launcher
         self.policy = policy
         self.clock = clock
+        self.retainedTerminalRecords = max(0, retainedTerminalRecords)
         (queue, queueContinuation) = AsyncStream<QueueSnapshot>.makeStream(
             bufferingPolicy: .bufferingNewest(1)
         )
@@ -43,6 +57,18 @@ public actor BrewRunner {
 
     /// How many operations the runner is tracking. Test-facing.
     var activeOperationCount: Int { operations.count }
+
+    /// Whether R2 has already released `id`'s execution resources. Test-facing.
+    func isCompacted(_ id: UUID) -> Bool { operations[id]?.isCompacted ?? false }
+
+    /// Whether `id` still pins a process, a task or a stream. Test-facing.
+    func holdsExecutionResources(_ id: UUID) -> Bool {
+        operations[id]?.holdsExecutionResources ?? false
+    }
+
+    /// Yields the current queue again, so BE1 sc10's "the same phase produced
+    /// repeatedly" is something a test can actually produce. Test-facing.
+    func republish() { publish() }
 
     // MARK: - Projection
 
@@ -62,8 +88,54 @@ public actor BrewRunner {
 
     /// Republishes the queue. Called at the five sites where a phase already
     /// changes: enqueue, install, spawn, terminal, cancel.
+    ///
+    /// Guarded by equality so an observer sees one change per real transition
+    /// rather than one per yield (BE1 sc10). `.bufferingNewest(1)` collapses a
+    /// *backlog*, which is a different thing: it cannot tell a repeat from a
+    /// transition, so without this guard a repeat is delivered as a change.
     private func publish() {
-        queueContinuation.yield(snapshot())
+        let snapshot = snapshot()
+        guard snapshot != lastPublished else { return }
+        lastPublished = snapshot
+        queueContinuation.yield(snapshot)
+    }
+
+    // MARK: - Retention (design D6, brew-execution BE1)
+
+    /// R2 — releases everything a terminal, drained operation no longer needs.
+    /// R1 is the guard on the first line: a live record is never touched.
+    private func compact(_ id: UUID) {
+        guard var record = operations[id], record.resolvedExit != nil, !record.isCompacted else {
+            return
+        }
+        record.process = nil
+        record.pump = nil
+        record.completion = nil
+        record.continuation = nil
+        record.lines = nil
+        record.isCompacted = true
+        operations[id] = record
+        evictRetiredRecords()
+    }
+
+    /// R3 — the handle is gone, so nobody can ask about this operation any more.
+    /// Called from `BrewOperation.deinit`; advisory, never imperative.
+    func release(_ id: UUID) {
+        guard operations[id] != nil else { return }
+        operations[id]?.isReleased = true
+        compact(id)
+        evictRetiredRecords()
+    }
+
+    /// Removes the oldest compacted-and-released records beyond the window.
+    private func evictRetiredRecords() {
+        let retired = operations.values
+            .filter { $0.isCompacted && $0.isReleased }
+            .sorted { $0.ordinal < $1.ordinal }
+        guard retired.count > retainedTerminalRecords else { return }
+        for record in retired.prefix(retired.count - retainedTerminalRecords) {
+            operations[record.id] = nil
+        }
     }
 
     // MARK: - Starting work
@@ -148,12 +220,14 @@ public actor BrewRunner {
                 executableURL: installation.executableURL
             )
             operations[id]?.resolvedExit = BrewExit(status: 127, reason: .exited)
-            record.continuation.finish()
+            record.continuation?.finish()
+            compact(id)
             publish()
             return
         }
 
-        let pump = Self.startPump(reading: process, into: record.continuation)
+        guard let continuation = record.continuation else { return }
+        let pump = Self.startPump(reading: process, into: continuation)
         operations[id]?.process = process
         operations[id]?.pump = pump
         publish()
@@ -198,6 +272,7 @@ public actor BrewRunner {
         // the right-hand side also reads it would overlap exclusive access.
         let result = terminalResult(exit, for: id)
         operations[id]?.resolvedExit = result
+        compact(id)
         publish()
     }
 
@@ -245,7 +320,8 @@ public actor BrewRunner {
                 status: 128 + SIGINT,
                 reason: .cancelled(signal: SIGINT)
             )
-            record.continuation.finish()
+            record.continuation?.finish()
+            compact(id)
             publish()
             return
         }
@@ -265,6 +341,9 @@ public actor BrewRunner {
             status: 128 + SIGTERM,
             reason: .cancelled(signal: SIGTERM)
         )
+        // The pump was cancelled rather than drained — the closest to drained
+        // that D4's "never SIGKILL" allows — so this record is compactable too.
+        compact(id)
         publish()
     }
 
@@ -279,54 +358,6 @@ public actor BrewRunner {
     ) async -> Bool {
         operations[id]?.cancellationSignal = signal.posixValue
         try? process.send(signal)
-        return await completes(pump, within: grace)
-    }
-
-    /// Races the output pump against the grace period on the injected clock.
-    ///
-    /// The pump finishing is the signal that the process is gone: both the real
-    /// and the fake process end their output stream exactly at termination.
-    private func completes(_ pump: Task<Void, Never>, within grace: Duration) async -> Bool {
-        let (outcomes, continuation) = AsyncStream<Bool>.makeStream()
-        let clock = self.clock
-
-        let watcher = Task.detached {
-            await pump.value
-            continuation.yield(true)
-            continuation.finish()
-        }
-        let timer = Task.detached {
-            try? await clock.sleep(for: grace)
-            continuation.yield(false)
-            continuation.finish()
-        }
-        defer {
-            watcher.cancel()
-            timer.cancel()
-        }
-
-        for await outcome in outcomes { return outcome }
-        return false
-    }
-
-    // MARK: - Plumbing
-
-    /// Drains raw chunks into whole, tagged, sequenced lines (design D2).
-    private static func startPump(
-        reading process: any LaunchedProcess,
-        into continuation: AsyncStream<LogLine>.Continuation
-    ) -> Task<Void, Never> {
-        Task {
-            var splitter = LineSplitter()
-            for await chunk in process.output {
-                for line in splitter.consume(chunk) {
-                    continuation.yield(line)
-                }
-            }
-            for line in splitter.flush() {
-                continuation.yield(line)
-            }
-            continuation.finish()
-        }
+        return await Self.completes(pump, within: grace, on: clock)
     }
 }
