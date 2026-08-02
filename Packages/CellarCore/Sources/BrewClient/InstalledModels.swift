@@ -89,6 +89,52 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
 
     /// When the primary keg was installed.
     public var installedAt: Date { primaryKeg.installedAt }
+
+    // MARK: - Derived state (design D4)
+
+    /// Whether the app keeps itself up to date.
+    ///
+    /// `nil` folds to `false` here and only here: "not declared" is a fact worth
+    /// preserving through decode, but at the point of decision the question is
+    /// binary (installed-inventory II2, II4).
+    public var isSelfUpdating: Bool { declaresAutoUpdates == true }
+
+    /// Whether Cellar should report this package as outdated.
+    ///
+    /// For a formula this is the snapshot's flag verbatim — it matches
+    /// `brew outdated` exactly. For a cask the flag is *conjoined* with the
+    /// auto-updates exclusion, which brew's own snapshot already applies: the
+    /// duplication is deliberate, so a future brew change cannot make Cellar
+    /// start nagging about apps that update themselves (installed-inventory
+    /// II4).
+    public var isOutdated: Bool {
+        switch kind {
+        case .formula: snapshotOutdated
+        case .cask: snapshotOutdated && !isSelfUpdating
+        }
+    }
+
+    /// Whether a self-updating cask is behind the version its record publishes.
+    ///
+    /// The greedy signal without the greedy probe: the same record carries both
+    /// numbers, so `brew outdated --greedy` is never spawned. Informational
+    /// only — it feeds a separate section, never the outdated set, the count or
+    /// a badge (installed-inventory II5).
+    public var hasNewerVersion: Bool {
+        isSelfUpdating && installedVersion != catalogVersion
+    }
+
+    /// Whether the user asked for this package, rather than getting it as
+    /// somebody else's dependency.
+    ///
+    /// The payload carries no `installed_as_dependency` the projection trusts,
+    /// so this is the *presence of an on-request marker*, not the absence of a
+    /// dependency one. Any keg counts: pulled in first and asked for later is
+    /// still asked for. A record with no marker at all reads as on request, so
+    /// nothing deliberate can be hidden by the default view (II3).
+    public var isOnRequest: Bool {
+        kegs.contains(where: \.installedOnRequest)
+    }
 }
 
 /// An immutable snapshot of what this machine has installed.
@@ -101,16 +147,40 @@ public struct InstalledInventory: Sendable, Hashable {
     /// Records the payload carried but this build could not read.
     public let skippedRecordCount: Int
 
+    /// Everything installed, as a membership set Browse can intersect against.
+    public let installedIDs: Set<PackageID>
+    /// Everything Cellar reports as outdated. Self-updating casks are excluded,
+    /// so the Browse filter and the Installed list agree by construction
+    /// (installed-inventory II8).
+    public let outdatedIDs: Set<PackageID>
+
     private let positions: [PackageID: Int]
 
+    /// Both membership sets are built here — once, in the same off-main pass
+    /// that produced the projection — rather than recomputed per query
+    /// (design D5).
     public init(packages: [InstalledPackage], skippedRecordCount: Int = 0) {
-        self.packages = packages
+        let ordered = packages.sorted(by: Self.precedes)
+        self.packages = ordered
         self.skippedRecordCount = skippedRecordCount
         positions = Dictionary(
-            packages.enumerated().map { ($0.element.id, $0.offset) },
+            ordered.enumerated().map { ($0.element.id, $0.offset) },
             uniquingKeysWith: { first, _ in first }
         )
+        installedIDs = Set(ordered.map(\.id))
+        outdatedIDs = Set(ordered.lazy.filter(\.isOutdated).map(\.id))
     }
+
+    /// Name first, then namespace. Total by construction — `(name, kind)` is
+    /// unique — so two adjacent rows can never swap between refreshes.
+    private static func precedes(_ lhs: InstalledPackage, _ rhs: InstalledPackage) -> Bool {
+        if lhs.name != rhs.name { return lhs.name < rhs.name }
+        return lhs.kind == .formula && rhs.kind == .cask
+    }
+
+    /// The badge count. Counts `isOutdated` only, so a self-updating cask with a
+    /// newer version is visible in its own section and invisible here.
+    public var outdatedCount: Int { outdatedIDs.count }
 
     /// A snapshot of a machine with nothing installed — or of no machine at all.
     /// A valid value either way, never an error (installed-inventory II9).
@@ -121,5 +191,14 @@ public struct InstalledInventory: Sendable, Hashable {
     /// The record for an id, or `nil`. A miss is an ordinary answer.
     public func package(_ id: PackageID) -> InstalledPackage? {
         positions[id].map { packages[$0] }
+    }
+
+    /// The Installed list, under the dependency toggle.
+    ///
+    /// The default is on-request only, because a machine with 160 packages
+    /// installed usually has ~40 the user chose and 120 that came along for the
+    /// ride (installed-inventory II3).
+    public func packages(includingDependencies: Bool) -> [InstalledPackage] {
+        includingDependencies ? packages : packages.filter(\.isOnRequest)
     }
 }

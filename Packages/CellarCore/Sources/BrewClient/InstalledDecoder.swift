@@ -43,18 +43,14 @@ public enum InstalledDecoder {
         let casks = envelope.casks?.elements ?? []
         let packages = formulae.compactMap(project(formula:)) + casks.compactMap(project(cask:))
 
+        // Ordering and the membership sets are the inventory's own invariants,
+        // established once in its initialiser — this decoder is not the only
+        // thing that builds one.
         return InstalledInventory(
-            packages: packages.sorted(by: precedes),
+            packages: packages,
             skippedRecordCount:
                 (envelope.formulae?.skippedCount ?? 0) + (envelope.casks?.skippedCount ?? 0)
         )
-    }
-
-    /// Name first, then namespace: the same token exists in both, and a stable
-    /// order is what lets a list diff cleanly between refreshes.
-    private static func precedes(_ lhs: InstalledPackage, _ rhs: InstalledPackage) -> Bool {
-        if lhs.name != rhs.name { return lhs.name < rhs.name }
-        return lhs.kind == .formula && rhs.kind == .cask
     }
 
     // MARK: - Projection

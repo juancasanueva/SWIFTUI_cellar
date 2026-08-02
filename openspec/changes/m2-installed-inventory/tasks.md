@@ -149,36 +149,36 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 4: Derivation (D4 — II3, II4, II5, II6) — ≈ 330 lines
 
-- [ ] 4.1 RED `Tests/BrewClientTests/InstalledDeriveTests.swift`, parameterised over the fixture: an
+- [x] 4.1 RED `Tests/BrewClientTests/InstalledDeriveTests.swift`, parameterised over the fixture: an
   outdated formula is in the outdated set and counted (II4 sc1); a cask that does not declare
   auto-updates is outdated on the same terms (II4 sc3); a self-updating cask installed `1.2.3`
   against published `1.3.1` with a false wire flag is **absent** from the set, absent from
   `outdatedCount`, and classified self-updating (II4 sc2).
-- [ ] 4.2 GREEN derivation in `InstalledModels.swift`: `isOutdated` = wire `outdated` verbatim for a
+- [x] 4.2 GREEN derivation in `InstalledModels.swift`: `isOutdated` = wire `outdated` verbatim for a
   formula, `wire.outdated && !isSelfUpdating` for a cask (belt-and-braces over brew's own exclusion);
   `isSelfUpdating` = `autoUpdates == true` (`nil` ⇒ false, "not declared"); `outdatedCount` counts
   `isOutdated` only.
-- [ ] 4.3 RED `InstalledDeriveTests`: `hasNewerVersion` is true for a self-updating cask with
+- [x] 4.3 RED `InstalledDeriveTests`: `hasNewerVersion` is true for a self-updating cask with
   `installed != version` and no second invocation is recorded (II5 sc1); it is false when the versions
   match, and the cask is still absent from the outdated set (II5 sc2). The signal must never reach
   the set, the count or a badge.
-- [ ] 4.4 GREEN `hasNewerVersion`, self-updating casks only, derived from the same record.
-- [ ] 4.5 RED `InstalledDeriveTests`: the default view lists the on-request formula only (II3 sc1);
+- [x] 4.4 GREEN `hasNewerVersion`, self-updating casks only, derived from the same record.
+- [x] 4.5 RED `InstalledDeriveTests`: the default view lists the on-request formula only (II3 sc1);
   with the dependency toggle on both are listed and each exposes whether it was on-request (II3 sc2);
   an installed cask, whose records carry no on-request marker at all, is listed by the default view
   (II3 sc3 — nothing deliberately installed may be hidden).
-- [ ] 4.6 GREEN `isOnRequest`: formula = `kegs.contains(\.installedOnRequest)`; cask = always `true`
+- [x] 4.6 GREEN `isOnRequest`: formula = `kegs.contains(\.installedOnRequest)`; cask = always `true`
   (no `installed_as_dependency` key exists in the payload); plus the `InstalledInventory` filtering
   entry point taking the dependency toggle.
-- [ ] 4.7 RED `InstalledDeriveTests`: a pinned formula and a pinned cask both report pinned with their
+- [x] 4.7 RED `InstalledDeriveTests`: a pinned formula and a pinned cask both report pinned with their
   recorded pinned version (II6 sc1); install dates equal their recorded timestamps interpreted as
   Unix epoch seconds for both kinds (II6 sc2). Both with exactly one recorded invocation.
-- [ ] 4.8 GREEN `isPinned` / `pinnedVersion` from the wire `pinned` / `pinned_version` in both
+- [x] 4.8 GREEN `isPinned` / `pinnedVersion` from the wire `pinned` / `pinned_version` in both
   namespaces; `installedAt` from `primaryKeg.installedAt`. `brew list --pinned` is never spawned.
-- [ ] 4.9 RED `Tests/BrewClientTests/InstalledInventoryTests.swift`: `installedIDs` and `outdatedIDs`
+- [x] 4.9 RED `Tests/BrewClientTests/InstalledInventoryTests.swift`: `installedIDs` and `outdatedIDs`
   membership over `PackageID`; `outdatedIDs` excludes self-updating casks; sort order is by name; an
   empty inventory is a valid value, not an error.
-- [ ] 4.10 GREEN both sets built once in the same off-main pass as the projection.
+- [x] 4.10 GREEN both sets built once in the same off-main pass as the projection.
   Verify: `FAST --filter "InstalledDerive\|InstalledInventory"`.
 
 ## Phase 5: `InstalledStore` (D6 — II1 sc1–2, II9, II10 sc4) — ≈ 330 lines
