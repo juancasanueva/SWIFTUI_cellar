@@ -36,6 +36,9 @@ public actor CatalogSyncEngine {
     private var inFlight: InFlightSync?
     private var nextSyncToken = 0
 
+    /// The identity of the snapshot currently on disk, if it is known.
+    private var diskRevision: CatalogSnapshotRevision?
+
     /// Status transitions and new snapshots, in order, for a single observer.
     public nonisolated let events: AsyncStream<CatalogSyncEvent>
     private nonisolated let continuation: AsyncStream<CatalogSyncEvent>.Continuation
@@ -60,8 +63,17 @@ public actor CatalogSyncEngine {
     // MARK: - Cache
 
     /// The persisted snapshot, or `nil`. Never blocks on the network.
+    ///
+    /// Every read is re-stamped with `diskRevision`, so the same file always
+    /// answers under the same identity and the consumer can tell a re-read from
+    /// genuinely new content (design D2).
     public func cachedSnapshot() -> CatalogSnapshot? {
-        (try? store.loadSnapshot()) ?? nil
+        guard let snapshot = (try? store.loadSnapshot()) ?? nil else { return nil }
+        guard let diskRevision else {
+            self.diskRevision = snapshot.revision
+            return snapshot
+        }
+        return snapshot.carrying(diskRevision)
     }
 
     /// Whether the oldest payload source is past its shelf life.
@@ -196,14 +208,22 @@ public actor CatalogSyncEngine {
                 analytics: analytics,
                 generatedAt: now
             )
-            try store.persist(
-                snapshot,
-                state: CatalogState(
-                    sources: sources,
-                    lastSuccessAt: now,
-                    skippedRecordCount: acquired.skippedRecordCount
+            do {
+                try store.persist(
+                    snapshot,
+                    state: CatalogState(
+                        sources: sources,
+                        lastSuccessAt: now,
+                        skippedRecordCount: acquired.skippedRecordCount
+                    )
                 )
-            )
+                diskRevision = snapshot.revision
+            } catch {
+                // A publish that failed part-way could have left either file on
+                // disk. Forget the pin rather than certify bytes nobody checked.
+                diskRevision = nil
+                throw error
+            }
             return succeed(with: snapshot, at: now)
         } catch {
             let failure = CatalogSyncError.from(error)

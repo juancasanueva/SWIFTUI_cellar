@@ -217,6 +217,54 @@ struct SyncEngineTests {
         #expect(harness.source.requests(for: .formulae).count == 2)
     }
 
+    // MARK: - Snapshot identity (D2)
+
+    @Test("The same file on disk keeps one identity across reads and revalidations")
+    func diskRevisionIsPinnedToTheFile() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(
+            .payload(Payload.formulae(["wget"]), validators: ConditionalValidators(etag: "V1")),
+            for: .formulae
+        )
+        harness.source.script(
+            .payload(Payload.casks(["iterm2"]), validators: ConditionalValidators(etag: "C1")),
+            for: .casks
+        )
+        let persisted = try #require(await harness.engine.sync().value)
+
+        let firstRead = try #require(await harness.engine.cachedSnapshot())
+        let secondRead = try #require(await harness.engine.cachedSnapshot())
+        #expect(firstRead.revision == secondRead.revision)
+        #expect(firstRead.revision == persisted.revision)
+
+        // A 304-only sync re-emits the catalog already on disk. Without the pin
+        // the 15-minute poll would hand out a fresh identity every time and
+        // rebuild a 16k-record index forever.
+        harness.source.script(.notModified, for: .formulae)
+        harness.source.script(.notModified, for: .casks)
+        harness.time.advance(by: 3_600)
+
+        let revalidated = try #require(await harness.engine.sync().value)
+
+        #expect(revalidated.revision == persisted.revision)
+        #expect(revalidated.packages.map(\.name).sorted() == ["iterm2", "wget"])
+    }
+
+    @Test("A changed payload is a new identity")
+    func changedPayloadTakesAFreshRevision() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        let first = try #require(await harness.engine.sync().value)
+
+        harness.source.script(.payload(Payload.formulae(["wget", "curl"])), for: .formulae)
+        harness.source.script(.notModified, for: .casks)
+        let second = try #require(await harness.engine.sync().value)
+
+        #expect(second.revision != first.revision)
+        #expect(try #require(await harness.engine.cachedSnapshot()).revision == second.revision)
+    }
+
     // MARK: - Single flight (CSA2)
 
     @Test("Two callers waiting on one gated sync perform exactly one acquisition")

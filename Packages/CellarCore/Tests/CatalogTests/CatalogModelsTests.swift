@@ -87,6 +87,60 @@ struct CatalogModelsTests {
         #expect(decoded.skippedRecordCount == 3)
         #expect(decoded.schemaVersion == CatalogSnapshot.currentSchemaVersion)
     }
+
+    // MARK: - Snapshot identity (D2)
+
+    @Test("Revisions minted concurrently are unique and strictly increasing")
+    func revisionsAreUniqueAndMonotonic() async {
+        let sequential = (0..<3).map { _ in CatalogSnapshotRevision.next() }
+        #expect(sequential[0].ordinal < sequential[1].ordinal)
+        #expect(sequential[1].ordinal < sequential[2].ordinal)
+
+        let minted = await withTaskGroup(of: CatalogSnapshotRevision.self) { group in
+            for _ in 0..<200 { group.addTask { CatalogSnapshotRevision.next() } }
+            return await group.reduce(into: [CatalogSnapshotRevision]()) { $0.append($1) }
+        }
+
+        #expect(minted.count == 200)
+        #expect(Set(minted).count == 200, "two concurrent callers were handed the same revision")
+    }
+
+    @Test("Two decodes of the same bytes are two distinct materializations")
+    func decodingMintsAFreshRevision() throws {
+        let snapshot = CatalogSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            skippedRecordCount: 0,
+            packages: [CatalogPackage.stub(kind: .formula, name: "wget")]
+        )
+        let data = try JSONEncoder().encode(snapshot)
+
+        let first = try JSONDecoder().decode(CatalogSnapshot.self, from: data)
+        let second = try JSONDecoder().decode(CatalogSnapshot.self, from: data)
+
+        #expect(first.revision != second.revision)
+        #expect(first.revision != snapshot.revision)
+        #expect(first.packages.map(\.id) == second.packages.map(\.id))
+    }
+
+    @Test("The persisted JSON gains no key: identity is process-local only")
+    func revisionIsNotPersisted() throws {
+        let snapshot = CatalogSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            skippedRecordCount: 3,
+            packages: [CatalogPackage.stub(kind: .formula, name: "wget")]
+        )
+
+        let data = try JSONEncoder().encode(snapshot)
+        let object = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        #expect(
+            Set(object.keys) == ["schemaVersion", "generatedAt", "skippedRecordCount", "packages"]
+        )
+        // The whole no-migration claim rests on this: same version, same shape.
+        #expect(object["schemaVersion"] as? Int == 1)
+    }
 }
 
 extension CatalogPackage {
