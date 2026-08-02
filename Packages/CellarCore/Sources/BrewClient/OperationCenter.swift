@@ -91,22 +91,37 @@ public final class OperationCenter {
         Task { [weak self] in
             for await snapshot in runner.queue {
                 guard let self else { break }
-                await self.apply(snapshot)
+                self.apply(snapshot)
             }
         }
     }
 
     /// The one place a queue phase is written onto an item, so the summary and
     /// the detail listing are reading the same projection (OA5).
+    ///
+    /// Two guards, both load-bearing since M2-3:
+    ///
+    /// - A phase is written only for an id the snapshot actually carries, so an
+    ///   operation whose execution-layer record has been **retired** (D6 R3)
+    ///   simply stops receiving updates rather than being reset. Its `isTerminal`
+    ///   is decided by its `outcome`, which the centre owns, so the item stays
+    ///   enumerable for the session with its identity, argv and outcome intact
+    ///   (operation-activity OA1).
+    /// - A phase is written only when it **differs**. `queuePhase` is observed,
+    ///   and the runner yields a snapshot per real transition; without this the
+    ///   centre would still wake every observer of every item on every yield
+    ///   (brew-execution BE1 sc10).
     private func apply(_ snapshot: QueueSnapshot) {
         let phases = Dictionary(
             snapshot.operations.map { ($0.id, $0.phase) },
             uniquingKeysWith: { _, newest in newest }
         )
         for item in items {
-            if let operationID = item.operationID, let phase = phases[operationID] {
-                item.queuePhase = phase
-            }
+            guard let operationID = item.operationID,
+                  let phase = phases[operationID],
+                  item.queuePhase != phase
+            else { continue }
+            item.queuePhase = phase
         }
     }
 
@@ -191,6 +206,10 @@ public final class OperationCenter {
             return
         }
         item.operationID = operation.id
+        // The item owns the handle from here until it settles: cancel reaches
+        // the runner that produced it, and the execution layer's record cannot
+        // be retired underneath a caller that can still ask about it (D6, D10).
+        item.operation = operation
 
         // A cancel that arrived while the submission was in flight has nothing
         // to act on yet, so it is replayed here rather than lost.

@@ -36,6 +36,21 @@ public final class ActivityItem: Identifiable {
     /// yet, so a cancel racing the submission cannot be lost.
     internal var isCancelRequested = false
 
+    /// The handle produced by **this item's own runner**, held for exactly as
+    /// long as the item is cancellable and dropped in `settle(_:)`.
+    ///
+    /// Two things depend on that lifetime. Cancel is delivered to the process
+    /// that actually exists, even after `brew` has been repointed or detached
+    /// (design D10). And the execution layer's retention rule is expressed as
+    /// ownership rather than as a timer: the runner may drop a terminal record
+    /// only once no handle survives, and this is the last one (D6 R3). Holding
+    /// it past `settle(_:)` would pin a record forever; dropping it earlier
+    /// would make a live operation uncancellable.
+    ///
+    /// `@ObservationIgnored` because it is plumbing: no view reads it, and
+    /// publishing it would wake every observer twice per operation.
+    @ObservationIgnored internal var operation: BrewOperation?
+
     /// The typed command. Everything displayed is rendered from this, never
     /// from bytes the subprocess wrote.
     public let command: MutationCommand
@@ -139,5 +154,9 @@ public final class ActivityItem: Identifiable {
     func settle(_ outcome: MutationOutcome) {
         guard self.outcome == nil else { return }
         self.outcome = outcome
+        // Terminal, so nothing can be cancelled and nothing can still ask the
+        // runner about it: releasing here is what makes the execution layer's
+        // record removable at all (design D6 R3).
+        operation = nil
     }
 }
