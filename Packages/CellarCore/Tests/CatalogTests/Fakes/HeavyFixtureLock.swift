@@ -1,3 +1,5 @@
+import Testing
+
 /// Serializes the tests that materialise a realistically sized catalog.
 ///
 /// `CatalogMemoryTests` asserts a budget on *process* footprint, which only
@@ -8,6 +10,23 @@
 ///
 /// `.serialized` cannot express this — it orders a suite's own tests, not two
 /// suites against each other — so the heavy tests take turns explicitly.
+/// Applied as `.heavyFixture` so a test body keeps its own shape — the tests
+/// wearing this are the ones that build a 15,000-record catalog or a 40 MB
+/// payload.
+struct HeavyFixtureTrait: TestTrait, SuiteTrait, TestScoping {
+    func provideScope(
+        for test: Test,
+        testCase: Test.Case?,
+        performing function: @Sendable () async throws -> Void
+    ) async throws {
+        try await HeavyFixtureLock.exclusive { try await function() }
+    }
+}
+
+extension Trait where Self == HeavyFixtureTrait {
+    static var heavyFixture: Self { HeavyFixtureTrait() }
+}
+
 actor HeavyFixtureLock {
     private static let shared = HeavyFixtureLock()
 

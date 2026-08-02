@@ -33,65 +33,62 @@ struct SearchLatencyTests {
     @Test(
         "p95 as-you-type latency stays under 8 ms on a realistic index",
         .enabled(if: BuildConfiguration.isRelease),
-        .timeLimit(.minutes(2))
+        .timeLimit(.minutes(2)),
+        .heavyFixture
     )
-    func p95StaysUnderCeiling() async {
-        await HeavyFixtureLock.exclusive {
-            // Build time is deliberately outside the measurement: the index is built
-            // once per sync, the query runs on every keystroke.
-            let index = PackageSearchIndex(snapshot: LatencyFixture.snapshot(count: Self.recordCount))
-            #expect(index.recordCount == Self.recordCount)
+    func p95StaysUnderCeiling() {
+        // Build time is deliberately outside the measurement: the index is built
+        // once per sync, the query runs on every keystroke.
+        let index = PackageSearchIndex(snapshot: LatencyFixture.snapshot(count: Self.recordCount))
+        #expect(index.recordCount == Self.recordCount)
 
-            let queries = LatencyFixture.asYouTypePrefixes()
-            #expect(queries.count == 50)
+        let queries = LatencyFixture.asYouTypePrefixes()
+        #expect(queries.count == 50)
 
-            // Warm-up: first-touch page faults on a 1–2 MB buffer are not latency.
-            for _ in 0..<5 {
-                for query in queries { _ = index.search(query) }
-            }
-
-            var samples: [Duration] = []
-            samples.reserveCapacity(queries.count * 20)
-            let clock = ContinuousClock()
-            for _ in 0..<20 {
-                for query in queries {
-                    let start = clock.now
-                    let hits = index.search(query)
-                    samples.append(clock.now - start)
-                    // Keeps the optimiser from deleting the call it is timing.
-                    blackHole(hits.count)
-                }
-            }
-
-            #expect(samples.count == 1_000)
-            let sorted = samples.sorted()
-            let p95 = sorted[Int(Double(sorted.count) * 0.95)]
-            let median = sorted[sorted.count / 2]
-
-            #expect(
-                p95 < Self.ceiling,
-                "p95 \(p95) exceeded the \(Self.ceiling) ceiling (median \(median), max \(sorted.last!))"
-            )
+        // Warm-up: first-touch page faults on a 1–2 MB buffer are not latency.
+        for _ in 0..<5 {
+            for query in queries { _ = index.search(query) }
         }
+
+        var samples: [Duration] = []
+        samples.reserveCapacity(queries.count * 20)
+        let clock = ContinuousClock()
+        for _ in 0..<20 {
+            for query in queries {
+                let start = clock.now
+                let hits = index.search(query)
+                samples.append(clock.now - start)
+                // Keeps the optimiser from deleting the call it is timing.
+                blackHole(hits.count)
+            }
+        }
+
+        #expect(samples.count == 1_000)
+        let sorted = samples.sorted()
+        let p95 = sorted[Int(Double(sorted.count) * 0.95)]
+        let median = sorted[sorted.count / 2]
+
+        #expect(
+            p95 < Self.ceiling,
+            "p95 \(p95) exceeded the \(Self.ceiling) ceiling (median \(median), max \(sorted.last!))"
+        )
     }
 
-    @Test("The latency fixture is the size and shape the ceiling is claimed for")
-    func fixtureIsRealistic() async {
-        await HeavyFixtureLock.exclusive {
-            let snapshot = LatencyFixture.snapshot(count: Self.recordCount)
+    @Test("The latency fixture is the size and shape the ceiling is claimed for", .heavyFixture)
+    func fixtureIsRealistic() {
+        let snapshot = LatencyFixture.snapshot(count: Self.recordCount)
 
-            #expect(snapshot.packages.count == Self.recordCount)
-            let nameLengths = snapshot.packages.map(\.name.count)
-            let descLengths = snapshot.packages.map { ($0.desc ?? "").count }
-            let meanName = Double(nameLengths.reduce(0, +)) / Double(nameLengths.count)
-            let meanDesc = Double(descLengths.reduce(0, +)) / Double(descLengths.count)
+        #expect(snapshot.packages.count == Self.recordCount)
+        let nameLengths = snapshot.packages.map(\.name.count)
+        let descLengths = snapshot.packages.map { ($0.desc ?? "").count }
+        let meanName = Double(nameLengths.reduce(0, +)) / Double(nameLengths.count)
+        let meanDesc = Double(descLengths.reduce(0, +)) / Double(descLengths.count)
 
-            // Live capture, 2026-08-01: mean name 10.2 chars, mean description 35.2.
-            #expect((8.0...13.0).contains(meanName), "mean name length \(meanName)")
-            #expect((30.0...42.0).contains(meanDesc), "mean description length \(meanDesc)")
-            #expect(snapshot.packages.contains { ($0.desc ?? "").isEmpty })
-            #expect(Set(snapshot.packages.map(\.kind)) == [.formula, .cask])
-        }
+        // Live capture, 2026-08-01: mean name 10.2 chars, mean description 35.2.
+        #expect((8.0...13.0).contains(meanName), "mean name length \(meanName)")
+        #expect((30.0...42.0).contains(meanDesc), "mean description length \(meanDesc)")
+        #expect(snapshot.packages.contains { ($0.desc ?? "").isEmpty })
+        #expect(Set(snapshot.packages.map(\.kind)) == [.formula, .cask])
     }
 
     @inline(never)

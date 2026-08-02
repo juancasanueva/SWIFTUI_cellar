@@ -152,23 +152,21 @@ struct SyncEngineTests {
 
     // MARK: - Failure never erases the cache (CS4)
 
-    @Test("A transport error keeps a large cached catalog answering")
+    @Test("A transport error keeps a large cached catalog answering", .heavyFixture)
     func transportErrorPreservesTheCache() async throws {
-        try await HeavyFixtureLock.exclusive {
-            let harness = try SyncHarness()
-            let names = (0..<15_000).map { "pkg\($0)" }
-            harness.source.script(.payload(Payload.formulae(names)), for: .formulae)
-            harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
-            _ = await harness.engine.sync()
+        let harness = try SyncHarness()
+        let names = (0..<15_000).map { "pkg\($0)" }
+        harness.source.script(.payload(Payload.formulae(names)), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        _ = await harness.engine.sync()
 
-            harness.source.script(.failure(.offline), for: .formulae)
+        harness.source.script(.failure(.offline), for: .formulae)
 
-            let result = await harness.engine.sync()
+        let result = await harness.engine.sync()
 
-            #expect(result.error == .offline)
-            let snapshot = try #require(try harness.store.loadSnapshot())
-            #expect(snapshot.packages.count == 15_001)
-        }
+        #expect(result.error == .offline)
+        let snapshot = try #require(try harness.store.loadSnapshot())
+        #expect(snapshot.packages.count == 15_001)
     }
 
     @Test("503 is retried to success, 404 is asked once")
@@ -384,29 +382,27 @@ struct SyncEngineTests {
 
     // MARK: - Degenerate payloads (CSA3, CSA4)
 
-    @Test("A degenerate payload is refused and the last good catalog survives")
+    @Test("A degenerate payload is refused and the last good catalog survives", .heavyFixture)
     func degeneratePayloadIsRefused() async throws {
-        try await HeavyFixtureLock.exclusive {
-            let harness = try SyncHarness(recording: true)
-            let recorder = try #require(harness.recorder)
-            let names = (0..<15_000).map { "pkg\($0)" }
-            harness.source.script(.payload(Payload.formulae(names)), for: .formulae)
-            harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
-            _ = await harness.engine.sync()
-            let writesBefore = recorder.publishedPaths
+        let harness = try SyncHarness(recording: true)
+        let recorder = try #require(harness.recorder)
+        let names = (0..<15_000).map { "pkg\($0)" }
+        harness.source.script(.payload(Payload.formulae(names)), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        _ = await harness.engine.sync()
+        let writesBefore = recorder.publishedPaths
 
-            // Well-formed JSON, zero usable records.
-            harness.source.script(.payload(Payload.formulae([])), for: .formulae)
-            harness.source.script(.notModified, for: .casks)
+        // Well-formed JSON, zero usable records.
+        harness.source.script(.payload(Payload.formulae([])), for: .formulae)
+        harness.source.script(.notModified, for: .casks)
 
-            let result = await harness.engine.sync()
+        let result = await harness.engine.sync()
 
-            #expect(result.error == .malformedPayload)
-            #expect(await harness.engine.status == .failed(.malformedPayload))
-            #expect(recorder.publishedPaths == writesBefore, "the refused sync wrote to disk")
-            let persisted = try #require(try harness.store.loadSnapshot())
-            #expect(persisted.packages.count == 15_001)
-        }
+        #expect(result.error == .malformedPayload)
+        #expect(await harness.engine.status == .failed(.malformedPayload))
+        #expect(recorder.publishedPaths == writesBefore, "the refused sync wrote to disk")
+        let persisted = try #require(try harness.store.loadSnapshot())
+        #expect(persisted.packages.count == 15_001)
     }
 
     @Test("A one-package catalog is not degenerate")
