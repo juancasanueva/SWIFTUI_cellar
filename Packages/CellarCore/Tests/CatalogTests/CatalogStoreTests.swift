@@ -3,7 +3,11 @@ import Testing
 
 @testable import Catalog
 
-@Suite("Catalog store")
+/// `.serialized` because several of these tests hold two ~15,000-record
+/// snapshots and their indexes alive at once. Run in parallel they add tens of
+/// megabytes of unrelated resident memory to whatever else is running, which
+/// `CatalogMemoryTests` measures as process footprint.
+@Suite("Catalog store", .serialized)
 @MainActor
 struct CatalogStoreTests {
     // MARK: - Start-up (CS8)
@@ -149,93 +153,99 @@ struct CatalogStoreTests {
 
     @Test("Adopting a 15,500-record snapshot leaves the main actor free")
     func adoptionDoesNotBlockTheMainActor() async throws {
-        let harness = try SyncHarness()
-        let store = CatalogStore(engine: harness.engine)
-        let snapshot = LatencyFixture.snapshot(count: SearchIndexTests.realisticRecordCount)
-        let finished = Flag()
-        let turns = Counter()
+        try await HeavyFixtureLock.exclusive {
+            let harness = try SyncHarness()
+            let store = CatalogStore(engine: harness.engine)
+            let snapshot = Self.snapshot(of: SearchIndexTests.realisticRecordCount, prefix: "pkg")
+            let finished = Flag()
+            let turns = Counter()
 
-        let ticker = Task { @MainActor in
-            while !finished.isSet {
-                await Task.yield()
-                turns.increment()
+            let ticker = Task { @MainActor in
+                while !finished.isSet {
+                    await Task.yield()
+                    turns.increment()
+                }
             }
+            await Task.yield()
+
+            let before = turns.value
+            await store.adopt(snapshot)
+            let during = turns.value - before
+            finished.set()
+            await ticker.value
+
+            #expect(store.packageCount == SearchIndexTests.realisticRecordCount)
+            // Zero under M1's synchronous main-actor build: it holds the actor from
+            // the moment adoption starts. A regression test, not a timing one.
+            #expect(during > 0, "no main-actor turn completed while the snapshot was adopted")
         }
-        await Task.yield()
-
-        let before = turns.value
-        await store.adopt(snapshot)
-        let during = turns.value - before
-        finished.set()
-        await ticker.value
-
-        #expect(store.packageCount == SearchIndexTests.realisticRecordCount)
-        // Zero under M1's synchronous main-actor build: it holds the actor from
-        // the moment adoption starts. A regression test, not a timing one.
-        #expect(during > 0, "no main-actor turn completed while the snapshot was adopted")
     }
 
     @Test("Every query issued during an adoption is answered from the last good index")
     func queriesNeverBlankWhileASnapshotIsAdopted() async throws {
-        let harness = try SyncHarness()
-        let store = CatalogStore(engine: harness.engine)
-        // Both snapshots share a name space, so "the results went empty" can
-        // only mean the swap blanked them — never that the query stopped
-        // matching.
-        await store.adopt(Self.snapshot(of: 15_000, prefix: "pkg"))
-        store.query = "pkg"
-        #expect(store.results.isEmpty == false)
+        try await HeavyFixtureLock.exclusive {
+            let harness = try SyncHarness()
+            let store = CatalogStore(engine: harness.engine)
+            // Both snapshots share a name space, so "the results went empty" can
+            // only mean the swap blanked them — never that the query stopped
+            // matching.
+            await store.adopt(Self.snapshot(of: 15_000, prefix: "pkg"))
+            store.query = "pkg"
+            #expect(store.results.isEmpty == false)
 
-        let finished = Flag()
-        let sawEmpty = Flag()
-        let answered = Counter()
+            let finished = Flag()
+            let sawEmpty = Flag()
+            let answered = Counter()
 
-        // Keystrokes for the whole duration of the adoption below.
-        let typist = Task { @MainActor in
-            var toggle = false
-            while !finished.isSet {
-                toggle.toggle()
-                store.query = toggle ? "pkg1" : "pkg2"
-                if store.results.isEmpty { sawEmpty.set() }
-                answered.increment()
-                await Task.yield()
+            // Keystrokes for the whole duration of the adoption below.
+            let typist = Task { @MainActor in
+                var toggle = false
+                while !finished.isSet {
+                    toggle.toggle()
+                    store.query = toggle ? "pkg1" : "pkg2"
+                    if store.results.isEmpty { sawEmpty.set() }
+                    answered.increment()
+                    await Task.yield()
+                }
             }
+            await Task.yield()
+
+            let before = answered.value
+            await store.adopt(Self.snapshot(of: 6_000, prefix: "pkg"))
+            let during = answered.value - before
+            finished.set()
+            await typist.value
+
+            #expect(during > 0, "no query was issued while the adoption was in progress")
+            #expect(sawEmpty.isSet == false, "a query observed an empty result set caused by the swap")
+
+            store.query = "pkg"
+            #expect(store.results.isEmpty == false)
+            #expect(store.packageCount == 6_000)
         }
-        await Task.yield()
-
-        let before = answered.value
-        await store.adopt(Self.snapshot(of: 15_500, prefix: "pkg"))
-        let during = answered.value - before
-        finished.set()
-        await typist.value
-
-        #expect(during > 0, "no query was issued while the adoption was in progress")
-        #expect(sawEmpty.isSet == false, "a query observed an empty result set caused by the swap")
-
-        store.query = "pkg"
-        #expect(store.results.isEmpty == false)
-        #expect(store.packageCount == 15_500)
     }
 
     @Test("A late adoption of an older snapshot is discarded, not installed")
     func lateOlderAdoptionIsDiscarded() async throws {
-        let harness = try SyncHarness()
-        let store = CatalogStore(engine: harness.engine)
-        // `older` is 15,500 records and `newer` is 3, so the newer build lands
-        // first and the older one arrives afterwards with a stale ordinal.
-        let older = Self.snapshot(of: 15_500, prefix: "old")
-        let newer = Self.snapshot(of: 3, prefix: "new")
+        try await HeavyFixtureLock.exclusive {
+            let harness = try SyncHarness()
+            let store = CatalogStore(engine: harness.engine)
+            // `older` is 15,500 records and `newer` is 3, so the newer build lands
+            // first and the older one arrives afterwards with a stale ordinal.
+            let older = Self.snapshot(of: 8_000, prefix: "old")
+            let newer = Self.snapshot(of: 3, prefix: "new")
 
-        let first = Task { await store.adopt(older) }
-        let second = Task { await store.adopt(newer) }
-        await second.value
-        await first.value
+            let first = Task { await store.adopt(older) }
+            let second = Task { await store.adopt(newer) }
+            await second.value
+            await first.value
 
-        #expect(store.packageCount == 3)
-        store.query = "new"
-        #expect(store.results.map(\.name).sorted() == ["new0", "new1", "new2"])
-        store.query = "old"
-        #expect(store.results.isEmpty, "the discarded older build was installed after all")
+            #expect(store.packageCount == 3)
+            store.query = "new"
+            #expect(store.results.map(\.name).sorted() == ["new0", "new1", "new2"])
+            store.query = "old"
+            #expect(store.results.isEmpty, "the discarded older build was installed after all")
+        }
     }
 
     @Test("A manual refresh with the event stream running builds one index for its snapshot")

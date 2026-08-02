@@ -182,10 +182,18 @@ public actor CatalogSyncEngine {
             let sources = acquired.sources
             let now = timeSource.now
 
-            guard acquired.changed || previousSnapshot == nil else {
+            if !acquired.changed, let previousSnapshot {
                 // Nothing moved. Writing the snapshot again would be 4 MB of
                 // pointless I/O; the sidecar still has to record the new
                 // `downloadedAt` or the next launch re-checks immediately.
+                //
+                // Bound to a readable previous snapshot on purpose: "unchanged"
+                // with nothing to rebuild from is not a success, and the old
+                // `previousSnapshot ?? CatalogSnapshot(packages: [])` fallback
+                // could only ever have published an empty catalog (design D4).
+                // Without a cache the sync falls through and fails as
+                // `.malformedPayload`, which is also what forces the next fetch
+                // to be unconditional.
                 try store.persistState(
                     CatalogState(
                         sources: sources,
@@ -193,10 +201,7 @@ public actor CatalogSyncEngine {
                         skippedRecordCount: previousState?.skippedRecordCount ?? 0
                     )
                 )
-                let snapshot = previousSnapshot ?? CatalogSnapshot(
-                    generatedAt: now, skippedRecordCount: 0, packages: []
-                )
-                return succeed(with: snapshot, at: now)
+                return succeed(with: previousSnapshot, at: now)
             }
 
             let analytics = await fetchAnalytics(into: staging, carryingOver: previousSnapshot)

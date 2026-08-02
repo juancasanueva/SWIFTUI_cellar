@@ -153,7 +153,60 @@ struct FileStoreTests {
         #expect(fileSystem.contents(at: staging.appendingPathComponent("formula.json")) == nil)
     }
 
+    // MARK: - Degenerate snapshots (CSA4, CSA3)
+
+    @Test("A zero-package catalog.json on disk reads as no cache, and throws nothing")
+    func zeroPackageSnapshotReadsAsNoCache() throws {
+        let directory = try Self.temporaryDirectory()
+        let store = CatalogFileStore(directory: directory)
+        // Written past the guard, the way a build without it would have.
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        try encoder.encode(Self.snapshot(names: [])).write(to: store.snapshotURL)
+
+        #expect(try store.loadSnapshot() == nil)
+        #expect(store.hasUsableCache == false)
+        // Left in place: a read path must not mutate the store, and the next
+        // successful sync overwrites it anyway.
+        #expect(FileManager.default.fileExists(atPath: store.snapshotURL.path))
+    }
+
+    @Test("A one-package catalog.json is still a usable cache")
+    func onePackageSnapshotIsAUsableCache() throws {
+        let directory = try Self.temporaryDirectory()
+        let store = CatalogFileStore(directory: directory)
+        try store.persist(Self.snapshot(names: ["wget"]), state: Self.state(recordCount: 1))
+
+        let loaded = try #require(try store.loadSnapshot())
+
+        #expect(loaded.packages.map(\.name) == ["wget"])
+        #expect(store.hasUsableCache)
+    }
+
+    @Test("Persisting a zero-package snapshot is malformed, not a persistence failure")
+    func zeroPackagePersistIsRefused() throws {
+        let fileSystem = FakeCatalogFileSystem()
+        let store = CatalogFileStore(directory: Self.root, fileSystem: fileSystem)
+
+        // `.persistence` would be the answer if the guard sat inside the `do`,
+        // which rewrites every throw. This is a semantic refusal, not I/O.
+        #expect(throws: CatalogSyncError.malformedPayload) {
+            try store.persist(Self.snapshot(names: []), state: Self.state(recordCount: 0))
+        }
+
+        #expect(fileSystem.contents(at: store.snapshotURL) == nil)
+        #expect(fileSystem.contents(at: store.stateURL) == nil)
+        #expect(fileSystem.operations.isEmpty, "a refused snapshot touched the file system")
+    }
+
     // MARK: - Helpers
+
+    static func temporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cellar-store-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
 
     static func snapshot(names: [String]) -> CatalogSnapshot {
         CatalogSnapshot(

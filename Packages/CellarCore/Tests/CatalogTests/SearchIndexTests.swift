@@ -3,7 +3,7 @@ import Testing
 
 @testable import Catalog
 
-@Suite("Search index")
+@Suite("Search index", .serialized)
 struct SearchIndexTests {
     /// The size the p95 ceiling is claimed for, so "realistic" means one thing.
     static let realisticRecordCount = SearchLatencyTests.recordCount
@@ -13,32 +13,34 @@ struct SearchIndexTests {
     @Test("The main actor keeps servicing work throughout a 15,500-record build")
     @MainActor
     func mainActorStaysResponsiveDuringTheBuild() async {
-        let snapshot = LatencyFixture.snapshot(count: Self.realisticRecordCount)
-        let finished = Flag()
-        let turns = Counter()
+        await HeavyFixtureLock.exclusive {
+            let snapshot = LatencyFixture.snapshot(count: Self.realisticRecordCount)
+            let finished = Flag()
+            let turns = Counter()
 
-        // Main-actor work that keeps offering itself for as long as the build
-        // runs, so what is measured is the *duration* of the build, not the one
-        // scheduling turn any `await` hands out for free.
-        let ticker = Task { @MainActor in
-            while !finished.isSet {
-                await Task.yield()
-                turns.increment()
+            // Main-actor work that keeps offering itself for as long as the build
+            // runs, so what is measured is the *duration* of the build, not the one
+            // scheduling turn any `await` hands out for free.
+            let ticker = Task { @MainActor in
+                while !finished.isSet {
+                    await Task.yield()
+                    turns.increment()
+                }
             }
+            await Task.yield()
+
+            let before = turns.value
+            let index = await PackageSearchIndex.build(from: snapshot)
+            let during = turns.value - before
+            finished.set()
+            await ticker.value
+
+            #expect(index.recordCount == Self.realisticRecordCount)
+            // Measured against a `@MainActor` build, this is exactly 0: the build
+            // holds the actor from the moment it starts, so no main-actor turn can
+            // complete inside the window. It is a regression test, not a timing one.
+            #expect(during > 0, "no main-actor turn completed while the index was building")
         }
-        await Task.yield()
-
-        let before = turns.value
-        let index = await PackageSearchIndex.build(from: snapshot)
-        let during = turns.value - before
-        finished.set()
-        await ticker.value
-
-        #expect(index.recordCount == Self.realisticRecordCount)
-        // Measured against a `@MainActor` build, this is exactly 0: the build
-        // holds the actor from the moment it starts, so no main-actor turn can
-        // complete inside the window. It is a regression test, not a timing one.
-        #expect(during > 0, "no main-actor turn completed while the index was building")
     }
 
     @Test("An off-main build answers identically to a synchronous one")

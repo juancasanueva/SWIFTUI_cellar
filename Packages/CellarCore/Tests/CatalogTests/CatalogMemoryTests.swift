@@ -16,37 +16,43 @@ struct CatalogMemoryTests {
     static let retainedBudget = 40 * 1_048_576
 
     @Test("Decoding a 40 MB payload stays inside the peak and retained budgets", .timeLimit(.minutes(2)))
-    func decodeStaysInsideTheMemoryBudget() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cellar-catalog-memory-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+    func decodeStaysInsideTheMemoryBudget() async throws {
+        // Process footprint is only the decoder's while nothing else in the
+        // process is holding a catalog-sized fixture.
+        try await HeavyFixtureLock.exclusive {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("cellar-catalog-memory-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
 
-        let payload = directory.appendingPathComponent("formula.json")
-        let writtenBytes = try SyntheticPayload.writeFormulae(to: payload, targetBytes: 40 * 1_048_576)
-        #expect(writtenBytes >= 40 * 1_048_576)
+            let payload = directory.appendingPathComponent("formula.json")
+            let writtenBytes = try SyntheticPayload.writeFormulae(
+                to: payload, targetBytes: 40 * 1_048_576
+            )
+            #expect(writtenBytes >= 40 * 1_048_576)
 
-        let baseline = MemoryProbe.physFootprint()
-        let sampler = MemoryProbe.Sampler()
-        sampler.start()
-        let decoded = try CatalogDecoder.decodeFormulae(contentsOf: payload)
-        let peak = sampler.stop()
-        let retained = MemoryProbe.physFootprint()
+            let baseline = MemoryProbe.physFootprint()
+            let sampler = MemoryProbe.Sampler()
+            sampler.start()
+            let decoded = try CatalogDecoder.decodeFormulae(contentsOf: payload)
+            let peak = sampler.stop()
+            let retained = MemoryProbe.physFootprint()
 
-        // The decode really happened: a trivial pass would report zero records.
-        #expect(decoded.packages.count > 5_000)
-        #expect(decoded.packages[0].tap == "homebrew/core")
+            // The decode really happened: a trivial pass would report zero records.
+            #expect(decoded.packages.count > 5_000)
+            #expect(decoded.packages[0].tap == "homebrew/core")
 
-        let peakDelta = Int(peak) - Int(baseline)
-        let retainedDelta = Int(retained) - Int(baseline)
-        #expect(
-            peakDelta <= Self.peakBudget,
-            "peak grew \(peakDelta / 1_048_576) MB, budget \(Self.peakBudget / 1_048_576) MB"
-        )
-        #expect(
-            retainedDelta <= Self.retainedBudget,
-            "retained \(retainedDelta / 1_048_576) MB, budget \(Self.retainedBudget / 1_048_576) MB"
-        )
+            let peakDelta = Int(peak) - Int(baseline)
+            let retainedDelta = Int(retained) - Int(baseline)
+            #expect(
+                peakDelta <= Self.peakBudget,
+                "peak grew \(peakDelta / 1_048_576) MB, budget \(Self.peakBudget / 1_048_576) MB"
+            )
+            #expect(
+                retainedDelta <= Self.retainedBudget,
+                "retained \(retainedDelta / 1_048_576) MB, budget \(Self.retainedBudget / 1_048_576) MB"
+            )
+        }
     }
 
     @Test("A staged payload is deleted as soon as it has been projected")

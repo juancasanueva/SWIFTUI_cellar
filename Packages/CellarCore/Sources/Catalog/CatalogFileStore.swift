@@ -33,7 +33,16 @@ public struct CatalogFileStore: Sendable {
     public func loadSnapshot() throws -> CatalogSnapshot? {
         guard let data = try? fileSystem.contentsMappedIfSafe(of: snapshotURL) else { return nil }
         guard schemaVersion(of: data) == CatalogSnapshot.currentSchemaVersion else { return nil }
-        return try? decoder.decode(CatalogSnapshot.self, from: data)
+        guard let snapshot = try? decoder.decode(CatalogSnapshot.self, from: data) else { return nil }
+        // A catalog with no packages is degenerate, and answering with it would
+        // leave the machine revalidating into emptiness forever: the stored
+        // validators would still certify it, the origin would answer 304, and
+        // nothing would ever rebuild. Classified as no cache, exactly like a
+        // missing or newer-schema file, which is the existing CS6 path that
+        // forces an unconditional re-download. The file is left where it is —
+        // a read must not mutate the store (design D4).
+        guard !snapshot.packages.isEmpty else { return nil }
+        return snapshot
     }
 
     public func loadState() throws -> CatalogState? {
@@ -57,6 +66,11 @@ public struct CatalogFileStore: Sendable {
     /// validators, which costs one redundant download. The reverse order would
     /// advertise a stale catalog as fresh, which serves wrong data (design D3).
     public func persist(_ snapshot: CatalogSnapshot, state: CatalogState) throws {
+        // Outside the `do` on purpose: that block rewrites every throw to
+        // `.persistence`, and this is a semantic refusal, not an I/O failure.
+        // No code path in this package can write an empty catalog (design D4).
+        guard !snapshot.packages.isEmpty else { throw CatalogSyncError.malformedPayload }
+
         do {
             try fileSystem.createDirectory(at: directory)
             try publish(try encoder.encode(snapshot), to: snapshotURL, stagedAs: "catalog.json.new")
