@@ -45,6 +45,26 @@ final class FakeCatalogFileSystem: CatalogFileSystem, Sendable {
         .map { ($0 as NSString).lastPathComponent }
     }
 
+    /// Whether the staging directory was created or removed, in order.
+    ///
+    /// The one question the mark-and-drain single-flight rule turns on: a
+    /// cancelled run's purge has to land before its successor stages anything,
+    /// or the successor's download is deleted underneath it.
+    enum StagingEvent: Equatable {
+        case created
+        case purged
+    }
+
+    func stagingLifecycle(at url: URL) -> [StagingEvent] {
+        operations.compactMap { operation in
+            switch operation {
+            case .createDirectory(url.path): .created
+            case .remove(url.path): .purged
+            default: nil
+            }
+        }
+    }
+
     func seed(_ data: Data, at url: URL) {
         state.withLock { $0.files[url.path] = data }
     }

@@ -78,6 +78,10 @@ struct CatalogStoreTests {
 
         await poll { store.results.isEmpty == false }
         #expect(store.results.map(\.name).sorted() == ["iterm2", "wget"])
+        // The engine yields `.snapshot` before `.succeeded`, and adoption is now
+        // an `await` (defect #1), so results land one or more turns ahead of the
+        // status. Same assertion, polled rather than read instantly.
+        await poll { if case .succeeded = store.syncStatus { true } else { false } }
         guard case .succeeded = store.syncStatus else {
             Issue.record("expected succeeded, got \(store.syncStatus)")
             return

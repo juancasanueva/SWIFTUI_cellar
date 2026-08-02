@@ -21,7 +21,23 @@ public actor CatalogSyncEngine {
     private let policy: CatalogRefreshPolicy
 
     public private(set) var status: CatalogSyncStatus = .idle
-    private var inFlight: Task<Result<CatalogSnapshot, CatalogSyncError>, Never>?
+
+    /// The one sync that may be joined, together with the token that owns it.
+    ///
+    /// Keyed by a token so a settling task can only ever vacate *its own* entry:
+    /// without it, a slow unwind could clear a slot a newer sync already took.
+    private struct InFlightSync {
+        let token: Int
+        let task: Task<Result<CatalogSnapshot, CatalogSyncError>, Never>
+        /// A cancelled slot is drainable but never joinable.
+        var isCancelled = false
+    }
+
+    private var inFlight: InFlightSync?
+    private var nextSyncToken = 0
+
+    /// The identity of the snapshot currently on disk, if it is known.
+    private var diskRevision: CatalogSnapshotRevision?
 
     /// Status transitions and new snapshots, in order, for a single observer.
     public nonisolated let events: AsyncStream<CatalogSyncEvent>
@@ -47,8 +63,17 @@ public actor CatalogSyncEngine {
     // MARK: - Cache
 
     /// The persisted snapshot, or `nil`. Never blocks on the network.
+    ///
+    /// Every read is re-stamped with `diskRevision`, so the same file always
+    /// answers under the same identity and the consumer can tell a re-read from
+    /// genuinely new content (design D2).
     public func cachedSnapshot() -> CatalogSnapshot? {
-        (try? store.loadSnapshot()) ?? nil
+        guard let snapshot = (try? store.loadSnapshot()) ?? nil else { return nil }
+        guard let diskRevision else {
+            self.diskRevision = snapshot.revision
+            return snapshot
+        }
+        return snapshot.carrying(diskRevision)
     }
 
     /// Whether the oldest payload source is past its shelf life.
@@ -68,16 +93,35 @@ public actor CatalogSyncEngine {
     ///
     /// Single-flight for the same reason `BrewDetectionStore.refresh()` is: a
     /// window regaining focus can fire in bursts, and two concurrent 47 MB
-    /// downloads help nobody.
+    /// downloads help nobody. Only work *genuinely in flight* may be joined: the
+    /// task vacates its own slot from inside its body, so the slot is empty
+    /// before any joiner resumes and nobody is handed a settled result as if it
+    /// were fresh (design D3).
     @discardableResult
     public func sync() async -> Result<CatalogSnapshot, CatalogSyncError> {
-        if let inFlight { return await inFlight.value }
+        while let current = inFlight {
+            guard current.isCancelled else { return await current.task.value }
+            // A cancelled run is not joinable, and it is still unwinding: its
+            // `defer { store.purgeStaging() }` would delete a successor's
+            // download. Drain it, then start fresh work on an empty staging dir.
+            _ = await current.task.value
+        }
 
-        let task = Task { await self.performSync() }
-        inFlight = task
-        let result = await task.value
+        nextSyncToken += 1
+        let token = nextSyncToken
+        // Creation and assignment are one actor turn with no suspension between
+        // them, so the body cannot settle before the slot exists.
+        let task = Task {
+            defer { self.vacate(token) }
+            return await self.performSync()
+        }
+        inFlight = InFlightSync(token: token, task: task)
+        return await task.value
+    }
+
+    private func vacate(_ token: Int) {
+        guard inFlight?.token == token else { return }
         inFlight = nil
-        return result
     }
 
     /// Syncs only when the persisted catalog is past `staleAfter`.
@@ -88,8 +132,15 @@ public actor CatalogSyncEngine {
     }
 
     /// Cancels the sync in flight, if any.
+    ///
+    /// Marks the slot rather than emptying it. Emptying immediately would let a
+    /// fresh sync start while the cancelled one is still unwinding, and the old
+    /// task's `defer { store.purgeStaging() }` would then delete the new run's
+    /// in-flight download. The mark keeps the invariant — nobody is satisfied by
+    /// cancelled work — without opening that race (design D3).
     public func cancel() {
-        inFlight?.cancel()
+        inFlight?.isCancelled = true
+        inFlight?.task.cancel()
     }
 
     /// Wakes every `pollGranularity` and syncs when the wall clock says the
@@ -131,10 +182,16 @@ public actor CatalogSyncEngine {
             let sources = acquired.sources
             let now = timeSource.now
 
-            guard acquired.changed || previousSnapshot == nil else {
-                // Nothing moved. Writing the snapshot again would be 4 MB of
-                // pointless I/O; the sidecar still has to record the new
-                // `downloadedAt` or the next launch re-checks immediately.
+            // Nothing moved. Writing the snapshot again would be 4 MB of
+            // pointless I/O; the sidecar still has to record the new
+            // `downloadedAt` or the next launch re-checks immediately. Bound to a
+            // *readable* previous snapshot: "unchanged" with nothing to rebuild
+            // from is not a success, and the old `previousSnapshot ??
+            // CatalogSnapshot(packages: [])` fallback could only ever have
+            // published an empty catalog. Without a cache the sync falls through
+            // and fails, which is what forces the next fetch to be unconditional
+            // (design D4).
+            if !acquired.changed, let previousSnapshot {
                 try store.persistState(
                     CatalogState(
                         sources: sources,
@@ -142,10 +199,7 @@ public actor CatalogSyncEngine {
                         skippedRecordCount: previousState?.skippedRecordCount ?? 0
                     )
                 )
-                let snapshot = previousSnapshot ?? CatalogSnapshot(
-                    generatedAt: now, skippedRecordCount: 0, packages: []
-                )
-                return succeed(with: snapshot, at: now)
+                return succeed(with: previousSnapshot, at: now)
             }
 
             let analytics = await fetchAnalytics(into: staging, carryingOver: previousSnapshot)
@@ -157,7 +211,7 @@ public actor CatalogSyncEngine {
                 analytics: analytics,
                 generatedAt: now
             )
-            try store.persist(
+            try persist(
                 snapshot,
                 state: CatalogState(
                     sources: sources,
@@ -170,6 +224,20 @@ public actor CatalogSyncEngine {
             let failure = CatalogSyncError.from(error)
             publish(.failed(failure))
             return .failure(failure)
+        }
+    }
+
+    /// Publishes a snapshot and re-pins the identity of the bytes on disk.
+    ///
+    /// A publish that failed part-way could have left either file behind, so the
+    /// pin is forgotten rather than left certifying bytes nobody checked.
+    private func persist(_ snapshot: CatalogSnapshot, state: CatalogState) throws {
+        do {
+            try store.persist(snapshot, state: state)
+            diskRevision = snapshot.revision
+        } catch {
+            diskRevision = nil
+            throw error
         }
     }
 
@@ -258,26 +326,17 @@ public actor CatalogSyncEngine {
             do {
                 let outcome = try await source.fetch(resource, validators: nil, into: directory)
                 guard case .downloaded(let payload) = outcome else {
-                    index = index.merging(Self.counts(of: resource.kind, in: previous))
+                    index = index.merging(AnalyticsIndex(carriedOverFor: resource.kind, in: previous))
                     continue
                 }
                 index = index.merging(
                     try await CatalogDecoder.decodeAnalytics(at: payload.fileURL, kind: resource.kind)
                 )
             } catch {
-                index = index.merging(Self.counts(of: resource.kind, in: previous))
+                index = index.merging(AnalyticsIndex(carriedOverFor: resource.kind, in: previous))
             }
         }
         return index
-    }
-
-    private static func counts(of kind: PackageKind, in snapshot: CatalogSnapshot?) -> AnalyticsIndex {
-        guard let snapshot else { return AnalyticsIndex() }
-        var counts: [PackageID: Int] = [:]
-        for package in snapshot.packages where package.kind == kind {
-            if let count = package.installCount365d { counts[package.id] = count }
-        }
-        return AnalyticsIndex(counts: counts)
     }
 
     private func succeed(
@@ -314,64 +373,5 @@ public actor CatalogSyncEngine {
     private func publish(_ status: CatalogSyncStatus) {
         self.status = status
         continuation.yield(.status(status))
-    }
-}
-
-extension CatalogResource {
-    /// The two resources that carry packages. Analytics is a separate, optional
-    /// join.
-    public static let payloadResources: [CatalogResource] = [.formulae, .casks]
-
-    /// The two optional install-count endpoints.
-    public static let analyticsResources: [CatalogResource] = [.analyticsFormula, .analyticsCask]
-
-    var kind: PackageKind {
-        switch self {
-        case .formulae, .analyticsFormula: .formula
-        case .casks, .analyticsCask: .cask
-        }
-    }
-}
-
-extension CatalogSyncError {
-    /// Normalises anything thrown inside a sync into the closed taxonomy.
-    static func from(_ error: any Error) -> CatalogSyncError {
-        switch error {
-        case let known as CatalogSyncError: known
-        case is CancellationError: .cancelled
-        default: .malformedPayload
-        }
-    }
-}
-
-extension CatalogDecoder {
-    /// Decodes a staged payload off the caller's executor.
-    ///
-    /// `@concurrent` rather than a plain `nonisolated func`: a synchronous
-    /// nonisolated call from an actor still runs *on* that actor, which is the
-    /// head-of-line block this whole design avoids (design D2).
-    @concurrent
-    public static func decode(
-        _ resource: CatalogResource,
-        at url: URL
-    ) async throws -> DecodedResource {
-        switch resource {
-        case .formulae:
-            try decodeFormulae(contentsOf: url, deletingAfterwards: true)
-        case .casks:
-            try decodeCasks(contentsOf: url, deletingAfterwards: true)
-        case .analyticsFormula, .analyticsCask:
-            throw CatalogSyncError.malformedPayload
-        }
-    }
-
-    /// Decodes a staged analytics payload off the caller's executor.
-    @concurrent
-    public static func decodeAnalytics(at url: URL, kind: PackageKind) async throws -> AnalyticsIndex {
-        defer { try? FileManager.default.removeItem(at: url) }
-        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
-            throw CatalogSyncError.malformedPayload
-        }
-        return try AnalyticsIndex.decode(data, kind: kind)
     }
 }

@@ -33,7 +33,8 @@ struct SearchLatencyTests {
     @Test(
         "p95 as-you-type latency stays under 8 ms on a realistic index",
         .enabled(if: BuildConfiguration.isRelease),
-        .timeLimit(.minutes(2))
+        .timeLimit(.minutes(2)),
+        .heavyFixture
     )
     func p95StaysUnderCeiling() {
         // Build time is deliberately outside the measurement: the index is built
@@ -73,7 +74,7 @@ struct SearchLatencyTests {
         )
     }
 
-    @Test("The latency fixture is the size and shape the ceiling is claimed for")
+    @Test("The latency fixture is the size and shape the ceiling is claimed for", .heavyFixture)
     func fixtureIsRealistic() {
         let snapshot = LatencyFixture.snapshot(count: Self.recordCount)
 

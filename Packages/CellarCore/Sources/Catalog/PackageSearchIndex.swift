@@ -127,6 +127,18 @@ public struct PackageSearchIndex: Sendable {
         self.positions = positions
     }
 
+    /// Builds an index off the caller's executor.
+    ///
+    /// `@concurrent` rather than a plain `nonisolated func`, mirroring
+    /// `CatalogDecoder.decode` (M1 D2): normalising ~16,000 records is tens of
+    /// milliseconds of CPU, and the caller is the main actor. The built value
+    /// crosses back with no lock — the index is `Sendable` by composition
+    /// (design D1).
+    @concurrent
+    public static func build(from snapshot: CatalogSnapshot) async -> PackageSearchIndex {
+        PackageSearchIndex(snapshot: snapshot)
+    }
+
     public init() {
         self.init(
             snapshot: CatalogSnapshot(

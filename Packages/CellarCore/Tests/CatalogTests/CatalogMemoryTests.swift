@@ -15,7 +15,13 @@ struct CatalogMemoryTests {
     static let peakBudget = 300 * 1_048_576
     static let retainedBudget = 40 * 1_048_576
 
-    @Test("Decoding a 40 MB payload stays inside the peak and retained budgets", .timeLimit(.minutes(2)))
+    @Test(
+        "Decoding a 40 MB payload stays inside the peak and retained budgets",
+        .timeLimit(.minutes(2)),
+        // Process footprint is only the decoder's while nothing else in the
+        // process is holding a catalog-sized fixture.
+        .heavyFixture
+    )
     func decodeStaysInsideTheMemoryBudget() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("cellar-catalog-memory-\(UUID().uuidString)", isDirectory: true)

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Which Homebrew namespace a package belongs to.
 public enum PackageKind: String, Codable, Sendable, Hashable, CaseIterable {
@@ -208,6 +209,22 @@ public struct CatalogPackage: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// Which materialization of catalog content a snapshot is.
+///
+/// Process-local and never persisted: the point is to tell "this is the catalog
+/// I already indexed" from "this is new content", and one launch is the only
+/// scope in which an index exists. Consumers can compare revisions but cannot
+/// mint one, so identity always comes from a real materialization (design D2).
+public struct CatalogSnapshotRevision: Hashable, Sendable {
+    private static let counter = Atomic<UInt64>(0)
+
+    let ordinal: UInt64
+
+    static func next() -> Self {
+        Self(ordinal: counter.wrappingAdd(1, ordering: .relaxed).newValue)
+    }
+}
+
 /// The persisted catalog: `catalog.json`.
 public struct CatalogSnapshot: Codable, Sendable {
     public static let currentSchemaVersion = 1
@@ -217,6 +234,16 @@ public struct CatalogSnapshot: Codable, Sendable {
     /// Records the payload published but this build could not read.
     public let skippedRecordCount: Int
     public let packages: [CatalogPackage]
+    /// This materialization's identity. Outside `CodingKeys`, so the persisted
+    /// JSON is byte-identical and `schemaVersion` stays 1.
+    public let revision: CatalogSnapshotRevision
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case generatedAt
+        case skippedRecordCount
+        case packages
+    }
 
     public init(
         schemaVersion: Int = CatalogSnapshot.currentSchemaVersion,
@@ -228,6 +255,47 @@ public struct CatalogSnapshot: Codable, Sendable {
         self.generatedAt = generatedAt
         self.skippedRecordCount = skippedRecordCount
         self.packages = packages
+        self.revision = .next()
+    }
+
+    private init(
+        schemaVersion: Int,
+        generatedAt: Date,
+        skippedRecordCount: Int,
+        packages: [CatalogPackage],
+        revision: CatalogSnapshotRevision
+    ) {
+        self.schemaVersion = schemaVersion
+        self.generatedAt = generatedAt
+        self.skippedRecordCount = skippedRecordCount
+        self.packages = packages
+        self.revision = revision
+    }
+
+    /// The same content under an identity that already exists.
+    ///
+    /// Decoding always mints, so re-reading one file would otherwise look like
+    /// new content every time; the engine pins the identity of the bytes on disk
+    /// and re-stamps what it reads (design D2).
+    func carrying(_ revision: CatalogSnapshotRevision) -> CatalogSnapshot {
+        CatalogSnapshot(
+            schemaVersion: schemaVersion,
+            generatedAt: generatedAt,
+            skippedRecordCount: skippedRecordCount,
+            packages: packages,
+            revision: revision
+        )
+    }
+
+    /// Explicit because `revision` is outside `CodingKeys`: every decode is a
+    /// fresh materialization and gets a fresh identity.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        generatedAt = try container.decode(Date.self, forKey: .generatedAt)
+        skippedRecordCount = try container.decode(Int.self, forKey: .skippedRecordCount)
+        packages = try container.decode([CatalogPackage].self, forKey: .packages)
+        revision = .next()
     }
 }
 

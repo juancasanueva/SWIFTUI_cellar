@@ -3,7 +3,7 @@ import Testing
 
 @testable import Catalog
 
-@Suite("Catalog sync engine")
+@Suite("Catalog sync engine", .timeLimit(.minutes(1)))
 struct SyncEngineTests {
     // MARK: - Acquisition through the seam (CS1)
 
@@ -144,7 +144,7 @@ struct SyncEngineTests {
 
     // MARK: - Failure never erases the cache (CS4)
 
-    @Test("A transport error keeps a large cached catalog answering")
+    @Test("A transport error keeps a large cached catalog answering", .heavyFixture)
     func transportErrorPreservesTheCache() async throws {
         let harness = try SyncHarness()
         let names = (0..<15_000).map { "pkg\($0)" }
@@ -301,12 +301,23 @@ struct SyncHarness {
     let clock: TestClock
     let time: FakeTimeSource
     let engine: CatalogSyncEngine
+    /// Non-nil when the store was wired to the in-memory recorder instead of the
+    /// real temp directory — the seam an ordering assertion needs.
+    let recorder: FakeCatalogFileSystem?
 
-    init(policy: CatalogRefreshPolicy = CatalogRefreshPolicy(backoff: .zero)) throws {
+    init(
+        policy: CatalogRefreshPolicy = CatalogRefreshPolicy(backoff: .zero),
+        recording: Bool = false
+    ) throws {
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("cellar-sync-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        store = CatalogFileStore(directory: directory)
+        recorder = recording ? FakeCatalogFileSystem() : nil
+        store = if let recorder {
+            CatalogFileStore(directory: directory, fileSystem: recorder)
+        } else {
+            CatalogFileStore(directory: directory)
+        }
         source = FakeCatalogSource()
         clock = TestClock()
         time = FakeTimeSource()
@@ -317,6 +328,37 @@ struct SyncHarness {
             timeSource: time,
             policy: policy
         )
+    }
+
+    /// A second engine over the same directory, source and clocks.
+    ///
+    /// The event stream buffers, so a store attached to an engine that already
+    /// synced would replay that snapshot. A launch has to start clean.
+    func freshEngine(policy: CatalogRefreshPolicy = CatalogRefreshPolicy(backoff: .zero))
+        -> CatalogSyncEngine {
+        CatalogSyncEngine(
+            store: store,
+            source: source,
+            clock: clock,
+            timeSource: time,
+            policy: policy
+        )
+    }
+
+    /// Overwrites `catalog.json` with a well-formed, current-schema snapshot
+    /// holding zero packages, leaving the sidecar and its validators intact.
+    ///
+    /// The exact on-disk state defect #7 describes: readable, certified by
+    /// stored validators, and useless.
+    func poisonSnapshot() throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        let poisoned = CatalogSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            skippedRecordCount: 0,
+            packages: []
+        )
+        try encoder.encode(poisoned).write(to: store.snapshotURL)
     }
 }
 
