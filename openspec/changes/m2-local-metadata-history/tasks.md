@@ -280,63 +280,63 @@ Absorbed follow-ups 2 and 5. Bulk multi-select (Phase 6) multiplies the exposure
 Every rule here is a pure function over values, testable in the `FAST` loop with no SwiftData in
 sight. This is what keeps Phase 8's views rule-free.
 
-- [ ] 5.1 RED `Tests/BrewClientTests/SnoozeProjectionTests.swift` (LPM5 sc1–2): a package snoozed at
+- [x] 5.1 RED `Tests/BrewClientTests/SnoozeProjectionTests.swift` (LPM5 sc1–2): a package snoozed at
   `1.2.3` and still outdated toward `1.2.3` shows **no** badge; when the offered version becomes
   `1.3.0` the badge is shown again, **with no user action** required to clear the snooze.
-- [ ] 5.2 RED `SnoozeProjectionTests` (LPM5 sc3 — the G5 ruling, Engram `#7117`): an offered
+- [x] 5.2 RED `SnoozeProjectionTests` (LPM5 sc3 — the G5 ruling, Engram `#7117`): an offered
   `1.2.3_1` **and separately an older `1.2.2`** each revive the badge — the accepted, visible false
   positive of an equality rule — and assert structurally that **no ordering comparison of version
   strings was performed** to reach either result. No comparator exists in this capability.
-- [ ] 5.3 RED `SnoozeProjectionTests` (LPM5 sc4–5): removing the snooze shows the badge on the next
+- [x] 5.3 RED `SnoozeProjectionTests` (LPM5 sc4–5): removing the snooze shows the badge on the next
   read with **no inventory refresh required**; a snoozed, outdated package is still listed with its
   installed version under default filters.
-- [ ] 5.4 GREEN `Sources/BrewClient/PackageMetadata.swift`: `PackageMetadata` (`isFavorite`, `note`,
+- [x] 5.4 GREEN `Sources/BrewClient/PackageMetadata.swift`: `PackageMetadata` (`isFavorite`, `note`,
   `snoozedVersion`), `MetadataSnapshot = [PackageID: PackageMetadata]`, `MetadataLookup` mirroring the
   existing `catalogLookup:`, and `func isSnoozed(offering:snoozedVersion:) -> Bool { snoozedVersion
   == candidate }`. Record the D5 rejection in the header: an ordering comparator's failure mode is
   **silent suppression of a real update**, the one outcome this feature must never produce.
-- [ ] 5.5 RED `Tests/BrewClientTests/InstalledFilterTests.swift` (II8 sc8–10): the favorites filter
+- [x] 5.5 RED `Tests/BrewClientTests/InstalledFilterTests.swift` (II8 sc8–10): the favorites filter
   narrows the list to `wget`; it **composes** with the outdated filter rather than replacing it
   (leaving only the outdated favorite); with no metadata it renders **disabled** and the results are
   identical to the same query with no favorites filtering.
-- [ ] 5.6 RED `InstalledFilterTests` (II8 sc5 + LPM3 sc3): the catalog query's declared filter set
+- [x] 5.6 RED `InstalledFilterTests` (II8 sc5 + LPM3 sc3): the catalog query's declared filter set
   contains **no** installed, not-installed, outdated **or favorite** predicate; and a package named
   `wget` whose note contains `zeppelin`, with nothing else matching, returns **no results** when the
   Installed list is searched for `zeppelin` — note text enters no search index.
-- [ ] 5.7 RED `Tests/BrewClientTests/SnoozeProjectionTests.swift` (II12 sc1–4): a snoozed outdated
+- [x] 5.7 RED `Tests/BrewClientTests/SnoozeProjectionTests.swift` (II12 sc1–4): a snoozed outdated
   formula is absent from the outdated **set** and the **count** is 1; a changed offered version
   (`1.3.0`, and separately `1.2.3_1`) returns it to both without user action; the outdated **browse
   filter** agrees with the outdated list exactly; and the snooze never hides the package from the
   Installed list.
-- [ ] 5.8 GREEN `Sources/BrewClient/InstalledFilterMode.swift`: `entries(…, metadata:)` and
+- [x] 5.8 GREEN `Sources/BrewClient/InstalledFilterMode.swift`: `entries(…, metadata:)` and
   `rows(…, metadata:)` take an optional `MetadataLookup`; the favorites filter is answered by
   intersecting with the favorite membership set on **exactly** the terms the installed-state filters
   already use; snooze-aware outdated is a **projection** over (inventory outdated state × stored
   snooze), never a mutation of the inventory's own derivation — so a cold, empty or unavailable store
   degrades to today's behaviour with no branch (LPM6 sc1).
-- [ ] 5.9 RED `Tests/BrewClientTests/BulkSelectionTests.swift` (II13 sc1–3): selecting `wget`, then
+- [x] 5.9 RED `Tests/BrewClientTests/BulkSelectionTests.swift` (II13 sc1–3): selecting `wget`, then
   `iterm2`, then `git` reports the selection in **that order**; deselecting the second leaves the
   other two in their original relative order; a package that leaves the inventory leaves the selection
   at the next refresh.
-- [ ] 5.10 RED `BulkSelectionTests` (II13 sc4–5) — **threat: irreversible mutation scope**:
+- [x] 5.10 RED `BulkSelectionTests` (II13 sc4–5) — **threat: irreversible mutation scope**:
   `BulkSelection.Action` is `CaseIterable` with **exactly two** cases, `.upgrade` and `.uninstall`, so
   the absence of a bulk pin, unpin, snooze, favorite or note affordance is a **test assertion**, not a
   convention; and an empty selection reports every bulk control unavailable rather than inert.
-- [ ] 5.11 RED `BulkSelectionTests` (II14 sc1–3 — absorbed follow-up 1): the announced count equals
+- [x] 5.11 RED `BulkSelectionTests` (II14 sc1–3 — absorbed follow-up 1): the announced count equals
   the number of operations submitted under the default filters; toggling the dependency filter moves
   both together; and with three outdated packages, one snoozed, the announced count is **2** and
   exactly two operations are submitted, **neither naming the snoozed package**.
-- [ ] 5.12 GREEN `Sources/BrewClient/BulkSelection.swift`: `init(selection: [PackageID], entries:
+- [x] 5.12 GREEN `Sources/BrewClient/BulkSelection.swift`: `init(selection: [PackageID], entries:
   [PackageEntry])` producing `upgradable` (selected ∧ outdated ∧ !pinned ∧ !snoozed) and
   `uninstallable` (selected ∧ installed), both **in selection order**, plus `Action`. Add
   `InstalledBrowse.upgradableIDs` as the **one** projection the label, the outdated section, the
   outdated count, the badge and the submission all read — which is what makes agreement structural
   rather than four filters happening to concur.
-- [ ] 5.13 RED `Tests/BrewClientTests/HistoryRecordingTests.swift`: `NoHistoryRecording` accepts a
+- [x] 5.13 RED `Tests/BrewClientTests/HistoryRecordingTests.swift`: `NoHistoryRecording` accepts a
   draft and does nothing; `HistoryDraft` carries `packageID: PackageID?` (nil ⇒ `upgradeAll`), verb,
   `VersionTransition?`, `MutationOutcome` and argv; the protocol is `@MainActor`, **synchronous and
   non-throwing** so a failed write can never change a mutation's outcome.
-- [ ] 5.14 GREEN `Sources/BrewClient/HistoryRecording.swift`: the protocol, `HistoryDraft`,
+- [x] 5.14 GREEN `Sources/BrewClient/HistoryRecording.swift`: the protocol, `HistoryDraft`,
   `VersionTransition(from:to:)` and the `NoHistoryRecording` default.
   Verify: `FAST --filter "SnoozeProjection\|InstalledFilter\|BulkSelection\|HistoryRecording"`.
 

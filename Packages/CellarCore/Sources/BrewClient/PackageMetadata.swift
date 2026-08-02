@@ -27,8 +27,43 @@ public struct PackageMetadata: Sendable, Hashable {
     public static let none = PackageMetadata()
 
     public var isEmpty: Bool { self == .none }
+
+    // MARK: - The snooze rule (design D5, local-package-metadata LPM5)
+
+    /// Whether the outdated badge is suppressed for a package currently offered
+    /// at `candidate`.
+    ///
+    /// The whole rule is **string equality**, and that was a ruling rather than
+    /// a default. An ordering comparator — `compare(_:options: .numeric)` or
+    /// anything like it — misreads `1.2.3_1`, `2023-10-01`, `r5` and `9e`, and
+    /// its failure mode is **silent suppression of a real update, forever**:
+    /// the one outcome this feature must never produce. Equality fails the other
+    /// way, visibly: a package republished at an older version shows a badge
+    /// again. That false positive is accepted on purpose.
+    ///
+    /// **No Homebrew version comparator exists in this capability**, and the
+    /// suite asserts structurally that none has been added.
+    public static func isSnoozed(offering candidate: String, snoozedVersion: String?) -> Bool {
+        snoozedVersion == candidate
+    }
+
+    public func isSnoozed(offering candidate: String) -> Bool {
+        Self.isSnoozed(offering: candidate, snoozedVersion: snoozedVersion)
+    }
 }
 
 /// Every package the metadata store knows about, keyed by the identity the
 /// catalog and the inventory already use.
 public typealias MetadataSnapshot = [PackageID: PackageMetadata]
+
+/// How a composition rule reaches stored metadata, mirroring the existing
+/// `catalogLookup:` seam.
+///
+/// A closure rather than a store reference, so every rule stays a pure function
+/// over values and `BrewClient` never links SwiftData (design D1, D5).
+public typealias MetadataLookup = (PackageID) -> PackageMetadata?
+
+extension Dictionary where Key == PackageID, Value == PackageMetadata {
+    /// The snapshot as a lookup.
+    public var lookup: MetadataLookup { { self[$0] } }
+}
