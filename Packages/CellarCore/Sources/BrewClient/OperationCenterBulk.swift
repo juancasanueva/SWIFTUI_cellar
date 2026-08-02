@@ -36,23 +36,15 @@ extension OperationCenter {
         }
     }
 
-    /// The same, over everything the inventory reports as outdated.
-    ///
-    /// The outdated set comes from `InstalledInventory` rather than being
-    /// re-derived, so the exclusion of self-updating casks agrees with the
-    /// inventory's own derivation (M2-1 II4/II5). Pinned packages are excluded
-    /// too and **no unpin is submitted on their behalf**: brew's own defaults
-    /// skip them, and defeating that would upgrade something the user
-    /// explicitly held back (package-mutation PM2).
-    @discardableResult
-    public func submitUpgradesForOutdated(in inventory: InstalledInventory) -> [ActivityItem] {
-        submitUpgrades(
-            for: inventory.packages
-                .filter { $0.isOutdated && !$0.isPinned }
-                .map(\.id),
-            in: inventory
-        )
-    }
+    // There is deliberately **no** `submitUpgradesForOutdated(in:)` here.
+    //
+    // It derived its own outdated-minus-pinned set over the whole inventory
+    // while the button beside it counted the dependency-filtered entries — two
+    // sets, announced as one. Callers pass `InstalledBrowse.upgradableIDs`
+    // instead, which is the single projection the label, the outdated section,
+    // the badge and this submission all read, so the pinned exclusion (PM2 — and
+    // still no unpin submitted on their behalf) and the snooze exclusion live in
+    // the derivation, once (design D8, installed-inventory II14).
 
     /// The move an upgrade of `id` is expected to make: what is installed now,
     /// toward what brew is currently offering.
@@ -68,19 +60,49 @@ extension OperationCenter {
         return VersionTransition(from: package.installedVersion, to: package.catalogVersion)
     }
 
-    // MARK: - Confirmation (design D6)
+    // MARK: - The surface a selection is acted on through (PM8, II13)
 
-    /// A destructive command waiting for an explicit yes.
+    /// What `action` would run over `ids`: one invocation per package, in
+    /// selection order.
     ///
-    /// It carries the **typed** command, so confirming submits exactly what was
-    /// shown: there is no path from the rendered string back to argv.
-    public struct ConfirmationRequest: Identifiable, Sendable, Equatable {
-        public let id: UUID
-        public let command: MutationCommand
-
-        /// The exact command that will run, character for character.
-        public var displayCommand: String { command.displayCommand }
+    /// Keyed on `BulkSelection.Action`, which is `CaseIterable` with exactly two
+    /// cases — so "no bulk pin, unpin, reinstall or zap exists" is enforced by
+    /// the type rather than by this switch remembering to omit them. An identity
+    /// that could not survive argv composition simply produces no command, which
+    /// is why this compacts rather than force-unwraps.
+    public func commands(
+        for action: BulkSelection.Action,
+        over ids: [PackageID]
+    ) -> [MutationCommand] {
+        ids.compactMap { id in
+            switch action {
+            case .upgrade: MutationCommand.naming(id, MutationCommand.upgrade)
+            case .uninstall: MutationCommand.naming(id, MutationCommand.uninstall)
+            }
+        }
     }
+
+    /// Runs a bulk action, asking first when the action requires it.
+    ///
+    /// Returns the pending request when one is owed and `nil` when the batch was
+    /// submitted directly — the same "no request means already submitted" shape
+    /// the single-command path uses, so a caller restates no rule about which
+    /// verbs are destructive.
+    @discardableResult
+    public func submitBulk(
+        _ action: BulkSelection.Action,
+        over ids: [PackageID],
+        in inventory: InstalledInventory? = nil
+    ) -> ConfirmationRequest? {
+        let commands = commands(for: action, over: ids)
+        if let request = request(commands) { return request }
+        for command in commands {
+            submit(command, versions: Self.transition(for: command.packageID, in: inventory))
+        }
+        return nil
+    }
+
+    // MARK: - Confirmation (design D6, D8)
 
     /// Asks for confirmation, when this command needs one.
     ///
@@ -88,23 +110,82 @@ extension OperationCenter {
     /// upgrade, upgrade-all, pin and unpin — so a caller can treat "no request"
     /// as "submit directly" without restating the rule (product Q2).
     public func request(_ command: MutationCommand) -> ConfirmationRequest? {
-        guard command.requiresConfirmation else { return nil }
-        let request = ConfirmationRequest(id: UUID(), command: command)
+        request([command])
+    }
+
+    /// Asks **once** for a whole batch.
+    ///
+    /// One request covering N commands rather than N requests: an all-or-nothing
+    /// destructive action must be agreed once, on the whole of what it will do.
+    /// Confirming submits every command it listed; declining submits none of
+    /// them, never a partial subset (package-mutation PM3 sc5–6).
+    public func request(_ commands: [MutationCommand]) -> ConfirmationRequest? {
+        guard let first = commands.first,
+              commands.contains(where: \.requiresConfirmation)
+        else { return nil }
+
+        let request = ConfirmationRequest(
+            id: UUID(),
+            command: first,
+            additional: Array(commands.dropFirst())
+        )
         pendingConfirmation = request
         return request
     }
 
-    /// Submits the confirmed command. Nothing was enqueued before this point.
+    /// Submits every command the confirmation showed, in the order it showed
+    /// them. Nothing was enqueued before this point.
     @discardableResult
-    public func confirm(_ request: ConfirmationRequest) -> ActivityItem? {
-        guard pendingConfirmation == request else { return nil }
+    public func confirm(_ request: ConfirmationRequest) -> [ActivityItem] {
+        guard pendingConfirmation == request else { return [] }
         pendingConfirmation = nil
-        return submit(request.command)
+        return request.commands.map { submit($0) }
     }
 
     /// Spawns nothing, enqueues nothing, leaves the inventory untouched.
     public func decline(_ request: ConfirmationRequest) {
         guard pendingConfirmation == request else { return }
         pendingConfirmation = nil
+    }
+
+    /// The transition for a command that may name no package at all.
+    private static func transition(
+        for id: PackageID?,
+        in inventory: InstalledInventory?
+    ) -> VersionTransition? {
+        guard let id else { return nil }
+        return transition(for: id, in: inventory)
+    }
+}
+
+extension OperationCenter {
+    /// One or more destructive commands waiting for a single explicit yes.
+    ///
+    /// It carries the **typed** commands, so confirming submits exactly what was
+    /// shown: there is no path from a rendered string back to argv.
+    ///
+    /// The head is a stored property and the rest is a list, so "a request always
+    /// covers at least one command" is a fact about the type rather than a check
+    /// somebody has to remember — an empty confirmation cannot be built at all.
+    public struct ConfirmationRequest: Identifiable, Sendable, Equatable {
+        public let id: UUID
+        /// The first command. A single-package confirmation has only this one.
+        public let command: MutationCommand
+        /// Everything else the same yes covers, in selection order.
+        public let additional: [MutationCommand]
+
+        /// Every command this confirmation will submit, in order.
+        public var commands: [MutationCommand] { [command] + additional }
+
+        /// True when one yes covers more than one package.
+        public var isBulk: Bool { !additional.isEmpty }
+
+        /// Each exact command that will run, character for character — never a
+        /// count and never an elided subset (PM3 sc5).
+        public var displayCommands: [String] { commands.map(\.displayCommand) }
+
+        /// The same, for a surface that renders one string: one command per
+        /// line, so a three-package uninstall discloses all three.
+        public var displayCommand: String { displayCommands.joined(separator: "\n") }
     }
 }

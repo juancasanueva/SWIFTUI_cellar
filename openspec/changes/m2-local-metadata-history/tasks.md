@@ -365,27 +365,27 @@ sight. This is what keeps Phase 8's views rule-free.
   the inventory they are already handed. Record the rejected alternative: diffing an inventory
   snapshot either side needs a re-snapshot to land before the write, makes the entry depend on watcher
   timing, and is exactly the per-package attribution settled decision R1 declines.
-- [ ] 6.7 RED `Tests/BrewClientTests/BulkFanOutTests.swift` (PM8 sc1; IH2 sc2) — **threat: subprocess
+- [x] 6.7 RED `Tests/BrewClientTests/BulkFanOutTests.swift` (PM8 sc1; IH2 sc2) — **threat: subprocess
   argument composition**: a confirmed bulk uninstall over formulae `wget`, `git` and cask `iterm2`,
   **in that order**, enqueues exactly three operations with argvs `uninstall --formula wget`,
   `uninstall --formula git`, `uninstall --cask iterm2` in that order; **no argv names more than one
   package**; and exactly three history drafts result, one naming each package.
-- [ ] 6.8 RED `BulkFanOutTests` (PM8 sc2–4): a mid-batch non-zero exit attributes to the **second
+- [x] 6.8 RED `BulkFanOutTests` (PM8 sc2–4): a mid-batch non-zero exit attributes to the **second
   package only** and the third still runs; cancelling the second of three leaves the first running and
   the third queued; and asking the mutation surface to build **pin, unpin or reinstall** for a
   selection yields no such bulk mutation.
-- [ ] 6.9 RED `BulkFanOutTests` (PM3 sc5–6) — **threat: irreversible mutation scope**: a bulk
+- [x] 6.9 RED `BulkFanOutTests` (PM3 sc5–6) — **threat: irreversible mutation scope**: a bulk
   uninstall over three packages requests **exactly one** confirmation before anything is submitted,
   and its text **names all three** — not a count, not an elided subset; declining submits **none** of
   it and spawns nothing, never a partial subset.
-- [ ] 6.10 GREEN `OperationCenter`: `ConfirmationRequest` gains a **multi-command** form carrying the
+- [x] 6.10 GREEN `OperationCenter`: `ConfirmationRequest` gains a **multi-command** form carrying the
   typed commands (so confirming submits exactly what was shown), and bulk submission fans out into
   N `.upgrade`/`.uninstall` submissions in selection order — the M2-2 ruling `#7101` applied to
   uninstall. **No new argv shape exists, so no new brew probe is required.**
-- [ ] 6.11 RED `BulkFanOutTests` (II14 — absorbed follow-up 1, centre side): the count
+- [x] 6.11 RED `BulkFanOutTests` (II14 — absorbed follow-up 1, centre side): the count
   `InstalledBrowse.upgradableIDs` announces equals the number of operations
   `submitUpgrades(for:in:)` submits, for every combination of dependency toggle and snooze state.
-- [ ] 6.12 GREEN: delete `submitUpgradesForOutdated(in:)` and replace its one call site with
+- [x] 6.12 GREEN: delete `submitUpgradesForOutdated(in:)` and replace its one call site with
   `submitUpgrades(for: browse.upgradableIDs, in:)`, so the pinned exclusion (PM2 — and still **no
   unpin submitted on their behalf**) and the snooze exclusion live in the derivation, once.
   Verify: `FAST --filter "OperationCenterHistory\|BulkFanOut\|OperationCenter"`.

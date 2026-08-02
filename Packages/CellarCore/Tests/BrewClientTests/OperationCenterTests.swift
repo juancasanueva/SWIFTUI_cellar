@@ -175,7 +175,11 @@ struct OperationCenterTests {
             )
         ])
 
-        let items = harness.center.submitUpgradesForOutdated(in: inventory)
+        let browse = InstalledBrowse(inventory: inventory, isAvailable: true)
+        let items = harness.center.submitUpgrades(
+            for: browse.upgradableIDs(includingDependencies: true),
+            in: inventory
+        )
         await harness.settle()
 
         #expect(items.map(\.arguments) == [["upgrade", "--formula", "wget"]])

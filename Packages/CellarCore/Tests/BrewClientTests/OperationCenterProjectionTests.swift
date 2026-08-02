@@ -173,9 +173,13 @@ struct OperationCenterProjectionTests {
         let harness = CenterHarness()
         let request = try #require(harness.center.request(.uninstall(PackageTarget(CenterHarness.wget)!)))
 
-        let item = try #require(harness.center.confirm(request))
+        // One command in, one item out: a single-package confirmation is the
+        // one-element case of the batch form, not a separate path.
+        let items = harness.center.confirm(request)
         await harness.settle()
 
+        let item = try #require(items.first)
+        #expect(items.count == 1)
         #expect(item.displayCommand == request.displayCommand)
         #expect(item.arguments == ["uninstall", "--formula", "wget"])
         try await harness.finish(call: 0)
