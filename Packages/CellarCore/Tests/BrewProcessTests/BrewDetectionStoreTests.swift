@@ -144,6 +144,54 @@ struct BrewDetectionStoreTests {
         #expect(store.state == detected)
     }
 
+    @Test("A settled evaluation does not answer a later re-evaluation")
+    func settledEvaluationDoesNotAnswerALaterRefresh() async {
+        let locator = FakeBrewLocator(results: [.absent, detected], gated: true)
+        let store = BrewDetectionStore(locator: locator)
+
+        let first = Task { await store.refresh() }
+        await locator.waitForCalls(atLeast: 1)
+        // The joiner asks again the instant its join resumes — the window in
+        // which the settled evaluation is still parked in the slot.
+        let second = Task {
+            await store.refresh()
+            await store.refresh()
+        }
+        await settle()
+        #expect(locator.callCount == 1)
+
+        locator.release()
+        await first.value
+        await second.value
+
+        #expect(locator.callCount == 2)
+        // The second probe resolves `detected`; inheriting the settled one would
+        // leave the store on `absent`.
+        #expect(store.state == detected)
+    }
+
+    @Test("An abandoned caller does not poison later re-evaluations")
+    func abandonedCallerDoesNotPoisonLaterRefreshes() async {
+        let locator = FakeBrewLocator(results: [.absent, detected], gated: true)
+        let store = BrewDetectionStore(locator: locator)
+
+        let abandoned = Task { await store.refresh() }
+        await locator.waitForCalls(atLeast: 1)
+        abandoned.cancel()
+
+        let later = Task {
+            await store.refresh()
+            await store.refresh()
+        }
+        await settle()
+        locator.release()
+        await abandoned.value
+        await later.value
+
+        #expect(locator.callCount == 2)
+        #expect(store.state == detected)
+    }
+
     @Test("The state before any evaluation is the soft absent signal")
     func initialStateIsAbsent() {
         let store = BrewDetectionStore(locator: FakeBrewLocator(results: [detected]))
