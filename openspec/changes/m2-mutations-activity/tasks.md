@@ -230,11 +230,11 @@ Independent of the mutation command layer; reviewable standalone.
 Must land before Phase 6: `BrewRunner.swift` is 372 lines and the projection adds ~45, which would
 breach SwiftLint's 400-line `file_length`.
 
-- [ ] 5.1 Create `Sources/BrewProcess/BrewOperation.swift` and move `BrewOperation` (~30 lines) and
+- [x] 5.1 Create `Sources/BrewProcess/BrewOperation.swift` and move `BrewOperation` (~30 lines) and
   `mapLaunchFailure` (~25 lines) into it **verbatim** — no rename, no signature change, no
   visibility change. `private var operations` is deliberately **not** weakened: the projection stays
   in the same file as the state it derives from.
-- [ ] 5.2 Verify the move is behaviour-free: `FAST` green with the Phase 0 test count unchanged, and
+- [x] 5.2 Verify the move is behaviour-free: `FAST` green with the Phase 0 test count unchanged, and
   `git diff --stat` shows only the two moved symbol bodies. No RED precedes this task because no
   behaviour changes — record that explicitly rather than faking a red test.
 
