@@ -5,6 +5,14 @@ PRD milestone M2 (§3.2, §3.10, §4.1–4.2, §7). Investigation only.
 Artifact store: hybrid — mirrored in Engram topic `sdd/m2-mutations-installed/explore` (#7064).
 Live brew probes captured by the orchestrator on 2026-08-02 (Homebrew 6.0.14, /opt/homebrew).
 
+> **As of 2026-08-03 (corrected during M2-3, absorbed follow-up 11).** Everything below was written
+> *before* M2-0, M2-1 and M2-2 shipped, and its present tense is the present tense **of the moment it
+> was written**. Statements about the code — target lists, file contents, "there is no X yet" — are
+> therefore historical, and several have since been superseded by the very slices this document
+> planned. The **probe findings** (§4–5) and the **slicing rationale** (§7) are what this file is
+> still consulted for; both are anchored to the probe date above. Six corrections from M2-1's docs
+> review are applied inline and marked **CORRECTED**.
+
 ## 1. Current State
 
 ### CellarCore (`Packages/CellarCore/Package.swift`, tools 6.0, `.macOS("26.0")`, `.swiftLanguageMode(.v6)` on all four targets)
@@ -35,7 +43,7 @@ Test targets `BrewProcessTests` (86 `@Test`) and `CatalogTests` (128) = 214 at M
 
 ### Catalog / app wiring
 
-- `CatalogStore` (`Sources/Catalog/CatalogStore.swift`) — `@MainActor @Observable`, lives in the *package* not the app target (design D1), because the app target sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (verified in `cellar.xcodeproj/project.pbxproj:447,479`) which would silently main-isolate anything written beside it and take it out of the `swift test` loop.
+- `CatalogStore` (`Sources/Catalog/CatalogStore.swift`) — `@MainActor @Observable`, lives in the *package* not the app target (design D1), because the app target sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (verified in `cellar.xcodeproj/project.pbxproj`; **CORRECTED** — cited as lines 447/479 as of 2026-08-02, now 435/467. Line numbers in a generated file are not a stable citation; the setting name is) which would silently main-isolate anything written beside it and take it out of the `swift test` loop.
 - `start()` is scene-lifetime: `loadCache()` then a `withTaskGroup` running the event observer + `engine.runRefreshLoop()`. Guarded by `isRunning` so a second window does not start a second iterator.
 - `adopt(_:)` rebuilds `PackageSearchIndex` and calls `rerank()` **synchronously on the main actor** — this is follow-up #1.
 - `rerank()` runs `index.search` synchronously on `@MainActor` by design D4 (measured p95 1.02 ms vs an 8 ms ceiling).
@@ -63,7 +71,7 @@ Formula record fields M2 needs:
 
 **Verified corrections to assumed field lists:**
 
-- There is **no `installed_as_dependency` key anywhere** in the payload (grep: 0 matches). "Installed as a dependency" must be *derived* as `installed_on_request == false` on the relevant keg record. Any spec text or task naming that field would be describing an API that does not exist.
+- **CORRECTED.** The original claim — "there is no `installed_as_dependency` key anywhere in the payload" — was over-generalised from one probe. The field **does exist**: M2-1's own `installed-info.json` fixture carries it 7 times. What holds is the weaker, and still useful, statement: it is **not present on every keg record**, so it cannot be relied on alone. `installed_on_request == false` remains the correct **fallback derivation** for "installed as a dependency" — a fallback, not an equivalence, and M2-1 shipped it as `isOnRequest`.
 - `installed` for a **formula** is an **array of keg objects**; `installed` for a **cask** is a **plain String** (`"installed": "0.46.0"`). Asymmetric decoding is mandatory.
 - `installed[].time` (formula) and `installed_time` (cask) are Unix epoch **seconds** → "installed on" date with no extra probe.
 - `pinned` and `pinned_version` are present on **both** formula and cask records. `brew list --pinned` is therefore redundant for reading pin state.
@@ -85,7 +93,7 @@ Cask record fields:
 
 ### `brew list --pinned` — empty (no pinned packages)
 
-Pin/unpin round-trips cannot be verified against live state without mutating. Read path is covered by `pinned` in the info snapshot.
+Pin/unpin round-trips cannot be verified against live state without mutating. **UNVERIFIED (CORRECTED):** the read path is *assumed* covered by `pinned` in the info snapshot, but this machine had **no pinned packages at probe time**, so no probe ever observed `pinned: true`. The field's presence was confirmed; the value's behaviour was not. M2-1 shipped the read path against fixtures, not against live pinned state.
 
 ### Command flags (docs.brew.sh Manpage, fetched)
 
@@ -154,7 +162,7 @@ The joint key for local metadata is `PackageID` (kind + name) — reuse the M1 t
 | 3 | `CatalogSyncEngine` single-flight joins finished/cancelled task | **Prelude** | Same defect class as the known `BrewDetectionStore` stale-join. M2's `InstalledStore` will copy that pattern verbatim — fix both so there is one correct exemplar to copy. ~80 lines + tests |
 | 4 | Payload cap enforced only after full download | **Defer** | Catalog-only, no M2 coupling |
 | 5 | `CatalogRefreshPolicy.payloadByteLimit` unwired | **Defer** | Bundle with #4 in a later catalog-hardening change |
-| 6 | Empty snapshot persistable as success (defence-in-depth) | **Defer, bundle with #7** | Cheap; both are "treat degenerate snapshot as no cache" |
+| 6 | Empty snapshot persistable as success (defence-in-depth) | **Prelude, bundled with #7** (**CORRECTED** — originally read "Defer, bundle with #7", which contradicted both #7's own `Prelude (with #6)` verdict and the Prelude bundle listed below) | Cheap; both are "treat degenerate snapshot as no cache" |
 | 7 | Zero-package poisoned snapshot has no recovery path | **Prelude (with #6)** | User-visible: a pre-fix machine is stuck on an empty catalog, and M2's Installed join against an empty catalog degrades badly. ~40 lines |
 | 8 | Refresh-loop ownership dies when owning window closes | **In M2 slice 1, as a design decision** | M2 introduces a *second* scene-lifetime loop (installed refresh + FS watcher) with the same `.task`-scoped ownership. Solve ownership once — app-level owner rather than first-scene owner — and both loops benefit. Do not fix it twice |
 | 9 | Event-stream single-subscription reattach doubt | **Bundle with #8** | Same ownership surface |
@@ -179,7 +187,7 @@ Scope discipline first: PRD **§3.2 is broader than the §7 M2 exit criterion.**
 
 Total ≈ **6.3k–8.3k authored lines**, in line with M1's actuals for a comparable milestone.
 
-Alternative if exceptions are unwelcome: split M2-1 into *snapshot+decode* / *UI+watcher*, M2-2 into *runner queue observability+commands* / *activity UI*, and M2-3 into *persistence+metadata* / *history+bulk* — six slices of roughly 1,100–1,500 lines each, at the cost of three extra review cycles and two slices that ship no user-visible behaviour on their own.
+Alternative if exceptions are unwelcome: split M2-1 into *snapshot+decode* / *UI+watcher*, M2-2 into *runner queue observability+commands* / *activity UI*, and M2-3 into *persistence+metadata* / *history+bulk*. **CORRECTED** — that is **seven** slices, not six: M2-0 is already under budget and is not split, so the plan is M2-0 plus six halves. Halving the three estimates above gives roughly **800–1,400** lines per slice, not the 1,100–1,500 originally stated, and only the largest halves approach the top of that band. The cost is three extra review cycles and two slices that ship no user-visible behaviour on their own.
 
 **Recommendation: the four-slice plan, with M2-0 merged first and unconditionally.** M2-0 is the only slice that both fits the budget and de-risks the other three, because slices 1–3 each replicate a pattern that M2-0 corrects.
 

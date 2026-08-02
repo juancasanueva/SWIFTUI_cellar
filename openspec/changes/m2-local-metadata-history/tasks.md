@@ -463,7 +463,7 @@ Phases 5–7.
 
 ## Phase 9: Docs, gate and manual verification
 
-- [ ] 9.1 **Absorbed follow-up 11** — `openspec/changes/m2-mutations-installed/explore.md`, the six
+- [x] 9.1 **Absorbed follow-up 11** — `openspec/changes/m2-mutations-installed/explore.md`, the six
   recorded doc corrections: the over-generalised `installed_as_dependency` claim, the unmarked pin
   read path, the Defer/Prelude verdict conflict, the stale `project.pbxproj` line numbers, the
   present-tense superseded facts needing an as-of anchor, and the six-slice arithmetic slip. Docs
@@ -484,13 +484,13 @@ Phases 5–7.
   history empty, favorites/notes/snoozes intact.
   Record each observation verbatim in the apply report. Do **not** exercise sudo-requiring casks or a
   real lock conflict — both are covered by probe `#7097`'s captured strings.
-- [ ] 9.3 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
+- [x] 9.3 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
   deleted), `FULL` green, `swiftlint` on changed files with new findings separated from the 33
   pre-existing source findings. Every changed file **under 400 lines** — check `OperationCenter.swift`,
   `InstalledFilterMode.swift`, `BrewRunner.swift` and the new `Persistence` files explicitly, and
   watch `type_body_length` on the new suites (it errors, and it bit M2-2). Record every command and
   its exact result.
-- [ ] 9.4 Scope guard: `git diff --stat main` touches only the files in design "File Changes" (plus
+- [x] 9.4 Scope guard: `git diff --stat main` touches only the files in design "File Changes" (plus
   any file a task above mandates by name — list each with its reason); `Persistence` is the outermost
   node and **nothing depends back on it**; `Catalog` still declares no `BrewProcess` dependency
   (`PackageGraphTests` green); `BrewClient` **never links SwiftData**; no `@unchecked Sendable` in
