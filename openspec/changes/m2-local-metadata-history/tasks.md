@@ -212,62 +212,62 @@ Absorbed follow-ups 2 and 5. Bulk multi-select (Phase 6) multiplies the exposure
 
 ## Phase 4: `Persistence` — schema, stores, degradation (D2, D3, D4 — LPM1–LPM4, LPM6, LPM7, IH4–IH6) — ≈ 1,150 lines
 
-- [ ] 4.1 RED `Tests/PersistenceTests/SchemaTests.swift` (LPM1 sc1–3): a favorite, a note and a
+- [x] 4.1 RED `Tests/PersistenceTests/SchemaTests.swift` (LPM1 sc1–3): a favorite, a note and a
   snooze recorded for the **formula** `wget` are readable after the store is closed and reopened
   against the same location; the **cask** `docker` and the **formula** `docker` are different keys;
   metadata for a package absent from the inventory is unchanged and still readable.
-- [ ] 4.2 GREEN `Sources/Persistence/SchemaV1.swift`: the three `public final class @Model`s —
+- [x] 4.2 GREEN `Sources/Persistence/SchemaV1.swift`: the three `public final class @Model`s —
   `PackageMeta`, `Snooze`, `HistoryEntry` — with the exact stored shapes from D2. `PackageKind`
   persists as `kindRaw: String`; **absence is `""`, never `Optional`**; `MutationOutcome` persists as
   `outcomeRaw` + `exitStatus`; `commandText` is the deliberate denormalisation of
   `argv.joined(separator: " ")`. **No `@Relationship` and no `@Transient` anywhere in V1** — record
   the reasons (history must survive both an uninstall and a metadata delete) in the file header.
-- [ ] 4.3 RED `Tests/PersistenceTests/MetadataStoreTests.swift` (LPM2 sc1, sc3): the favorite flag
+- [x] 4.3 RED `Tests/PersistenceTests/MetadataStoreTests.swift` (LPM2 sc1, sc3): the favorite flag
   round-trips (mark → read → unmark → read); a package for which nothing was ever stored reports
   **not favorite** and throws nothing.
-- [ ] 4.4 RED `MetadataStoreTests` (LPM2 sc2): with a recording process launcher in scope, marking
+- [x] 4.4 RED `MetadataStoreTests` (LPM2 sc2): with a recording process launcher in scope, marking
   and unmarking favorite records **no brew invocation** and submits **no operation** to the queue.
-- [ ] 4.5 RED `MetadataStoreTests` (LPM3 sc1–2) — **threat: user free text reaching a command
+- [x] 4.5 RED `MetadataStoreTests` (LPM3 sc1–2) — **threat: user free text reaching a command
   vector.** A note containing `line one\n\n  # not a heading  \nline two`, and separately one
   containing `; rm -rf /` and `--force`, is stored and returned **byte-identical** with no markup
   interpreted or stripped, no length cap applied, and **changes no `ProcessSpec`** — assert no argv
   anywhere in the recorded launches contains any fragment of the note text. Setting a note to `""`
   reports no note.
-- [ ] 4.6 RED `MetadataStoreTests` (LPM4 sc1–3): snoozing stores the exact offered version `1.2.3`
+- [x] 4.6 RED `MetadataStoreTests` (LPM4 sc1–3): snoozing stores the exact offered version `1.2.3`
   and nothing else; the stored fields carry **no duration, no expiry and no timestamp that governs
   when the snooze ends**; re-snoozing at `1.3.0` leaves exactly one snooze, naming `1.3.0`.
   Unsnoozing removes it entirely.
-- [ ] 4.7 GREEN `Sources/Persistence/MetadataStore.swift`: `@MainActor @Observable public final
+- [x] 4.7 GREEN `Sources/Persistence/MetadataStore.swift`: `@MainActor @Observable public final
   class` over the container's `mainContext`, on the shipped `InstalledStore` exemplar. Fetch-or-create
   upsert on the joint key; **writes `save()` explicitly** rather than relying on autosave, and the
   `MetadataSnapshot` value is republished from the store after each save. No `@Query`, no
   `.modelContainer(…)` modifier, no `@ModelActor`.
-- [ ] 4.8 RED `MetadataStoreTests` (LPM6 sc2) — **threat: filesystem write surface**: a container
+- [x] 4.8 RED `MetadataStoreTests` (LPM6 sc2) — **threat: filesystem write surface**: a container
   that fails to open yields `availability == .unavailable(reason)`, an **empty** snapshot, **no-op**
   writes that throw nothing, and a reason string available for rendering. Nothing else in the app is
   affected.
-- [ ] 4.9 GREEN `Sources/Persistence/PersistenceContainer.swift`: on-disk factory at
+- [x] 4.9 GREEN `Sources/Persistence/PersistenceContainer.swift`: on-disk factory at
   `Application Support/<bundleID>/Metadata/Metadata.store` (the `CatalogStore.defaultDirectory()`
   precedent) and an `isStoredInMemoryOnly` factory. Container creation `throw`s are **caught and
   folded** into `.unavailable(reason)` — a `try!` at launch would turn a recoverable disk problem
   into a boot loop (D4).
-- [ ] 4.10 RED `Tests/PersistenceTests/HistoryStoreTests.swift` (IH5 sc1–4): three entries read with
+- [x] 4.10 RED `Tests/PersistenceTests/HistoryStoreTests.swift` (IH5 sc1–4): three entries read with
   an empty search return **all three, newest first**; searching `WGET` returns only the `wget` entry
   (case-insensitive over name, verb and argv); searching `uninstall` returns only the uninstall entry;
   a term matching nothing returns empty and a later empty search still returns all three.
-- [ ] 4.11 GREEN `Sources/Persistence/HistoryStore.swift`: `FetchDescriptor` with a `#Predicate` over
+- [x] 4.11 GREEN `Sources/Persistence/HistoryStore.swift`: `FetchDescriptor` with a `#Predicate` over
   `name`/`verb`/`commandText` and `SortDescriptor(\.date, order: .reverse)`, and **no `fetchLimit`** —
   keep-all retention (IH4) means an empty search MUST return every entry, and truncating the view
   would quietly contradict the retention promise. Pagination stays an additive future change.
-- [ ] 4.12 RED `HistoryStoreTests` (IH4 sc1–2): a large number of appended entries across several
+- [x] 4.12 RED `HistoryStoreTests` (IH4 sc1–2): a large number of appended entries across several
   sessions are all still present, none removed by age or by count; an uninstall of `wget` after an
   install of `wget` produces **two** entries with the first one's fields unchanged.
-- [ ] 4.13 RED `HistoryStoreTests` (IH6 sc1, sc3–4): a confirmed clear empties the history; every
+- [x] 4.13 RED `HistoryStoreTests` (IH6 sc1, sc3–4): a confirmed clear empties the history; every
   favorite, note and snooze is **still readable with its original value** afterwards; and the
   projection exposes **no per-entry delete or remove control**.
-- [ ] 4.14 GREEN `HistoryStore.clearAll()`: `try context.delete(model: HistoryEntry.self)` and
+- [x] 4.14 GREEN `HistoryStore.clearAll()`: `try context.delete(model: HistoryEntry.self)` and
   nothing else — it touches no other model. No selective or per-entry deletion exists (settled R3).
-- [ ] 4.15 RED/GREEN `Tests/PersistenceTests/MigrationTests.swift` (LPM7 sc1–2): the stored
+- [x] 4.15 RED/GREEN `Tests/PersistenceTests/MigrationTests.swift` (LPM7 sc1–2): the stored
   configuration and public surface declare **no sync, cloud or remote destination** and make no
   network request; and a store written at V1 holding a favorite, a note and a snooze is still
   readable with its original values when opened by a schema version that adds a field (exercise
