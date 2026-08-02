@@ -88,7 +88,14 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 - [x] 4.6 RED `SyncEngineTests`: given a poisoned zero-package snapshot plus a sidecar holding validators for both sources, the next sync's recorded requests carry neither `If-Modified-Since` nor `If-None-Match`, and a successful response replaces the poisoned snapshot and serves its records (CSA4 scenario 2, defect #7). GREEN: this must fall out of 4.1 through the existing `revalidatable: previousSnapshot != nil` path (`:128`) — assert it, do not add a branch. Confirm the cold-launch status stays the ordinary progression, never `failed` (Q1).
 - [x] 4.7 D6 audit for #6/#7: migrate `packages: []` convenience fixtures in `FileStoreTests`, `SyncEngineTests` and `AnalyticsTests` to one-record fixtures; any assertion encoding defect #6 or #7 changes in its fix's commit citing the number. Verify: `FAST`.
 
-## Phase 5: `CellarTestSupport` (D5, defect #10) — designated cut point
+## Phase 5: `CellarTestSupport` (D5, defect #10) — CUT, deferred to a follow-up
+
+> **Deferred at apply time.** The authored diff for Phases 0–4 and 6 came in at
+> ~1,400 changed lines against the 1,500 `single-pr` budget. D5 is forecast at
+> ~380, which would overrun it, so the pre-agreed cut point is taken: Phase 5
+> ships as a follow-up PR based on this branch (feature-branch-chain). Nothing in
+> Phases 1–4 depends on it, and the existing tests still tear `start()` down with
+> `Task.cancel()` rather than by awaiting the loop.
 
 - [ ] 5.1 Add to `Packages/CellarCore/Package.swift`: `.target(name: "CellarTestSupport", path: "Tests/CellarTestSupport", swiftSettings: [.swiftLanguageMode(.v6)])` with **no** `dependencies:` and absent from `products:` — CS1 is enforced structurally by the target graph. Add it to both test targets' `dependencies`. Verify: `FAST` compiles with the target empty.
 - [ ] 5.2 Move `TestClock`, `TestPoll` and `FakeTimeSource` into `Tests/CellarTestSupport/{TestClock,TestPoll,FakeTimeSource}.swift` as `public`; delete `Tests/CatalogTests/Fakes/TestClock.swift` and `Tests/BrewProcessTests/Fakes/TestClock.swift`; re-home `extension FakeTimeSource: CatalogTimeSource` in `CatalogTests` as a retroactive conformance. Behaviour-identical move. Verify: `FAST`, both targets.
@@ -97,5 +104,5 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 6: Gate
 
-- [ ] 6.1 Full gate: `FAST` green with the M1 `@Test` count from 0.1 intact plus the new regressions (none deleted), `REL` green, `FULL` green, `swiftlint` clean on changed files. Record every command and its exact result in the apply report.
-- [ ] 6.2 Scope guard: `git diff --stat main` touches only the files in design "File Changes"; no new public API on the `Catalog` or `BrewProcess` products; `CatalogSnapshot.currentSchemaVersion` still 1 and persisted JSON byte-identical; nothing from follow-ups #4/#5/#8/#9 or any M2 feature work is present.
+- [x] 6.1 Full gate: `FAST` green with the M1 `@Test` count from 0.1 intact plus the new regressions (none deleted), `REL` green, `FULL` green, `swiftlint` clean on changed files. Record every command and its exact result in the apply report.
+- [x] 6.2 Scope guard: `git diff --stat main` touches only the files in design "File Changes"; no new public API on the `Catalog` or `BrewProcess` products; `CatalogSnapshot.currentSchemaVersion` still 1 and persisted JSON byte-identical; nothing from follow-ups #4/#5/#8/#9 or any M2 feature work is present.

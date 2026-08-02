@@ -96,7 +96,7 @@ struct BrewDetectionStoreTests {
                         version: BrewVersion(major: 4, minor: 2, patch: 0)
                     )
                 ),
-                .configuredPathMissing(configured),
+                .configuredPathMissing(configured)
             ]
         )
         let store = BrewDetectionStore(locator: locator, configuredPath: configured)

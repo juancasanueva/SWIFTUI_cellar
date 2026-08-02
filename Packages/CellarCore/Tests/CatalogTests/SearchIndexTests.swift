@@ -48,7 +48,7 @@ struct SearchIndexTests {
             CatalogPackage.stub(kind: .cask, name: "docker", desc: "container desktop", installCount365d: 50),
             CatalogPackage.stub(kind: .formula, name: "dockerize", desc: "wait for services"),
             CatalogPackage.stub(kind: .formula, name: "openssl@3", desc: "Cryptography and SSL"),
-            CatalogPackage.stub(kind: .cask, name: "visual-studio-code", desc: "Café-friendly editor"),
+            CatalogPackage.stub(kind: .cask, name: "visual-studio-code", desc: "Café-friendly editor")
         ]
         let snapshot = CatalogSnapshot(
             generatedAt: Date(timeIntervalSince1970: 0),
