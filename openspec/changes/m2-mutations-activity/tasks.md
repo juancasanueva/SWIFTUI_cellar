@@ -109,44 +109,44 @@ Scheduled first so no new suite in Phases 2–7 mints a fourth `TestClock`.
 
 Independent of the mutation command layer; reviewable standalone.
 
-- [ ] 2.1 RED `Tests/BrewClientTests/InstalledRefreshTests.swift` (D8a — II10 sc5): a change signal
+- [x] 2.1 RED `Tests/BrewClientTests/InstalledRefreshTests.swift` (D8a — II10 sc5): a change signal
   opens the quiet window; a mutation begins **before** the window elapses; the window then elapses
   while the mutation is in flight → **no** re-snapshot runs, and exactly one runs at the mutation's
   terminal outcome. Second case: cancelling the debounce task prevents the pending refresh entirely.
-- [ ] 2.2 GREEN `Sources/BrewClient/InstalledChangeObserving.swift`: `waitOutTheQuietWindow()`
+- [x] 2.2 GREEN `Sources/BrewClient/InstalledChangeObserving.swift`: `waitOutTheQuietWindow()`
   re-checks the gate **after** the sleep and drops the refresh (the terminal owes one anyway). Store
   the debounce `Task` in `debounceTask` and cancel it when `run()`'s group ends — that is what makes
   the existing `Task.isCancelled` guards reachable instead of dead code.
-- [ ] 2.3 RED `Tests/BrewClientTests/InstalledStoreTests.swift` (D8b — II10 sc6): with a counting
+- [x] 2.3 RED `Tests/BrewClientTests/InstalledStoreTests.swift` (D8b — II10 sc6): with a counting
   scripted source, an acquisition is in flight against payload `P1`; a signal arrives **after** it
   started and the payload is now `P2` → a further invocation is performed after the quiet window and
   the inventory reflects `P2`, not `P1`. A signal that arrived *before* the acquisition still joins it.
-- [ ] 2.4 GREEN `Sources/BrewClient/InstalledStore.swift`: a monotonic `invalidationCount` and
+- [x] 2.4 GREEN `Sources/BrewClient/InstalledStore.swift`: a monotonic `invalidationCount` and
   `public func invalidate()`. Each `InFlightRefresh` records the mark it started at; a later caller
   joins only when `current.mark >= mark` **and** the request URL matches (M2-1 D6's key is kept, not
   replaced). `InstalledRefreshCoordinator` calls `invalidate()` on every signal and every mutation
   terminal.
-- [ ] 2.5 RED `InstalledStoreTests` (D8c — II10 sc7): an acquisition is in flight and has not
+- [x] 2.5 RED `InstalledStoreTests` (D8c — II10 sc7): an acquisition is in flight and has not
   settled; `clear(to:)` resets the store to `.brewAbsent`; a later valid refresh performs an
   invocation and publishes its snapshot → the inventory does not stay empty, and `.brewAbsent` is
   never answered by pre-clear data.
-- [ ] 2.6 GREEN `InstalledStore.clear(to:)`: cancel the in-flight task and vacate the slot **before**
+- [x] 2.6 GREEN `InstalledStore.clear(to:)`: cancel the in-flight task and vacate the slot **before**
   bumping the ordinal. The ordinal guard still discards any late answer, so the cancellation is
   belt-and-braces rather than load-bearing.
-- [ ] 2.7 RED `Tests/BrewClientTests/InstalledFilterTests.swift` (D8d — II8 sc6–7): under
+- [x] 2.7 RED `Tests/BrewClientTests/InstalledFilterTests.swift` (D8d — II8 sc6–7): under
   `installed` mode over an inventory of one formula and one cask, one deprecated — kind, deprecated
   and disabled each change the visible rows (or report themselves unavailable for the mode); under
   `outdated` mode the kind control applied to casks leaves only the cask. Plus the II3 principle: a
   row whose package has **no catalog record** is never hidden by a catalog-only flag.
-- [ ] 2.8 GREEN `Sources/BrewClient/InstalledFilterMode.swift`: `InstalledBrowse.rows(…)` takes
+- [x] 2.8 GREEN `Sources/BrewClient/InstalledFilterMode.swift`: `InstalledBrowse.rows(…)` takes
   `SearchFilters`. `kinds` filters on `InstalledPackage.kind` (the inventory is authoritative).
   `excludeDeprecated` / `excludeDisabled` are **catalog** predicates and are applied through the
   `catalogLookup` decoration already passed in, with *no catalog record ⇒ not excluded*. The picker
   stays enabled; no control lies.
-- [ ] 2.9 RED `Tests/BrewClientTests/InstalledObserverTests.swift` (new, construction-level): two
+- [x] 2.9 RED `Tests/BrewClientTests/InstalledObserverTests.swift` (new, construction-level): two
   `changes()` calls on one `FSEventsInstalledObserver` leave exactly **one** live stream — the first
   is finished, not leaked — and teardown completes without trapping.
-- [ ] 2.10 GREEN `Sources/BrewClient/FSEventsInstalledObserver.swift`: `start(yielding:)` calls
+- [x] 2.10 GREEN `Sources/BrewClient/FSEventsInstalledObserver.swift`: `start(yielding:)` calls
   `stop()` first (last caller wins). `stop()` takes the `Watcher` out **under** the lock and tears it
   down **outside** it, then finishes the old continuation — the `SystemProcess` compute-under-lock,
   act-outside precedent. **Trap to avoid:** finishing the continuation inside the lock re-enters the

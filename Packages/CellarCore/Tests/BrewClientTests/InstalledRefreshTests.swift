@@ -30,9 +30,10 @@ struct InstalledRefreshTests {
             .formulae(["wget"]),
             .formulae(["wget", "curl"])
         ],
-        withObserver: Bool = true
+        withObserver: Bool = true,
+        gated: Bool = false
     ) -> Harness {
-        let source = FakeInstalledPayloadSource(answers)
+        let source = FakeInstalledPayloadSource(answers, gated: gated)
         let store = InstalledStore(source: source)
         let observer = FakeInstalledChangeObserver()
         let mutations = InstalledMutationGate()
@@ -218,6 +219,134 @@ struct InstalledRefreshTests {
 
         #expect(harness.source.callCount - baseline == 1)
         loop.cancel()
+    }
+
+    /// The M2-1 defect this change absorbs (design D8a — II10 sc5): suppression
+    /// was consulted when the signal arrived and when the window opened, so a
+    /// window that opened *before* a mutation began still fired mid-install.
+    /// The re-check has to happen where the re-snapshot would actually start.
+    @Test("A window opened before a mutation began does not fire during it")
+    func anOpenWindowDoesNotFireDuringAMutation() async {
+        let harness = harness(answers: [.formulae(["wget"])])
+        let loop = Task { await harness.coordinator.run() }
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+
+        // The signal opens the window...
+        harness.observer.emit()
+        await harness.clock.waitForSleepers()
+
+        // ...and only then does a Cellar-initiated mutation begin.
+        harness.mutations.begin()
+
+        // The window now elapses while that mutation is still in flight.
+        await passQuietWindow(harness.clock)
+
+        #expect(
+            harness.source.callCount == baseline,
+            "an already-open quiet window re-snapshotted during a mutation"
+        )
+
+        // The refresh it dropped is not lost: the terminal owes exactly one.
+        harness.mutations.end()
+        await settle()
+        await passQuietWindow(harness.clock)
+
+        #expect(harness.source.callCount - baseline == 1)
+        loop.cancel()
+    }
+
+    /// The coordinator is what tells the store its freshness mark moved
+    /// (design D8b — II10 sc6). Without that call the debounced refresh joins
+    /// the acquisition that was already running when the signal arrived, and
+    /// the inventory settles on state observed before the change.
+    @Test("A signal during an acquisition is not answered by that acquisition")
+    func aSignalDuringAnAcquisitionIsNotAnsweredByIt() async {
+        let harness = harness(
+            answers: [.formulae(["wget"]), .formulae(["wget", "curl"])],
+            gated: true
+        )
+        let loop = Task { await harness.coordinator.run() }
+
+        let baseline = Task {
+            await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        }
+        await harness.source.waitForCalls(atLeast: 1)
+
+        // The change lands while that first acquisition is still open.
+        harness.observer.emit()
+        await harness.clock.waitForSleepers()
+        await passQuietWindow(harness.clock)
+
+        #expect(
+            harness.source.callCount == 2,
+            "the debounced refresh joined a pre-signal acquisition"
+        )
+
+        harness.source.release()
+        await baseline.value
+        await settle()
+
+        #expect(harness.store.inventory.packages.map(\.name) == ["curl", "wget"])
+        loop.cancel()
+    }
+
+    /// A mutation terminal is an invalidation for the same reason a watcher
+    /// signal is: brew has just changed what is installed.
+    @Test("A mutation terminal invalidates the inventory before re-snapshotting")
+    func aMutationTerminalInvalidatesTheInventory() async {
+        let harness = harness(
+            answers: [.formulae(["wget"]), .formulae(["wget", "curl"])],
+            gated: true
+        )
+        let loop = Task { await harness.coordinator.run() }
+
+        let baseline = Task {
+            await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        }
+        await harness.source.waitForCalls(atLeast: 1)
+
+        harness.mutations.begin()
+        harness.mutations.end()
+        await harness.source.waitForCalls(atLeast: 2)
+
+        #expect(
+            harness.source.callCount == 2,
+            "the terminal re-snapshot joined an acquisition that predates the mutation"
+        )
+
+        harness.source.release()
+        await baseline.value
+        await settle()
+
+        #expect(harness.store.inventory.packages.map(\.name) == ["curl", "wget"])
+        loop.cancel()
+    }
+
+    /// The debounce task was unstructured and unowned, which made the
+    /// `Task.isCancelled` guards inside it unreachable: nothing ever cancelled
+    /// it. Owning it is what turns those guards from dead code into the reason a
+    /// torn-down coordinator cannot refresh after the fact (design D8a).
+    @Test("Cancelling the loop cancels the pending debounce, so no refresh escapes it")
+    func cancellingTheLoopCancelsThePendingDebounce() async {
+        let harness = harness(answers: [.formulae(["wget"])])
+        let loop = Task { await harness.coordinator.run() }
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+
+        harness.observer.emit()
+        await harness.clock.waitForSleepers()
+
+        loop.cancel()
+        harness.observer.finish()
+        await loop.value
+        await settle()
+        await passQuietWindow(harness.clock)
+
+        #expect(
+            harness.source.callCount == baseline,
+            "a debounced refresh survived the loop that owned it"
+        )
     }
 
     // MARK: - Baseline (the watcher is an optimisation, never the only path)

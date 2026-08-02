@@ -71,11 +71,13 @@ public final class InstalledStore {
 
     @ObservationIgnored private let source: any InstalledPayloadSourcing
 
-    /// The one acquisition that may be joined, the token that owns it, and the
-    /// request it was started for.
+    /// The one acquisition that may be joined, the token that owns it, the
+    /// request it was started for, and the freshness mark it started at.
     private struct InFlightRefresh {
         let token: Int
         let request: URL
+        /// The value of `invalidationCount` when this acquisition started.
+        let mark: Int
         let task: Task<Result<InstalledInventory, InstalledInventoryError>, Never>
     }
 
@@ -83,6 +85,20 @@ public final class InstalledStore {
     @ObservationIgnored private var nextToken = 0
     /// The newest ordinal that actually reached `inventory`.
     @ObservationIgnored private var installedSequence = 0
+    /// Monotonic count of "what is installed changed since you last looked".
+    @ObservationIgnored private var invalidationCount = 0
+
+    // MARK: - Freshness
+
+    /// Records that the resident inventory — and anything currently in flight —
+    /// may already be stale.
+    ///
+    /// Called on every external change signal and at every mutation terminal.
+    /// It spawns nothing: it only moves the mark that decides whether the next
+    /// refresh is entitled to join the acquisition already running (design D8b).
+    public func invalidate() {
+        invalidationCount += 1
+    }
 
     public init(source: any InstalledPayloadSourcing = BrewInfoPayloadSource()) {
         self.source = source
@@ -123,7 +139,14 @@ public final class InstalledStore {
         let outcome: Result<InstalledInventory, InstalledInventoryError>
         let token: Int
 
-        if let current = inFlight, current.request == request {
+        // Joining requires both conditions. The request key is M2-1 D6's and is
+        // kept, not replaced: it stops a snapshot of the previous `brew` from
+        // answering a refresh of the new one. The mark is the addition: an
+        // acquisition that started before the newest invalidation observed the
+        // world before the change it is being asked about (design D8b).
+        if let current = inFlight,
+           current.request == request,
+           current.mark >= invalidationCount {
             token = current.token
             outcome = await current.task.value
         } else {
@@ -138,7 +161,12 @@ public final class InstalledStore {
                 defer { self?.vacate(token) }
                 return await Self.snapshot(from: source, using: installation)
             }
-            inFlight = InFlightRefresh(token: token, request: request, task: acquisition)
+            inFlight = InFlightRefresh(
+                token: token,
+                request: request,
+                mark: invalidationCount,
+                task: acquisition
+            )
             outcome = await acquisition.value
         }
 
@@ -185,7 +213,17 @@ public final class InstalledStore {
     }
 
     /// Clears to an empty inventory with guidance, spawning nothing.
+    ///
+    /// The slot is vacated **before** the ordinal is bumped. Leaving it resident
+    /// stranded the store: a refresh requested afterwards joined the pre-clear
+    /// acquisition, whose answer the ordinal guard then discarded, so the
+    /// inventory stayed empty even after a valid refresh (design D8c). The
+    /// cancellation is belt-and-braces — the ordinal guard still discards any
+    /// late answer — but the vacating is load-bearing.
     private func clear(to absence: InstalledAbsence) {
+        inFlight?.task.cancel()
+        inFlight = nil
+
         nextToken += 1
         installedSequence = nextToken
         inventory = .empty

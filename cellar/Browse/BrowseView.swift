@@ -74,6 +74,10 @@ struct BrowseView: View {
         browse.rows(
             mode: mode,
             query: catalog.query,
+            // The same controls the index already answers for `all` and
+            // `notInstalled`, now honoured under the two inventory-driven modes
+            // as well — so no enabled control is inert (design D8d).
+            filters: catalog.filters,
             catalogResults: catalog.results,
             catalogLookup: { catalog.package($0) }
         )
