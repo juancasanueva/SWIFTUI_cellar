@@ -20,6 +20,7 @@ import SwiftUI
 struct BrowseView: View {
     let catalog: CatalogStore
     let installed: InstalledStore
+    let operations: OperationCenter
     @Binding var selection: PackageID?
 
     @State private var mode: InstalledFilterMode = .all
@@ -39,8 +40,12 @@ struct BrowseView: View {
             Divider()
 
             List(rows, selection: $selection) { entry in
-                PackageRow(entry: entry)
-                    .tag(entry.id)
+                HStack(spacing: 6) {
+                    PackageRow(entry: entry)
+                    Spacer(minLength: 0)
+                    MutationMenu(center: operations, entry: entry)
+                }
+                .tag(entry.id)
             }
             .overlay {
                 if rows.isEmpty {
@@ -109,6 +114,7 @@ private struct EmptyResults: View {
     return BrowseView(
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
         installed: InstalledStore(),
+        operations: OperationCenter(),
         selection: $selection
     )
 }

@@ -3,6 +3,7 @@
 //  cellar
 //
 
+import BrewClient
 import Catalog
 import SwiftUI
 
@@ -13,6 +14,8 @@ import SwiftUI
 /// view keeps that distinction visible (package-detail PD1).
 struct PackageDetailView: View {
     let catalog: CatalogStore
+    let installed: InstalledStore
+    let operations: OperationCenter
     let id: PackageID?
     @Binding var selection: PackageID?
 
@@ -33,6 +36,7 @@ struct PackageDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header(for: package)
+                actions(for: package)
                 statuses(for: package)
                 facts(for: package)
                 analytics(for: package)
@@ -44,6 +48,32 @@ struct PackageDetailView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .navigationTitle(package.displayName)
+    }
+
+    /// The mutation affordances for this package, plus copy-command.
+    ///
+    /// The entry is composed here rather than pulled from the Browse list, so
+    /// the detail view shows the installed state this machine actually has —
+    /// including for a package the current catalog page never listed.
+    @ViewBuilder
+    private func actions(for package: CatalogPackage) -> some View {
+        let entry = PackageEntry(
+            installed: installed.inventory.package(package.id),
+            catalog: package,
+            id: package.id
+        )
+        HStack(spacing: 10) {
+            MutationMenu(center: operations, entry: entry)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            CopyCommandButton(text: MutationCommand.install(package.id).displayCommand)
+            if let guidance = operations.unavailableGuidance {
+                Text(guidance)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     @ViewBuilder
@@ -290,6 +320,8 @@ private struct FlowText: View {
     @Previewable @State var selection: PackageID?
     return PackageDetailView(
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
+        installed: InstalledStore(),
+        operations: OperationCenter(),
         id: nil,
         selection: $selection
     )

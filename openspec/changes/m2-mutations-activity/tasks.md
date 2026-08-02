@@ -340,27 +340,27 @@ the two hunks in separate commits so each reviews on its own terms.
 
 Views own **no rules**: everything they read is a computed property proven in Phases 3–7.
 
-- [ ] 8.1 `cellar.xcodeproj/project.pbxproj`: add the `Activity` group and its four files to the
+- [x] 8.1 `cellar.xcodeproj/project.pbxproj`: add the `Activity` group and its four files to the
   `cellar` target. Verify: `xcodebuild build`.
-- [ ] 8.2 Create `cellar/Activity/ActivityBar.swift`: running command, pending count, cancel. Hidden
+- [x] 8.2 Create `cellar/Activity/ActivityBar.swift`: running command, pending count, cancel. Hidden
   **entirely** when the center is empty.
-- [ ] 8.3 Create `cellar/Activity/ActivityDrawer.swift` and `cellar/Activity/ActivityLogView.swift`:
+- [x] 8.3 Create `cellar/Activity/ActivityDrawer.swift` and `cellar/Activity/ActivityLogView.swift`:
   the expanded list with per-item state, argv, copy-command and streamed log.
-- [ ] 8.4 Create `cellar/Activity/MutationConfirmation.swift`: the uninstall/zap sheet, rendering
+- [x] 8.4 Create `cellar/Activity/MutationConfirmation.swift`: the uninstall/zap sheet, rendering
   `displayCommand` verbatim. Zap is a **separate** choice, never implied by an ordinary uninstall.
-- [ ] 8.5 `cellar/cellarApp.swift` + `cellar/ContentView.swift`: own the `OperationCenter`, call
+- [x] 8.5 `cellar/cellarApp.swift` + `cellar/ContentView.swift`: own the `OperationCenter`, call
   `attach(installation:)` from the detection wiring, and add
   `.safeAreaInset(edge: .bottom) { ActivityBar(center: center) }`. An inset rather than a sheet —
   a mutation is background work and a sheet would hold the app hostage.
-- [ ] 8.6 `cellar/Installed/{InstalledListView,InstalledRow}.swift` and
+- [x] 8.6 `cellar/Installed/{InstalledListView,InstalledRow}.swift` and
   `cellar/Browse/{PackageDetailView,BrowseView}.swift`: install / uninstall / zap / reinstall /
   upgrade / pin / unpin affordances, upgrade-selected and upgrade-all entry points, and
   copy-command everywhere. Affordances are **unavailable** (not failing) when the center reports no
   runner.
-- [ ] 8.7 `cellar/Browse/CatalogFilterBar.swift` + `BrowseView.swift`: thread `SearchFilters` into
+- [x] 8.7 `cellar/Browse/CatalogFilterBar.swift` + `BrowseView.swift`: thread `SearchFilters` into
   `InstalledBrowse.rows(…)` so the kind / deprecated / disabled controls are honoured under the
   `installed` and `outdated` modes (Phase 2's D8d rule, view side only).
-- [ ] 8.8 Integration checks via `FULL`: builds and links; the activity bar is absent with nothing
+- [x] 8.8 Integration checks via `FULL`: builds and links; the activity bar is absent with nothing
   running. Build-level only — **no new live-brew test**.
 
 ## Phase 9: Manual verification and gate
