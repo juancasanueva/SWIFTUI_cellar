@@ -85,18 +85,6 @@ struct SingleFlightRecipeTests {
 
 // MARK: - Probe
 
-/// A set-once flag several tasks can share.
-///
-/// `Mutex` is non-copyable, so it cannot be captured by more than one escaping
-/// closure directly; a `Sendable` reference around it can.
-private final class Flag: Sendable {
-    private let value = Mutex(false)
-
-    var isSet: Bool { value.withLock { $0 } }
-
-    func set() { value.withLock { $0 = true } }
-}
-
 /// A stripped-down copy of the D3 slot, with no sync engine attached.
 private actor SingleFlightProbe {
     struct Outcome: Sendable {
