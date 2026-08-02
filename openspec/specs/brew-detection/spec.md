@@ -91,7 +91,11 @@ configured path is invalid, and MUST NOT run any mutating brew command.
 
 Detection state MUST be observable, evaluated at launch, and re-evaluated on window focus and when
 the configured path disappears. Every re-evaluation MUST publish the resulting state so observers
-see transitions.
+see transitions. Overlapping re-evaluations MUST be coalesced onto the one evaluation genuinely in
+flight; a re-evaluation requested after the evaluation in flight has settled, or after its
+requesting caller was cancelled or abandoned, MUST run a fresh probe and MUST NOT be answered with
+the earlier evaluation's result. A settled or abandoned evaluation MUST NOT leave detection unable
+to re-evaluate.
 
 #### Scenario: Evaluated at launch
 
@@ -113,6 +117,26 @@ see transitions.
 - AND a path that still exists but is not executable is instead reported as
   `invalid(notExecutable)`, distinct from `configuredPathMissing`
 
+#### Scenario: A settled evaluation does not answer a later re-evaluation
+
+- GIVEN a locator that answered one evaluation with `absent` and that evaluation has settled
+- WHEN a re-evaluation is requested and the locator would now resolve `native`
+- THEN the locator is probed a second time
+- AND observers receive a transition to `native`
+
+#### Scenario: An abandoned caller does not poison later re-evaluations
+
+- GIVEN a caller whose task is cancelled while it awaits a re-evaluation
+- WHEN a later re-evaluation is requested and the locator would now resolve a different state
+- THEN a fresh probe runs
+- AND observers receive the newest result rather than the abandoned caller's
+
+#### Scenario: Concurrent re-evaluations coalesce onto one probe
+
+- GIVEN a locator that does not answer until it is released
+- WHEN two callers request a re-evaluation before the locator is released
+- THEN exactly one probe is performed and both callers observe the same resulting state
+
 ## Provenance
 
 - Established by change `m1-brewrunner-core` (archived `2026-08-01`), ADDED-only delta —
@@ -128,3 +152,25 @@ see transitions.
   path" scenario asserted a three-way outcome enumeration in its THEN block alongside the AND clause
   that disambiguates it. Amended so the THEN block states the single outcome and the AND clause
   contrasts it with `invalid(notExecutable)`. No behavioural change.
+- **Amended by change `m2-catalog-hardening` (archived `2026-08-02`)**, 1 MODIFIED requirement /
+  6 scenarios, from
+  `openspec/changes/archive/2026-08-02-m2-catalog-hardening/specs/brew-detection/spec.md`.
+  "Detection is observable, re-evaluated state" gained a single-flight clause: overlapping
+  re-evaluations coalesce onto the one evaluation genuinely in flight, while a request arriving
+  after that evaluation settled — or after its caller was cancelled or abandoned — MUST run a fresh
+  probe rather than be handed the earlier result. Previously the requirement mandated observability
+  and publication on every re-evaluation but said nothing about coalescing, so a caller arriving
+  after an evaluation settled could be handed a stale result presented as fresh. Its three existing
+  scenarios ("Evaluated at launch", "Focus re-evaluation observes a newly installed brew",
+  "Disappearing configured path transitions away") are preserved verbatim and three were added
+  ("A settled evaluation does not answer a later re-evaluation", "An abandoned caller does not
+  poison later re-evaluations", "Concurrent re-evaluations coalesce onto one probe"). The other four
+  requirements are untouched. Capability total after the merge: **5 requirements / 15 scenarios**.
+  This is the same invariant `catalog-sync` now states for sync, applied to detection so the M2
+  `InstalledStore` has one correct exemplar to copy.
+  - **Known gap, deliberately out of scope** (native review lineage `review-93ca396315542808`,
+    WARNING, pre-existing — not caused by this change): `BrewDetectionStore.configuredPath`'s
+    `didSet` fires a refresh that can still join an evaluation started under the *previous* path and
+    adopt its answer. That evaluation is genuinely in flight, just for a different question, so the
+    requirement above does not cover it. The fix is to key the coalescing slot by the request and is
+    routed to change `m2-installed-inventory`, which copies this recipe.

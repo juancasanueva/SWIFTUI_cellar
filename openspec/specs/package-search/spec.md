@@ -144,6 +144,38 @@ build time. This ceiling is a requirement with an automated assertion, not an as
 - WHEN the index is built
 - THEN each record is normalised exactly once and the built index answers queries
 
+### Requirement: Index construction never runs on the main actor
+
+Building the search index over a snapshot MUST run off the main actor, so the main actor stays
+responsive while a snapshot of realistic size (approximately 15,500–16,000 records) is indexed. The
+built index MUST be indistinguishable from one built on the caller's executor: the same records,
+the same normalisation, the same ranking order, and the same query results. Moving the build off
+the main actor MUST NOT relax the existing single-pass build requirement, and MUST NOT relax the
+p95 8 ms query ceiling, which continues to be measured over a built index and to exclude build
+time.
+
+#### Scenario: The main actor stays responsive during an index build
+
+- GIVEN a snapshot of approximately 15,500 records
+- WHEN the index for that snapshot is built
+- THEN other main-actor work submitted after the build starts runs to completion before the build
+  finishes
+- AND the main actor is never blocked for the duration of the build
+
+#### Scenario: An off-main build answers identically
+
+- GIVEN the same fixture used by the ranking and filter requirements
+- WHEN the index is built off the main actor and the documented queries run against it
+- THEN the results and their order are identical to the documented ranking, filter and
+  empty-query outcomes
+
+#### Scenario: The latency ceiling and single-pass build still hold
+
+- GIVEN an index built off the main actor from a fixture of approximately 15,500 records
+- WHEN at least 100 representative as-you-type queries of varying length are executed
+- THEN the 95th-percentile query duration is below 8 milliseconds
+- AND each record was normalised exactly once while the index was built
+
 ## Provenance
 
 - Established by change `m1-catalog-browse` (archived `2026-08-01`), ADDED-only delta — 6
@@ -153,5 +185,22 @@ build time. This ceiling is a requirement with an automated assertion, not an as
 - Measured at close for "Measured as-you-type latency ceiling": release gate
   `swift test -c release --filter SearchLatency` reports **p95 1.02 ms** (median 0.96 ms, max
   1.70 ms) against the 8 ms ceiling — roughly 8x headroom.
-- The archived delta spec is the verbatim audit trail; this file adds only the header, the
+- **Extended by change `m2-catalog-hardening` (archived `2026-08-02`)**, ADDED-only delta — 1
+  requirement / 3 scenarios copied verbatim from
+  `openspec/changes/archive/2026-08-02-m2-catalog-hardening/specs/package-search/spec.md`:
+  "Index construction never runs on the main actor", appended after "Measured as-you-type latency
+  ceiling". Nothing was modified, removed or renamed — in particular "Measured as-you-type latency
+  ceiling" and its "Index build is a single pass over the snapshot" scenario keep their M1 text
+  byte-for-byte, and the new requirement re-asserts both against the off-main build. Capability
+  total after the merge: **7 requirements / 19 scenarios**. This closes M1 follow-up #1
+  (main-actor index rebuild).
+  - Release latency gate re-measured at close: `swift test -c release --filter SearchLatency`
+    green, 2/2, p95 still under the 8 ms ceiling with the build moved off the main actor.
+  - **Implementation note** (native review lineage `review-93ca396315542808`, SUGGESTION,
+    non-blocking): the latency test builds its index through the synchronous
+    `PackageSearchIndex(snapshot:)` initialiser rather than the `@concurrent`
+    `PackageSearchIndex.build(from:)` factory. The factory wraps that exact initialiser and a
+    companion test proves the two are indistinguishable, so scenario 3 is COMPLIANT transitively;
+    switching the latency test to the factory would make it literal at zero cost.
+- The archived delta specs are the verbatim audit trail; this file adds only the header, the
   `## Requirements` wrapper, and this provenance section.

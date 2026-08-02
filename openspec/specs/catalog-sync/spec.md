@@ -241,6 +241,139 @@ the snapshot MUST still persist and the catalog MUST remain fully usable with ab
 - WHEN `obscure` is inspected
 - THEN its install count is absent and is not `0`
 
+### Requirement: A snapshot is adopted exactly once, in order
+
+The catalog MUST adopt each snapshot at most once, however many ingresses deliver it — cache load,
+manual refresh, and the sync event stream. A manual refresh keeps its existing contract: it runs a
+sync regardless of catalog age and returns once the resulting snapshot is queryable. When two
+adoptions overlap, the catalog MUST end up serving the newer snapshot; an adoption of an older
+snapshot that completes later MUST be discarded rather than installed. Cached results MUST remain
+queryable for the whole duration of an adoption.
+
+#### Scenario: A manual refresh adopts its snapshot once
+
+- GIVEN a running catalog that is also observing the sync event stream
+- WHEN a manual refresh completes a sync that produces snapshot `S`
+- THEN the search index is built exactly once for `S`
+- AND the served record count and results are `S`'s
+
+#### Scenario: A late adoption of an older snapshot is discarded
+
+- GIVEN the adoption of snapshot `A` is still in progress when newer snapshot `B` is delivered
+- WHEN `B` finishes adopting first and `A`'s adoption completes afterwards
+- THEN the catalog still serves `B`
+- AND the served record count and results are `B`'s, not `A`'s
+
+#### Scenario: Results never blank while a snapshot is adopted
+
+- GIVEN a catalog serving 15,000 cached records
+- WHEN a new snapshot is adopted
+- THEN every query issued while that adoption is in progress returns the previous results
+- AND no query observes an empty result set caused by the swap
+
+### Requirement: A single-flight join is satisfied only by work still in flight
+
+Overlapping sync requests MUST be coalesced onto the one run genuinely in flight. A request that
+arrives after the run in flight has settled, or after that run was cancelled, MUST start fresh
+work: it MUST NOT be answered with the already-settled result, and it MUST NOT be answered with
+`cancelled` from the previous attempt. A settled run MUST vacate the coalescing slot before any
+joined caller resumes, never afterwards. Cancelling a sync MUST prevent any later request from
+joining the cancelled run; the later request starts fresh work, and that fresh work MUST NOT begin
+acquisition until the cancelled run has finished unwinding its staging area.
+
+#### Scenario: Concurrent callers coalesce onto one sync
+
+- GIVEN a source that does not answer until it is released
+- WHEN two callers request a sync before the source is released
+- THEN exactly one acquisition is performed
+- AND both callers receive the same result
+
+#### Scenario: A settled sync does not answer a later caller
+
+- GIVEN a sync that has already completed against a source serving payload `P1`
+- WHEN a sync is requested afterwards and the source now serves payload `P2`
+- THEN a second acquisition is performed
+- AND the second caller's result reflects `P2`
+
+#### Scenario: A cancelled sync does not answer a later caller
+
+- GIVEN a sync in flight that is cancelled
+- WHEN a sync is requested after that cancellation
+- THEN fresh acquisition work starts
+- AND the later caller does not receive `cancelled` from the cancelled attempt
+
+### Requirement: A zero-package catalog is never published as success
+
+A sync MUST NOT report success for, publish, or persist a snapshot containing zero packages. Any
+sync whose candidate snapshot would contain zero packages MUST fail with `malformedPayload`, MUST
+leave the previously persisted snapshot and its state intact and served, and MUST NOT write a
+snapshot or a state sidecar for the rejected result. This applies to every path that can produce a
+candidate snapshot, including the path where every payload resource revalidates as unchanged while
+no readable previous snapshot exists. The threshold is exactly zero packages: the system MUST NOT
+apply any other plausibility floor, so a small but non-empty catalog MUST persist normally.
+
+#### Scenario: A degenerate payload from the origin is rejected
+
+- GIVEN a persisted snapshot of 15,000 records and a source returning a well-formed payload that
+  yields zero packages
+- WHEN a sync runs
+- THEN it fails with `malformedPayload`
+- AND no snapshot or state sidecar is written
+- AND the 15,000 cached records are still served
+
+#### Scenario: An unchanged answer with no readable cache does not succeed empty
+
+- GIVEN no readable persisted snapshot and a source that answers "unchanged" for every payload
+  resource
+- WHEN a sync runs
+- THEN it does not report success and publishes no snapshot
+- AND the status is `failed(.malformedPayload)`
+
+#### Scenario: A degenerate first sync stays non-fatal
+
+- GIVEN no persisted catalog and a first sync whose payload yields zero packages
+- WHEN the sync completes
+- THEN the status is `failed(.malformedPayload)`, queries return zero results, and nothing is thrown
+- AND no snapshot file exists on disk afterwards
+
+#### Scenario: A one-package catalog is not degenerate
+
+- GIVEN a source returning a payload that yields exactly one package
+- WHEN a sync runs
+- THEN it succeeds and the one-package snapshot is persisted and served
+
+### Requirement: A persisted zero-package snapshot is treated as no cache
+
+A persisted snapshot containing zero packages MUST be classified as no usable cache, exactly as a
+missing, corrupt or newer-schema file is. Loading it MUST NOT throw, MUST NOT be reported through a
+`CatalogSyncStatus` case dedicated to the discarded snapshot, and MUST leave the consumer in the
+ordinary cold-launch state. Because no readable snapshot backs the stored validators, the next sync
+MUST be unconditional — it MUST NOT replay `If-Modified-Since` or `If-None-Match` — so a machine
+carrying a poisoned snapshot recovers on its next sync instead of revalidating into it forever. The
+threshold is the same on the read side: a persisted snapshot with at least one package remains a
+usable cache.
+
+#### Scenario: A poisoned snapshot on disk is silently ignored
+
+- GIVEN a persisted snapshot file with a current `schemaVersion` containing zero packages, and a
+  sidecar recording validators for both sources
+- WHEN the catalog loads
+- THEN it reports no usable cache, nothing is thrown, and queries return zero results
+- AND the status is the ordinary cold-launch progression, not `failed`
+
+#### Scenario: Recovery from a poisoned snapshot is unconditional
+
+- GIVEN the on-disk state above
+- WHEN the next sync runs
+- THEN the recorded request carried neither `If-Modified-Since` nor `If-None-Match`
+- AND a successful response replaces the poisoned snapshot and its records are served
+
+#### Scenario: A one-package persisted snapshot is still a usable cache
+
+- GIVEN a persisted snapshot containing exactly one package
+- WHEN the catalog loads
+- THEN it reports a usable cache and serves that package
+
 ## Provenance
 
 - Established by change `m1-catalog-browse` (archived `2026-08-01`), ADDED-only delta — 9
@@ -258,5 +391,31 @@ the snapshot MUST still persist and the catalog MUST remain fully usable with ab
   revalidation without full re-download" requires of an unchanged response ("MUST keep the existing
   snapshot"). Recorded here as implementation evidence only; receipt `terminal_state: approved`,
   `evidence_outcome: passed`.
-- The archived delta spec is the verbatim audit trail; this file adds only the header, the
+- **Extended by change `m2-catalog-hardening` (archived `2026-08-02`)**, ADDED-only delta — 4
+  requirements / 13 scenarios copied verbatim from
+  `openspec/changes/archive/2026-08-02-m2-catalog-hardening/specs/catalog-sync/spec.md` and appended
+  after "Analytics counts are parsed locale-independently and degrade gracefully": "A snapshot is
+  adopted exactly once, in order", "A single-flight join is satisfied only by work still in flight",
+  "A zero-package catalog is never published as success", and "A persisted zero-package snapshot is
+  treated as no cache". Nothing was modified, removed or renamed — the 9 M1 requirements and their
+  26 scenarios keep their text byte-for-byte. Capability total after the merge: **13 requirements /
+  39 scenarios**. These four requirements close M1 follow-ups #2, #3, #6 and #7 (see the M1 archive
+  report's follow-up register).
+  - The "single-flight join" requirement carries the user-approved **mark-and-drain** cancellation
+    wording (Engram `#7070`): `cancel()` marks and cancels the slot, and a successor drains the
+    cancelled run before starting fresh work, so the dying run's staging purge cannot delete the
+    successor's in-flight download. It replaced the proposal's original "cancelling MUST make the
+    slot available immediately".
+  - **Implementation note for "A zero-package catalog is never published as success"** (native
+    review lineage `review-93ca396315542808`, SUGGESTION, non-blocking): the delivered refusal is
+    carried by the `CatalogFileStore.persist` structural guard plus M1's per-resource decoder guard.
+    The additional engine-side semantic guard named in the change's design D4 and tasks 4.x was not
+    separately implemented. The requirement is satisfied and all four scenarios are COMPLIANT; the
+    drift is between the archived design/tasks and the code, not between the spec and the code.
+  - **Implementation note for "A persisted zero-package snapshot is treated as no cache"** (same
+    review lineage, WARNING, non-blocking): recovery is reached through the existing freshness path,
+    so a poisoned snapshot sitting beside a *fresh* sidecar leaves an empty, silent catalog until the
+    staleness window passes. The requirement text is unchanged — tightening the trigger is tracked as
+    a follow-up, not a spec gap.
+- The archived delta specs are the verbatim audit trail; this file adds only the header, the
   `## Requirements` wrapper, and this provenance section.
