@@ -392,33 +392,33 @@ sight. This is what keeps Phase 8's views rule-free.
 
 ## Phase 7: The SwiftData recorder (D1, D7 — IH1, IH3, IH4) — ≈ 350 lines
 
-- [ ] 7.1 RED `Tests/PersistenceTests/HistoryRecorderTests.swift` (IH1 sc1, sc4): a `HistoryDraft`
+- [x] 7.1 RED `Tests/PersistenceTests/HistoryRecorderTests.swift` (IH1 sc1, sc4): a `HistoryDraft`
   maps to a `HistoryEntry` row with every field preserved — date, `kindRaw`, `name`, verb,
   `versionFrom`/`versionTo`, `outcomeRaw`, `exitStatus`, `argv`, `commandText` — and three recorded
   entries survive a close/reopen against the same location with their original fields.
-- [ ] 7.2 RED `HistoryRecorderTests` — replay safety: recording the **same** draft id twice leaves
+- [x] 7.2 RED `HistoryRecorderTests` — replay safety: recording the **same** draft id twice leaves
   exactly one row, because `HistoryEntry.id` is the `ActivityItem.id` and `#Unique` on it means a
   replayed write cannot double-log.
-- [ ] 7.3 RED `HistoryRecorderTests` — **threat: untrusted payload as classification input**: a
+- [x] 7.3 RED `HistoryRecorderTests` — **threat: untrusted payload as classification input**: a
   successful run whose package output contains `Password:` persists the **same** outcome M2-2 asserts
   (`.succeeded`, not `.needsPrivileges`). `outcomeRaw` is derived from the pure classifier, never from
   raw output.
-- [ ] 7.4 RED `HistoryRecorderTests` — **threat: persisted argv is display-only**: enumerate the
+- [x] 7.4 RED `HistoryRecorderTests` — **threat: persisted argv is display-only**: enumerate the
   public surface and assert **no API accepts a `HistoryEntry` (or its projected record) and returns a
   `MutationCommand`** — the mapping is one-way, exactly like `displayCommand`. The view offers copy
   only, and the copy text equals `commandText` character for character.
-- [ ] 7.5 GREEN `Sources/Persistence/SwiftDataHistoryRecorder.swift`: the `HistoryRecording`
+- [x] 7.5 GREEN `Sources/Persistence/SwiftDataHistoryRecorder.swift`: the `HistoryRecording`
   conformance, draft → row, `nil` package identity persisting as `""`. Non-throwing; a write failure
   surfaces on the store's own `lastError` and never reaches the operation.
-- [ ] 7.6 RED `Tests/BrewClientTests/OperationCenterHistoryTests.swift` (IH3 sc1–2): with a running
+- [x] 7.6 RED `Tests/BrewClientTests/OperationCenterHistoryTests.swift` (IH3 sc1–2): with a running
   inventory and a change source under test control, an **externally** added package appears in the
   inventory after the quiet window but produces **no** history entry; and an inventory refresh, a
   catalog sync and a brew detection all completing leave the history empty. **No FSEvents-driven write
   exists** (settled R2).
-- [ ] 7.7 RED `Tests/PersistenceTests/HistoryRecorderTests.swift` (IH4 sc3): an entry whose
+- [x] 7.7 RED `Tests/PersistenceTests/HistoryRecorderTests.swift` (IH4 sc3): an entry whose
   operation's execution-layer record has been **retired** by Phase 1 is still present with all of its
   fields — durable retention is independent of the runner's bounded records.
-- [ ] 7.8 GREEN wiring: no production change expected for 7.6–7.7. A failure means a non-mutation path
+- [x] 7.8 GREEN wiring: no production change expected for 7.6–7.7. A failure means a non-mutation path
   gained a write, or retention reached into the store.
   Verify: `FAST --filter "HistoryRecorder\|OperationCenterHistory"`.
 

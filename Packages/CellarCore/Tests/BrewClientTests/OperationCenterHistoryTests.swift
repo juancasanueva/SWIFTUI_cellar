@@ -225,6 +225,79 @@ struct OperationCenterHistoryTests {
         #expect(draft.commandText == "upgrade")
     }
 
+    // MARK: - IH3 sc1–2 — only what Cellar submitted is recorded
+
+    /// The change observer makes an external install **visible**; it must not
+    /// make it *recorded*. Settled decision R2: no FSEvents-driven write exists,
+    /// so a package that appeared because someone used a Terminal produces a row
+    /// in the inventory and no row in the history.
+    @Test("A package installed outside Cellar is listed but never logged")
+    func anExternalInstallIsNeverLogged() async {
+        // A live, attached centre with a real recorder behind it — so "nothing
+        // was written" is a claim about a wired seam, not about an idle object.
+        let harness = CenterHarness()
+        let source = FakeInstalledPayloadSource([
+            .formulae(["wget"]),
+            .formulae(["wget", "curl"])
+        ])
+        let store = InstalledStore(source: source)
+        let observer = FakeInstalledChangeObserver()
+        let clock = TestClock()
+        let coordinator = InstalledRefreshCoordinator(
+            store: store,
+            observer: observer,
+            mutations: harness.gate,
+            clock: clock
+        )
+        let loop = Task { await coordinator.run() }
+
+        await coordinator.refresh(using: TestInstallation.appleSilicon)
+        #expect(store.inventory.packages.map(\.name) == ["wget"])
+
+        observer.emit()
+        await clock.waitForSleepers()
+        for _ in 0..<4 {
+            await clock.advance(by: .seconds(2))
+            for _ in 0..<20 { await Task.yield() }
+        }
+
+        // The inventory has genuinely moved — so this is "detected and not
+        // logged", not "nothing happened".
+        #expect(store.inventory.packages.map(\.name) == ["curl", "wget"])
+        #expect(source.callCount == 2)
+        #expect(harness.recorder.drafts.isEmpty, "an externally installed package was logged")
+        #expect(harness.center.items.isEmpty, "the change signal enqueued an operation")
+
+        // And the same centre does write, for something Cellar itself submits —
+        // so the emptiness above is the rule, not a dead seam.
+        harness.center.submit(.upgradeAll)
+        try? await harness.finish(call: 0)
+        #expect(harness.recorder.drafts.count == 1)
+        loop.cancel()
+    }
+
+    /// Read-only work writes nothing: a refresh, a catalog sync and a detection
+    /// are probes, and a probe is not a mutation.
+    @Test("An inventory refresh, a catalog sync and a brew detection all write nothing")
+    func readOnlyWorkWritesNothing() async {
+        let harness = CenterHarness()
+        let source = FakeInstalledPayloadSource([.formulae(["wget"]), .formulae(["wget", "curl"])])
+        let store = InstalledStore(source: source)
+
+        await store.refresh(using: TestInstallation.appleSilicon)
+        await store.refresh(using: TestInstallation.appleSilicon)
+        // Detection: pointing the centre at an installation, and repointing it.
+        harness.center.attach(installation: TestInstallation.appleSilicon)
+        harness.center.attach(installation: TestInstallation.intel)
+        harness.center.attach(installation: nil)
+        await harness.settle()
+
+        #expect(source.callCount == 2, "the refreshes did not run")
+        #expect(store.inventory.packages.isEmpty == false)
+        #expect(harness.recorder.drafts.isEmpty, "a read-only path wrote a history entry")
+        #expect(harness.center.items.isEmpty)
+    }
+
     /// The rejected alternative, asserted structurally: deriving the transition
     /// by diffing an inventory snapshot either side of the operation would make
     /// the entry depend on watcher timing.

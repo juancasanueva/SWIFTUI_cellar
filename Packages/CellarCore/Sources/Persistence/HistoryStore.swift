@@ -72,6 +72,13 @@ public final class HistoryStore {
     /// The current projection: newest first, filtered by `search`.
     public private(set) var records: [HistoryRecord] = []
 
+    /// Why the last write did not land, if it did not.
+    ///
+    /// Surfaced here rather than thrown, because the caller is a mutation's
+    /// terminal path and a failed *record* must never change a *mutation's*
+    /// reported outcome (IH7).
+    public private(set) var lastError: String?
+
     /// The search term. Empty returns every entry (IH5 sc1).
     public var search: String = "" {
         didSet {
@@ -135,6 +142,31 @@ public final class HistoryStore {
             records = []
             availability = .unavailable(reason: MetadataStore.describe(error))
         }
+    }
+
+    // MARK: - Appending (IH1, IH4)
+
+    /// Appends one row, then republishes the projection.
+    ///
+    /// Append-only: no entry is ever rewritten or amended, so a later operation
+    /// on the same package produces a new row rather than updating the previous
+    /// one. `#Unique` on `id` means a **replayed** write of the same terminal
+    /// outcome upserts instead of double-logging, which is a different thing
+    /// from amending — the row it lands on is the one it already wrote.
+    ///
+    /// Non-throwing on purpose: the caller is `OperationCenter.finish(_:with:)`,
+    /// and a failure here must cost the history entry and nothing else (IH7).
+    func append(_ entry: HistoryEntry) {
+        guard let context else { return }
+        do {
+            context.insert(entry)
+            try context.save()
+            lastError = nil
+        } catch {
+            context.rollback()
+            lastError = MetadataStore.describe(error)
+        }
+        reload()
     }
 
     // MARK: - Clearing
