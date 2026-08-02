@@ -65,7 +65,9 @@ struct SingleFlightRecipeTests {
         await probe.waitForSlot()
         let firstJoiner = Task { await probe.acquire(gate: gate) }
         let secondJoiner = Task { await probe.acquire(gate: gate) }
-        await gate.waitForWaiters(atLeast: 1)
+        // Both joiners must be attached *before* the body may finish, or they
+        // would arrive at an empty slot and become creators themselves.
+        await probe.waitForJoiners(atLeast: 2)
         gate.open()
 
         let creatorOutcome = await creator.value
@@ -96,6 +98,7 @@ private actor SingleFlightProbe {
     private var inFlight: (token: Int, task: Task<Int, Never>)?
     private var nextToken = 0
     private(set) var bodyCount = 0
+    private(set) var joinerCount = 0
 
     var hasSlot: Bool { inFlight != nil }
 
@@ -107,8 +110,17 @@ private actor SingleFlightProbe {
         }
     }
 
+    nonisolated func waitForJoiners(atLeast count: Int) async {
+        var attempts = 0
+        while await joinerCount < count, attempts < 10_000 {
+            attempts += 1
+            await Task.yield()
+        }
+    }
+
     func acquire(gate: Gate) async -> Outcome {
         if let current = inFlight {
+            joinerCount += 1
             let value = await current.task.value
             return Outcome(value: value, slotWasVacant: inFlight == nil)
         }

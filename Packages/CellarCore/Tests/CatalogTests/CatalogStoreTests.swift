@@ -78,6 +78,10 @@ struct CatalogStoreTests {
 
         await poll { store.results.isEmpty == false }
         #expect(store.results.map(\.name).sorted() == ["iterm2", "wget"])
+        // The engine yields `.snapshot` before `.succeeded`, and adoption is now
+        // an `await` (defect #1), so results land one or more turns ahead of the
+        // status. Same assertion, polled rather than read instantly.
+        await poll { if case .succeeded = store.syncStatus { true } else { false } }
         guard case .succeeded = store.syncStatus else {
             Issue.record("expected succeeded, got \(store.syncStatus)")
             return
@@ -139,6 +143,130 @@ struct CatalogStoreTests {
 
         #expect(store.packageCount == 0)
         #expect(store.isReady)
+    }
+
+    // MARK: - Off-main, ordered, single adoption (CSA1)
+
+    @Test("Adopting a 15,500-record snapshot leaves the main actor free")
+    func adoptionDoesNotBlockTheMainActor() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+        let snapshot = LatencyFixture.snapshot(count: SearchIndexTests.realisticRecordCount)
+        let finished = Flag()
+        let turns = Counter()
+
+        let ticker = Task { @MainActor in
+            while !finished.isSet {
+                await Task.yield()
+                turns.increment()
+            }
+        }
+        await Task.yield()
+
+        let before = turns.value
+        await store.adopt(snapshot)
+        let during = turns.value - before
+        finished.set()
+        await ticker.value
+
+        #expect(store.packageCount == SearchIndexTests.realisticRecordCount)
+        // Zero under M1's synchronous main-actor build: it holds the actor from
+        // the moment adoption starts. A regression test, not a timing one.
+        #expect(during > 0, "no main-actor turn completed while the snapshot was adopted")
+    }
+
+    @Test("Every query issued during an adoption is answered from the last good index")
+    func queriesNeverBlankWhileASnapshotIsAdopted() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+        // Both snapshots share a name space, so "the results went empty" can
+        // only mean the swap blanked them — never that the query stopped
+        // matching.
+        await store.adopt(Self.snapshot(of: 15_000, prefix: "pkg"))
+        store.query = "pkg"
+        #expect(store.results.isEmpty == false)
+
+        let finished = Flag()
+        let sawEmpty = Flag()
+        let answered = Counter()
+
+        // Keystrokes for the whole duration of the adoption below.
+        let typist = Task { @MainActor in
+            var toggle = false
+            while !finished.isSet {
+                toggle.toggle()
+                store.query = toggle ? "pkg1" : "pkg2"
+                if store.results.isEmpty { sawEmpty.set() }
+                answered.increment()
+                await Task.yield()
+            }
+        }
+        await Task.yield()
+
+        let before = answered.value
+        await store.adopt(Self.snapshot(of: 15_500, prefix: "pkg"))
+        let during = answered.value - before
+        finished.set()
+        await typist.value
+
+        #expect(during > 0, "no query was issued while the adoption was in progress")
+        #expect(sawEmpty.isSet == false, "a query observed an empty result set caused by the swap")
+
+        store.query = "pkg"
+        #expect(store.results.isEmpty == false)
+        #expect(store.packageCount == 15_500)
+    }
+
+    @Test("A late adoption of an older snapshot is discarded, not installed")
+    func lateOlderAdoptionIsDiscarded() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+        // `older` is 15,500 records and `newer` is 3, so the newer build lands
+        // first and the older one arrives afterwards with a stale ordinal.
+        let older = Self.snapshot(of: 15_500, prefix: "old")
+        let newer = Self.snapshot(of: 3, prefix: "new")
+
+        let first = Task { await store.adopt(older) }
+        let second = Task { await store.adopt(newer) }
+        await second.value
+        await first.value
+
+        #expect(store.packageCount == 3)
+        store.query = "new"
+        #expect(store.results.map(\.name).sorted() == ["new0", "new1", "new2"])
+        store.query = "old"
+        #expect(store.results.isEmpty, "the discarded older build was installed after all")
+    }
+
+    @Test("A manual refresh with the event stream running builds one index for its snapshot")
+    func refreshNowAdoptsItsSnapshotExactlyOnce() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+
+        let store = CatalogStore(engine: harness.engine)
+        let running = Task { await store.start() }
+        defer { running.cancel() }
+        await poll { store.isReady }
+        // The refresh loop's own first sync has to land before its successor is
+        // scripted, or `refreshNow()` joins it instead of running a new one.
+        await poll { store.results.count == 2 }
+
+        let buildsBefore = store.indexBuildCount
+        let requestsBefore = store.adoptionRequestCount
+
+        harness.source.script(.payload(Payload.formulae(["wget", "curl"])), for: .formulae)
+        harness.source.script(.notModified, for: .casks)
+        await store.refreshNow()
+        // Let the `.snapshot` event reach the observer too.
+        await Self.settle()
+
+        // Both ingresses delivered the snapshot...
+        #expect(store.adoptionRequestCount == requestsBefore + 2)
+        // ...and exactly one of them built an index for it.
+        #expect(store.indexBuildCount == buildsBefore + 1)
+        #expect(store.packageCount == 3)
+        #expect(store.results.map(\.name).sorted() == ["curl", "iterm2", "wget"])
     }
 
     // MARK: - Reranking (D4)
@@ -214,6 +342,22 @@ struct CatalogStoreTests {
     }
 
     // MARK: - Helpers
+
+    /// Lets every pending main-actor continuation run.
+    static func settle() async {
+        for _ in 0..<200 { await Task.yield() }
+    }
+
+    /// A snapshot of `count` distinctly named records.
+    static func snapshot(of count: Int, prefix: String) -> CatalogSnapshot {
+        CatalogSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 0),
+            skippedRecordCount: 0,
+            packages: (0..<count).map {
+                CatalogPackage.stub(kind: .formula, name: "\(prefix)\($0)")
+            }
+        )
+    }
 
     /// A started store holding a small, known catalog.
     static func populated() async throws -> CatalogStore {

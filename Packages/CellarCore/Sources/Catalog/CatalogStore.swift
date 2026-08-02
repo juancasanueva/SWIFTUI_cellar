@@ -46,6 +46,22 @@ public final class CatalogStore {
     @ObservationIgnored private let resultLimit: Int
     @ObservationIgnored private var index = PackageSearchIndex()
     @ObservationIgnored private var isRunning = false
+    /// Stamped before each adoption's build; only an ordinal still ahead of
+    /// `installedSequence` may install.
+    @ObservationIgnored private var adoptionSequence = 0
+    @ObservationIgnored private var installedSequence = 0
+    /// The newest snapshot identity this store has taken responsibility for, and
+    /// the adoption a duplicate delivery of it should wait on.
+    @ObservationIgnored private var adoptedRevision: CatalogSnapshotRevision?
+    @ObservationIgnored private var adoptionInFlight: Task<Void, Never>?
+
+    /// How many adoptions were requested, and how many actually built an index.
+    ///
+    /// Internal instrumentation: "one snapshot, one index" is not observable
+    /// from the outside — a duplicate build produces exactly the same results,
+    /// just after another 30 ms of CPU.
+    @ObservationIgnored private(set) var adoptionRequestCount = 0
+    @ObservationIgnored private(set) var indexBuildCount = 0
 
     public init(engine: CatalogSyncEngine, resultLimit: Int = 200) {
         self.engine = engine
@@ -112,8 +128,10 @@ public final class CatalogStore {
     /// Reads whatever is on disk and starts answering queries.
     public func loadCache() async {
         if let snapshot = await engine.cachedSnapshot() {
-            adopt(snapshot)
+            await adopt(snapshot)
         }
+        // Still after the adoption: a cold launch with a usable cache shows
+        // results rather than flashing an empty state and repopulating.
         isReady = true
     }
 
@@ -125,7 +143,7 @@ public final class CatalogStore {
     public func refreshNow() async {
         let result = await engine.sync()
         if case .success(let snapshot) = result {
-            adopt(snapshot)
+            await adopt(snapshot)
         }
         syncStatus = await engine.status
     }
@@ -136,17 +154,57 @@ public final class CatalogStore {
         index.package(id)
     }
 
-    private func handle(_ event: CatalogSyncEvent) {
+    private func handle(_ event: CatalogSyncEvent) async {
         switch event {
         case .status(let status): syncStatus = status
-        case .snapshot(let snapshot): adopt(snapshot)
+        case .snapshot(let snapshot): await adopt(snapshot)
         }
     }
 
-    private func adopt(_ snapshot: CatalogSnapshot) {
-        index = PackageSearchIndex(snapshot: snapshot)
-        packageCount = index.recordCount
-        rerank()
+    /// Installs a snapshot's index, building it off the main actor.
+    ///
+    /// Internal rather than private because the guarantees worth testing here —
+    /// the main actor stays free, queries never blank, a late older build is
+    /// discarded — are all statements about `adopt` itself.
+    func adopt(_ snapshot: CatalogSnapshot) async {
+        adoptionRequestCount += 1
+
+        // The same snapshot arrives through `refreshNow()` and through the sync
+        // event stream, and a 304 poll re-emits the file already on disk. All of
+        // those are one materialization and must cost one index, not two
+        // (design D2). Claimed before any suspension, so a concurrent duplicate
+        // cannot slip past. The duplicate *joins* rather than returns: a manual
+        // refresh has to come back with its snapshot queryable, whichever
+        // ingress happened to claim it.
+        guard snapshot.revision != adoptedRevision else {
+            await adoptionInFlight?.value
+            return
+        }
+        adoptedRevision = snapshot.revision
+
+        adoptionSequence += 1
+        let ordinal = adoptionSequence
+        indexBuildCount += 1
+
+        let adoption = Task { [weak self] in
+            let built = await PackageSearchIndex.build(from: snapshot)
+            guard let self else { return }
+            // Builds can finish out of order — a 16k snapshot overtaken by a
+            // small one. The newer catalog wins, so a stale ordinal is discarded
+            // here rather than installed on top of fresher data (design D1).
+            guard ordinal > installedSequence else { return }
+            installedSequence = ordinal
+            // One main-actor assignment, after the build: there is no window in
+            // which the store is between indexes.
+            index = built
+            packageCount = built.recordCount
+            rerank()
+        }
+        adoptionInFlight = adoption
+
+        await adoption.value
+
+        if adoptionInFlight == adoption { adoptionInFlight = nil }
     }
 
     /// Recomputes the result list on the main actor, synchronously.
