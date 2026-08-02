@@ -108,43 +108,43 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 3: Acquisition and decode (D2, D3 — II1 sc3, II2; threat rows) — ≈ 700 lines
 
-- [ ] 3.1 RED `Tests/BrewClientTests/InstalledPayloadTests.swift` — **threat: untrusted subprocess
+- [x] 3.1 RED `Tests/BrewClientTests/InstalledPayloadTests.swift` — **threat: untrusted subprocess
   payload**. Against `payload(from:exit:)` with synthesised `[LogLine]` and no process: a non-zero
   exit yields `.commandFailed(status:message:)` carrying the `.stderr` tail and **never** an empty
   inventory; empty stdout yields `.malformedPayload`; interleaved `.stderr` lines never enter the
   joined JSON.
-- [ ] 3.2 GREEN `Sources/BrewClient/InstalledPayloadSource.swift`: the `InstalledPayloadSourcing`
+- [x] 3.2 GREEN `Sources/BrewClient/InstalledPayloadSource.swift`: the `InstalledPayloadSourcing`
   protocol, the closed `InstalledInventoryError` (`.brewUnavailable`, `.commandFailed(status:message:)`,
   `.malformedPayload`, `.cancelled`), and the pure
   `static func payload(from:exit:) throws(InstalledInventoryError) -> Data`.
-- [ ] 3.3 RED `Tests/BrewClientTests/InstalledArgvTests.swift` — **threat: subprocess argument
+- [x] 3.3 RED `Tests/BrewClientTests/InstalledArgvTests.swift` — **threat: subprocess argument
   composition**. Assert the composed command is `BrewCommand.read(["info", "--installed", "--json=v2"])`:
   the recorded argument vector equals that exact fixed vector, `kind == .read` (so it never enters
   M2-2's mutation gate), and no user-supplied or catalog-supplied token can reach it — no shell, no
   string joining.
-- [ ] 3.4 GREEN `InstalledPayloadSource.swift`: `BrewInfoPayloadSource` — ~20 lines of glue that drain
+- [x] 3.4 GREEN `InstalledPayloadSource.swift`: `BrewInfoPayloadSource` — ~20 lines of glue that drain
   `operation.lines`, `await operation.exit()`, and hand both to 3.2's pure function.
-- [ ] 3.5 Author `Tests/BrewClientTests/Fixtures/installed-info.json`, trimmed by hand: a multi-keg
+- [x] 3.5 Author `Tests/BrewClientTests/Fixtures/installed-info.json`, trimmed by hand: a multi-keg
   formula, a dependency-only formula, an outdated formula, a pinned formula, a self-updating cask
   with `installed != version`, a plain outdated cask, a pinned cask, and a tap-only formula with no
   catalog counterpart. No production code in this task.
-- [ ] 3.6 RED `Tests/BrewClientTests/InstalledDecodeTests.swift`: a single-keg formula decodes with
+- [x] 3.6 RED `Tests/BrewClientTests/InstalledDecodeTests.swift`: a single-keg formula decodes with
   its version and install time (II2 sc1); a two-keg formula appears **once with both kegs**, neither
   dropped (II2 sc2); a cask's String `installed` decodes as `1.2.3` (II2 sc3); `auto_updates` true vs
   `null` stay distinguishable as "declared" vs "not declared" at the wire layer, never folded to a
   plain `false` (II2 sc4); and — **threat: untrusted payload** — truncated JSON is `.malformedPayload`
   while one corrupt record among good ones is skipped, not fatal.
-- [ ] 3.7 GREEN `Sources/BrewClient/InstalledWire.swift` (two wire types, two `init(from:)` for the
+- [x] 3.7 GREEN `Sources/BrewClient/InstalledWire.swift` (two wire types, two `init(from:)` for the
   asymmetric `installed` shapes, `LossyArray`-style per-record tolerance),
   `Sources/BrewClient/InstalledModels.swift` (`InstalledKeg`, `InstalledPackage`,
   `InstalledInventory`, `InstalledLoadState`), and `Sources/BrewClient/InstalledDecoder.swift`
   (envelope → projection; drop `bottle`, `urls`, `artifacts`, `ruby_source_checksum`,
   `runtime_dependencies`, `used_options`, `sha256`, `service`, `depends_on`, `conflicts_with`;
   `linked_keg` selects `primaryKeg`, falling back to the newest `installedAt`).
-- [ ] 3.8 RED `InstalledDecodeTests`: over a realistic-size payload, main-actor work submitted after
+- [x] 3.8 RED `InstalledDecodeTests`: over a realistic-size payload, main-actor work submitted after
   the decode starts runs to completion **before** the decode finishes (II1 sc3) — the M2-0 D1
   yield-counting shape.
-- [ ] 3.9 GREEN `InstalledDecoder.decode(_:)` becomes `@concurrent` — attribute **before** the
+- [x] 3.9 GREEN `InstalledDecoder.decode(_:)` becomes `@concurrent` — attribute **before** the
   modifier (M1 apply-time finding). Verify: `FAST --filter "InstalledPayload\|InstalledArgv\|InstalledDecode"`.
 
 ## Phase 4: Derivation (D4 — II3, II4, II5, II6) — ≈ 330 lines
