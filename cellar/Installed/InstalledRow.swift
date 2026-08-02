@@ -15,6 +15,7 @@ import SwiftUI
 /// (installed-inventory II7).
 struct InstalledRow: View {
     let entry: PackageEntry
+    let operations: OperationCenter
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -30,6 +31,7 @@ struct InstalledRow: View {
                     badge.view
                 }
                 Spacer(minLength: 0)
+                MutationMenu(center: operations, entry: entry)
             }
             if let desc = entry.desc {
                 Text(desc)
@@ -119,6 +121,9 @@ enum InstalledBadge: Hashable {
         declaresAutoUpdates: true
     )
     return List {
-        InstalledRow(entry: PackageEntry(installed: package, catalog: nil, id: package.id))
+        InstalledRow(
+            entry: PackageEntry(installed: package, catalog: nil, id: package.id),
+            operations: OperationCenter()
+        )
     }
 }

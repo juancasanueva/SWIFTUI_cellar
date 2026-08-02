@@ -16,17 +16,22 @@ struct InstalledFilterTests {
         _ name: String,
         desc: String? = nil,
         version: String = "1.0.0",
-        installCount: Int? = nil
+        installCount: Int? = nil,
+        deprecated: Bool = false,
+        disabled: Bool = false
     ) -> CatalogPackage {
         CatalogPackage(
             kind: kind, name: name, displayName: name, desc: desc, homepage: nil,
             license: nil, version: version, tap: "homebrew/core", dependencies: [],
-            buildDependencies: [], dependents: [], caveats: nil, deprecated: false,
-            deprecationReason: nil, deprecationDate: nil, disabled: false,
+            buildDependencies: [], dependents: [], caveats: nil, deprecated: deprecated,
+            deprecationReason: nil, deprecationDate: nil, disabled: disabled,
             disableReason: nil, disableDate: nil, autoUpdates: false,
             installCount365d: installCount
         )
     }
+
+    /// Every predicate on, which is what "no filtering" spells.
+    static let noFilters = SearchFilters()
 
     static let wgetCatalog = catalogPackage(
         .formula, "wget", desc: "Internet file retriever", installCount: 1_234
@@ -60,6 +65,7 @@ struct InstalledFilterTests {
         let rows = browse(Self.wgetOnly).rows(
             mode: .installed,
             query: "",
+            filters: Self.noFilters,
             catalogResults: Self.catalogResults,
             catalogLookup: Self.lookup
         )
@@ -72,6 +78,7 @@ struct InstalledFilterTests {
         let rows = browse(Self.wgetOnly).rows(
             mode: .notInstalled,
             query: "",
+            filters: Self.noFilters,
             catalogResults: Self.catalogResults,
             catalogLookup: Self.lookup
         )
@@ -84,6 +91,7 @@ struct InstalledFilterTests {
         let rows = browse(Self.wgetOnly).rows(
             mode: .all,
             query: "",
+            filters: Self.noFilters,
             catalogResults: Self.catalogResults,
             catalogLookup: Self.lookup
         )
@@ -106,6 +114,7 @@ struct InstalledFilterTests {
         let rows = browse(inventory).rows(
             mode: .outdated,
             query: "",
+            filters: Self.noFilters,
             catalogResults: [],
             catalogLookup: { _ in nil }
         )
@@ -125,6 +134,7 @@ struct InstalledFilterTests {
         let rows = browse(inventory).rows(
             mode: .installed,
             query: "",
+            filters: Self.noFilters,
             // A page that happens to contain none of them, as it would after
             // ranking by install count.
             catalogResults: Self.catalogResults,
@@ -145,6 +155,7 @@ struct InstalledFilterTests {
         let matches = browse(inventory).rows(
             mode: .installed,
             query: "rip",
+            filters: Self.noFilters,
             catalogResults: [],
             catalogLookup: { _ in nil }
         )
@@ -168,12 +179,14 @@ struct InstalledFilterTests {
         let filtered = composer.rows(
             mode: composer.effectiveMode(.installed),
             query: "doc",
+            filters: Self.noFilters,
             catalogResults: Self.catalogResults,
             catalogLookup: Self.lookup
         )
         let unfiltered = composer.rows(
             mode: .all,
             query: "doc",
+            filters: Self.noFilters,
             catalogResults: Self.catalogResults,
             catalogLookup: Self.lookup
         )

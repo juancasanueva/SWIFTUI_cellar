@@ -29,6 +29,11 @@ struct cellarApp: App {
     /// Owns cadence: launch, activation, and debounced external changes.
     @State private var refresher: InstalledRefreshCoordinator
 
+    /// The queue of Cellar-initiated mutations, and everything the activity
+    /// surfaces read. It is what finally drives `mutations`, the gate M2-1
+    /// shipped with no callers at all.
+    @State private var operations: OperationCenter
+
     /// The app's long-lived loops.
     ///
     /// App-level state outlives every scene, so closing the window that started
@@ -44,11 +49,17 @@ struct cellarApp: App {
         _refresher = State(
             initialValue: InstalledRefreshCoordinator(store: installed, mutations: mutations)
         )
+        _operations = State(initialValue: OperationCenter(gate: mutations))
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView(brewDetection: brewDetection, catalog: catalog, installed: installed)
+            ContentView(
+                brewDetection: brewDetection,
+                catalog: catalog,
+                installed: installed,
+                operations: operations
+            )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
                 // from a terminal while Cellar was in the background.
@@ -63,10 +74,15 @@ struct cellarApp: App {
         }
     }
 
-    /// Detection first, then the inventory that depends on it.
+    /// Detection first, then everything that depends on it.
+    ///
+    /// The operation centre is attached from the same place, so mutations become
+    /// available the moment brew does and go unavailable the moment it stops
+    /// being — with no restart either way (package-mutation PM7).
     @MainActor
     private func refreshEverything() async {
         await brewDetection.refresh()
+        operations.attach(installation: brewDetection.state.installation)
         await refresher.refresh(for: brewDetection.state)
     }
 

@@ -272,7 +272,9 @@ struct InstalledDeriveTests {
         installed: String,
         published: String? = nil,
         snapshotOutdated: Bool = false,
-        onRequest: Bool = true
+        onRequest: Bool = true,
+        isPinned: Bool = false,
+        pinnedVersion: String? = nil
     ) -> InstalledPackage {
         let keg = InstalledKeg(
             version: installed,
@@ -290,8 +292,8 @@ struct InstalledDeriveTests {
             kegs: [keg],
             primaryKeg: keg,
             snapshotOutdated: snapshotOutdated,
-            isPinned: false,
-            pinnedVersion: nil,
+            isPinned: isPinned,
+            pinnedVersion: pinnedVersion,
             declaresAutoUpdates: nil
         )
     }

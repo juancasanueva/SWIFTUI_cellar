@@ -8,33 +8,23 @@ import Foundation
 /// actor is testable without spawning anything, and every grace period runs on
 /// the injected `Clock`, so cancellation is testable without waiting.
 public actor BrewRunner {
-    private struct OperationRecord {
-        /// Held for the operation's lifetime on purpose: an `AsyncStream` that
-        /// nobody retains terminates as `.cancelled`, which would silently
-        /// cancel an operation whose caller only cares about `exit()`.
-        let lines: AsyncStream<LogLine>
-        let continuation: AsyncStream<LogLine>.Continuation
-        var process: (any LaunchedProcess)?
-        /// Invariant I3: the pump is unstructured but owned by this record and
-        /// cancelled when the operation ends.
-        var pump: Task<Void, Never>?
-        /// Completes only once the operation has a terminal result.
-        var completion: Task<Void, Never>?
-        var resolvedExit: BrewExit?
-        var fault: BrewProcessError?
-        /// Set before a signal is delivered, so the terminal result can be
-        /// reported as cancelled rather than as a plain signal death.
-        var cancellationSignal: Int32?
-        var isCancelling = false
-    }
-
     private let installation: BrewInstallation
     private let launcher: any ProcessLaunching
     private let policy: CancellationPolicy
     private let clock: any Clock<Duration>
     private var operations: [UUID: OperationRecord] = [:]
+    private var nextOrdinal = 0
     /// The gate task of the most recently submitted mutation (design D5).
     private var mutationTail: Task<Void, Never>?
+
+    /// Queue state, republished whenever a phase changes.
+    ///
+    /// `.bufferingNewest(1)` is correct rather than merely cheap: these are
+    /// *state snapshots*, so dropping an intermediate one is lossless, and a
+    /// slow UI can never back-pressure the actor. `queue` is a `nonisolated let`
+    /// of `Sendable` elements, so reading it crosses no isolation (design D3).
+    public nonisolated let queue: AsyncStream<QueueSnapshot>
+    private nonisolated let queueContinuation: AsyncStream<QueueSnapshot>.Continuation
 
     public init(
         installation: BrewInstallation,
@@ -46,10 +36,35 @@ public actor BrewRunner {
         self.launcher = launcher
         self.policy = policy
         self.clock = clock
+        (queue, queueContinuation) = AsyncStream<QueueSnapshot>.makeStream(
+            bufferingPolicy: .bufferingNewest(1)
+        )
     }
 
     /// How many operations the runner is tracking. Test-facing.
     var activeOperationCount: Int { operations.count }
+
+    // MARK: - Projection
+
+    /// Every operation the runner is tracking, in submission order.
+    ///
+    /// Strictly read-only: it starts nothing, cancels nothing, and never awaits
+    /// the operation in flight, so enumerating cannot perturb scheduling
+    /// (brew-execution BE1).
+    public func snapshot() -> QueueSnapshot {
+        QueueSnapshot(
+            operations: operations
+                .values
+                .sorted { $0.ordinal < $1.ordinal }
+                .map(\.projection)
+        )
+    }
+
+    /// Republishes the queue. Called at the five sites where a phase already
+    /// changes: enqueue, install, spawn, terminal, cancel.
+    private func publish() {
+        queueContinuation.yield(snapshot())
+    }
 
     // MARK: - Starting work
 
@@ -66,8 +81,16 @@ public actor BrewRunner {
             environment: BrewEnvironment.current()
         )
 
-        let id = UUID()
+        nextOrdinal += 1
         let (lines, continuation) = AsyncStream<LogLine>.makeStream()
+        let submission = Submission(
+            id: UUID(),
+            command: command,
+            ordinal: nextOrdinal,
+            lines: lines,
+            continuation: continuation
+        )
+        let id = submission.id
 
         switch command.kind {
         case .read:
@@ -79,10 +102,10 @@ public actor BrewRunner {
                 // spawn leaves no half-built operation behind.
                 throw Self.mapLaunchFailure(error, executableURL: installation.executableURL)
             }
-            install(id: id, process: process, lines: lines, continuation: continuation)
+            install(submission, process: process)
 
         case .mutate:
-            enqueueMutation(id: id, spec: spec, lines: lines, continuation: continuation)
+            enqueueMutation(submission, spec: spec)
         }
 
         return BrewOperation(id: id, lines: lines, runner: self)
@@ -93,14 +116,10 @@ public actor BrewRunner {
     /// Invariant I2: the tail is read **and** replaced synchronously, before
     /// this method's first `await` — in fact it never suspends at all — so actor
     /// reentrancy cannot reorder the queue no matter how the callers interleave.
-    private func enqueueMutation(
-        id: UUID,
-        spec: ProcessSpec,
-        lines: AsyncStream<LogLine>,
-        continuation: AsyncStream<LogLine>.Continuation
-    ) {
+    private func enqueueMutation(_ submission: Submission, spec: ProcessSpec) {
+        let id = submission.id
         let predecessor = mutationTail
-        operations[id] = OperationRecord(lines: lines, continuation: continuation)
+        operations[id] = submission.record()
 
         let gate = Task { [self] in
             await predecessor?.value
@@ -109,7 +128,8 @@ public actor BrewRunner {
         mutationTail = gate
         operations[id]?.completion = gate
 
-        installConsumerCancellation(for: id, on: continuation)
+        installConsumerCancellation(for: id, on: submission.continuation)
+        publish()
     }
 
     /// Runs one gated mutation and holds the gate until it is terminal.
@@ -129,34 +149,28 @@ public actor BrewRunner {
             )
             operations[id]?.resolvedExit = BrewExit(status: 127, reason: .exited)
             record.continuation.finish()
+            publish()
             return
         }
 
         let pump = Self.startPump(reading: process, into: record.continuation)
         operations[id]?.process = process
         operations[id]?.pump = pump
+        publish()
         await drive(id)
     }
 
     /// Records a launched process and starts pumping its output.
-    private func install(
-        id: UUID,
-        process: any LaunchedProcess,
-        lines: AsyncStream<LogLine>,
-        continuation: AsyncStream<LogLine>.Continuation
-    ) {
-        let pump = Self.startPump(reading: process, into: continuation)
-        operations[id] = OperationRecord(
-            lines: lines,
-            continuation: continuation,
-            process: process,
-            pump: pump
-        )
+    private func install(_ submission: Submission, process: any LaunchedProcess) {
+        let id = submission.id
+        let pump = Self.startPump(reading: process, into: submission.continuation)
+        operations[id] = submission.record(process: process, pump: pump)
         // Safe to assign after the fact: this method never suspends, so the
         // task body cannot observe the record before the assignment lands.
         operations[id]?.completion = Task { await self.drive(id) }
 
-        installConsumerCancellation(for: id, on: continuation)
+        installConsumerCancellation(for: id, on: submission.continuation)
+        publish()
     }
 
     /// Cancelling the task consuming `lines` cancels the operation itself.
@@ -184,6 +198,7 @@ public actor BrewRunner {
         // the right-hand side also reads it would overlap exclusive access.
         let result = terminalResult(exit, for: id)
         operations[id]?.resolvedExit = result
+        publish()
     }
 
     // MARK: - Results
@@ -231,6 +246,7 @@ public actor BrewRunner {
                 reason: .cancelled(signal: SIGINT)
             )
             record.continuation.finish()
+            publish()
             return
         }
 
@@ -249,6 +265,7 @@ public actor BrewRunner {
             status: 128 + SIGTERM,
             reason: .cancelled(signal: SIGTERM)
         )
+        publish()
     }
 
     /// Delivers one signal and reports whether the process stopped within
@@ -311,61 +328,5 @@ public actor BrewRunner {
             }
             continuation.finish()
         }
-    }
-
-    /// Maps a spawn fault onto the narrow `BrewProcessError` taxonomy.
-    private static func mapLaunchFailure(
-        _ error: any Error,
-        executableURL: URL
-    ) -> BrewProcessError {
-        if let brewError = error as? BrewProcessError { return brewError }
-
-        if let posix = error as? POSIXError {
-            switch posix.code {
-            case .ENOENT, .EACCES, .EPERM, .ENOEXEC:
-                return .executableUnavailable(executableURL)
-            default:
-                return .launchFailed(executableURL, code: posix.code.rawValue)
-            }
-        }
-
-        let cocoa = error as NSError
-        if cocoa.domain == NSCocoaErrorDomain,
-           cocoa.code == CocoaError.fileNoSuchFile.rawValue
-               || cocoa.code == CocoaError.fileReadNoPermission.rawValue {
-            return .executableUnavailable(executableURL)
-        }
-
-        return .launchFailed(executableURL, code: Int32(truncatingIfNeeded: cocoa.code))
-    }
-}
-
-/// A handle to one running `brew` invocation.
-public struct BrewOperation: Sendable, Identifiable {
-    public let id: UUID
-    /// Whole lines, in the order they were read.
-    public let lines: AsyncStream<LogLine>
-
-    private let runner: BrewRunner
-
-    init(id: UUID, lines: AsyncStream<LogLine>, runner: BrewRunner) {
-        self.id = id
-        self.lines = lines
-        self.runner = runner
-    }
-
-    /// The terminal result, available only after every line is observable.
-    public func exit() async -> BrewExit {
-        await runner.exit(of: id)
-    }
-
-    /// An out-of-band fault, if one occurred. `nil` for every normal run.
-    public func fault() async -> BrewProcessError? {
-        await runner.fault(of: id)
-    }
-
-    /// Stops the operation, escalating `SIGINT` → `SIGTERM`.
-    public func cancel() async {
-        await runner.cancel(id)
     }
 }

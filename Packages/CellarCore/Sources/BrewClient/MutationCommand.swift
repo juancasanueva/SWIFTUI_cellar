@@ -1,0 +1,250 @@
+import BrewProcess
+import Catalog
+
+// MARK: - Threat response: subprocess argument composition
+//
+// Every mutating `brew` invocation Cellar can produce is spelled in this file,
+// as a typed case that lowers to an argv vector. Three properties hold by
+// construction rather than by discipline (design D1, D2):
+//
+// 1. **argv, never a string.** `arguments` is handed to `BrewCommand.mutate` and
+//    from there element-by-element to the process seam. Nothing joins, quotes,
+//    interpolates or shells out, so a name containing a space, `;` or `$(…)`
+//    stays one literal argument.
+// 2. **The kind flag is always explicit.** Every command that names a package
+//    passes `--formula` or `--cask`, so a token published in both namespaces —
+//    `docker` is the live one — can never resolve to the wrong package. There is
+//    no per-verb exception: `brew pin` and `brew unpin` both accept the flags
+//    (live probe, brew 6.0.14).
+// 3. **Names are refused at construction.** A name that is empty or begins with
+//    `-` would be read by brew as an option wherever it sat in the vector, so
+//    the failable factories reject it and no argv is ever built from it.
+//
+// `displayCommand` is **one-way**: it renders argv for a human to read or paste,
+// and nothing in this module — or anywhere else — parses a command string back
+// into arguments. That is what keeps the rendering incapable of changing what
+// runs.
+
+/// A formula, proven to be one.
+///
+/// The wrapper exists so "pin a cask" is unrepresentable rather than validated
+/// at runtime — the same technique `CatalogFilterBar.KindSelection` uses for
+/// "neither kind selected". It does no argv work: the kind flag comes from the
+/// `PackageID` like every other command's.
+public struct FormulaID: Sendable, Hashable {
+    public let id: PackageID
+
+    public var name: String { id.name }
+
+    /// Fails when `id` is a cask, or when its name could be read as an option.
+    public init?(_ id: PackageID) {
+        guard id.kind == .formula, MutationName.isSafe(id.name) else { return nil }
+        self.id = id
+    }
+
+    public init?(name: String) {
+        self.init(PackageID(kind: .formula, name: name))
+    }
+}
+
+/// A cask, proven to be one.
+///
+/// `--zap` is cask-only in brew, so a formula literally cannot spell it.
+public struct CaskID: Sendable, Hashable {
+    public let id: PackageID
+
+    public var name: String { id.name }
+
+    /// Fails when `id` is a formula, or when its name could be read as an option.
+    public init?(_ id: PackageID) {
+        guard id.kind == .cask, MutationName.isSafe(id.name) else { return nil }
+        self.id = id
+    }
+
+    public init?(name: String) {
+        self.init(PackageID(kind: .cask, name: name))
+    }
+}
+
+/// The rule that decides whether a package name may reach argv.
+///
+/// Deliberately narrow. Names come from brew's own snapshot or from the
+/// catalog, never from free text, so this is a second line rather than the
+/// first — and widening it to "alphanumeric only" would refuse names brew
+/// genuinely publishes (`gcc@11`, `font-fira-code`, `python@3.12`).
+enum MutationName {
+    static func isSafe(_ name: String) -> Bool {
+        guard !name.isEmpty, !name.hasPrefix("-") else { return false }
+        return !name.contains(where: \.isWhitespace)
+    }
+}
+
+/// Every mutating `brew` command Cellar can issue.
+///
+/// There is no `upgradeSelected` case: a selection fans out into N ordinary
+/// `.upgrade(id)` submissions at the call site, so each selected package gets
+/// its own queue item, log, copy-command, cancel and terminal outcome, and a
+/// mid-batch failure attributes to exactly one package (design D1, user ruling
+/// 2026-08-02).
+public enum MutationCommand: Sendable, Equatable {
+    case install(PackageID)
+    case uninstall(PackageID)
+    case reinstall(PackageID)
+    case upgrade(PackageID)
+    /// `brew uninstall --cask --zap` — cask-only, and separately confirmed.
+    case zap(CaskID)
+    /// Plain `brew upgrade`: no name, no kind flag, brew's own defaults
+    /// (product Q3).
+    case upgradeAll
+    case pin(FormulaID)
+    case unpin(FormulaID)
+
+    // MARK: - Failable construction
+
+    public static func install(formula name: String) -> MutationCommand? {
+        FormulaID(name: name).map { .install($0.id) }
+    }
+
+    public static func install(cask name: String) -> MutationCommand? {
+        CaskID(name: name).map { .install($0.id) }
+    }
+
+    public static func uninstall(formula name: String) -> MutationCommand? {
+        FormulaID(name: name).map { .uninstall($0.id) }
+    }
+
+    public static func uninstall(cask name: String) -> MutationCommand? {
+        CaskID(name: name).map { .uninstall($0.id) }
+    }
+
+    public static func reinstall(formula name: String) -> MutationCommand? {
+        FormulaID(name: name).map { .reinstall($0.id) }
+    }
+
+    public static func upgrade(formula name: String) -> MutationCommand? {
+        FormulaID(name: name).map { .upgrade($0.id) }
+    }
+
+    public static func upgrade(cask name: String) -> MutationCommand? {
+        CaskID(name: name).map { .upgrade($0.id) }
+    }
+
+    public static func zap(cask name: String) -> MutationCommand? {
+        CaskID(name: name).map { .zap($0) }
+    }
+
+    public static func pin(formula name: String) -> MutationCommand? {
+        FormulaID(name: name).map { .pin($0) }
+    }
+
+    public static func unpin(formula name: String) -> MutationCommand? {
+        FormulaID(name: name).map { .unpin($0) }
+    }
+
+    /// The safe way to build a command for a package identity the UI already
+    /// holds, whichever verb it is.
+    ///
+    /// Returns `nil` when the identity could not survive argv composition, so a
+    /// caller that cannot build one renders the affordance unavailable rather
+    /// than failing at spawn time. Deliberately not named after any one verb:
+    /// an overload called `upgrade(_:)` would collide with the case of the same
+    /// name and silently recurse.
+    public static func naming(
+        _ id: PackageID,
+        _ build: (PackageID) -> MutationCommand
+    ) -> MutationCommand? {
+        MutationName.isSafe(id.name) ? build(id) : nil
+    }
+
+    // MARK: - Projection
+
+    /// The package this command acts on, when it acts on one.
+    public var packageID: PackageID? {
+        switch self {
+        case .install(let id), .uninstall(let id), .reinstall(let id), .upgrade(let id):
+            id
+        case .zap(let cask):
+            cask.id
+        case .pin(let formula), .unpin(let formula):
+            formula.id
+        case .upgradeAll:
+            nil
+        }
+    }
+
+    /// The argv vector, excluding the `brew` executable itself.
+    public var arguments: [String] {
+        switch self {
+        case .install(let id):
+            [Verb.install.rawValue] + Self.target(id)
+        case .uninstall(let id):
+            [Verb.uninstall.rawValue] + Self.target(id)
+        case .reinstall(let id):
+            [Verb.reinstall.rawValue] + Self.target(id)
+        case .upgrade(let id):
+            [Verb.upgrade.rawValue] + Self.target(id)
+        case .zap(let cask):
+            [Verb.uninstall.rawValue, Flag.cask.rawValue, Flag.zap.rawValue, cask.name]
+        case .upgradeAll:
+            [Verb.upgrade.rawValue]
+        case .pin(let formula):
+            [Verb.pin.rawValue] + Self.target(formula.id)
+        case .unpin(let formula):
+            [Verb.unpin.rawValue] + Self.target(formula.id)
+        }
+    }
+
+    /// The runnable form, always serialized as a mutation.
+    public var brewCommand: BrewCommand {
+        .mutate(arguments)
+    }
+
+    /// Whether this command destroys something and must be confirmed first.
+    ///
+    /// Exactly `uninstall` and `zap` (product Q2). `upgradeAll` is the only bulk
+    /// command and is non-destructive, so no bulk destructive path exists.
+    public var requiresConfirmation: Bool {
+        switch self {
+        case .uninstall, .zap: true
+        case .install, .reinstall, .upgrade, .upgradeAll, .pin, .unpin: false
+        }
+    }
+
+    /// The command as a human reads it — and as they can paste it.
+    ///
+    /// Display only. Nothing parses this back into argv (see the file header),
+    /// which is what makes the confirmation sheet and the copy-command
+    /// affordance incapable of changing what runs.
+    public var displayCommand: String {
+        "brew " + arguments.joined(separator: " ")
+    }
+
+    // MARK: - Vector pieces
+
+    /// Spelled as cases rather than literals so a typo is a compile error and
+    /// the set of verbs Cellar can issue is enumerable by reading.
+    private enum Verb: String {
+        case install
+        case uninstall
+        case reinstall
+        case upgrade
+        case pin
+        case unpin
+    }
+
+    private enum Flag: String {
+        case formula = "--formula"
+        case cask = "--cask"
+        case zap = "--zap"
+    }
+
+    /// The kind flag and the name, in that order. The single place a package
+    /// becomes two argv elements.
+    private static func target(_ id: PackageID) -> [String] {
+        let flag: Flag = switch id.kind {
+        case .formula: .formula
+        case .cask: .cask
+        }
+        return [flag.rawValue, id.name]
+    }
+}

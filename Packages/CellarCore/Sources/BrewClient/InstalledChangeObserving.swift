@@ -22,6 +22,14 @@ public protocol InstalledChangeObserving: Sendable {
 @MainActor
 @Observable
 public final class InstalledMutationGate {
+    /// How many mutations are currently in flight.
+    ///
+    /// A depth rather than a flag, because M2-2 submits batches: a selected
+    /// upgrade over three packages is three operations, and a flag would report
+    /// "not mutating" the moment the first of them settled — re-opening the
+    /// suppression window while brew was still writing (design D7).
+    @ObservationIgnored private var depth = 0
+
     public private(set) var isMutating = false
 
     /// One element per mutation that reached a terminal outcome.
@@ -33,14 +41,22 @@ public final class InstalledMutationGate {
     }
 
     public func begin() {
+        depth += 1
         isMutating = true
     }
 
-    /// Ends the mutation, whatever its outcome. Success and failure both
+    /// Ends one mutation, whatever its outcome. Success and failure both
     /// invalidate the snapshot.
+    ///
+    /// The terminal is yielded **unconditionally**, even when the depth is
+    /// already zero. That asymmetry is deliberate: the previous
+    /// `guard isMutating` swallowed every end past the first, so a batch of N
+    /// produced N−1 re-snapshots and the last mutation's effect could stay
+    /// invisible until something else happened to invalidate the inventory. One
+    /// wasted refresh is a far cheaper mistake than a stale list.
     public func end() {
-        guard isMutating else { return }
-        isMutating = false
+        depth = max(0, depth - 1)
+        isMutating = depth > 0
         continuation.yield()
     }
 }
@@ -74,6 +90,13 @@ public final class InstalledRefreshCoordinator {
     private var installation: BrewInstallation?
     private var isDebouncing = false
     private var windowExtended = false
+
+    /// The one debounce in flight, owned so `run()` can cancel it.
+    ///
+    /// It used to be a detached `Task` nobody held, which made the
+    /// `Task.isCancelled` guards below unreachable — nothing ever cancelled it,
+    /// so a torn-down coordinator could still refresh minutes later (design D8a).
+    private var debounceTask: Task<Void, Never>?
 
     public init(
         store: InstalledStore,
@@ -128,11 +151,17 @@ public final class InstalledRefreshCoordinator {
             if let mutations {
                 group.addTask { [terminals = mutations.terminals] in
                     for await _ in terminals {
-                        await self.performRefresh()
+                        await self.mutationSettled()
                     }
                 }
             }
         }
+
+        // The group is structured, so both children are done here — but the
+        // debounce is not one of them. Cancelling it is what stops a window
+        // opened before teardown from refreshing after it.
+        debounceTask?.cancel()
+        debounceTask = nil
     }
 
     // MARK: - Debounce
@@ -148,6 +177,12 @@ public final class InstalledRefreshCoordinator {
     }
 
     private func changeSignalled() {
+        // Whatever is resident — and whatever is currently in flight — was
+        // observed before this signal, so it can no longer answer for the world
+        // after it. Marking is unconditional and spawns nothing; suppression
+        // below only decides *when* the re-snapshot runs (design D8b).
+        store.invalidate()
+
         // Our own writes. brew is mid-install; every one of these is noise, and
         // the terminal outcome will settle it once.
         if mutations?.isMutating == true { return }
@@ -160,7 +195,7 @@ public final class InstalledRefreshCoordinator {
         }
         isDebouncing = true
 
-        Task { @MainActor in
+        debounceTask = Task { @MainActor in
             await self.waitOutTheQuietWindow()
         }
     }
@@ -172,7 +207,25 @@ public final class InstalledRefreshCoordinator {
         } while windowExtended && !Task.isCancelled
 
         isDebouncing = false
+        debounceTask = nil
         guard !Task.isCancelled else { return }
+
+        // Suppression is re-checked *here*, where the re-snapshot would actually
+        // start, and not only when the signal arrived and when the window
+        // opened. A mutation that began inside an already-open window would
+        // otherwise be re-snapshotted mid-install (design D8a — II10 sc5).
+        // Dropping the refresh loses nothing: the mutation's terminal outcome
+        // owes exactly one anyway.
+        guard mutations?.isMutating != true else { return }
+
+        await performRefresh()
+    }
+
+    /// One mutation reached a terminal outcome: brew has just changed what is
+    /// installed, so the mark moves for the same reason a watcher signal moves
+    /// it, and exactly one re-snapshot is owed.
+    private func mutationSettled() async {
+        store.invalidate()
         await performRefresh()
     }
 

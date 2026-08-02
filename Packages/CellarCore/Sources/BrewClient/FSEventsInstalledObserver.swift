@@ -46,7 +46,18 @@ public final class FSEventsInstalledObserver: InstalledChangeObserving {
 
     private let roots: [String]
     private let queue = DispatchQueue(label: "com.juancasanueva.cellar.installed-watcher")
-    private let watcher = Mutex<Watcher?>(nil)
+    private let state = Mutex(State())
+
+    /// Everything one `changes()` call owns.
+    ///
+    /// The continuation is held **separately** from the CF stream on purpose: it
+    /// exists even when `FSEventStreamCreate` fails, and a superseding caller
+    /// still has to finish it. Keeping them in one slot would make idempotency
+    /// depend on CoreServices having succeeded.
+    private struct State: Sendable {
+        var live: AsyncStream<Void>.Continuation?
+        var watcher: Watcher?
+    }
 
     /// The running stream and its retained box.
     ///
@@ -85,6 +96,13 @@ public final class FSEventsInstalledObserver: InstalledChangeObserving {
     }
 
     private func start(yielding continuation: AsyncStream<Void>.Continuation) {
+        // Last caller wins. `changes()` used to be non-idempotent: a second call
+        // created a second stream and silently abandoned the first, along with
+        // its retained box and its unfinished continuation. Tearing the previous
+        // one down here means exactly one stream is ever live.
+        stop()
+        state.withLock { $0.live = continuation }
+
         let info = Unmanaged.passRetained(SignalBox(continuation)).toOpaque()
         var context = FSEventStreamContext(
             version: 0,
@@ -117,30 +135,38 @@ public final class FSEventsInstalledObserver: InstalledChangeObserving {
             return
         }
 
-        watcher.withLock {
-            $0 = Watcher(
+        state.withLock {
+            $0.watcher = Watcher(
                 stream: UInt(bitPattern: UnsafeMutableRawPointer(created)),
                 info: UInt(bitPattern: info)
             )
         }
     }
 
+    /// Tears the running stream down and finishes the continuation it fed.
+    ///
+    /// The slot is emptied **under** the lock and everything else happens
+    /// **outside** it — the `SystemProcess` compute-under-lock, act-outside
+    /// precedent. That ordering is load-bearing rather than stylistic:
+    /// `continuation.finish()` re-enters this method through `onTermination`,
+    /// and `Mutex` is not recursive, so finishing inside the lock would trap.
+    /// Emptying first also means the re-entrant call finds nothing and stops.
     private func stop() {
-        watcher.withLock { current in
-            guard let running = current else { return }
-            // Cleared before teardown, so a second call — `deinit` after the
-            // stream already terminated — finds nothing and does nothing.
-            current = nil
-            guard
-                let stream = OpaquePointer(bitPattern: running.stream),
-                let info = UnsafeMutableRawPointer(bitPattern: running.info)
-            else { return }
+        let (watcher, live) = state.withLock { state -> (Watcher?, AsyncStream<Void>.Continuation?) in
+            defer { state = State() }
+            return (state.watcher, state.live)
+        }
 
+        if let watcher,
+           let stream = OpaquePointer(bitPattern: watcher.stream),
+           let info = UnsafeMutableRawPointer(bitPattern: watcher.info) {
             FSEventStreamStop(stream)
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
             Unmanaged<SignalBox>.fromOpaque(info).release()
         }
+
+        live?.finish()
     }
 }
 

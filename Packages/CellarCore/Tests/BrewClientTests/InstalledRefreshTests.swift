@@ -1,3 +1,4 @@
+import CellarTestSupport
 import Foundation
 import Testing
 
@@ -29,9 +30,10 @@ struct InstalledRefreshTests {
             .formulae(["wget"]),
             .formulae(["wget", "curl"])
         ],
-        withObserver: Bool = true
+        withObserver: Bool = true,
+        gated: Bool = false
     ) -> Harness {
-        let source = FakeInstalledPayloadSource(answers)
+        let source = FakeInstalledPayloadSource(answers, gated: gated)
         let store = InstalledStore(source: source)
         let observer = FakeInstalledChangeObserver()
         let mutations = InstalledMutationGate()
@@ -219,6 +221,40 @@ struct InstalledRefreshTests {
         loop.cancel()
     }
 
+    /// The M2-1 defect this change absorbs (design D8a — II10 sc5): suppression
+    /// was consulted when the signal arrived and when the window opened, so a
+    /// window that opened *before* a mutation began still fired mid-install.
+    /// The re-check has to happen where the re-snapshot would actually start.
+    @Test("A window opened before a mutation began does not fire during it")
+    func anOpenWindowDoesNotFireDuringAMutation() async {
+        let harness = harness(answers: [.formulae(["wget"])])
+        let loop = Task { await harness.coordinator.run() }
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+
+        // The signal opens the window...
+        harness.observer.emit()
+        await harness.clock.waitForSleepers()
+
+        // ...and only then does a Cellar-initiated mutation begin.
+        harness.mutations.begin()
+
+        // The window now elapses while that mutation is still in flight.
+        await passQuietWindow(harness.clock)
+
+        #expect(
+            harness.source.callCount == baseline,
+            "an already-open quiet window re-snapshotted during a mutation"
+        )
+
+        // The refresh it dropped is not lost: the terminal owes exactly one.
+        harness.mutations.end()
+        await settle()
+        await passQuietWindow(harness.clock)
+
+        #expect(harness.source.callCount - baseline == 1)
+        loop.cancel()
+    }
     // MARK: - Baseline (the watcher is an optimisation, never the only path)
 
     @Test("The baseline refresh fires at launch and on activation with no observer at all")
