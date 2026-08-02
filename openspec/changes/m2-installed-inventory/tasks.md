@@ -183,30 +183,30 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 5: `InstalledStore` (D6 — II1 sc1–2, II9, II10 sc4) — ≈ 330 lines
 
-- [ ] 5.1 RED `Tests/BrewClientTests/InstalledStoreTests.swift` (`@MainActor`), with a counting
+- [x] 5.1 RED `Tests/BrewClientTests/InstalledStoreTests.swift` (`@MainActor`), with a counting
   `FakeInstalledPayloadSource`: one completed refresh records **exactly one** invocation, whose
   arguments are `info --installed --json=v2` (II1 sc1); reading outdated, pinned and dependency-only
   state afterwards answers all three and the count is **still one** (II1 sc2).
-- [ ] 5.2 GREEN `Sources/BrewClient/InstalledStore.swift`:
+- [x] 5.2 GREEN `Sources/BrewClient/InstalledStore.swift`:
   `@MainActor @Observable public final class InstalledStore` with
   `public func refresh(using installation: BrewInstallation?) async`.
-- [ ] 5.3 RED `InstalledStoreTests`: two overlapping refreshes perform one acquisition and observe
+- [x] 5.3 RED `InstalledStoreTests`: two overlapping refreshes perform one acquisition and observe
   the same inventory; a refresh requested **after** the previous settled against `P1` performs a
   second invocation and the inventory reflects `P2` (II10 sc4); a refresh under a *different*
   `BrewInstallation` does not join the one in flight.
-- [ ] 5.4 GREEN: the M2-0 D3 token slot **keyed by `installation.executableURL`**, with
+- [x] 5.4 GREEN: the M2-0 D3 token slot **keyed by `installation.executableURL`**, with
   `defer { vacate(token) }` inside the task body so no caller can join settled work.
-- [ ] 5.5 RED `InstalledStoreTests`: two scripted payloads with controlled completion order — older
+- [x] 5.5 RED `InstalledStoreTests`: two scripted payloads with controlled completion order — older
   `A` and newer `B` where `B` completes first — leave `B` resident and discard `A`'s late adoption.
-- [ ] 5.6 GREEN: the M2-0 D1 monotonic ordinal stamped before the `await`; **one** main-actor
+- [x] 5.6 GREEN: the M2-0 D1 monotonic ordinal stamped before the `await`; **one** main-actor
   assignment, admitted only while the ordinal still exceeds `installedSequence`.
-- [ ] 5.7 RED `InstalledStoreTests`: a failed refresh keeps the **last good inventory** resident and
+- [x] 5.7 RED `InstalledStoreTests`: a failed refresh keeps the **last good inventory** resident and
   sets `.failed(error)`; a `nil` installation clears to an empty inventory with `.brewAbsent`,
   throws nothing, and the launch counter stays at zero (II9 sc1); an invalid configured path is the
   same, with the rejection reason available as read-only guidance (II9 sc2); a store that reported
   absent, then given a valid installation and a refresh, reports the snapshot's packages without a
   restart (II9 sc3).
-- [ ] 5.8 GREEN the load-state and brew-absent paths in `InstalledStore`.
+- [x] 5.8 GREEN the load-state and brew-absent paths in `InstalledStore`.
   Verify: `FAST --filter InstalledStore`.
 
 ## Phase 6: Freshness (D8, D9 — II10) — ≈ 380 lines — **cut point with Phase 7**
