@@ -211,25 +211,25 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 6: Freshness (D8, D9 — II10) — ≈ 380 lines — **cut point with Phase 7**
 
-- [ ] 6.1 Add `Tests/BrewClientTests/Fakes/`: `TestClock.swift` (third copy — M2-0 D5's
+- [x] 6.1 Add `Tests/BrewClientTests/Fakes/`: `TestClock.swift` (third copy — M2-0 D5's
   `CellarTestSupport` extraction was cut and is still pending), `FakeInstalledChangeObserver.swift`,
   `FakeInstalledPayloadSource.swift`. No production code.
-- [ ] 6.2 RED `Tests/BrewClientTests/InstalledRefreshTests.swift`: with a running coordinator, the
+- [x] 6.2 RED `Tests/BrewClientTests/InstalledRefreshTests.swift`: with a running coordinator, the
   underlying snapshot gains a package and one signal is emitted — after the quiet window the
   inventory lists it, with no user action (II10 sc1); twenty signals inside the quiet window record
   **exactly one** additional invocation (II10 sc2). The signal is never parsed; a re-snapshot is
   always taken.
-- [ ] 6.3 GREEN `Sources/BrewClient/InstalledChangeObserving.swift`: the
+- [x] 6.3 GREEN `Sources/BrewClient/InstalledChangeObserving.swift`: the
   `func changes() -> AsyncStream<Void>` seam plus `InstalledRefreshCoordinator` debouncing on an
   injected `any Clock<Duration>` with a 2 s quiet window.
-- [ ] 6.4 RED `InstalledRefreshTests`: with a Cellar-initiated mutation in flight, signals emitted
+- [x] 6.4 RED `InstalledRefreshTests`: with a Cellar-initiated mutation in flight, signals emitted
   continuously produce **no** re-snapshot; exactly one runs at the mutation's terminal outcome
   (II10 sc3).
-- [ ] 6.5 GREEN suppression against the injected `isMutating` flag object M2-2 will drive.
-- [ ] 6.6 RED `InstalledRefreshTests`: the baseline refresh fires at launch and on activation with
+- [x] 6.5 GREEN suppression against the injected `isMutating` flag object M2-2 will drive.
+- [x] 6.6 RED `InstalledRefreshTests`: the baseline refresh fires at launch and on activation with
   **no observer attached at all** — the watcher is an optimisation, never the only path.
-- [ ] 6.7 GREEN the baseline hook in `InstalledRefreshCoordinator`.
-- [ ] 6.8 `Sources/BrewClient/FSEventsInstalledObserver.swift` (D8) — the single **untested-by-design**
+- [x] 6.7 GREEN the baseline hook in `InstalledRefreshCoordinator`.
+- [x] 6.8 `Sources/BrewClient/FSEventsInstalledObserver.swift` (D8) — the single **untested-by-design**
   surface, ~40 lines, no branch beyond "yield". It MUST carry a header comment stating the
   confinement invariant: `final class Sendable Box` holding only a `let continuation`, passed as
   `Unmanaged.passRetained(...).toOpaque()`; a file-scope `@convention(c)` callback that captures
@@ -242,11 +242,11 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 7: Loop ownership (D10 — II11) — ≈ 110 lines — **cut point with Phase 6**
 
-- [ ] 7.1 RED `Tests/BrewClientTests/LoopOwnerTests.swift` with counting closures: `start` twice for
+- [x] 7.1 RED `Tests/BrewClientTests/LoopOwnerTests.swift` with counting closures: `start` twice for
   one id runs exactly one loop; open → close → open re-enters `start`, finds it running, and does not
   restart or double-start (II11 sc2); a closed scene does not cancel a running loop, and a subsequent
   refresh still updates (II11 sc1).
-- [ ] 7.2 GREEN `Sources/BrewClient/LoopOwner.swift`: `@MainActor @Observable public final class`
+- [x] 7.2 GREEN `Sources/BrewClient/LoopOwner.swift`: `@MainActor @Observable public final class`
   with idempotent `start(_ id:_ body:)` and `isRunning(_:)`. Dependency-free — closures, not stores —
   so it stays inside the `FAST` inner loop. Verify: `FAST --filter LoopOwner`.
 
