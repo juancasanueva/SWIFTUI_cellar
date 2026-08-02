@@ -252,28 +252,28 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 8: Browse composition and catalog decoration (D5, D7 — II7, II8) — ≈ 200 lines
 
-- [ ] 8.1 RED `Tests/BrewClientTests/InstalledFilterTests.swift`: with a catalog holding `wget` and
+- [x] 8.1 RED `Tests/BrewClientTests/InstalledFilterTests.swift`: with a catalog holding `wget` and
   `curl` and an inventory holding only `wget`, `installed` leaves only `wget` (II8 sc1) and
   `notInstalled` leaves only `curl` (II8 sc2); with one outdated formula and one self-updating cask
   behind its published version, `outdated` leaves only the formula (II8 sc3); with `.brewAbsent` and
   an empty inventory the mode is forced to `all`, the picker reports itself disabled, and the rows
   are **identical** to the same query with no installed-state filtering (II8 sc4).
-- [ ] 8.2 GREEN `Sources/BrewClient/InstalledFilterMode.swift`: the
+- [x] 8.2 GREEN `Sources/BrewClient/InstalledFilterMode.swift`: the
   `InstalledFilterMode { all, installed, notInstalled, outdated }` case set and the pure resolution
   rule — `all` → `catalog.results` unchanged; `installed`/`outdated` → sourced from the **inventory**
   (name/desc-matched against the live query, sorted by name), because `catalog.results` is capped at
   `resultLimit` 200 and intersecting an empty-query page with ~160 IDs would render ~0 rows;
   `notInstalled` → `catalog.results` minus `installedIDs`.
-- [ ] 8.3 RED `Tests/CatalogTests/FilterTests.swift`: the catalog query's declared filter set,
+- [x] 8.3 RED `Tests/CatalogTests/FilterTests.swift`: the catalog query's declared filter set,
   enumerated, contains no installed, not-installed or outdated predicate (II8 sc5).
-- [ ] 8.4 GREEN: **no production change expected** — `SearchFilters` and `PackageSearchIndex` are
+- [x] 8.4 GREEN: **no production change expected** — `SearchFilters` and `PackageSearchIndex` are
   untouched. A failure here means composition leaked into the index. Also assert
   `git diff --exit-code -- openspec/specs/package-search/spec.md` stays clean.
-- [ ] 8.5 RED `InstalledFilterTests`: an installed formula `wget` matched to a catalog record carries
+- [x] 8.5 RED `InstalledFilterTests`: an installed formula `wget` matched to a catalog record carries
   both the installed version and the catalog description (II7 sc1); an installed formula from a
   third-party tap with no catalog record is still listed with its snapshot data and no catalog
   metadata, never hidden (II7 sc2).
-- [ ] 8.6 GREEN the per-row decoration resolver over the existing `CatalogStore.package(id)` — O(1)
+- [x] 8.6 GREEN the per-row decoration resolver over the existing `CatalogStore.package(id)` — O(1)
   per rendered row, joined on the existing `(kind, name)` `PackageID`, never re-declared. A cold,
   empty or poisoned catalog costs decoration, never a row.
   Verify: `FAST --filter "InstalledFilter\|Filter"`.
