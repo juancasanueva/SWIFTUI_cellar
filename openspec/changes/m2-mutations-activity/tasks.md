@@ -365,7 +365,7 @@ Views own **no rules**: everything they read is a computed property proven in Ph
 
 ## Phase 9: Manual verification and gate
 
-- [ ] 9.1 **Manual verification (D12, for the surfaces that are untested by design).** Left
+- [x] 9.1 **Manual verification (D12, for the surfaces that are untested by design).** Left
   unchecked for the orchestrator. With the app running and brew present:
   (a) install a small formula **from Cellar** → one queue item, live streamed log, exactly one
   re-snapshot at the terminal outcome, the exact command visible and copyable;
@@ -378,6 +378,23 @@ Views own **no rules**: everything they read is a computed property proven in Ph
   Record each observation verbatim in the apply report. Do **not** exercise sudo-requiring casks or
   a real lock conflict: both are covered by probe #7097's captured strings, and neither is inside
   the consented mutation scope.
+
+  **Executed 2026-08-02 by the orchestrator** (Debug build at head `474fdb9`, live brew 6.0.14,
+  refreshes counted via a 0.2 s process monitor on `brew.rb info --installed` spawns; mutations
+  via a monitor on `brew.rb (install|uninstall|reinstall|upgrade|pin|unpin)` argv).
+
+  | Leg | Verdict | Evidence |
+  |---|---|---|
+  | (a) | **PASS** | "Copy install command" put `brew install --formula hello` on the clipboard verbatim; the UI-submitted mutation spawned argv `install --formula hello` matching character-for-character; the drawer shows the operation record with state Done, its log, and a per-row copy control; exactly one re-snapshot at the terminal outcome (21:43:54). One additional refresh ~3 s later (21:43:57) was the FSEvents watcher reacting to the mutation's own Cellar write whose signal arrived after `end()` — treated as an external change per shipped semantics; benign (single-flight absorbs), recorded as a follow-up observation, not a defect. |
+  | (b) | **PARTIAL** | Pending visibility PROVEN: with a mutation running, the second submission rendered as "1 queued" in the activity bar with a Cancel control (screenshot), and the process monitor proves FIFO serialization — the queued argv spawned only after the predecessor exited. Cancel-before-spawn was NOT completed manually: on this network every consented small-formula mutation completes in ~1–2 s, and three scripted attempts (calibrated coordinates, then AX-tree targeting — SwiftUI exposes the buttons with no AX titles) all lost the race. The behaviour is directly covered by the named unit tests for "a queued mutation cancelled before spawning resolves without spawning" (brew-execution scenario) and the OperationCenter pending-cancel tests. |
+  | (c) | **NOT RUN manually** | Same sub-second-window constraint. Covered by named package tests: SIGINT→SIGTERM escalation (M1, retained), the generic partial-state message, and the forced re-snapshot at every terminal outcome (OperationCenter suite). Residual risk: the rendered sentence itself was not observed live; recorded for the verify phase to weigh. |
+  | (d) | **PASS** | Three external Terminal uninstalls (kubernetes-cli 21:53:03, micro 21:53:10, hello 21:53:18) each produced **exactly one** debounced refresh (21:53:07 / 21:53:15 / 21:53:23; snapshot count 13→14→15→16), no streams — re-confirming the FSEvents adapter after the Phase 2 idempotency change. |
+
+  Additional observations: the uninstall menu item carries the confirmation ellipsis (Q2 visible in
+  the actions menu); duplicate submission of the same install is accepted and the duplicate runs to
+  a benign "already installed" outcome — a dedup guard is a possible nicety, noted as a follow-up;
+  the package-actions popup is an in-window overlay (automation note). Machine state fully restored:
+  hello unpinned and uninstalled, micro and kubernetes-cli uninstalled, nothing else touched.
 - [x] 9.2 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
   deleted), `FULL` green, `swiftlint` on changed files with new findings separated from the 11
   pre-existing ones. Every changed file **under 400 lines** — check `BrewRunner.swift` and
