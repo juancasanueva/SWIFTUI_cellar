@@ -139,6 +139,46 @@ struct InstalledRefreshTests {
         loop.cancel()
     }
 
+    /// The app attaches its watcher after launch, once detection has told it
+    /// which prefix to watch, so it forwards signals through this entry point
+    /// rather than through an observer handed to `run()`. Same debounce, same
+    /// suppression — proven here rather than assumed.
+    @Test("A directly reported change is debounced exactly like an observed one")
+    func directlyReportedChangesAreDebouncedToo() async {
+        let harness = harness(answers: [.formulae(["wget"])], withObserver: false)
+        let loop = Task { await harness.coordinator.run() }
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+
+        for _ in 0..<20 { harness.coordinator.changeDetected() }
+        await settle()
+        await harness.clock.waitForSleepers()
+        await passQuietWindow(harness.clock)
+
+        #expect(harness.source.callCount - baseline == 1)
+        loop.cancel()
+    }
+
+    @Test("A directly reported change during a mutation is suppressed too")
+    func directlyReportedChangesAreSuppressedDuringAMutation() async {
+        let harness = harness(answers: [.formulae(["wget"])], withObserver: false)
+        let loop = Task { await harness.coordinator.run() }
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+
+        harness.mutations.begin()
+        for _ in 0..<5 { harness.coordinator.changeDetected() }
+        await settle()
+        await passQuietWindow(harness.clock)
+
+        #expect(harness.source.callCount == baseline)
+        harness.mutations.end()
+        await settle()
+        await passQuietWindow(harness.clock)
+        #expect(harness.source.callCount - baseline == 1)
+        loop.cancel()
+    }
+
     // MARK: - Suppression during a mutation (II10 sc3)
 
     @Test("Signals during a Cellar mutation are suppressed and settled exactly once")

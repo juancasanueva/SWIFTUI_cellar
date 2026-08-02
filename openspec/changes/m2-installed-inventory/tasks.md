@@ -280,23 +280,23 @@ If cut, PR 2 base = PR 1 branch (feature-branch-chain).
 
 ## Phase 9: App wiring and UI (xcodebuild only, outside the `FAST` loop) — ≈ 520 lines
 
-- [ ] 9.1 `cellar.xcodeproj/project.pbxproj`: link the `BrewClient` product into the `cellar` target.
+- [x] 9.1 `cellar.xcodeproj/project.pbxproj`: link the `BrewClient` product into the `cellar` target.
   Verify: `xcodebuild build`.
-- [ ] 9.2 `cellar/cellarApp.swift`: hold `LoopOwner` as `@State` (App-level state outlives every
+- [x] 9.2 `cellar/cellarApp.swift`: hold `LoopOwner` as `@State` (App-level state outlives every
   scene), construct `InstalledStore` and `InstalledRefreshCoordinator`, and move both existing
   scene-owned loops to `loops.start("catalog") { … }` / `loops.start("installed") { … }` from
   `.task`. Wire `NSApplication.didBecomeActiveNotification` to the baseline refresh, mirroring the
   existing `brewDetection.refresh()` wiring. Closes M1 follow-ups #8 and #9.
-- [ ] 9.3 `cellar/ContentView.swift` + `cellar/Shell/AppSection.swift`: Installed sidebar section and
+- [x] 9.3 `cellar/ContentView.swift` + `cellar/Shell/AppSection.swift`: Installed sidebar section and
   detail routing.
-- [ ] 9.4 Create `cellar/Installed/{InstalledListView,InstalledFilterBar,InstalledRow,InstalledEmptyState}.swift`:
+- [x] 9.4 Create `cellar/Installed/{InstalledListView,InstalledFilterBar,InstalledRow,InstalledEmptyState}.swift`:
   the list, the dependency-only toggle (default off), badges, the **separate** self-updating section
   showing `hasNewerVersion` without an outdated badge, and the brew-absent read-only guidance state.
-- [ ] 9.5 `cellar/Browse/CatalogFilterBar.swift` + `cellar/Browse/BrowseView.swift`: the
+- [x] 9.5 `cellar/Browse/CatalogFilterBar.swift` + `cellar/Browse/BrowseView.swift`: the
   `InstalledFilterMode` picker bound to Phase 8's rule (view-side only), replacing the existing
   "deliberately absent" comment; `.disabled(true)` and forced to `all` when the store reports
   `.brewAbsent`.
-- [ ] 9.6 Integration checks via `FULL`: the Installed section renders empty guidance with brew
+- [x] 9.6 Integration checks via `FULL`: the Installed section renders empty guidance with brew
   absent, and the Browse mode picker is disabled there. Build-level only — **no new live-brew test**.
 
 ## Phase 10: Manual verification and gate

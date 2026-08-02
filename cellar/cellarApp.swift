@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import BrewClient
 import BrewProcess
 import Catalog
 import SwiftUI
@@ -21,25 +22,80 @@ struct cellarApp: App {
     /// this milestone stores anything a user could lose.
     @State private var catalog = CatalogStore(directory: CatalogStore.defaultDirectory())
 
+    /// What this machine has installed.
+    @State private var installed: InstalledStore
+    /// The seam M2-2 will drive while a Cellar-initiated mutation runs.
+    @State private var mutations: InstalledMutationGate
+    /// Owns cadence: launch, activation, and debounced external changes.
+    @State private var refresher: InstalledRefreshCoordinator
+
+    /// The app's long-lived loops.
+    ///
+    /// App-level state outlives every scene, so closing the window that started
+    /// Cellar no longer cancels the catalog refresh schedule or drops the sync
+    /// event subscription (M1 follow-ups #8 and #9).
+    @State private var loops = LoopOwner()
+
+    init() {
+        let installed = InstalledStore()
+        let mutations = InstalledMutationGate()
+        _installed = State(initialValue: installed)
+        _mutations = State(initialValue: mutations)
+        _refresher = State(
+            initialValue: InstalledRefreshCoordinator(store: installed, mutations: mutations)
+        )
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView(brewDetection: brewDetection, catalog: catalog)
+            ContentView(brewDetection: brewDetection, catalog: catalog, installed: installed)
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
                 // from a terminal while Cellar was in the background.
-                .task { await brewDetection.refresh() }
-                .task {
-                    let activations = NotificationCenter.default.notifications(
-                        named: NSApplication.didBecomeActiveNotification
-                    )
-                    for await _ in activations {
-                        await brewDetection.refresh()
-                    }
-                }
-                // Long-lived: `start()` loads the cache and then runs the
-                // refresh schedule for as long as the scene exists, so closing
-                // the window cancels the loop structurally.
-                .task { await catalog.start() }
+                .task { await refreshEverything() }
+                .task { await observeActivations() }
+                // Owned by `loops`, not by this scene: `start` is idempotent per
+                // id, so a second window joins rather than starting a second
+                // loop, and closing this one leaves both running.
+                .task { loops.start("catalog") { await catalog.start() } }
+                .task { loops.start("installed") { await refresher.run() } }
+                .task { loops.start("installed-watcher") { await watchInstalledRoots() } }
+        }
+    }
+
+    /// Detection first, then the inventory that depends on it.
+    @MainActor
+    private func refreshEverything() async {
+        await brewDetection.refresh()
+        await refresher.refresh(for: brewDetection.state)
+    }
+
+    @MainActor
+    private func observeActivations() async {
+        let activations = NotificationCenter.default.notifications(
+            named: NSApplication.didBecomeActiveNotification
+        )
+        for await _ in activations {
+            await refreshEverything()
+        }
+    }
+
+    /// Watches Homebrew's installation roots, once there is an installation to
+    /// watch, and forwards every signal to the coordinator's quiet window.
+    ///
+    /// The watcher is latency, not correctness: if the prefix appears after
+    /// launch this loop has already returned, and the activation refresh above
+    /// still keeps the inventory right (design D9).
+    @MainActor
+    private func watchInstalledRoots() async {
+        // Joins the launch evaluation rather than starting a second probe —
+        // detection's single flight is keyed by the configured path.
+        await brewDetection.refresh()
+        guard let installation = brewDetection.state.installation else { return }
+
+        let observer = FSEventsInstalledObserver(installation: installation)
+        for await _ in observer.changes() {
+            refresher.changeDetected()
         }
     }
 }

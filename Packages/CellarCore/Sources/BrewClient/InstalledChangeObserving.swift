@@ -137,6 +137,16 @@ public final class InstalledRefreshCoordinator {
 
     // MARK: - Debounce
 
+    /// Reports an external change from a source attached after `run()` started.
+    ///
+    /// The app cannot build its watcher until detection has told it which prefix
+    /// to watch, which is after this coordinator exists, so the watcher forwards
+    /// its signals here instead of being handed to `run()`. Identical treatment:
+    /// same quiet window, same suppression.
+    public func changeDetected() {
+        changeSignalled()
+    }
+
     private func changeSignalled() {
         // Our own writes. brew is mid-install; every one of these is noise, and
         // the terminal outcome will settle it once.

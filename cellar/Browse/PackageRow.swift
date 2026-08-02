@@ -3,6 +3,7 @@
 //  cellar
 //
 
+import BrewClient
 import Catalog
 import SwiftUI
 
@@ -11,17 +12,29 @@ import SwiftUI
 /// Deprecated and disabled packages stay in the list and carry a badge instead
 /// of disappearing: a user searching for a package that was just deprecated
 /// deserves to be told so, not to be told nothing (package-search PS4).
+///
+/// The row takes a `PackageEntry` rather than a `CatalogPackage` because a
+/// filtered list can contain a package this machine has installed that the
+/// catalog has never heard of — a third-party tap — and that row must render in
+/// full rather than vanish (installed-inventory II7).
 struct PackageRow: View {
-    let package: CatalogPackage
+    let entry: PackageEntry
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Text(package.displayName)
+                Text(entry.displayName)
                     .font(.body)
                     .lineLimit(1)
-                KindTag(kind: package.kind)
-                ForEach(package.badges, id: \.self) { badge in
+                KindTag(kind: entry.id.kind)
+                if entry.isInstalled {
+                    Label("Installed", systemImage: "checkmark.circle")
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.secondary)
+                        .help("Installed")
+                        .accessibilityLabel("Installed")
+                }
+                ForEach(entry.catalog?.badges ?? [], id: \.self) { badge in
                     Label(badge.label, systemImage: badge.systemImage)
                         .labelStyle(.iconOnly)
                         .foregroundStyle(.orange)
@@ -30,7 +43,7 @@ struct PackageRow: View {
                 }
                 Spacer(minLength: 0)
             }
-            if let desc = package.desc {
+            if let desc = entry.desc {
                 Text(desc)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -59,16 +72,15 @@ struct KindTag: View {
 }
 
 #Preview {
-    List {
-        PackageRow(
-            package: CatalogPackage(
-                kind: .formula, name: "wget", displayName: "wget",
-                desc: "Internet file retriever", homepage: nil, license: "GPL-3.0-or-later",
-                version: "1.25.0", tap: "homebrew/core", dependencies: [], buildDependencies: [],
-                dependents: [], caveats: nil, deprecated: false, deprecationReason: nil,
-                deprecationDate: nil, disabled: false, disableReason: nil, disableDate: nil,
-                autoUpdates: false, installCount365d: 1_234_567
-            )
-        )
+    let package = CatalogPackage(
+        kind: .formula, name: "wget", displayName: "wget",
+        desc: "Internet file retriever", homepage: nil, license: "GPL-3.0-or-later",
+        version: "1.25.0", tap: "homebrew/core", dependencies: [], buildDependencies: [],
+        dependents: [], caveats: nil, deprecated: false, deprecationReason: nil,
+        deprecationDate: nil, disabled: false, disableReason: nil, disableDate: nil,
+        autoUpdates: false, installCount365d: 1_234_567
+    )
+    return List {
+        PackageRow(entry: PackageEntry(installed: nil, catalog: package, id: package.id))
     }
 }

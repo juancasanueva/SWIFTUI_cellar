@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		BC0000010000000000000001 /* BrewProcess in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000003 /* BrewProcess */; };
 		BC0000010000000000000004 /* Catalog in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000005 /* Catalog */; };
+		BC0000010000000000000006 /* BrewClient in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000007 /* BrewClient */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +60,7 @@
 			files = (
 				BC0000010000000000000001 /* BrewProcess in Frameworks */,
 				BC0000010000000000000004 /* Catalog in Frameworks */,
+				BC0000010000000000000006 /* BrewClient in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,6 +123,7 @@
 			packageProductDependencies = (
 				BC0000010000000000000003 /* BrewProcess */,
 				BC0000010000000000000005 /* Catalog */,
+				BC0000010000000000000007 /* BrewClient */,
 			);
 			productName = cellar;
 			productReference = BCDBE97B301E2D410013A38D /* cellar.app */;
@@ -279,24 +282,6 @@
 			targetProxy = BCDBE995301E2D420013A38D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		BC0000010000000000000002 /* XCLocalSwiftPackageReference "Packages/CellarCore" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/CellarCore;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		BC0000010000000000000003 /* BrewProcess */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = BrewProcess;
-		};
-		BC0000010000000000000005 /* Catalog */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = Catalog;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BCDBE99C301E2D420013A38D /* Debug */ = {
@@ -603,6 +588,28 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		BC0000010000000000000002 /* XCLocalSwiftPackageReference "Packages/CellarCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CellarCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BC0000010000000000000003 /* BrewProcess */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BrewProcess;
+		};
+		BC0000010000000000000005 /* Catalog */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Catalog;
+		};
+		BC0000010000000000000007 /* BrewClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BrewClient;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BCDBE973301E2D410013A38D /* Project object */;
 }
