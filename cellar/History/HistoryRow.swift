@@ -58,10 +58,16 @@ struct HistoryRow: View {
         .padding(.vertical, 2)
     }
 
-    /// A grouped `upgradeAll` names no package, and the row says so rather than
-    /// rendering an empty gap.
+    /// What the entry acted on, read off `HistoryRecord.subject`.
+    ///
+    /// The rule is **not** "empty name means all packages": storage spells a
+    /// grouped `upgradeAll` and a service verb's null package identity the same
+    /// way, and only the verb separates them. Deciding here on the empty string
+    /// would title `brew services stop atuin` as "All packages" — the borrowed
+    /// identity IH1 forbids. The projection is proven in `swift test`
+    /// (`HistorySubjectTests`); this view owns no rule.
     private var title: String {
-        record.name.isEmpty ? "All packages" : record.name
+        record.subject.label
     }
 
     /// The stored outcome, spelled for a human. Read off `outcomeRaw`, which the

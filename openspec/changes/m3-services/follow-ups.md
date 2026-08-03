@@ -59,7 +59,7 @@ Guarded rather than trusted: task 17.2 asserts `rg 'isSettling|settleGrace'` ret
 | **`InstalledMutationGate` naming debt** — **new, from this slice** | The type now serves two domains under an installed-specific name. It was always a depth counter plus a `terminals` stream with nothing installed-specific in its body, so the services gate is a second *instance*, not a second type. Renaming it is public-API churn across test call sites and the app's composition root, and buys no behaviour | A rename in a slice that is already touching those call sites |
 | **U5 residual** — the exact stderr/exit signature of a rejected root-domain `launchctl bootstrap` | Unprobed, and not safely probeable on the dev machine. The classifier degrades correctly without it: a rejected bootstrap is a generic failure with its log verbatim, never a success and never a state change that did not happen. This is a **message-quality** gap, not a correctness gap | A live probe on a machine where a root-domain service can be rejected |
 | **`brew services info --json <name>` cost** — **new, from this slice** | Schema-verified from Homebrew source and cost-probed only via `--all` at n = 1 service. A per-service call could prove slower than measured | If it does: a cache. The fetch is already lazy and selection-keyed, so the mitigation is not a redesign |
-| **M2-2 #8** — carry `standardInput` through `ProcessSpec` | Still deferred. U5 answered the question that could have changed this verdict: a root-domain start does **not** hang, because brew never invokes sudo on that path, so stdin observability stays cosmetic | A recording seam that carries `standardInput`, if another family ever needs one |
+| **M2-2 #8** — carry `standardInput` through `ProcessSpec` | Still deferred, and **no longer load-bearing**. Batch 3 made the guarantee observable without it: `SystemProcessTests` spawns a real `/usr/bin/stat -f "%i %HT" /dev/fd/0` through `BrewRunner` + `SystemProcessLauncher` and compares the **child's own reported stdin inode** against `/dev/null`, on both the `.read` and the `.mutate` path. So SM7 sc3, PM4 sc2 and PM4 sc5 have runtime evidence at the real seam rather than at the fake one, `ProcessSpec` is unwidened, and `SystemProcess.swift` stays byte-unchanged against `main`. What #8 would still buy is observability at the **recording** seam, so a fake launcher could assert it too | A recording seam that carries `standardInput`, if another family ever needs one — the real-process test above covers the guarantee itself |
 | **M2-2 #10** — `skippedRecordCount` is never surfaced | Still deferred, and deliberately **not** solved for one decoder. This slice added a fourth tolerant decoder (`ServicesDecoder`), which strengthens the original reasoning rather than weakening it: the answer is one mechanism across all of them | One shared "what did we skip" surface, across every tolerant decoder at once |
 | **M3-0 VS2** — the equal-ordinal/equal-revision invariant is unstated | Untouched by this slice; it lives in `Catalog` | Assert it, or state it in the type |
 | **M3-0 (c)** — the app-target `reconcileOrder` expression is unproved | Untouched; folds into the VS3 ruling | The VS3 harness |
@@ -73,15 +73,30 @@ Guarded rather than trusted: task 17.2 asserts `rg 'isSettling|settleGrace'` ret
 | 15.2 | `openspec/specs/installation-history/spec.md`'s header was **checked and needed no edit** — it names no forced inventory re-snapshot. The only such phrase in that file is inside IH7's requirement text, which this slice's delta replaces in full, and inside IH3, which is untouched and still accurate. Recorded rather than silently skipped |
 | 1.5 (batch 1) | `openspec/changes/m3-services-cleanup-taps/explore.md:207-208` repeated the false claim that `HOMEBREW_COLOR=0` stops ANSI. Corrected |
 
-## One open discrepancy this slice did **not** resolve
+## The open discrepancy, now **closed** (batch 3, task 18.8)
 
 **The service verb vocabulary.** The shipped verbs are `serviceStart`, `serviceRun`, `serviceStop`
 and `serviceRestart`, per design D9 and task 13.4, namespaced so an IH5 search cannot collide with a
-package verb. The `installation-history` delta's IH1 sc5 text says a service operation records "its
+package verb. The `installation-history` delta's IH1 sc5 text said a service operation records "its
 own verb — `start`, `stop`, `restart`, `run`".
 
-Both readings satisfy every IH5 scenario, because the namespaced form still matches a case-insensitive
-`stop` substring search and the service's name is found through the argv either way. The
-implementation follows the design because the design states a reason and the delta text does not
-contradict it deliberately — but **the delta text needs reconciling to the shipped form**, and that
-is a spec edit this apply phase did not take on its own authority.
+`sdd-verify` adjudicated it (ADJUDICATION 1): **the code is right and the spec text was wrong.** The
+namespaced form satisfies every IH5 scenario by case-insensitive substring, a bare `run` or `start`
+entering a vocabulary that already holds `install`/`upgrade`/`pin` would leave the user unable to tell
+which family they matched, and `ServiceCommandTests > eachVerbRecordsUnderItsOwnName` already asserts
+`Set(verbs).isDisjoint(with: packageVerbs)` precisely to protect IH5. The delta text was amended to
+the namespaced spellings, with the reason stated in IH1's body. **No code changed.**
+
+## Registered by batch 3, from the verify report, and deliberately not fixed in it
+
+The remediation batch was scoped to the CRITICAL, the two HIGHs and the stale text. These are the
+findings it deliberately left alone rather than widening a remediation into a second feature slice.
+
+| Item | Why it is open | What would close it |
+|---|---|---|
+| **MEDIUM 1** — SM12's three scenarios are the thinnest-covered requirement in the slice | The properties hold structurally (`InstalledModels.swift` and `Sources/Catalog/` are byte-unchanged; `ServicesStore` never reads `InstalledStore`), and the catalog-filter half is already pinned by an exhaustive equality. What is missing is a test that *enumerates* the installed projection's fields and one that drives a deliberate name collision | Two tests in the existing `InstalledFilterFavoritesTests` idiom — cheap, and worth doing in the next slice that touches either surface |
+| **MEDIUM 2** — `ServiceDetailView` reports a **failed** detail probe as "No service selected" | The same shape as HIGH 1 with a smaller blast radius: `ServicesStore.select` swallows a failed `services info --json <name>` into `detail = nil` while `selected` stays set, and the view branches on `detail != nil` only. `selected` is already `public`, so the view has everything it needs to say the truth | The HIGH 1 treatment applied again: a projection over (`selected`, `detail`, the probe's outcome) in `ServicesPresentation`, plus a `ServiceDetailView` switch. It needs the store to *keep* the failure reason, which HIGH 1 did not require |
+| **MEDIUM 3** — the services list is probed once per launch and once per activation even when Services has never been shown | Not a scenario violation: SM3 forbids *polling* while not visible and separately mandates a baseline on becoming visible, and `InstalledRefreshCoordinator` behaves the same way. But it contradicts SM3's own headline and the design's "zero cost while hidden" framing | A deliberate decision, either way: gate the baseline on visibility too, or state in SM3 that a launch/activation baseline is permitted regardless. MV-2(c) is the check that observes it |
+| **MEDIUM 4** — closing one of two windows stops the poll while another window still shows Services | `setVisible` is one shared boolean on an app-lifetime coordinator driven by every `ServicesListView.onDisappear`. SM3 sc3 only requires that never *more than one* loop runs, which still holds. A visibility-refcount gap, not a leak | A refcount or a per-scene identity on the coordinator's visibility input |
+| **LOW 3** — the row's Copy-command control always copies `brew services start <name>` | Defensible as a default, but the label says "Copy command" without saying which one | Either label it "Copy start command" or derive it from the service's current status |
+| **SUGGESTION** — `ServicesListView` passes a redundant `.tag(service.id)` inside `List(_:selection:)` | Harmless; `List` already derives the tag from `Identifiable` | Delete the modifier |

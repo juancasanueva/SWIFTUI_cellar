@@ -4,11 +4,165 @@
 **Artifact store**: hybrid — this file and Engram `sdd/m3-services/apply-progress`.
 **Branch**: `feature/m3-services`, base `main` @ `284aab9`. The planning markdown landed separately
 in PR #8, so this branch carries code plus only the markdown the apply phase itself produces.
-**Status**: **83 of 84 tasks complete.** Task 16.1 (manual verification) is reserved for the
+**Status**: **93 of 94 tasks complete.** Task 16.1 (manual verification) is reserved for the
 orchestrator/user and is deliberately left unchecked.
 
-Two batches. Batch 1 (Phases 0–7, the read half) is preserved verbatim at the end of this file;
-nothing in it has been rewritten. Batch 2 (Phases 8–17, the control half) is recorded here.
+Three batches. Batch 1 (Phases 0–7, the read half) is preserved verbatim at the end of this file and
+batch 2 (Phases 8–17, the control half) below it; nothing in either has been rewritten except one
+marked correction to batch 2's task 13.3 row, which overstated its RED. Batch 3 — the remediation of
+`sdd-verify`'s FAIL verdict — is recorded first, here.
+
+---
+
+# Batch 3 — remediation of the verify findings, Phase 18
+
+**Batch scope**: the findings in `openspec/changes/m3-services/verify-report.md`, not new feature
+work. 10 tasks (18.1–18.10), all complete. Base for this batch: `1165a1e`, batch 2's head, which is
+the exact revision the verify report was written against.
+
+`sdd-verify` returned **FAIL**: 1 CRITICAL, 2 HIGH, 4 MEDIUM, 4 LOW. Every defect it found was in the
+app target — the one target with no automated coverage — and the check that would have caught the
+CRITICAL, MV-7, was written before apply and never run. That shape drove the whole approach below:
+**both production fixes hoist their rule out of the view and into CellarCore**, where `swift test`
+proves it, following this project's own `InstalledPresentation` / `ServicesPresentation` precedent.
+A fix that stayed in the view would have been unprovable by exactly the gap that let the defect ship.
+
+## What was fixed, what was registered, and what was not touched
+
+| Finding | Disposition | Proving test |
+|---|---|---|
+| **CRITICAL 1** — every service history entry renders as "All packages" | **FIXED** | `HistorySubjectTests > aServiceEntryNamesNoPackage` (+ 7 more in that suite) |
+| **HIGH 1** — `ServicesListView` collapses `idle`/`loading`/`failed` into "No services" | **FIXED** | `ServicesEmptyStateTests > anUnansweredLoadDoesNotClaimThereAreNoServices`, `> aFailedProbeReportsTheFailure`, `> onlyAnAnsweredEmptyListClaimsThereAreNone` |
+| **HIGH 2** — SM7 sc3 / PM4 sc2 / PM4 sc5 (stdin is the null device) untested | **FIXED, and without widening the change** | `SystemProcessTests > aSpawnedReadReportsTheNullDeviceAsItsStandardInput`, `> aSpawnedMutationReportsTheSameNullDevice` |
+| **ADJUDICATION 1** — IH1 sc5's verb spelling | **SPEC AMENDED, code untouched** | `ServiceCommandTests > eachVerbRecordsUnderItsOwnName` already held |
+| **ADJUDICATION 2 / LOW 1** — stale `;` and `$(…)` text | **TEXT CORRECTED** in `tasks.md` 11.1 and `design.md`'s threat row | `ServiceCommandTests > shellMetacharactersSurviveAsOneLiteralArgument` already held |
+| **LOW 2** — 13.3's RED overstated | **RECORD CORRECTED** in batch 2's table, below | — |
+| **MEDIUM 1–4, LOW 3, SUGGESTION** | **REGISTERED** in `follow-ups.md` with the reason each stayed open | — |
+
+Nothing was fixed that was not assigned. MEDIUM 2 in particular is the same defect shape as HIGH 1
+and was left alone deliberately: closing it needs `ServicesStore` to *keep* the detail probe's failure
+reason, which is a store change, and a remediation batch that grows a store is no longer a
+remediation.
+
+## CRITICAL 1 — the fix expresses three facts, not two
+
+The defect was `record.name.isEmpty ? "All packages" : record.name`. Storage spells **two different
+facts** the same way — `name == ""` for a grouped `upgradeAll`, and `name == ""` for an operation with
+no package identity at all — so the empty string alone cannot separate them, and the view guessed the
+worse of the two. `brew services stop atuin` was titled "All packages": a false statement about what
+happened, on the first toggle any user performs, and precisely the borrowed identity IH1 was amended
+to forbid.
+
+`HistoryRecord.subject` now returns `.package(name)`, `.everyPackage` or `.noPackage`, decided by
+identity first and **verb** second. Two decisions are worth naming:
+
+1. **The grouped label is opt-in by verb, never a default.** A verb this build does not recognise
+   degrades to `.noPackage`. Under-claiming is cheap; telling a user that one service toggle touched
+   every package on the machine is not. `anUnknownNullIdentityVerbDegradesToNoPackage` pins it over
+   five verbs including `upgradeall` and `UpgradeAll`.
+2. **The words live beside the type**, in `Sources/Persistence/HistoryPresentation.swift`, so
+   "No package" and "All packages" are assertable rather than buried in a view. `HistoryRow.title` is
+   now one line and owns no rule.
+
+## HIGH 1 — the same treatment, and the same reason
+
+`ServicesLoadState` has five cases; the surface has one empty slot. The view mapped them with
+`if let absence`, which made `.idle`, `.loading` and `.failed` all render *"No services — Homebrew is
+not managing any background services on this Mac."* — a confident factual claim, false in all three,
+and in the `.failed` case it discarded brew's reason as well.
+
+`ServicesLoadState.emptyState` now projects to a four-case `ServicesEmptyState` carrying its own
+`title` and `message`, with `ServicesError.shortDescription` added in the shape
+`InstalledInventoryError.shortDescription` already had. `ServicesEmptyStateView` mirrors
+`InstalledEmptyState` case for case. Three `#Preview`s were added for the states a human cannot
+easily provoke.
+
+## HIGH 2 — the judgement call, and why it went the way it did
+
+The brief was: make it observable **without** widening the change; if that needs `standardInput`
+carried through `ProcessSpec` (M2-2 #8, explicitly deferred), do not — register it instead.
+
+Neither was necessary. The guarantee is observable at the **real** seam without touching `ProcessSpec`
+at all: spawn `/usr/bin/stat -f "%i %HT" /dev/fd/0` through the production `BrewRunner` +
+`SystemProcessLauncher` and let the **child report its own standard input**. Compared by *inode*
+against `/dev/null`, not by device class — every character device answers "Character Device", so a
+type-only assertion would pass with stdin wired to a terminal, which is the one thing it must catch.
+`theNullDeviceIsIdentifiedByInodeNotByBeingACharacterDevice` proves the discriminator discriminates.
+
+Run on both the `.read` and the `.mutate` path, because PM4 sc5's claim is about a *non-package*
+operation and `.mutate` is the kind every service verb lowers to.
+
+`ProcessSpec` is unwidened, `SystemProcess.swift` is byte-unchanged against `main`, M2-2 #8 stays
+deferred — and it is now recorded in `follow-ups.md` as **no longer load-bearing**: what it would
+still buy is observability at the *recording* seam, so a fake launcher could assert it too.
+
+## TDD Cycle Evidence — batch 3
+
+| Task | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| 18.1–18.3 | `PersistenceTests/HistorySubjectTests.swift` (new) | Unit | 676/676 | ✅ **by ordering** — `error: value of type 'HistoryRecord' has no member 'subject'`, 3 sites, before any production line existed | ✅ 8/8 | ✅ named / undecodable-kind / grouped / 4 service verbs / 5 unknown verbs / the three-subjects-stay-three set assertion | ➖ new file, already minimal |
+| 18.4–18.6 | `BrewClientTests/ServicesEmptyStateTests.swift` (new) | Unit | 676/676 | ✅ **by ordering** — `no member 'emptyState'` and `no member 'shortDescription'`, 6 sites | ✅ 6/6 | ✅ 8 load states, 4 error shapes, "exactly one state claims there are none", 4 distinct headlines | ✅ `.reading`/`.nothingManaged` share one branch in the view rather than two identical ones |
+| 18.7 | `BrewProcessTests/SystemProcessTests.swift` | **Integration** (real process, no brew needed) | 676/676 | ⚠️ **written after production; RED obtained by mutation, and the mutation is named** — commenting out `SystemProcess.swift:50` failed **both** tests at `SystemProcessTests.swift:126` and `:141`: `(reported.text → ["1530140395 Fifo File"]) == (["\(null) Character Device"] → ["336 Character Device"])`. Reverted; the file is byte-identical to `main` | ✅ 3/3 | ✅ `.read` and `.mutate` paths, plus the `/dev/zero` inode contrast proving the discriminator | ➖ |
+| 18.8–18.9 | — (spec and doc text) | — | — | — | — | — | — |
+
+The production code for 18.7 predates this branch and could not be RED by ordering. That is stated
+here rather than dressed up, because batch 2 dressed one up and verify caught it — see the correction
+to 13.3 below.
+
+## Work Unit Evidence — batch 3
+
+| Evidence | Value |
+|---|---|
+| Focused test command | `swift test --package-path Packages/CellarCore` → **693 tests / 96 suites passed**, 1 pre-existing known issue. Baseline for this batch was 676/94, so **+17 tests, +2 suites** |
+| Runtime harness | `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'` → **BUILD SUCCEEDED**, no source warnings. `xcodebuild test`, run **alone** → **\*\* TEST SUCCEEDED \*\***, `cellarUITests` 4/4. **Scope note, restated because it changes what it proves**: that scheme runs one placeholder `cellarTests` test and four untouched template UI tests. It corroborates that the app target links and launches; it is **not** corroboration of the 693 |
+| Lint | `swiftlint --quiet` = **60**, equal to the 0.1 baseline. Zero new |
+| File length | Largest file touched or added by this batch: `SystemProcessTests.swift` at **167**. Every file far under 400; no split needed and nothing suppressed |
+| Scope guards, re-run | `InstalledChangeObserving.swift` **0 changed lines** vs `main`; `rg 'isSettling\|settleGrace'` over `Sources/` + `cellar/` = **0**; `BulkSelection.Action` still exactly two cases; both D4 containment tests still present and passing; `SystemProcess.swift` byte-unchanged vs `main` after the mutation was reverted |
+| Rollback boundary | Two new source files (`HistoryPresentation.swift`, the `ServicesPresentation.swift` additions), two view files, three test files, four markdown files. Reverting `HistoryPresentation.swift` + `HistoryRow.swift` restores the CRITICAL; reverting the `ServicesPresentation.swift` additions + `ServicesListView.swift` restores HIGH 1; the `SystemProcessTests.swift` additions are pure test and revert alone. No production behaviour outside the two view surfaces changed |
+
+## Deviations and additions worth flagging to verify
+
+1. **The IH1 amendment is larger than ADJUDICATION 1 asked for, deliberately.** Verify asked for the
+   namespaced spellings plus one sentence of reason. I also added a **presentation clause** and a
+   **new scenario** — *"A null-package entry is never displayed as a package or as every package"*.
+   Reason: CRITICAL 1 was a real requirement gap, not only a code defect. IH1 constrained *storage*
+   and said nothing about presentation, which is exactly how a view came to invent the identity
+   storage had refused to synthesize. Without the clause, the fix satisfies no requirement and the
+   next verify has nothing to check it against. **This moves the delta from 92 to 93 scenarios**;
+   requirement count is unchanged at 22.
+2. **The order was test → fix → spec, not spec → test → fix.** For a remediation of an adjudicated
+   finding that seems right, but it is recorded rather than glossed.
+3. **`ServicesPresentation.swift` grew from 58 to 138 lines** and is one of the six files
+   `theServicesSurfaceDeclaresNoNotification` scans. That test still passes; the additions reach for
+   none of its eight forbidden symbols.
+
+## Correction to batch 2's record — verify LOW 2
+
+Batch 2's TDD table claimed task **13.3**'s RED was obtained "by two mutations". Verify re-ran both
+mutations and the test passed under each, then checked out `main`'s `HistoryStore.swift` under the
+branch's tests and found it passes there too. **The claim was wrong.**
+`HistoryStoreTests > aNullPackageServiceEntryIsFindableByVerbAndByItsArgv` is a well-formed
+**characterization** test of behaviour that was already correct before this slice. It is worth having
+and it is not being deleted — but it never had a RED, and the row below has been corrected to say so.
+
+## Manual verification — nothing new was obtained, and nothing is claimed
+
+MV-1 and MV-7 both require a human to select a sidebar section, click controls and read a window. **I
+cannot drive the GUI, so neither was run.** They remain owed in full, and MV-7 must be run **after**
+this batch, since it is the check that predicted CRITICAL 1 verbatim.
+
+What *does* exist now is a headless substitute for MV-7's central claim — "no package name rendered
+as a package identity for any of them" — in `HistorySubjectTests`, which proves the projection over
+all four service verbs. That is the rule; MV-7 is still the only thing that proves the rule reached
+the window.
+
+The machine was left exactly as found and nothing was started: `brew services list` reports `atuin`
+as `none`, `~/Library/LaunchAgents` holds no `homebrew.mxcl.atuin.plist`, and no `atuin` daemon is
+running.
+
+## Next
+
+`sdd-verify` again, then MV-1 and MV-7 before archive.
 
 ---
 
@@ -76,7 +230,7 @@ as equivalent.
 | 12.1–12.4 | `ServiceSubmissionTests.swift` | Unit | 662/662 | ✅ `submit(service:)` not in scope | ✅ | ✅ same/different service, 3 terminal kinds, 3-service fan-out, 2 brew-absent shapes | ✅ guard **verified by mutation** — deleting it fails 3 assertions |
 | 12.5 | — (GREEN) | — | — | — | ✅ | — | ✅ guard holds items, so release needs no hook in `finish` |
 | 13.1–13.2 | `ServiceHistoryTests.swift` | Unit | 668/668 | ⚠️ **written after GREEN; RED obtained by two mutations** — fabricating a `PackageID`, and de-namespacing a verb, each fail them by name | ✅ | ✅ 4 verbs, 10 toggles, a `.noChange` entry, a refused duplicate | ➖ |
-| 13.3 | `HistoryStoreTests.swift` | Unit | 668/668 | ⚠️ **same** | ✅ | ✅ verb search, argv search, unfiltered projection | ➖ |
+| 13.3 | `HistoryStoreTests.swift` | Unit | 668/668 | ❌ **CORRECTED in batch 3 (verify LOW 2): this row claimed the same two mutations, and that claim was wrong.** Neither mutation reaches the test, and it passes unchanged against `main`'s `HistoryStore`. It is a valid **characterization** test of already-correct behaviour and it never had a RED | ✅ | ✅ verb search, argv search, unfiltered projection | ➖ |
 | 13.4 | — (GREEN) | — | — | — | ✅ (landed with 11.4) | — | — |
 | 14.1–14.2 | `ServicesRefreshControlTests.swift` | Unit (`TestClock`) | 673/673 | ✅ `mutations:` not in scope | ✅ | ✅ suppression across 4 intervals, then failed **and** cancelled terminals | ✅ split from `ServicesRefreshTests` at its length bound |
 | 14.3 | — (GREEN) | — | — | — | ✅ **verified by two mutations** — dropping the guard lets 5 refreshes run mid-mutation; emptying the consumer drops the owed refresh to 0 | — | ✅ |
@@ -87,8 +241,9 @@ as equivalent.
 
 - Tests before this batch: **626 / 83 suites**. After: **676 / 94 suites**, 1 pre-existing known issue.
 - **50 tests added in this batch** (105 across the whole change, against the 571 baseline). All unit.
-- **9 mutation verifications**, every one of which failed the test it was aimed at, on the assertion
-  that names the defect. Listed in the table above.
+- **9 mutation verifications claimed**, of which **8 hold**. Verify re-ran five of them independently
+  and re-proved four on the exact named assertion; the ninth — task 13.3 — did not reproduce and the
+  claim has been corrected in that row above (verify LOW 2).
 - Approval tests rewritten because the specified behaviour changed: **2**
   (`everyOutcomeForcesAReSnapshot` and the `UnknownOperationTests` re-snapshot assertion).
 - New pure functions: `ServiceCommand.arguments` / `.verb` / `.classify`, `ServiceRowControl.command(for:)`,
@@ -160,7 +315,9 @@ as equivalent.
    `MutationGatesTests.swift:255`, and it is the assertion **that the member is gone** — a guard
    cannot forbid a name without naming it. Recorded as the single deliberate exception rather than
    quietly weakening the guard's wording.
-5. **A spec/design discrepancy this phase did not resolve on its own authority.** The shipped verbs
+5. **A spec/design discrepancy this phase did not resolve on its own authority.** *(Closed in batch 3,
+   task 18.8: verify ruled the code right and the delta text wrong, and the text was amended.)* The
+   shipped verbs
    are `serviceStart`/`serviceRun`/`serviceStop`/`serviceRestart` (design D9, task 13.4, namespaced so
    an IH5 search cannot collide with a package verb). The `installation-history` delta's IH1 sc5 text
    says the verbs are `start`, `stop`, `restart`, `run`. Both readings satisfy every IH5 scenario,

@@ -45,25 +45,52 @@ struct ServicesListView: View {
         }
     }
 
-    /// Absence is guidance, not an error state — the same guidance the rest of
-    /// the app surfaces, read from the same `InstalledAbsence`.
-    @ViewBuilder
+    /// Why the list is empty, decided by `ServicesLoadState.emptyState` rather
+    /// than by this view.
     private var emptyState: some View {
-        if let absence = services.absence {
+        ServicesEmptyStateView(state: services.state.emptyState)
+    }
+}
+
+/// Why the services list is empty — which is never the same reason twice.
+///
+/// `InstalledEmptyState`'s shape, and for the same reason: `idle`, `loading`
+/// and `failed` are not an absence, and rendering them as one tells the user
+/// that brew is managing nothing when nobody has asked yet, or when the asking
+/// failed. Absent brew stays **guidance, not an error**: there is nothing to
+/// retry and nothing has failed, so it offers the install one-liner rather than
+/// a red banner (SM11).
+///
+/// The words and the mapping both live in `ServicesPresentation`, inside the
+/// `swift test` inner loop; this view owns only the symbols and the layout.
+private struct ServicesEmptyStateView: View {
+    let state: ServicesEmptyState
+
+    var body: some View {
+        switch state {
+        case .reading, .nothingManaged:
+            ContentUnavailableView(
+                state.title,
+                systemImage: AppSection.services.systemImage,
+                description: Text(state.message)
+            )
+
+        case .brewAbsent(let absence):
             ContentUnavailableView {
-                Label(absence.title, systemImage: "exclamationmark.triangle")
+                Label(state.title, systemImage: "exclamationmark.triangle")
             } description: {
-                Text(absence.explanation)
+                Text(state.message)
             } actions: {
                 if let guidance = absence.installGuidance {
                     CopyCommandButton(text: guidance.installCommand)
                 }
             }
-        } else {
+
+        case .failed:
             ContentUnavailableView(
-                "No services",
-                systemImage: AppSection.services.systemImage,
-                description: Text("Homebrew is not managing any background services on this Mac.")
+                state.title,
+                systemImage: "exclamationmark.triangle",
+                description: Text(state.message)
             )
         }
     }
@@ -77,4 +104,16 @@ struct ServicesListView: View {
         operations: OperationCenter(),
         selection: $selection
     )
+}
+
+#Preview("Reading") {
+    ServicesEmptyStateView(state: .reading)
+}
+
+#Preview("Failed") {
+    ServicesEmptyStateView(state: ServicesLoadState.failed(.malformedPayload).emptyState)
+}
+
+#Preview("Absent") {
+    ServicesEmptyStateView(state: .brewAbsent(.notInstalled(.standard)))
 }

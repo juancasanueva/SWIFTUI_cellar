@@ -402,10 +402,20 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 - [x] 11.1 **RED** `Tests/BrewClientTests/ServiceCommandTests.swift` (new) —
       `anUnsafeServiceNameIsRejectedAtConstructionAndBuildsNoArgv`, parameterized over a name with a
-      leading `-`, an empty name, whitespace, `;`, `$(…)` and a name equal to `--all`. Each rejected
-      at construction, **no argv built**. — threat matrix, *Subprocess argument composition*.
-      `ServiceTarget` is expressed over `MutationName.isSafe` (`MutationCommand.swift:104`) exactly as
-      `PackageTarget` is; that stays the single gate.
+      leading `-`, an empty name, whitespace and a name equal to `--all`. Each rejected at
+      construction, **no argv built**; `legitimateServiceNamesAreAccepted` stops the gate passing
+      vacuously. — threat matrix, *Subprocess argument composition*. `ServiceTarget` is expressed over
+      `MutationName.isSafe` (`MutationCommand.swift:104`) exactly as `PackageTarget` is; that stays
+      the single gate.
+      **Corrected during remediation — this task originally also required `;` and `$(…)` to be
+      rejected at construction, and they are not.** `MutationName.isSafe` is exactly
+      "non-empty, no leading `-`, no whitespace", the `package-mutation` delta says PM9 is untouched,
+      and widening the shared gate would change package construction rules the delta explicitly
+      preserves. No spec scenario requires the rejection. The guarantee that actually protects the
+      user is covered instead by `shellMetacharactersSurviveAsOneLiteralArgument`, which drives
+      `$(whoami)`, `atuin;rm`, `` `id` ``, `a|b`, `a&b` and `a>b` through the **real** `BrewRunner`
+      and process seam and asserts `spec.arguments == ["services","stop",name]` — argv is a vector and
+      no shell exists. See verify ADJUDICATION 2.
 - [x] 11.2 **RED** same file — `eachVerbProducesItsExactArgv` (`services start atuin`,
       `services stop atuin`, `services restart atuin`, `services run atuin`);
       `noServiceArgvEverContainsAll`; `killAndStopKeepAreNotOffered`. — SM4 sc 1–3.
@@ -755,7 +765,61 @@ If the split is taken, exactly four things must move with it — nothing else:
       start from 45–55 lines per test, not 20–25. Batch 2 alone (Phases 8–17) measured
       **40 files, +3,510 / −176**.
 
+## Phase 18: Remediation of the verify findings — added after `sdd-verify` returned FAIL
+
+Added during batch 3. Every task here answers a numbered finding in
+`openspec/changes/m3-services/verify-report.md`; nothing here is new feature work. Strict TDD applies
+unchanged, and the two production defects both live in the app target — the one target with no
+automated coverage — so each fix hoists its rule into CellarCore where `swift test` can prove it,
+following the project's own `InstalledPresentation` / `ServicesPresentation` precedent.
+
+- [x] 18.1 **RED** `Tests/PersistenceTests/HistorySubjectTests.swift` (new) — `HistoryRecord.subject`
+      is three facts, not two: `.package(name)`, `.everyPackage`, `.noPackage`. Four service verbs
+      read off `ServiceCommand.allVerbs(for:)` must each be `.noPackage` and never `.everyPackage`;
+      the grouped verb's durable spelling is pinned; an unrecognised null-identity verb degrades to
+      `.noPackage`. — **CRITICAL 1**, `installation-history` IH1 sc *"A null-package entry is never
+      displayed as a package or as every package"*.
+- [x] 18.2 **GREEN** `Sources/Persistence/HistoryPresentation.swift` (new) — `HistoryRecord.Subject`
+      and `subject`, decided by identity first and **verb** second. The grouped label is opt-in by
+      `MutationCommand.upgradeAll.verb`, never a default.
+- [x] 18.3 **GREEN** `cellar/History/HistoryRow.swift` — `title` reads `record.subject.label`. The
+      view owns no rule. Replaces `record.name.isEmpty ? "All packages" : record.name`, which titled
+      every service entry "All packages".
+- [x] 18.4 **RED** `Tests/BrewClientTests/ServicesEmptyStateTests.swift` (new) —
+      `ServicesLoadState.emptyState` maps all five cases; `.idle`/`.loading` are `.reading`, `.failed`
+      carries `ServicesError.shortDescription`, and **exactly one** of the eight probed states claims
+      there are no services. — **HIGH 1**.
+- [x] 18.5 **GREEN** `Sources/BrewClient/ServicesPresentation.swift` — `ServicesError.shortDescription`
+      (mirroring `InstalledInventoryError`'s), `ServicesEmptyState` with its `title`/`message`, and
+      the total `ServicesLoadState.emptyState` mapping.
+- [x] 18.6 **GREEN** `cellar/Services/ServicesListView.swift` — private `ServicesEmptyStateView`
+      switching the four projected cases, mirroring `InstalledEmptyState`. Three previews added so
+      the states a human cannot easily provoke are still inspectable.
+- [x] 18.7 **RED (by mutation, named)** `Tests/BrewProcessTests/SystemProcessTests.swift` — a real
+      `/usr/bin/stat -f "%i %HT" /dev/fd/0` spawned through `BrewRunner` + `SystemProcessLauncher`
+      makes the **child report its own standard input**, compared by inode against `/dev/null`, on
+      both the `.read` and the `.mutate` path. — **HIGH 2**, `service-management` SM7 sc3,
+      `package-mutation` PM4 sc2 and sc5. Production is byte-unchanged, so RED could only come by
+      mutation: commenting out `SystemProcess.swift:50`
+      (`process.standardInput = FileHandle.nullDevice`) failed both tests on the naming assertion —
+      `(reported.text → ["1530140395 Fifo File"]) == ["336 Character Device"]` — and the mutation was
+      reverted, leaving the file byte-identical to `main`. **No `ProcessSpec` change; M2-2 #8 stays
+      deferred.**
+- [x] 18.8 **Spec amendment.** `specs/installation-history/spec.md` IH1: verbs restated as
+      `serviceStart`/`serviceStop`/`serviceRestart`/`serviceRun` in the requirement body and in sc5,
+      with the namespacing reason stated; a new presentation clause and scenario forbidding a
+      null-package entry from being rendered as a package or as every package. — verify
+      ADJUDICATION 1 plus CRITICAL 1. **The code was right; the spec text was wrong.**
+- [x] 18.9 **Residual text.** Task 11.1 above and `design.md`'s *Subprocess argument composition*
+      threat row corrected: `;` and `$(…)` are **not** rejected at construction, must not be, and are
+      neutralised structurally instead. — verify ADJUDICATION 2 / LOW 1.
+- [x] 18.10 **Full gate, re-run.** `swift test --package-path Packages/CellarCore` → **693 tests /
+      96 suites**, 1 pre-existing known issue. `xcodebuild build` → BUILD SUCCEEDED.
+      `xcodebuild test` (run alone) → TEST SUCCEEDED. `swiftlint --quiet` = **60**, equal to the 0.1
+      baseline, zero new. Largest touched file 167 lines. `InstalledChangeObserving.swift` still
+      0 changed lines; `BulkSelection.Action` still two cases; both D4 containment anchors still bite.
+
 ---
 
-**Counts.** 84 tasks across 18 phases; 44 RED tasks, 12 pre-written manual checks, 15 work-unit
-commits. Split boundary after Phase 7 / commit 7.
+**Counts.** 94 tasks across 19 phases (84 across 0–17, plus Phase 18's 10 remediation tasks); 47 RED
+tasks, 12 pre-written manual checks, 15 work-unit commits. Split boundary after Phase 7 / commit 7.
