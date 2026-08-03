@@ -486,20 +486,20 @@ If the split is taken, exactly four things must move with it — nothing else:
 > deterministic timestamp — the claims are "exactly N entries", "null package identity", "typed verb"
 > and "exact argv". Do not add the seam speculatively; it stays open on the register (task 15.4).
 
-- [ ] 13.1 **RED** `Tests/BrewClientTests/ServiceHistoryTests.swift` (new), over
+- [x] 13.1 **RED** `Tests/BrewClientTests/ServiceHistoryTests.swift` (new), over
       `Tests/BrewClientTests/Fakes/OperationCenterHarness.swift` —
       `eachServiceVerbWritesOneEntryWithANullPackageIdentity`: four operations → exactly four entries,
       each with its own verb, its outcome and its exact argv; every one carrying a **null** package
       identity, no version-from, no version-to, and none storing `atuin` as a package identity. —
       IH1 sc 5, OA6 sc *"An operation with no package identity records exactly one entry"*.
-- [ ] 13.2 **RED** same file — `repeatedTogglingAppendsOneEntryPerOperation`: five start/stop pairs →
+- [x] 13.2 **RED** same file — `repeatedTogglingAppendsOneEntryPerOperation`: five start/stop pairs →
       exactly ten entries in submission order, nothing collapsed, deduplicated or netted out. — IH1
       sc 6. The chatty-history cost is accepted and recorded (ruling #7180 a), not papered over.
-- [ ] 13.3 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
+- [x] 13.3 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
       `aNullPackageServiceEntryIsFindableByVerbAndByItsArgv`: searching `STOP` and then `atuin` each
       returns only the service entry, and it is present in the unfiltered newest-first projection. —
       IH5 sc 5.
-- [ ] 13.4 **GREEN** the verb vocabulary — `verb` = `"serviceStart" | "serviceRun" | "serviceStop" |
+- [x] 13.4 **GREEN** the verb vocabulary — `verb` = `"serviceStart" | "serviceRun" | "serviceStop" |
       "serviceRestart"`, camelCase on the `upgradeAll` precedent and **namespaced** so an IH5 search
       for "start" cannot collide with a package verb. Update `Sources/BrewClient/HistoryRecording.swift`
       and `Sources/Persistence/SwiftDataHistoryRecorder.swift` for the null-package draft form.

@@ -90,6 +90,63 @@ struct HistoryStoreTests {
         #expect(store.records.first?.commandText == "upgrade --cask iterm2")
     }
 
+    // MARK: - IH5 sc5 — a null-package entry stays listed and matchable
+
+    /// A service operation stores **no** package identity, so the ordinary
+    /// name-matching path cannot reach it. IH5 requires that it stays in the
+    /// projection anyway and stays findable — by its verb, and by the argv,
+    /// which is where the subject's name actually lives.
+    ///
+    /// The stored verb is namespaced (`serviceStop`), so a search for `STOP`
+    /// still reaches it by substring while a future package verb called `start`
+    /// could not collide with it.
+    @Test("A null-package service entry is findable by verb and by its argv")
+    func aNullPackageServiceEntryIsFindableByVerbAndByItsArgv() throws {
+        let (container, store) = try Self.seeded()
+        let argv = ["services", "stop", "atuin"]
+        container.mainContext.insert(
+            HistoryEntry(
+                id: UUID(),
+                date: Date(timeIntervalSince1970: 4_000),
+                // Absence is the empty string in V1 — this is the null identity.
+                kindRaw: "",
+                name: "",
+                verb: "serviceStop",
+                versionFrom: "",
+                versionTo: "",
+                outcomeRaw: "succeeded",
+                exitStatus: 0,
+                argv: argv,
+                commandText: argv.joined(separator: " ")
+            )
+        )
+        try container.mainContext.save()
+        store.reload()
+
+        // Present in the unfiltered, newest-first projection.
+        #expect(store.records.count == 4)
+        let newest = try #require(store.records.first)
+        #expect(newest.verb == "serviceStop")
+        #expect(newest.packageID == nil, "the null identity was resolved into a package")
+        #expect(newest.name.isEmpty)
+
+        // Findable by verb, case-insensitively, and only it.
+        store.search = "STOP"
+        #expect(store.records.map(\.verb) == ["serviceStop"])
+
+        // And findable by the argv, which is where `atuin` actually lives —
+        // there is no package identity carrying that name, and that is the
+        // point of the scenario.
+        store.search = "atuin"
+        #expect(store.records.count == 1)
+        #expect(store.records.first?.commandText == "services stop atuin")
+        #expect(store.records.first?.packageID == nil)
+
+        // The package entries are untouched by either search.
+        store.search = ""
+        #expect(store.records.map(\.verb) == ["serviceStop", "upgrade", "uninstall", "install"])
+    }
+
     // MARK: - IH5 sc4 — an empty result is non-destructive
 
     @Test("A search matching nothing is empty, and the next empty search returns everything")
