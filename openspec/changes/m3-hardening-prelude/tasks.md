@@ -250,19 +250,38 @@ reordered by one writer, but not parallelised across worktrees.
       confirm the reason renders **inline** on the projection's own surface with **no blocking alert
       and no retry control**. Restore the file afterwards. State this partiality explicitly in the
       verify report rather than claiming full manual coverage.
-- [ ] 9.2 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ baseline
+- [x] 9.2 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ baseline
       555 + 14 new tests; (ii) `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       — BUILD SUCCEEDED, zero concurrency warnings; (iii) `swiftlint --quiet` — finding count equal to
       the 0.1 baseline (**zero new**); (iv) file length — `wc -l` on `CatalogStore.swift`,
       `OperationCenter.swift`, `HistoryStore.swift`, `BrewRunner.swift`, `MutationOutcome.swift`,
       `InstalledListView.swift` and the three new files, each under SwiftLint's default 400-line
       `file_length` warning.
-- [ ] 9.3 **Scope guard.** `git diff main...HEAD --name-only` must contain **no** `Package.swift`, no
+      **Recorded**: (i) `Test run with 571 tests in 77 suites passed after 5.293 seconds with 1 known
+      issue.` — baseline 555 + **16** new tests (the plan forecast 14; the two extra are the
+      relocation of item #6's classification test into its own suite, and one added `NoteDraft`
+      starting-state test). (ii) `** BUILD SUCCEEDED **`, zero concurrency warnings — the only
+      warning emitted is `appintentsmetadataprocessor: Metadata extraction skipped. No
+      AppIntents.framework dependency found.`, which is pre-existing and not a compiler diagnostic.
+      (iii) `swiftlint --quiet` = **60** findings, equal to the 0.1 baseline — zero new. (iv) `wc -l`:
+      `CatalogStore` 231, `OperationCenter` 327, `HistoryStore` 234, `BrewRunner` 365,
+      `MutationOutcome` 187, `InstalledListView` 210, `LocalStores` 48, `NoteDraft` 40,
+      `InstalledSections` 52 — every one under 400.
+- [x] 9.3 **Scope guard.** `git diff main...HEAD --name-only` must contain **no** `Package.swift`, no
       `project.pbxproj`, no new SPM target, and no services / taps / cleanup / disk-usage file. Then
       `rg 'BrewMutating|InvalidationScope|ServiceCommand|TapCommand|CleanupCommand'` over `Sources/`
       and `cellar/` must return **zero**, `forcesReSnapshot` must be unchanged (PM6 untouched), and
       the delta set must still be exactly five MODIFIED requirements with zero ADDED / REMOVED /
       RENAMED. Any hit is M3-1 scope that leaked.
+      **Recorded**: 33 changed files, none matching `Package.swift`, `project.pbxproj`, or
+      services / taps / cleanup / disk-usage; no new SPM target. `rg` over `Sources/` and `cellar/`
+      for the five M3-1 symbols returns **zero**. `forcesReSnapshot` does not appear in the
+      `MutationOutcome.swift` diff at all (PM6 untouched). The delta set is five files, each with
+      exactly one `## MODIFIED Requirements` header and no ADDED / REMOVED / RENAMED header.
+      **Candidate size**: `git diff main...HEAD --shortstat` = **1,808 insertions + 72 deletions =
+      1,880** changed lines against the 2,000 budget. No item was dropped; no `size:exception` is
+      requested. Roughly 120 lines of headroom remain for the verify report — see the apply report's
+      risk note.
 
 ---
 
