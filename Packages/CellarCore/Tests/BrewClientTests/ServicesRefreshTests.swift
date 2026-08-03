@@ -161,6 +161,56 @@ struct ServicesRefreshTests {
         #expect(launcher.launchCount == beforeHiding)
     }
 
+    /// SM3 names **two** reasons the surface stops being visible: the window
+    /// was hidden, or the section was deselected. They arrive from two
+    /// different places — `scenePhase` in the app, `onDisappear` in the view —
+    /// so the gate is the conjunction of both. Either one alone stops the poll,
+    /// and it takes both to restart it.
+    @Test("Hiding the window stops polling even while the section is still selected")
+    func hidingTheWindowStopsPollingWhileTheSectionIsSelected() async {
+        let harness = harness()
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        harness.coordinator.setVisible(true)
+        await harness.source.waitForCalls(atLeast: 2)
+        let beforeHiding = harness.source.callCount
+
+        // The window goes away. The section is still selected.
+        harness.coordinator.setActive(false)
+        await settle()
+        for _ in 0..<8 {
+            await harness.clock.advance(by: .seconds(5))
+            await settle()
+        }
+
+        #expect(harness.source.callCount == beforeHiding, "a hidden window kept polling")
+        #expect(harness.coordinator.isPolling == false)
+
+        // Coming back to the front resumes it, with a baseline refresh.
+        harness.coordinator.setActive(true)
+        await harness.source.waitForCalls(atLeast: beforeHiding + 1)
+        #expect(harness.coordinator.isPolling)
+
+        harness.coordinator.setVisible(false)
+    }
+
+    @Test("Becoming active on a section that is not showing starts nothing")
+    func becomingActiveOnAnotherSectionStartsNothing() async {
+        let harness = harness()
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+
+        // The app is frontmost, but Services is not the selected section.
+        harness.coordinator.setActive(true)
+        await settle()
+        for _ in 0..<4 {
+            await harness.clock.advance(by: .seconds(5))
+            await settle()
+        }
+
+        #expect(harness.source.callCount == baseline, "another section was polling services")
+        #expect(harness.coordinator.isPolling == false)
+    }
+
     // MARK: - SM3 sc3 — at most one loop
 
     /// Reported visibility arrives from `onAppear`, `onDisappear` and

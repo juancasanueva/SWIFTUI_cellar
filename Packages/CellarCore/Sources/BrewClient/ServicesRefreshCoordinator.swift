@@ -37,7 +37,19 @@ public final class ServicesRefreshCoordinator {
     /// The installation the baseline last refreshed with. The poll reuses it,
     /// so a tick can never probe a `brew` the user has already moved away from.
     private var installation: BrewInstallation?
-    private var isVisible = false
+
+    /// The two reported halves of "the surface is visible".
+    ///
+    /// SM3 names two reasons it stops being so — the window was hidden, or the
+    /// section was deselected — and they are observed in two different places:
+    /// `scenePhase` in the app, `onAppear`/`onDisappear` in the view. Folding
+    /// them into one setter would let whichever reported last overrule the
+    /// other, so a hidden window with Services still selected would keep
+    /// polling. The gate is their conjunction.
+    private var isSectionVisible = false
+    private var isAppActive = true
+
+    private var isVisible: Bool { isSectionVisible && isAppActive }
 
     /// The one poll in flight, owned so hiding can end it.
     ///
@@ -82,17 +94,30 @@ public final class ServicesRefreshCoordinator {
 
     // MARK: - Visibility
 
-    /// Reports whether the services surface is on screen.
+    /// Reports whether the services section is the one being shown.
     ///
-    /// Visibility is **reported** by the UI, never decided by it: `onAppear` and
-    /// `onDisappear` cover section deselection and window close, `scenePhase`
-    /// covers hiding the app. All three arrive for one real transition, so this
-    /// is idempotent — a repeated show must not run a second baseline or start
-    /// a second loop.
+    /// Visibility is **reported** by the UI, never decided by it: `onAppear`
+    /// and `onDisappear` cover section deselection and window close. Both
+    /// arrive more than once for one real transition, so this is idempotent —
+    /// a repeated show must not run a second baseline or start a second loop.
     public func setVisible(_ visible: Bool) {
-        guard visible != isVisible else { return }
-        isVisible = visible
-        if visible {
+        guard visible != isSectionVisible else { return }
+        isSectionVisible = visible
+        applyVisibility()
+    }
+
+    /// Reports whether the app itself is in the foreground, from `scenePhase`.
+    ///
+    /// A window hidden with ⌘H while Services is still the selected section is
+    /// not a visible surface, and must cost zero probes.
+    public func setActive(_ active: Bool) {
+        guard active != isAppActive else { return }
+        isAppActive = active
+        applyVisibility()
+    }
+
+    private func applyVisibility() {
+        if isVisible {
             startPolling()
         } else {
             stopPolling()

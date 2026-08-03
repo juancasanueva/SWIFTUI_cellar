@@ -256,27 +256,27 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 6: The services read surface — D8, SM9 / SM11 / SM12
 
-- [ ] 6.1 `cellar/Shell/AppSection.swift` — add `.services` as the 5th case. Verified safe: no test
+- [x] 6.1 `cellar/Shell/AppSection.swift` — add `.services` as the 5th case. Verified safe: no test
       asserts a case count on `AppSection`; `BulkSelection.Action.allCases == [.upgrade, .uninstall]`
       is the suite's only exhaustive enum assertion and is untouched here.
-- [ ] 6.2 Create `cellar/Services/ServicesListView.swift` and `cellar/Services/ServiceRow.swift` —
+- [x] 6.2 Create `cellar/Services/ServicesListView.swift` and `cellar/Services/ServiceRow.swift` —
       name plus colour-coded status. **No controls yet** (Phase 14). `onAppear`/`onDisappear` *report*
       visibility to the coordinator; they never decide it.
-- [ ] 6.3 **RED** `Tests/BrewClientTests/ServicesPresentationTests.swift` (new) — the status → label +
+- [x] 6.3 **RED** `Tests/BrewClientTests/ServicesPresentationTests.swift` (new) — the status → label +
       colour mapping as a **pure projection**, one case per status including `unrecognised`. This is
       the headless substitute for the six statuses that cannot be produced on the dev machine; MV-9
       corroborates it under a temporary fixture patch.
-- [ ] 6.4 **RED** same file — `aChangedStatusReplacesThePreviousOne` (no stale status retained) and a
+- [x] 6.4 **RED** same file — `aChangedStatusReplacesThePreviousOne` (no stale status retained) and a
       structural assertion that the services surface declares **no** notification request, no
       permission prompt, no badge and no blocking alert. — sc *"A service that dies is shown as failed
       at the next poll"*, *"No notification is requested or delivered for it"* (ruling #7182-2).
-- [ ] 6.5 **GREEN** create `Sources/BrewClient/LogFileOpening.swift` — the open-in-Console protocol
+- [x] 6.5 **GREEN** create `Sources/BrewClient/LogFileOpening.swift` — the open-in-Console protocol
       seam (`rules.design`: a protocol boundary for every external dependency). The **single**
       `NSWorkspace` implementation lives in the app target, not in CellarCore.
-- [ ] 6.6 Create `cellar/Services/ServiceDetailView.swift` — status, user, plist `file`, deduped log
+- [x] 6.6 Create `cellar/Services/ServiceDetailView.swift` — status, user, plist `file`, deduped log
       paths, open-in-Console. Brew-absent renders `ServicesStore.absence` / `OperationCenter.unavailableGuidance`
       as read-only guidance; no new rule.
-- [ ] 6.7 **Wire** `cellar/ContentView.swift` (services column) and `cellar/cellarApp.swift` (DI,
+- [x] 6.7 **Wire** `cellar/ContentView.swift` (services column) and `cellar/cellarApp.swift` (DI,
       `scenePhase` → `setVisible`). `loops.start("services")` is **Phase 14** — the terminals consumer
       does not exist yet. Verified by `xcodebuild build` plus manual steps **MV-1, MV-5, MV-10**.
       **Commit 6.**
