@@ -210,10 +210,19 @@ struct HistoryRecorderTests {
 
     /// One-way, exactly like `displayCommand`. Enumerated on the source rather
     /// than argued, so an overload added later fails this instead of shipping.
+    ///
+    /// Every file is anchored positively before the four negative assertions.
+    /// Four "does not contain" checks pass on an empty string, so a renamed
+    /// file, a moved directory or an over-eager comment strip would have turned
+    /// this into a test that asserts nothing while still reporting green.
     @Test("No API turns a stored row back into a runnable command")
     func aStoredRowCannotBecomeACommand() throws {
         for file in ["SwiftDataHistoryRecorder.swift", "HistoryStore.swift", "SchemaV1.swift"] {
             let source = try Self.declarations(of: file)
+            #expect(
+                source.contains("HistoryEntry"),
+                "\(file) read as \(source.count) characters of declarations — the scan below is vacuous"
+            )
             #expect(
                 source.contains("-> MutationCommand") == false,
                 "\(file) reconstructs a command from a stored row"

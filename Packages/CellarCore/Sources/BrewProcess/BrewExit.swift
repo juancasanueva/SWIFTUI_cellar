@@ -11,6 +11,11 @@ public struct BrewExit: Sendable, Equatable {
         case cancelled(signal: Int32)
         /// The process was terminated by a signal Cellar did not send.
         case signalled(Int32)
+        /// No process ever existed for the identity that was asked about: it was
+        /// never submitted, or its record has already been retired. Declared
+        /// here rather than in an extension because Swift has no way to add an
+        /// enum case from outside its declaration.
+        case unknownOperation
     }
 
     /// The process exit status, or `128 + signal` when it was signalled.
@@ -34,4 +39,15 @@ public struct BrewExit: Sendable, Equatable {
         if case .cancelled = reason { return true }
         return false
     }
+}
+
+extension BrewExit {
+    /// The answer for an identity the execution layer does not know.
+    ///
+    /// `-1` cannot collide with a real terminal status: a wait status is 0–255
+    /// and a signalled one is `128 + n`. Paired with a reason of
+    /// `.unknownOperation`, `isSuccess` — which requires `.exited` *and* a zero
+    /// status — makes the fabricated success unrepresentable rather than merely
+    /// unobserved (brew-execution, design D8).
+    public static let unknownOperation = BrewExit(status: -1, reason: .unknownOperation)
 }

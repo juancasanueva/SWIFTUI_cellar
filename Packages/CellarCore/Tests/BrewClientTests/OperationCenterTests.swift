@@ -57,6 +57,55 @@ struct OperationCenterTests {
         #expect(harness.launcher.recordedSpecs.map(\.arguments) == [item.arguments])
     }
 
+    // MARK: - A terminal outcome that never spawned (OA6, the no-runner path)
+
+    /// The exactly-one-entry rule holds for an operation that never spawns a
+    /// process. It settled beside the funnel before — inline, without the gate
+    /// and without the recorder — so a submission with no runner reported a
+    /// terminal outcome and wrote nothing at all.
+    @Test("A submit with no runner records exactly one history entry")
+    func aSubmitWithNoRunnerRecordsExactlyOneHistoryEntry() async throws {
+        let harness = CenterHarness(attached: false)
+        let terminals = Counter()
+        let watcher = Task { [stream = harness.gate.terminals] in
+            for await _ in stream { terminals.increment() }
+        }
+        await harness.settle()
+
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.iterm)!))
+        await harness.settle()
+
+        #expect(harness.center.isAvailable == false)
+        #expect(item.outcome == .launchFailed)
+        #expect(item.isTerminal)
+        #expect(harness.launcher.launchCount == 0, "a submission with no runner spawned a process")
+
+        #expect(
+            harness.recorder.drafts.count == 1,
+            "a terminal outcome wrote \(harness.recorder.drafts.count) entries rather than one"
+        )
+        let draft = try #require(harness.recorder.drafts.first)
+        #expect(draft.argv == ["install", "--cask", "iterm2"])
+        #expect(draft.outcome == .launchFailed)
+        #expect(terminals.value == 1, "the terminal owed one re-snapshot and forced \(terminals.value)")
+        #expect(harness.gate.isMutating == false, "the gate was left open by a submission that never spawned")
+
+        // Per operation, not per method call: a second one is a second entry and
+        // a second re-snapshot, so nothing here is a fixed answer.
+        let second = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
+        await harness.settle()
+
+        #expect(second.outcome == .launchFailed)
+        #expect(harness.recorder.drafts.count == 2)
+        #expect(harness.recorder.drafts.map(\.argv) == [
+            ["install", "--cask", "iterm2"],
+            ["install", "--formula", "wget"]
+        ])
+        #expect(terminals.value == 2)
+        #expect(harness.gate.isMutating == false)
+        watcher.cancel()
+    }
+
     // MARK: - The bounded log ring (OA3 sc3)
 
     @Test("The log drains verbatim, tagged, in emission order")

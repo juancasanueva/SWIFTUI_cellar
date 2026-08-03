@@ -87,16 +87,39 @@ public final class HistoryStore {
         }
     }
 
-    @ObservationIgnored private let container: ModelContainer?
+    /// How `clearAll()` performs the deletion.
+    ///
+    /// A seam rather than a hard-coded statement, so the *failure* branch is
+    /// provable in the `swift test` loop. Forcing a real SwiftData delete to
+    /// throw needs a read-only directory or a corrupted file, both of which are
+    /// flaky and test SwiftData rather than this store's reaction to it — the
+    /// same reasoning behind `ProcessLaunching` and `CatalogSource` (design D5).
+    typealias Clearing = @MainActor (ModelContext) throws -> Void
+
+    /// The real deletion: one statement over one model, then one save.
+    static let deleteEveryEntry: Clearing = { context in
+        try context.delete(model: HistoryEntry.self)
+        try context.save()
+    }
+
+    /// Internal rather than private so "one container, both stores" is an
+    /// invariant a test can state directly rather than infer (design D6).
+    @ObservationIgnored let container: ModelContainer?
+    @ObservationIgnored private let clearing: Clearing
 
     private var context: ModelContext? { container?.mainContext }
 
-    public init(container: ModelContainer?) {
+    init(container: ModelContainer?, clearing: @escaping Clearing) {
         self.container = container
+        self.clearing = clearing
         availability = container == nil
             ? .unavailable(reason: "The local history store could not be opened.")
             : .available
         reload()
+    }
+
+    public convenience init(container: ModelContainer?) {
+        self.init(container: container, clearing: HistoryStore.deleteEveryEntry)
     }
 
     /// Opens the store at `url`, folding a failure into `.unavailable(reason:)`
@@ -105,9 +128,16 @@ public final class HistoryStore {
         do {
             self.init(container: try PersistenceContainer.onDisk(at: url))
         } catch {
-            self.init(container: nil)
-            availability = .unavailable(reason: MetadataStore.describe(error))
+            self.init(unavailable: error)
         }
+    }
+
+    /// One open failure, folded into a reason. Internal so `LocalStores` can
+    /// give both stores the *same* reason when the one container it opens for
+    /// them fails (design D6).
+    convenience init(unavailable error: any Error) {
+        self.init(container: nil)
+        availability = .unavailable(reason: MetadataStore.describe(error))
     }
 
     // MARK: - Reading
@@ -178,15 +208,27 @@ public final class HistoryStore {
     /// cascade that could reach them. The confirmation itself belongs to the
     /// view — this is the action it confirms, and it is all-or-nothing because
     /// no selective deletion exists to offer instead.
+    ///
+    /// A clear that fails is **observable**: it rolls back, rebuilds the
+    /// projection so every surviving entry is readable again, and only then
+    /// applies the reason. That order is the whole fix — `reload()` sets
+    /// `.available` on a successful fetch, so applying the failure first (what
+    /// this did) meant the reload erased it and a failed clear was reported as a
+    /// healthy history. Inline surface only: `availability` and `lastError`, set
+    /// exactly as `append` sets them — no alert and no retry affordance
+    /// (installation-history IH6, design D4).
     public func clearAll() {
         guard let context else { return }
         do {
-            try context.delete(model: HistoryEntry.self)
-            try context.save()
+            try clearing(context)
+            reload()
+            lastError = nil
         } catch {
             context.rollback()
-            availability = .unavailable(reason: MetadataStore.describe(error))
+            let reason = MetadataStore.describe(error)
+            reload()
+            availability = .unavailable(reason: reason)
+            lastError = reason
         }
-        reload()
     }
 }

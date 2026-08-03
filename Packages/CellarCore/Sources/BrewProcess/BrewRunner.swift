@@ -280,15 +280,17 @@ public actor BrewRunner {
 
     /// The terminal result of `id`, once every line it produced is observable.
     ///
-    /// Never throws: a cancelled run is a `BrewExit.Reason`, not a failure (D3).
+    /// Never throws: a cancelled run is a `BrewExit.Reason`, not a failure (D3),
+    /// and an identity with no record is a value too — `.unknownOperation`,
+    /// never a fabricated `status: 0` success (brew-execution, design D8).
     func exit(of id: UUID) async -> BrewExit {
         guard let record = operations[id] else {
-            return BrewExit(status: 0, reason: .exited)
+            return .unknownOperation
         }
         if let resolved = record.resolvedExit { return resolved }
 
         await record.completion?.value
-        return operations[id]?.resolvedExit ?? BrewExit(status: 0, reason: .exited)
+        return operations[id]?.resolvedExit ?? .unknownOperation
     }
 
     /// An out-of-band fault, if the operation hit one. `nil` for every normal

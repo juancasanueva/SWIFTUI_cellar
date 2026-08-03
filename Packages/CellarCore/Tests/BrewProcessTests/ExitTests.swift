@@ -76,6 +76,40 @@ struct ExitTests {
         #expect(second.status == 42)
     }
 
+    @Test("An unknown operation identity yields a typed unknown result rather than success")
+    func anUnknownOperationYieldsATypedUnknownResultRatherThanSuccess() async throws {
+        let launcher = FakeProcessLauncher()
+        let process = FakeProcess()
+        launcher.enqueue(process)
+        // Zero retained terminal records, so a released operation is retired
+        // immediately: the spec's second unknown identity — "one whose record
+        // has already been retired" — is reachable without waiting on a cap.
+        let runner = BrewRunner(installation: .fixture, launcher: launcher, retainedTerminalRecords: 0)
+
+        // An identity the runner was never asked to run.
+        let neverSubmitted = await runner.exit(of: UUID())
+
+        #expect(neverSubmitted.reason == .unknownOperation)
+        #expect(neverSubmitted.isSuccess == false, "an unknown identity was answered with a success")
+        #expect(neverSubmitted != BrewExit(status: 0, reason: .exited))
+        #expect(launcher.launchCount == 0, "asking about an unknown identity spawned a process")
+
+        // The same entry point still answers a known identity with its real
+        // exit — the unknown branch narrows nothing.
+        let operation = try await runner.start(.read(["list"]))
+        process.terminate(with: BrewExit(status: 0, reason: .exited))
+        let known = await operation.exit()
+        #expect(known == BrewExit(status: 0, reason: .exited))
+
+        // And an identity whose record has been retired is unknown too, without
+        // the released flag being what keeps the fabricated success unobserved.
+        await runner.release(operation.id)
+        let retired = await runner.exit(of: operation.id)
+
+        #expect(retired.reason == .unknownOperation)
+        #expect(retired.isSuccess == false)
+    }
+
     @Test("A missing executable is reported as executableUnavailable")
     func missingExecutableIsDistinct() async {
         let launcher = FakeProcessLauncher()
