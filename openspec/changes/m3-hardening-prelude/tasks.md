@@ -214,12 +214,17 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 8: Test integrity (item #8)
 
-- [ ] 8.1 `Tests/PersistenceTests/HistoryRecorderTests.swift:214` — amend
+- [x] 8.1 `Tests/PersistenceTests/HistoryRecorderTests.swift:214` — amend
       `aStoredRowCannotBecomeACommand` with a per-file **positive anchor**
       (`#expect(source.contains("HistoryEntry"))`) before the four negative assertions, so an
       unresolved path or an over-eager comment strip fails instead of passing vacuously. Run once
       against a deliberately wrong filename to prove the anchor bites, then revert that probe.
       **Commit 8.**
+      **Probe recorded**: the stronger of the two failure modes was used — `declarations(of:)` was
+      temporarily made to return `""` (an over-eager comment strip; a wrong *filename* already
+      throws out of `String(contentsOf:)`). The amended test then failed with three issues, one per
+      scanned file: `Expectation failed: (source → "").contains("HistoryEntry")`. Before the
+      amendment that same emptied scan passed all four negative assertions silently. Probe reverted.
 
 ## Phase 9: Verification (no commit of its own unless a fix is needed)
 
