@@ -192,23 +192,23 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 3: Payload sources and argv — D7, SM1 / SM2 (argv)
 
-- [ ] 3.1 **RED** `Tests/BrewClientTests/ServicesPayloadTests.swift` (new) —
+- [x] 3.1 **RED** `Tests/BrewClientTests/ServicesPayloadTests.swift` (new) —
       `oneRefreshRecordsExactlyOneInvocationWithTheExactArgv`: assert `services list --json`, element
       for element, through `RecordingProcessLauncher`. — sc *"One invocation per refresh, with the
       exact argv"*.
-- [ ] 3.2 **RED** same file — `theDetailProbeNamesExactlyOneServiceAndNeverUsesAll`: the info argv is
+- [x] 3.2 **RED** same file — `theDetailProbeNamesExactlyOneServiceAndNeverUsesAll`: the info argv is
       `["services","info","--json", name]` with `name` as the **last, separate** element, never
       interpolated; no invocation carries `--all`. — sc *"Detail is fetched only for the selected
       service"*.
-- [ ] 3.3 **GREEN** create `Sources/BrewClient/ServicesPayloadSource.swift` —
+- [x] 3.3 **GREEN** create `Sources/BrewClient/ServicesPayloadSource.swift` —
       `ServicesListPayloadSource` on the compile-time-constant `BrewCommand.read(["services","list","--json"])`
       (exactly `BrewInfoPayloadSource`'s pattern) and `ServiceInfoPayloadSource`, the codebase's only
       parameterised read argv. Closed error enum
       `ServicesError { brewUnavailable, commandFailed(status:message:), malformedPayload, cancelled }`.
-- [ ] 3.4 **RED** same file — `aNonZeroExitIsAnErrorAndNeverAnEmptyList`,
+- [x] 3.4 **RED** same file — `aNonZeroExitIsAnErrorAndNeverAnEmptyList`,
       `stderrNeverEntersTheDocument`, `aBlankDocumentIsMalformed`. — copies `InstalledPayload`'s rules
       verbatim (design D7).
-- [ ] 3.5 **GREEN** same source file — the pure `ServicesPayload.payload(from:exit:)` function.
+- [x] 3.5 **GREEN** same source file — the pure `ServicesPayload.payload(from:exit:)` function.
       **Commit 3.**
 
 ## Phase 4: `ServicesStore` — D7, SM11 (read half)
