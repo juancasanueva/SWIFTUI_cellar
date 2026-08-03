@@ -16,6 +16,43 @@ public enum ServicesLoadState: Sendable, Equatable {
     case failed(ServicesError)
 }
 
+/// Why a detail probe could not answer.
+///
+/// Deliberately **not** a widened `ServicesError`: two of these three never
+/// reach brew at all, and a list refresh could not produce them. Folding them
+/// into the acquisition error would force every list-side switch to handle
+/// cases it cannot observe, and would let a probe report a refusal in brew's
+/// name.
+public enum ServiceDetailFailure: Sendable, Equatable {
+    /// brew was asked, and the probe failed. Carries brew's own reason.
+    case probe(ServicesError)
+    /// The argv gate refused the name, so brew was never asked (SM2).
+    case unusableName
+    /// No brew installation has been located, so there is nothing to ask.
+    case noInstallation
+}
+
+/// What the store can currently say about the **selected** service's detail.
+///
+/// `ServicesLoadState`'s shape one pane over, and for the same reason: the
+/// detail pane has four outcomes and `detail: ServiceDetail?` can express two.
+/// A failed probe whose reason was discarded is indistinguishable from nothing
+/// having been selected, and the surface then tells the user the reassuring one.
+///
+/// `.loading` and `.failed` carry the service name because a projection that
+/// cannot name what it was reading has to be assembled from two properties at
+/// the call site — which is the coupling that let the defect in.
+public enum ServiceDetailLoadState: Sendable, Equatable {
+    /// Nothing is selected.
+    case idle
+    /// A probe for this service is in flight.
+    case loading(String)
+    /// brew answered about this service.
+    case loaded(ServiceDetail)
+    /// The probe for this service did not answer, and why.
+    case failed(name: String, reason: ServiceDetailFailure)
+}
+
 /// The services list as the UI sees it.
 ///
 /// `InstalledStore`'s shape over a different projection, and deliberately so:
@@ -46,9 +83,22 @@ public final class ServicesStore {
     public private(set) var services: [ServiceRecord] = []
     public private(set) var state: ServicesLoadState = .idle
 
+    /// What the selected service's probe has produced so far. Fetched lazily
+    /// and keyed on selection — never on a poll tick.
+    public private(set) var detailState: ServiceDetailLoadState = .idle
+
     /// The selected service's detail, when one is selected and its probe
-    /// answered. Fetched lazily and keyed on selection — never on a poll tick.
-    public private(set) var detail: ServiceDetail?
+    /// answered.
+    ///
+    /// Derived rather than stored, so "there is a detail" and "the probe
+    /// succeeded" cannot drift apart. A caller reading this alone still cannot
+    /// tell a failure from an empty selection — that is what `detailState` is
+    /// for — but no caller can now be shown a detail the state does not claim.
+    public var detail: ServiceDetail? {
+        guard case .loaded(let detail) = detailState else { return nil }
+        return detail
+    }
+
     /// The selected service's name, whether or not its detail has arrived.
     public private(set) var selected: String?
 
@@ -207,7 +257,7 @@ public final class ServicesStore {
         nextToken += 1
         installedSequence = nextToken
         services = []
-        detail = nil
+        detailState = .idle
         state = .brewAbsent(absence)
     }
 
@@ -225,14 +275,26 @@ public final class ServicesStore {
     /// current call sites: `refresh` has no path to `detailSource`.
     public func select(_ name: String?) async {
         selected = name
-        detail = nil
 
-        guard let name,
-              let installation,
-              // The same argv gate the mutating commands use. A name that could
-              // not survive composition is never probed.
-              let target = ServiceTarget(name: name)
-        else { return }
+        guard let name else {
+            detailState = .idle
+            return
+        }
+        detailState = .loading(name)
+
+        guard let installation else {
+            // Nothing is in flight and nothing will arrive. Left as `.loading`
+            // the pane would read as an answer that is still coming.
+            detailState = .failed(name: name, reason: .noInstallation)
+            return
+        }
+        // The same argv gate the mutating commands use. A name that could not
+        // survive composition is never probed — but the user is told that,
+        // rather than shown an empty pane.
+        guard let target = ServiceTarget(name: name) else {
+            detailState = .failed(name: name, reason: .unusableName)
+            return
+        }
 
         do {
             let payload = try await detailSource.payload(using: installation, naming: target)
@@ -241,12 +303,20 @@ public final class ServicesStore {
             // through the list faster than brew answers must not be shown the
             // previous service's log paths.
             guard selected == name else { return }
-            detail = details.first { $0.name == name } ?? details.first
+            guard let detail = details.first(where: { $0.name == name }) ?? details.first else {
+                // brew answered about nothing at all. An answer that describes
+                // no service is not a description of this one.
+                detailState = .failed(name: name, reason: .probe(.malformedPayload))
+                return
+            }
+            detailState = .loaded(detail)
         } catch {
             // A detail probe that fails costs the detail pane and nothing else:
             // the list is not a failure because one service would not describe
-            // itself.
-            detail = nil
+            // itself. The reason is **kept**, because a pane that drops it can
+            // only report the failure as an absence.
+            guard selected == name else { return }
+            detailState = .failed(name: name, reason: .probe(error))
         }
     }
 }

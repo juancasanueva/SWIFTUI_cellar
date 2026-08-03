@@ -26,14 +26,18 @@ struct ServiceDetailView: View {
             } description: {
                 Text(absence.explanation)
             }
-        } else if let detail = services.detail {
-            content(for: detail)
         } else {
-            ContentUnavailableView(
-                "No service selected",
-                systemImage: AppSection.services.systemImage,
-                description: Text("Select a service to see where it is installed and what it logs.")
-            )
+            // Which of the four outcomes this is — nothing selected, reading,
+            // answered, failed — is decided by `ServiceDetailLoadState.pane` in
+            // `BrewClient`, inside the `swift test` inner loop. Branching here
+            // on `detail != nil` alone is what reported a **failed** probe as
+            // "No service selected", with brew's reason discarded.
+            switch services.detailState.pane {
+            case .detail(let detail):
+                content(for: detail)
+            case .notice(let notice):
+                ServiceDetailNoticeView(notice: notice)
+            }
         }
     }
 
@@ -110,6 +114,36 @@ struct ServiceDetailView: View {
     }
 }
 
+/// Why the detail pane has no detail — which is never the same reason twice.
+///
+/// `ServicesEmptyStateView`'s shape, one pane over: nothing selected, a probe
+/// still in flight, and a probe that failed are three different facts, and
+/// rendering the last two as the first tells the user that they simply have not
+/// picked anything — when in truth brew was asked and could not answer.
+///
+/// The words and the mapping both live in `ServicesPresentation`; this view owns
+/// only the symbols and the layout.
+private struct ServiceDetailNoticeView: View {
+    let notice: ServiceDetailNotice
+
+    var body: some View {
+        ContentUnavailableView(
+            notice.title,
+            systemImage: symbol,
+            description: Text(notice.message)
+        )
+    }
+
+    /// Only a failure gets the warning symbol. An unanswered probe has not
+    /// failed, and nothing having been selected is not a problem at all.
+    private var symbol: String {
+        switch notice {
+        case .nothingSelected, .reading: AppSection.services.systemImage
+        case .failed: "exclamationmark.triangle"
+        }
+    }
+}
+
 /// The one place AppKit opens a file. Kept behind `LogFileOpening` so every
 /// rule above it stays provable without a window.
 struct WorkspaceLogFileOpener: LogFileOpening {
@@ -120,4 +154,21 @@ struct WorkspaceLogFileOpener: LogFileOpening {
 
 #Preview {
     ServiceDetailView(services: ServicesStore(), opener: NoLogFileOpening())
+}
+
+#Preview("Nothing selected") {
+    ServiceDetailNoticeView(notice: .nothingSelected)
+}
+
+#Preview("Reading") {
+    ServiceDetailNoticeView(notice: .reading("atuin"))
+}
+
+#Preview("Failed") {
+    ServiceDetailNoticeView(
+        notice: .failed(
+            service: "atuin",
+            reason: ServiceDetailFailure.probe(.malformedPayload).shortDescription
+        )
+    )
 }
