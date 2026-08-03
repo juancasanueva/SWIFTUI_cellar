@@ -213,14 +213,14 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 4: `ServicesStore` — D7, SM11 (read half)
 
-- [ ] 4.1 **RED** `Tests/BrewClientTests/ServicesStoreTests.swift` (new) — three tests mirroring
+- [x] 4.1 **RED** `Tests/BrewClientTests/ServicesStoreTests.swift` (new) — three tests mirroring
       `InstalledStoreTests`: overlapping refreshes coalesce onto the one in flight keyed by request
       URL + invalidation mark; an older ordinal arriving after a newer one is discarded; a failed
       refresh leaves the last good list intact.
-- [ ] 4.2 **RED** same file — `absentBrewGivesAnEmptyListWithGuidanceAndNoSpawn`: empty list, nothing
+- [x] 4.2 **RED** same file — `absentBrewGivesAnEmptyListWithGuidanceAndNoSpawn`: empty list, nothing
       thrown, `absence` carries the guidance, **zero** recorded invocations, no poll loop running. —
       sc *"Absent brew produces an empty services list with guidance"*.
-- [ ] 4.3 **GREEN** create `Sources/BrewClient/ServicesStore.swift` — `InstalledStore`'s shape over
+- [x] 4.3 **GREEN** create `Sources/BrewClient/ServicesStore.swift` — `InstalledStore`'s shape over
       services. **It opens no `ModelContainer`**: services state is launchd truth and persists
       nothing, so W3's one-container invariant holds *a fortiori* and
       `LocalStoresTests > oneContainerServesBothStores` remains the assertion. This is a deliberate,
