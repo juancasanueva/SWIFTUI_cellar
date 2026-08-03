@@ -129,11 +129,11 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 3: No-runner submit through the funnel — D3 (item #2, `operation-activity`)
 
-- [ ] 3.1 **RED** `Tests/BrewClientTests/OperationCenterTests.swift` —
+- [x] 3.1 **RED** `Tests/BrewClientTests/OperationCenterTests.swift` —
       `aSubmitWithNoRunnerRecordsExactlyOneHistoryEntry`: submit with `runner == nil`; expect outcome
       `.launchFailed`, recorder spy drafts `== 1`, gate terminals `== 1`. — sc *"An operation that
       never spawns still records once"*.
-- [ ] 3.2 **GREEN** `Sources/BrewClient/OperationCenter.swift:159-169` — hoist `gate?.begin()`
+- [x] 3.2 **GREEN** `Sources/BrewClient/OperationCenter.swift:159-169` — hoist `gate?.begin()`
       **above** `guard let runner`, and replace the inline `item.queuePhase = …` / `item.settle(…)`
       pair with `finish(item, with: .launchFailed)` after setting the terminal queue phase. One
       `begin()` per submit, one `end()` per finish; `finish` is the only settle site and already

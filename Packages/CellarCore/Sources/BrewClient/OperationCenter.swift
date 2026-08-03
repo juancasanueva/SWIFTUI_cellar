@@ -156,17 +156,26 @@ public final class OperationCenter {
         let item = ActivityItem(id: UUID(), command: command, versions: versions)
         items.append(item)
 
-        guard let runner else {
-            item.queuePhase = .terminal(BrewExit(status: 127, reason: .exited), fault: nil)
-            item.settle(.launchFailed)
-            return item
-        }
-
         // The gate opens per submission, not per batch, so `isMutating` stays
         // true for the whole of a fan-out — a quiet window between two queued
         // mutations wastes no refresh — while N terminals still produce exactly
         // N re-snapshots (design D7).
+        //
+        // Hoisted above the runner guard so that one `begin()` per submit and
+        // one `end()` per finish is an invariant of *submission* rather than of
+        // the happy path: every exit from this method below here goes through
+        // `finish`, which is the only settle site (design D3).
         gate?.begin()
+
+        guard let runner else {
+            item.queuePhase = .terminal(BrewExit(status: 127, reason: .exited), fault: nil)
+            // Through the funnel, never beside it. Settling inline here is what
+            // made a terminal outcome with no history entry possible at all: the
+            // entry is written by construction now, not by a second call site
+            // remembering to write one (operation-activity OA6).
+            finish(item, with: .launchFailed)
+            return item
+        }
 
         // Marked before the task is created, so a cancel arriving between here
         // and `run(_:for:on:)` is replayed rather than settling an operation
