@@ -228,8 +228,24 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 9: Verification (no commit of its own unless a fix is needed)
 
-- [ ] 9.1 **Manual verification — reserved for the orchestrator, leave unchecked.** Four steps, run
+- [x] 9.1 **Manual verification — reserved for the orchestrator, leave unchecked.** Four steps, run
       against a `xcodebuild build` product after Phase 8:
+
+      **Executed 2026-08-03 (orchestrator + user), all four steps PASS with one honest caveat on (a).**
+      (a) PASS with partial evidence: the before-launch `stat` was not captured (the app was launched
+      before this task's exact steps were read). After the session: exactly **one** `.store` file
+      exists under `Application Support/com.juancasanueva.cellar/` (`fd -e store` count = 1),
+      `stat -f '%i %m %z'` = `451684779 1785735401 90112`, and the user exercised star + note +
+      mutation + History in one session with no "could not be opened" reason anywhere and all
+      surfaces surviving relaunch (user-observed). The one-container rule itself is proven headless
+      by `LocalStoresTests > oneContainerServesBothStores`.
+      (b) PASS: typed note text survived switching to another package and back without leaving the
+      field, and survived quit + relaunch (user-observed).
+      (c) PASS: a one-gesture multi-add followed by bulk submission ran operations in the order the
+      list displays them, top to bottom, matching the visible rows (user-observed).
+      (d) PASS as honestly scoped: the Clear flow shows a confirmation only — no blocking alert, no
+      retry affordance (user-observed). The failure path is not reachable through the UI; that
+      coverage rests on the headless seam tests (`HistoryStoreTests`), as planned.
       **(a) One container at launch (item #4, mandatory).** Before launching, `stat -f '%i %m %z'` the
       store file at `PersistenceContainer.defaultURL()` and list its directory. Launch, then in one
       session: star a package in Browse, write a note on it, run one mutation, open History. Expect
