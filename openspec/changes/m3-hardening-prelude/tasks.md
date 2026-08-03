@@ -65,10 +65,12 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 0: Housekeeping and baseline (2 commits, own boundary)
 
-- [ ] 0.1 Record the baseline on `3562cd1`: `swift test --package-path Packages/CellarCore` test/suite
+- [x] 0.1 Record the baseline on `3562cd1`: `swift test --package-path Packages/CellarCore` test/suite
       counts (expect 555 / 73) and `swiftlint --quiet` finding count. No commit — this is the number
       task 9.2 compares against.
-- [ ] 0.2 `openspec/config.yaml`: `:7` `review_budget_lines: 800 → 2000`, and `:59` prose
+      **Recorded**: `Test run with 555 tests in 73 suites passed after 5.272 seconds with 1 known
+      issue.` · `swiftlint --quiet` = **60** findings.
+- [x] 0.2 `openspec/config.yaml`: `:7` `review_budget_lines: 800 → 2000`, and `:59` prose
       "Forecast the 800-line review budget" → `2,000`. — proposal item #10. **Commit 0a.**
 - [ ] 0.3 `git mv openspec/changes/m2-mutations-installed openspec/changes/archive/2026-08-03-m2-mutations-installed`,
       then repoint the citation at `openspec/specs/installed-inventory/spec.md:547` to the archive
