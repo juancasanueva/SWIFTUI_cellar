@@ -9,8 +9,9 @@ import Foundation
 /// 1. **Baseline** — launch, activation, and becoming visible. Always on.
 /// 2. **Poll** — every 5 seconds, on an injected clock, and **only** while the
 ///    surface is visible.
-/// 3. *(Phase 14)* forced refresh at every service-mutation terminal, and
-///    suppression while one is in flight.
+/// 3. **Our own mutations** — suppressed while one is in flight, so a restart
+///    in progress cannot flicker between statuses, and settled with exactly one
+///    forced refresh at the terminal outcome.
 ///
 /// **Trap, read from the code rather than assumed.** The poll must not be a
 /// `LoopOwner` slot. `LoopOwner.start` guards on `loops[id] == nil` and a slot
@@ -31,6 +32,14 @@ public final class ServicesRefreshCoordinator {
     public static let defaultInterval: Duration = .seconds(5)
 
     private let store: ServicesStore
+    /// The gate for the **services** domain, not the installed one.
+    ///
+    /// It is a second instance of the shipped `InstalledMutationGate` type
+    /// rather than a new type: that type is already a depth counter plus a
+    /// `terminals` stream with nothing installed-specific in its body. The
+    /// rename it now deserves is registered as debt rather than taken here
+    /// (design D2).
+    private let mutations: InstalledMutationGate?
     private let clock: any Clock<Duration>
     private let interval: Duration
 
@@ -60,12 +69,45 @@ public final class ServicesRefreshCoordinator {
 
     public init(
         store: ServicesStore,
+        mutations: InstalledMutationGate? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
         interval: Duration = ServicesRefreshCoordinator.defaultInterval
     ) {
         self.store = store
+        self.mutations = mutations
         self.clock = clock
         self.interval = interval
+    }
+
+    // MARK: - The terminals consumer
+
+    /// Consumes service-mutation terminals until cancelled.
+    ///
+    /// Owned by `LoopOwner.start("services")` for the app's lifetime, matching
+    /// `loops.start("installed")`. **Only this** belongs in a `LoopOwner` slot:
+    /// a slot stays claimed for the rest of the launch even after its body
+    /// returns, which is right for an app-lifetime consumer and fatal for the
+    /// poll — see the trap in this type's documentation.
+    public func run() async {
+        guard let mutations else { return }
+        for await _ in mutations.terminals {
+            await mutationSettled()
+        }
+    }
+
+    /// One service mutation reached a terminal outcome: brew has just changed
+    /// what launchd is running, so exactly one refresh is owed — success,
+    /// failure and cancellation alike, and whether or not the surface is
+    /// visible (SM8).
+    ///
+    /// `invalidate()` first, for the reason `InstalledRefreshCoordinator` does
+    /// it: the store coalesces same-request refreshes, so without moving the
+    /// mark this refresh could be answered by a poll acquisition that started
+    /// *before* the mutation finished — a list from before the change, adopted
+    /// after it.
+    private func mutationSettled() async {
+        store.invalidate()
+        await performRefresh()
     }
 
     /// Whether a poll loop is running right now.
@@ -167,6 +209,14 @@ public final class ServicesRefreshCoordinator {
             // Re-checked after the sleep rather than only before it: the hide
             // that ends this loop lands while it is suspended here.
             guard !Task.isCancelled, isVisible else { return }
+
+            // Our own writes. A restart is a stop and a start, so a tick landing
+            // between them would show the user a status that is true for a
+            // fraction of a second and reads as a flicker. The terminal owes
+            // exactly one refresh anyway, so the tick is dropped rather than
+            // deferred — `continue`, not `return`: the loop is suppressed for
+            // the duration, not ended by it (SM3).
+            guard mutations?.isMutating != true else { continue }
             await performRefresh()
         }
     }

@@ -79,6 +79,7 @@ struct ContentView: View {
                 ServicesListView(
                     services: services,
                     refresher: servicesRefresher,
+                    operations: operations,
                     selection: $serviceSelection
                 )
                 .navigationSplitViewColumnWidth(min: 280, ideal: 340)

@@ -507,16 +507,16 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 14: Poll control half and the row controls — D3, D8, SM3 (suppression) / SM8
 
-- [ ] 14.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` —
+- [x] 14.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` —
       `pollingIsSuppressedWhileAServiceMutationIsInFlight`: advance the `TestClock` past several
       intervals before the terminal; expect **zero** poll refreshes while in flight and **exactly
       one** refresh at the terminal, not duplicated by the poll. — SM3 sc 4.
-- [ ] 14.2 **RED** same file — `aFailedOrCancelledServiceVerbStillForcesExactlyOneServicesRefresh`,
+- [x] 14.2 **RED** same file — `aFailedOrCancelledServiceVerbStillForcesExactlyOneServicesRefresh`,
       and zero inventory re-snapshots in both cases. — SM8 sc 2.
-- [ ] 14.3 **GREEN** `Sources/BrewClient/ServicesRefreshCoordinator.swift` — the terminals consumer
+- [x] 14.3 **GREEN** `Sources/BrewClient/ServicesRefreshCoordinator.swift` — the terminals consumer
       (forced refresh at every service-mutation terminal) and suppression while
       `serviceGate.isMutating`.
-- [ ] 14.4 **Wire** `cellar/Services/ServiceControls.swift` (new) — all four verbs as **separately
+- [x] 14.4 **Wire** `cellar/Services/ServiceControls.swift` (new) — all four verbs as **separately
       labelled, separately invoked** controls, each label stating which it does ("Start at login" vs
       "Run once"), plus copy-command. `cellar/cellarApp.swift` gains `loops.start("services")` running
       the terminals consumer only — **not** the poll (see the Phase 5 trap). Verified by

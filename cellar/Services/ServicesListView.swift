@@ -20,11 +20,14 @@ import SwiftUI
 struct ServicesListView: View {
     let services: ServicesStore
     let refresher: ServicesRefreshCoordinator
+    /// Passed to the rows so each one's controls submit through the same
+    /// guarded path; the list itself submits nothing.
+    let operations: OperationCenter
     @Binding var selection: String?
 
     var body: some View {
         List(services.services, selection: $selection) { service in
-            ServiceRow(service: service)
+            ServiceRow(service: service, operations: operations)
                 .tag(service.id)
         }
         .overlay {
@@ -71,6 +74,7 @@ struct ServicesListView: View {
     return ServicesListView(
         services: ServicesStore(),
         refresher: ServicesRefreshCoordinator(store: ServicesStore()),
+        operations: OperationCenter(),
         selection: $selection
     )
 }

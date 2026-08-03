@@ -25,8 +25,14 @@ struct cellarApp: App {
 
     /// What this machine has installed.
     @State private var installed: InstalledStore
-    /// The seam M2-2 will drive while a Cellar-initiated mutation runs.
+    /// The seam driven while a Cellar-initiated mutation that invalidates the
+    /// **installed set** runs.
     @State private var mutations: InstalledMutationGate
+    /// The same seam for the **services** domain. A second instance of the same
+    /// type, because a gate is a depth counter plus a terminals stream and there
+    /// is nothing installed-specific in it — the rename it deserves is recorded
+    /// as debt rather than taken here (design D2).
+    @State private var serviceMutations: InstalledMutationGate
     /// Owns cadence: launch, activation, and debounced external changes.
     @State private var refresher: InstalledRefreshCoordinator
 
@@ -74,7 +80,8 @@ struct cellarApp: App {
     /// The services **poll** is deliberately not one of them: a `LoopOwner`
     /// slot stays claimed for the rest of the launch even after its body
     /// returns, so a poll started there would never restart after the first
-    /// hide. The coordinator owns it instead.
+    /// hide. The coordinator owns it instead, and only its app-lifetime
+    /// terminals consumer takes a slot here.
     @State private var loops = LoopOwner()
 
     /// Whether the app itself is in the foreground. One of the two reported
@@ -85,16 +92,18 @@ struct cellarApp: App {
     init() {
         let installed = InstalledStore()
         let mutations = InstalledMutationGate()
+        let serviceMutations = InstalledMutationGate()
         let services = ServicesStore()
         // One container, opened once, shared by both stores.
         let stores = LocalStores()
         _installed = State(initialValue: installed)
         _mutations = State(initialValue: mutations)
+        _serviceMutations = State(initialValue: serviceMutations)
         _metadata = State(initialValue: stores.metadata)
         _history = State(initialValue: stores.history)
         _services = State(initialValue: services)
         _servicesRefresher = State(
-            initialValue: ServicesRefreshCoordinator(store: services)
+            initialValue: ServicesRefreshCoordinator(store: services, mutations: serviceMutations)
         )
         _refresher = State(
             initialValue: InstalledRefreshCoordinator(store: installed, mutations: mutations)
@@ -104,9 +113,15 @@ struct cellarApp: App {
         // fact. Removing this argument returns the centre to its M2-2 behaviour
         // exactly, which is what makes the feature one injection from revertible
         // (installation-history IH7).
+        // Two domains, and a command opens only the gates its own `invalidates`
+        // scope names — so a service toggle costs zero inventory probes and does
+        // not suppress the installed watcher while it runs (design D2).
         _operations = State(
             initialValue: OperationCenter(
-                gate: mutations,
+                gates: MutationGates([
+                    (.installedInventory, mutations),
+                    (.services, serviceMutations)
+                ]),
                 history: SwiftDataHistoryRecorder(store: stores.history)
             )
         )
@@ -141,6 +156,11 @@ struct cellarApp: App {
                 .task { loops.start("catalog") { await catalog.start() } }
                 .task { loops.start("installed") { await refresher.run() } }
                 .task { loops.start("installed-watcher") { await watchInstalledRoots() } }
+                // The **terminals consumer only** — never the poll. A `LoopOwner`
+                // slot stays claimed for the rest of the launch even after its
+                // body returns, so a poll started here would never restart after
+                // the first hide. The coordinator owns the poll itself.
+                .task { loops.start("services") { await servicesRefresher.run() } }
         }
     }
 
