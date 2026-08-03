@@ -2,9 +2,16 @@
 
 Changing the installed set through `brew`: the six typed mutating commands and the argv they
 generate, the three upgrade scopes, the destructive-action confirmation gate, the typed sudo and
-external-lock failures, the forced inventory re-snapshot and honest cancel reporting at every
-terminal outcome, and refusing to mutate when brew is absent. Owned by `Packages/CellarCore` target
-`BrewClient` — the only target that sees both `BrewProcess` and `Catalog`, one-directionally.
+external-lock failures, the **typed invalidation scope each command declares** and the honest cancel
+reporting owed at every terminal outcome, and refusing to mutate when brew is absent. Owned by
+`Packages/CellarCore` target `BrewClient` — the only target that sees both `BrewProcess` and
+`Catalog`, one-directionally.
+
+This capability also owns the **shared mutation spine** — the queue, the activity projection, the
+confirmation gate and the history recorder — which other capabilities' commands enter through a
+shared abstraction rather than as additional cases of this capability's own command type. A command
+that does not declare the installed set forces no inventory re-snapshot at any terminal outcome; the
+exactly-once obligation is per declared domain, not unconditional.
 
 Process spawning, output streaming, cancellation escalation and queue serialization belong to
 `brew-execution` and are referenced here, never restated. Queue presentation belongs to

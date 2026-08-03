@@ -15,7 +15,23 @@ are strict supersets of the text they replace.
 |---|---|
 | **PM1** "Every mutation is a typed command carrying an explicit kind flag" | "Exactly six" is restated so it survives the shared-abstraction generalisation and forbids a seventh, non-package case |
 | **PM4** "A sudo or password prompt is a typed failure" | Widened to every family on the spine, and to brew's **non-fatal** privilege warning on paths that then succeed (gate U5) |
-| **PM6** "Every terminal outcome forces one re-snapshot" | Becomes a **typed invalidation scope** declared by the command; the exactly-once invariant is preserved per declared domain |
+| **PM6** "Every terminal outcome forces one re-snapshot" | **RETITLED**, not merely re-bodied — becomes a **typed invalidation scope** declared by the command; the exactly-once invariant is preserved per declared domain |
+
+> **Instruction to the archive step — PM6 is a rename-in-place.**
+>
+> The old title is *"Every terminal outcome forces one re-snapshot, and cancel is reported honestly"*
+> (`openspec/specs/package-mutation/spec.md`). The new title is *"Every terminal outcome forces one
+> refresh of each state domain the command invalidates, and cancel is reported honestly"*.
+>
+> Archive replaces a MODIFIED requirement by **name**. Because the name changes, promoting this delta
+> naively would **add** the new requirement while **leaving the old one in place**, and the main spec
+> would then carry two contradictory versions of PM6 — one saying the re-snapshot is unconditional
+> and one saying it is scoped. The old-titled requirement MUST be removed in the **same edit** that
+> adds the new one.
+>
+> The capability header prose was reconciled during apply (task 15.2) rather than left to the archive
+> step, because header prose sits outside delta scope and would otherwise have survived promotion
+> still describing the unconditional re-snapshot.
 | **PM7** "No mutation is built or spawned when brew is absent or invalid" | Generalised to every family on the spine |
 
 **Untouched and deliberately so:** PM2 (upgrade scopes), PM3 (confirmation gate — no service verb is

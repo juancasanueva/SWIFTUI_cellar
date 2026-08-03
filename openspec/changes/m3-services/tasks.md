@@ -524,20 +524,20 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 15: Reconciliation — specs, register, docs
 
-- [ ] 15.1 **PM6 is RETITLED, not merely re-bodied.** Old title: *"Every terminal outcome forces one
+- [x] 15.1 **PM6 is RETITLED, not merely re-bodied.** Old title: *"Every terminal outcome forces one
       re-snapshot"*. New title: *"Every terminal outcome forces one refresh of each state domain the
       command invalidates, and cancel is reported honestly"*. The archive step replaces by requirement
       **NAME**, so promotion MUST be treated as a **rename-in-place**: the old-titled requirement is
       removed from `openspec/specs/package-mutation/spec.md` in the same edit that adds the new one.
       Otherwise the main spec ends up carrying **both** titles. Record this instruction inside the
       delta header so the archive agent cannot miss it.
-- [ ] 15.2 **Reconcile the `package-mutation` capability header prose**,
+- [x] 15.2 **Reconcile the `package-mutation` capability header prose**,
       `openspec/specs/package-mutation/spec.md:1-12`, which still describes the old **unconditional**
       re-snapshot at every terminal outcome. That prose is **outside delta scope** and will therefore
       survive the archive untouched unless it is fixed deliberately. Same treatment for any header
       sentence in `installation-history` naming "the forced inventory re-snapshot" in the singular.
       Prose only — no requirement text, no scenario.
-- [ ] 15.3 **Re-register M2-2 #6 (post-terminal FSEvents echo) as an OPEN follow-up**, with its reason
+- [x] 15.3 **Re-register M2-2 #6 (post-terminal FSEvents echo) as an OPEN follow-up**, with its reason
       stated: closing it requires an explicit `installed-inventory` **II10 amendment** narrowing the
       `:334-337` convergence guarantee, so a post-terminal echo can be dropped without also dropping a
       genuine external signal landing in the same window. The earlier draft's `isSettling` grace sat
@@ -545,7 +545,7 @@ If the split is taken, exactly four things must move with it — nothing else:
       governs *in-flight* suppression — a different moment and a different guarantee. The register
       already classifies the redundant re-snapshot as **conforming, not a defect**. That is a spec
       decision, and this slice does not take it.
-- [ ] 15.4 Re-register the remaining open items with their reasons: **VS3** (no XCUITest harness;
+- [x] 15.4 Re-register the remaining open items with their reasons: **VS3** (no XCUITest harness;
       a dedicated harness slice remains the eventual answer, funded separately); **VS4** (clock seam —
       still unneeded, see Phase 13); the **`InstalledMutationGate` naming debt** (now serving two
       domains under an installed-specific name; renaming is public-API churn that buys no behaviour);
@@ -553,7 +553,7 @@ If the split is taken, exactly four things must move with it — nothing else:
       a message-quality gap, not a correctness gap); and the **`services info --json <name>` cost
       question** (probed only via `--all` at n=1; the mitigation is a cache, not a redesign, because
       the fetch is already lazy and selection-keyed).
-- [ ] 15.5 Mark **S1** and **W1** closed on the register, citing `BrewRunner.swift:288/293` and
+- [x] 15.5 Mark **S1** and **W1** closed on the register, citing `BrewRunner.swift:288/293` and
       `OperationCenter.swift:168-177`. No code task exists for either. **Commit 15.**
 
 ## Phase 16: Manual verification — VS3, written now, executed at apply/verify
