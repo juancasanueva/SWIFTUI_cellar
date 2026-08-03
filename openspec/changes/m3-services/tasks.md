@@ -578,7 +578,15 @@ If the split is taken, exactly four things must move with it — nothing else:
 > corroborated by the one fixture-driven check, MV-9. Every check below is labelled **LIVE**,
 > **FIXTURE-DRIVEN** or **HEADLESS-ONLY**.
 
-- [ ] 16.1 **Manual verification — reserved for the orchestrator/user, leave unchecked until run.**
+- [x] 16.1 **Manual verification — RUN 2026-08-03 with the user driving the GUI. Closed on the
+      archive-blocking subset; the remainder is deferred by an explicit user decision, not dropped.**
+      OBTAINED: **MV-1**, **MV-3** (control enumeration in the app + the LaunchAgents discriminator
+      headlessly), **MV-4** (all four summary labels verbatim), **MV-5 dedupe half**, **MV-7 in
+      full** including both search filters, **MV-11 byte half**. `sdd-verify` pass 2 named **MV-1 and
+      MV-7 as the only archive-blocking checks**; both PASS. DEFERRED by user decision, registered as
+      owed rather than claimed: MV-2 (a)(b)(d), MV-5 GUI half, MV-6, MV-8, MV-9 (needs an
+      uncommittable fixture patch), MV-10, MV-11 GUI half, MV-12. Machine returned to baseline:
+      `atuin` at status `none`, no `~/Library/LaunchAgents/homebrew.mxcl.atuin.plist`.
       Build with `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       and run the twelve checks below in order. Record the **actual** observation for each, not just
       PASS.
