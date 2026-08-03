@@ -100,3 +100,20 @@ findings it deliberately left alone rather than widening a remediation into a se
 | **MEDIUM 4** — closing one of two windows stops the poll while another window still shows Services | `setVisible` is one shared boolean on an app-lifetime coordinator driven by every `ServicesListView.onDisappear`. SM3 sc3 only requires that never *more than one* loop runs, which still holds. A visibility-refcount gap, not a leak | A refcount or a per-scene identity on the coordinator's visibility input |
 | **LOW 3** — the row's Copy-command control always copies `brew services start <name>` | Defensible as a default, but the label says "Copy command" without saying which one | Either label it "Copy start command" or derive it from the service's current status |
 | **SUGGESTION** — `ServicesListView` passes a redundant `.tag(service.id)` inside `List(_:selection:)` | Harmless; `List` already derives the tag from `Identifiable` | Delete the modifier |
+
+## LOW — package-only vocabulary in two shared surfaces (found during M3-1 manual verification)
+
+Both surfaces now carry a second operation family, but their copy still says "package":
+
+- `cellar/Activity/ActivityBar.swift:85` — the collapsed bar's **idle fallback** reads
+  "No package changes running".
+- The History empty/detail pane reads "Every package change Cellar made, newest first."
+
+**Not a misreport, and deliberately not fixed in M3-1.** `OperationCenterSummary.runningCommand`
+returns the running item's `displayCommand` for any family, so a live service operation does show
+its own argv in the bar; the package-specific wording appears only when nothing is running. Every
+history row likewise renders its own subject correctly ("No package" for a null identity). This is
+stale copy, not a false statement about any operation.
+
+Closing it is a copy change plus its tests, and it should be taken together with any other
+vocabulary review when a third command family lands (taps in M3-2), rather than piecemeal.

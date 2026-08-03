@@ -583,6 +583,84 @@ If the split is taken, exactly four things must move with it — nothing else:
       and run the twelve checks below in order. Record the **actual** observation for each, not just
       PASS.
 
+      > **GUI evidence obtained by the user, 2026-08-03 — screenshot of the running app.**
+      >
+      > **MV-1 — PASS.** Services is present in the sidebar and selected. `atuin` is listed with
+      > status **"Not running"**, matching `brew services list`'s `none`. No error state and no
+      > empty-state placeholder is shown. The detail pane renders the service name, its status, and
+      > the property list path `/opt/homebrew/opt/atuin/homebrew.mxcl.atuin.plist`.
+      >
+      > **MV-3, control-enumeration half — PASS.** The `atuin` row offers **exactly five** controls,
+      > in this order: **Start at login · Run once · Stop · Restart · Copy command**. Each is labelled
+      > with what it does, and no single control would choose between start and run on the user's
+      > behalf. This satisfies SM "Neither action is a hidden default" sc2 for a stopped service.
+      > The `~/Library/LaunchAgents` half of MV-3 was already obtained headlessly (below).
+      >
+      > **MV-5, dedupe half — PASS (in the stopped state).** `brew services info atuin --json`
+      > reports `log_path` and `error_log_path` as the **same** file
+      > (`/opt/homebrew/var/log/atuin.log`), and the pane shows **exactly one** log location plus an
+      > **Open in Console** affordance — no duplicated row, no placeholder. The started-state half of
+      > MV-5 (status/user fields against the JSON, and the Console click) is still owed.
+      >
+      > **MV-4 — PASS. All four summary labels recorded verbatim from the Activity list**, in click
+      > order, each its own row with its own argv and none collapsed or deduplicated:
+      >
+      > | # | Command shown | Summary | Detail line |
+      > |---|---|---|---|
+      > | 1 | `brew services start atuin` | **Done** | `Done.` |
+      > | 2 | `brew services start atuin` | **No change** | `No change: it was already in that state. Homebrew reported this rather than doing anything.` |
+      > | 3 | `brew services stop atuin` | **Done** | `Done.` |
+      > | 4 | `brew services stop atuin` | **No change** | `No change: it was already in that state. Homebrew reported this rather than doing anything.` |
+      >
+      > All four brew invocations exit 0, and the two no-ops are still told apart from the two real
+      > state changes — never "Done", never a failure, never an error row. This is the end-to-end
+      > proof of SM "Outcome classification comes from output markers, never from the exit code
+      > alone", and it confirms the `.noChange` case renders as neither success nor failure. The row
+      > returned to **Not running** at the end, so the machine is at baseline.
+      >
+      > **MV-7 — PASS on its central claim. This is the check that predicted CRITICAL 1 verbatim,
+      > and the remediation holds in the window.** History lists **four** service entries, one per
+      > click, nothing collapsed or deduplicated, newest first:
+      >
+      > | Title | Verb badge | Command | Outcome |
+      > |---|---|---|---|
+      > | **No package** | `serviceStop` | `services stop atuin` | No change |
+      > | **No package** | `serviceStop` | `services stop atuin` | Done |
+      > | **No package** | `serviceStart` | `services start atuin` | No change |
+      > | **No package** | `serviceStart` | `services start atuin` | Done |
+      >
+      > Every service row is titled **"No package"** — **not** "All packages". `HistoryRecord.subject`
+      > resolves `.noPackage` and the view renders it, so the CRITICAL fix is proven end to end and
+      > not merely in the package tests. Newest-first ordering is the exact reverse of the click
+      > order, satisfying IH5. **No regression on package rows**: the pre-existing entry still reads
+      > `hello` / `install` / `install --formula hello`, so `.package(name)` is unaffected. Still
+      > owed to close MV-7 fully: the two search filters (`atuin` → only service entries, `stop` →
+      > only the stop entries).
+      >
+      > **MV-7 search half — PASS, obtained.** Search `atuin` → **only the four service entries**;
+      > the pre-existing `hello` / `install` row correctly drops out. Search `stop` → **exactly the
+      > two `serviceStop` entries**; both `serviceStart` rows drop out, so the substring match does
+      > not bleed across verbs in the direction that matters here. IH5's searchable vocabulary is
+      > satisfied for the new verbs, and this is the end-to-end vindication of shipping them
+      > **namespaced** rather than bare — the adjudication `sdd-verify` made against the delta text.
+      > **MV-7 is now fully closed.**
+      >
+      > **Observation, LOW, not blocking — the same stale vocabulary appears twice more.** The
+      > History empty/detail pane reads "Every **package** change Cellar made, newest first", which
+      > is now incomplete for the same reason as the activity bar: History carries service operations
+      > too. Cosmetic copy, no false statement about any row. Registered with the bar nit.
+      >
+      > **Observation, LOW, not blocking — stale copy in the collapsed activity bar.** With nothing
+      > running the bar reads "No package changes running" (`cellar/Activity/ActivityBar.swift:85`),
+      > which is now incomplete vocabulary: that bar also carries service operations. Verified NOT a
+      > misreport — `OperationCenterSummary.runningCommand` returns the running item's
+      > `displayCommand` for any family, so a live service operation does show its own argv there;
+      > the package-specific wording is only the **idle fallback**. Registered as a follow-up.
+      >
+      > Offering **Stop** and **Restart** on a not-running service is **conformant, not a defect**:
+      > MV-4 exercises stop-on-stopped deliberately and expects a "No change" summary, and the spec
+      > constrains only that start-at-login and run-once both be present and separately invocable.
+      >
       > **Partial evidence obtained during apply — recorded honestly, and it does NOT check this
       > task.** Everything below was obtained live on brew **6.0.15-4-gd610afe** (the design's probes
       > were taken on 6.0.14, so these also re-confirm the markers on a newer brew). The machine was
