@@ -68,6 +68,12 @@ public enum MutationOutcome: Sendable, Equatable {
             }
         }
 
+        // An identity the execution layer does not know never had a process, so
+        // it is the same fact `.launchFailed` already names — "the process never
+        // started". No new outcome case, no new sentence, and decided here so
+        // subprocess prose can never reclassify it (brew-execution, design D8).
+        if exit.reason == .unknownOperation { return .launchFailed }
+
         if exit.isCancelled { return .cancelled }
         if exit.isSuccess { return .succeeded }
 

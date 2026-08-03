@@ -103,23 +103,27 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 2: Typed unknown-operation result — D8 (item #6, `brew-execution`)
 
-- [ ] 2.1 **RED** `Tests/BrewProcessTests/ExitTests.swift` —
+- [x] 2.1 **RED** `Tests/BrewProcessTests/ExitTests.swift` —
       `anUnknownOperationYieldsATypedUnknownResultRatherThanSuccess`: ask `exit(of:)` for an id never
       submitted; expect `reason == .unknownOperation`, `isSuccess == false`, nothing thrown, no
       `isReleased` involvement. — sc *"An unknown operation identity yields a typed unknown result"*.
-- [ ] 2.2 **GREEN** `Sources/BrewProcess/BrewExit.swift` — add `case unknownOperation` **inside the
+- [x] 2.2 **GREEN** `Sources/BrewProcess/BrewExit.swift` — add `case unknownOperation` **inside the
       `Reason` declaration** (`:7-14`); a Swift enum case cannot be added in an extension. Then
       `extension BrewExit { public static let unknownOperation = BrewExit(status: -1, reason: .unknownOperation) }`.
       `-1` cannot collide with a wait status (0–255) or a signalled `128+n`, and `isSuccess`
       (`reason == .exited && status == 0`) makes the fabricated success unrepresentable.
-- [ ] 2.3 **GREEN** `Sources/BrewProcess/BrewRunner.swift:286` and `:291` — return
+- [x] 2.3 **GREEN** `Sources/BrewProcess/BrewRunner.swift:286` and `:291` — return
       `BrewExit.unknownOperation` instead of `BrewExit(status: 0, reason: .exited)`. Signature stays
       non-throwing, so the 30 callers via `BrewOperation.exit()` are untouched.
-- [ ] 2.4 **RED** `Tests/BrewClientTests/ClassificationTests.swift` —
+- [x] 2.4 **RED** `Tests/BrewClientTests/ClassificationTests.swift` —
       `anUnknownOperationClassifiesAsLaunchFailedNotSucceeded`: expect `.launchFailed`,
       `isFailure == true`, and that the terminal path still records an entry. — `brew-execution` sc
       above + `operation-activity` *"an identity the execution layer cannot answer"* clause.
-- [ ] 2.5 **GREEN** `Sources/BrewClient/MutationOutcome.swift` — add the `.unknownOperation` branch
+      **Landed in a new `Tests/BrewClientTests/UnknownOperationTests.swift` instead**: adding it to
+      `ClassificationTests` pushed that struct to 259 lines and raised a new `type_body_length`
+      finding, which the zero-new-findings gate forbids. RED was observed in both locations. The
+      "records an entry" half is proven end to end by task 3.1 through the single `finish` funnel.
+- [x] 2.5 **GREEN** `Sources/BrewClient/MutationOutcome.swift` — add the `.unknownOperation` branch
       after the fault switch, mapping to the **existing** `.launchFailed` ("the process never
       started"). No new `MutationOutcome` case, no message or `summaryLabel` churn. **Commit 2.**
 
