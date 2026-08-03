@@ -181,14 +181,14 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 6: Note draft commits on a package switch — D7 (item #5)
 
-- [ ] 6.1 **RED** `Tests/PersistenceTests/NoteDraftTests.swift` (new) — three tests:
+- [x] 6.1 **RED** `Tests/PersistenceTests/NoteDraftTests.swift` (new) — three tests:
       `anEditedDraftOwesAWriteWhenTheShownPackageChanges`, `anUnchangedDraftOwesNoWrite`,
       `anEmptiedDraftOwesAWriteThatClearsTheNote` (pending write `== ""`). — design D7 / settled Q2.
-- [ ] 6.2 **GREEN** create `Sources/Persistence/NoteDraft.swift` — `Sendable, Equatable` value with
+- [x] 6.2 **GREEN** create `Sources/Persistence/NoteDraft.swift` — `Sendable, Equatable` value with
       `init(_:)`, `static func starting(from stored: String?)`, and
       `func pendingWrite(against stored: String?) -> String?` (`nil` = owes nothing). Pure; no store
       reference.
-- [ ] 6.3 **Wire** `cellar/Browse/PackageMetadataSection.swift` — `onChange(of: entry.id)` (`:56`)
+- [x] 6.3 **Wire** `cellar/Browse/PackageMetadataSection.swift` — `onChange(of: entry.id)` (`:56`)
       commits against **`oldValue`** before resetting the draft (the closure's `oldValue` is the only
       place the departing package's identity still exists — `stored` already reads the new one), then
       resets via `NoteDraft.starting(from:)`. Correct the `:26-27` doc comment: a multiline

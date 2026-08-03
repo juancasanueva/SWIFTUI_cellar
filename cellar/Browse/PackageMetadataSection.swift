@@ -23,8 +23,13 @@ struct PackageMetadataSection: View {
     let entry: PackageEntry
     let metadata: MetadataStore
 
-    /// Local, so typing does not write a row per keystroke. Committed on
-    /// `onSubmit` and when focus leaves.
+    /// Local, so typing does not write a row per keystroke.
+    ///
+    /// Committed when **focus leaves the field** and when the **shown package
+    /// changes**. Those are the only two triggers there are: a multiline
+    /// `TextEditor` has no `onSubmit`, so the commit this comment used to claim
+    /// happened on submit never existed. Whether a commit is owed at all is
+    /// `NoteDraft.pendingWrite(against:)`, proven in the package's own suite.
     @State private var draft = ""
     @FocusState private var isEditing: Bool
 
@@ -52,8 +57,14 @@ struct PackageMetadataSection: View {
             }
         }
         .disabled(isUnavailable)
-        .onAppear { draft = stored?.note ?? "" }
-        .onChange(of: entry.id) { _, _ in draft = stored?.note ?? "" }
+        .onAppear { draft = NoteDraft.starting(from: stored?.note).text }
+        // Against `oldValue`, and before the reset: `stored` already reads the
+        // package being switched *to*, so the closure's own `oldValue` is the
+        // only place the departing package's identity still exists.
+        .onChange(of: entry.id) { oldValue, _ in
+            commit(for: oldValue, against: metadata.snapshot[oldValue]?.note)
+            draft = NoteDraft.starting(from: stored?.note).text
+        }
     }
 
     /// Snoozes the **currently offered** version, which is the whole of what a
@@ -113,15 +124,19 @@ struct PackageMetadataSection: View {
                 }
                 .onChange(of: isEditing) { _, editing in
                     guard !editing else { return }
-                    commit()
+                    commit(for: entry.id, against: stored?.note)
                 }
         }
     }
 
-    /// Verbatim, including newlines and leading whitespace. Empty means "no
-    /// note" rather than "a note that is empty".
-    private func commit() {
-        guard draft != (stored?.note ?? "") else { return }
-        metadata.setNote(draft, for: entry.id)
+    /// Writes the draft against `id`, if it owes anything.
+    ///
+    /// Both the stored note and the identity are parameters rather than read
+    /// from `entry`, because the package-change trigger has to commit against
+    /// the one being *left*. Verbatim, including newlines and leading
+    /// whitespace; an emptied draft writes `""`, which is what clears the note.
+    private func commit(for id: PackageID, against storedNote: String?) {
+        guard let pending = NoteDraft(draft).pendingWrite(against: storedNote) else { return }
+        metadata.setNote(pending, for: id)
     }
 }
