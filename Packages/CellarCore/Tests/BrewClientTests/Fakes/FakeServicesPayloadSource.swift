@@ -83,21 +83,42 @@ final class FakeServicesPayloadSource: ServicesPayloadSourcing, Sendable {
 }
 
 /// A scripted detail source, keyed by the service it was asked about.
+///
+/// Holdable for the same reason `FakeServicesPayloadSource` is: a probe that
+/// answers instantly can never be superseded, so the guard that discards a
+/// stale answer — or a stale *failure* — would have nothing to discard.
 final class FakeServiceDetailSource: ServiceDetailPayloadSourcing, Sendable {
     private struct State {
         var payloads: [String: String]
         var requested: [String] = []
+        var isOpen: Bool
     }
 
     private let state: Mutex<State>
 
-    init(_ payloads: [String: String] = ["atuin": ServicesFixture.infoWithIdenticalLogPaths]) {
-        state = Mutex(State(payloads: payloads))
+    /// - Parameters:
+    ///   - payloads: what each named service answers; an unlisted name is
+    ///     refused as a malformed payload.
+    ///   - gated: when true, each probe blocks until it is released.
+    init(
+        _ payloads: [String: String] = ["atuin": ServicesFixture.infoWithIdenticalLogPaths],
+        gated: Bool = false
+    ) {
+        state = Mutex(State(payloads: payloads, isOpen: !gated))
     }
 
     /// Every service name asked about, in order.
     var requested: [String] { state.withLock { $0.requested } }
     var callCount: Int { state.withLock { $0.requested.count } }
+
+    /// Lets every held probe finish.
+    func release() {
+        state.withLock { $0.isOpen = true }
+    }
+
+    func waitForCalls(atLeast count: Int) async {
+        await TestPoll.until(self.callCount >= count)
+    }
 
     func payload(
         using installation: BrewInstallation,
@@ -107,7 +128,12 @@ final class FakeServiceDetailSource: ServiceDetailPayloadSourcing, Sendable {
             state.requested.append(target.name)
             return state.payloads[target.name]
         }
+
+        await TestPoll.until(self.isOpen)
+
         guard let payload else { throw .malformedPayload }
         return Data(payload.utf8)
     }
+
+    private var isOpen: Bool { state.withLock { $0.isOpen } }
 }
