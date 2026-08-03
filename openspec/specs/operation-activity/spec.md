@@ -201,8 +201,8 @@ When an operation this capability projects reaches a terminal outcome, exactly o
 be submitted for it — never zero and never two — carrying that operation's package identity when it
 has one, its verb, its exact argv and its outcome. Success, failure and cancellation MUST each be
 recorded. Nothing MUST be submitted while the operation is pending or running. Recording MUST be a
-side effect: if it is unavailable or fails, the operation's reported outcome, its log, and the forced
-re-snapshot owed at that outcome MUST be unchanged. What the entry stores and how long it is kept are
+side effect: if it is unavailable or fails, the operation's reported outcome, its log, and the
+refreshes owed at that outcome MUST be unchanged. What the entry stores and how long it is kept are
 owned by `installation-history`.
 
 An operation that reaches a terminal outcome **without ever spawning a process** MUST be treated as a
@@ -211,6 +211,14 @@ process exists, and an identity the execution layer cannot answer MUST each reco
 carrying that operation's argv and its failure outcome. This rule MUST hold with no carve-out — a
 settled outcome that is reported to the queue but writes no entry is forbidden, whatever path settled
 it.
+
+An operation that acts on **no package** MUST be recorded on exactly the same terms: exactly one
+entry, carrying no package identity, its own typed verb, its exact argv and its outcome. The absence
+of a package identity MUST NOT be a reason to skip the entry, to defer it, or to record a placeholder
+or synthesized identity in its place, and MUST NOT change when the entry is written.
+(Previously: the requirement was written for operations that carry a package identity and said
+nothing about one that does not; and its side-effect clause named "the forced re-snapshot" in the
+singular, which no longer matches the per-domain invalidation scope `package-mutation` now declares.)
 
 #### Scenario: A successful operation records once
 
@@ -243,7 +251,14 @@ it.
 - GIVEN a history recorder that fails on every write
 - WHEN a mutation reaches its terminal outcome
 - THEN the operation's reported outcome and log are identical to the same run with a working recorder
-- AND exactly one inventory re-snapshot was forced
+- AND exactly one refresh was forced for each state domain that mutation declared
+
+#### Scenario: An operation with no package identity records exactly one entry
+
+- GIVEN a submitted operation that acts on no package, which reaches a terminal outcome
+- WHEN the recorded entries are enumerated
+- THEN exactly one entry was submitted for it, carrying its verb, its exact argv and its outcome
+- AND that entry carries no package identity, and none was synthesized from its arguments
 
 ## Provenance
 
@@ -324,3 +339,27 @@ it.
   - **Native review note (lineage `review-fa82e5eaa3023fc4`)**: the reviewer positively verified
     begin/end pairing is structurally sound — every `ActivityItem` is constructed only inside
     `submit`, so no path can reach a terminal outcome outside the funnel.
+- **Amended by change `m3-services` (archived `2026-08-03`, PRD milestone **M3**, slice M3-1 —
+  Service Management)**: **1 MODIFIED** requirement replaced as a whole block — "Every terminal
+  outcome records exactly one history entry" — adding **1 scenario**. 6 requirements / 23 scenarios →
+  **6 requirements / 24 scenarios**. Nothing was added, removed or renamed; the other five
+  requirements are byte-identical, and the replacement is a strict superset of the text it replaced.
+  Services is the first **non-package** operation family, and two things needed saying: what "exactly
+  one entry" means for an operation carrying no package identity, and that the side-effect clause's
+  "the forced re-snapshot", in the singular, no longer matches the per-domain invalidation scope
+  `package-mutation` PM6 now declares.
+  - **The absence of a package identity is never a reason to skip, defer, or synthesize.** A
+    placeholder or an identity inferred from the argv would have been the path of least resistance and
+    is now explicitly forbidden — `installation-history` states the storage half of the same rule.
+  - **OA1–OA5 needed no change and were deliberately not reproduced.** OA1 already requires each item
+    to carry "the package identity it acts on **when it has one**", so a non-package operation was
+    already in contract; copy-command, log streaming, cancel and the summary/detail projections are
+    written against the operation rather than against a package, so a service verb gets its own queue
+    item, live log, cancel and copy-command for free.
+  - **Known follow-up (LOW, non-blocking, found during M3-1 manual verification)**: the collapsed
+    activity bar's **idle fallback** reads "No package changes running"
+    (`cellar/Activity/ActivityBar.swift:85`), which is now incomplete vocabulary since the bar also
+    carries service operations. Verified **not** a misreport — `OperationCenterSummary.runningCommand`
+    returns the running item's `displayCommand` for any family, so a live service operation does show
+    its own argv; the package-specific wording appears only when nothing is running. Stale copy, not
+    a false statement, and deliberately deferred to a vocabulary review when a third family lands.

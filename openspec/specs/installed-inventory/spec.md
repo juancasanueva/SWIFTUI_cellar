@@ -321,15 +321,22 @@ An external change to the installed packages MUST be reflected without user acti
 signal MUST be treated purely as an invalidation trigger: its contents MUST NOT be parsed to derive
 inventory state — a re-snapshot is always taken instead. Bursts of signals MUST be coalesced on an
 injected clock so that a burst within the quiet window causes exactly one re-snapshot. While a
-Cellar-initiated mutation is in flight, signals MUST be suppressed, and exactly one re-snapshot MUST
-be taken at that mutation's terminal outcome. Overlapping refresh requests MUST coalesce onto the
-one refresh genuinely in flight; a request that arrives after that refresh has settled MUST take a
-fresh snapshot rather than be handed the settled one.
+Cellar-initiated mutation **that invalidates the installed set** is in flight, signals MUST be
+suppressed, and exactly one re-snapshot MUST be taken at that mutation's terminal outcome.
+Overlapping refresh requests MUST coalesce onto the one refresh genuinely in flight; a request that
+arrives after that refresh has settled MUST take a fresh snapshot rather than be handed the settled
+one.
+
+Suppression and the owed re-snapshot MUST be scoped to commands that declare they invalidate the
+installed set, as `package-mutation` requires each command to declare. A Cellar-initiated operation
+that does not declare the installed set MUST NOT suppress external change signals while it runs, and
+MUST NOT force an inventory re-snapshot at its terminal outcome; external changes observed while such
+an operation runs MUST be handled by the ordinary debounce and coalescing rules above.
 
 Mutation suppression MUST be evaluated at the moment a re-snapshot would actually start, not only
-when a signal arrives and when the quiet window opens. A quiet window that opened before a mutation
-began MUST NOT fire a re-snapshot while that mutation is in flight; it MUST be folded into the single
-re-snapshot owed at the mutation's terminal outcome.
+when a signal arrives and when the quiet window opens. A quiet window that opened before an
+inventory-invalidating mutation began MUST NOT fire a re-snapshot while that mutation is in flight;
+it MUST be folded into the single re-snapshot owed at the mutation's terminal outcome.
 
 An acquisition already in flight MUST NOT be used to answer a change signal that arrived after that
 acquisition started: such a signal MUST invalidate the in-flight result for freshness purposes and
@@ -340,6 +347,9 @@ Resetting the inventory to a detection-driven state — for example clearing it 
 reported brew absent — while an acquisition is in flight MUST NOT strand that acquisition. The
 inventory MUST remain able to run and publish a later refresh, and MUST NOT stay stuck in the
 cleared state after a subsequent successful refresh.
+(Previously: suppression and the owed re-snapshot applied to **every** Cellar-initiated mutation
+unconditionally, so a mutation that cannot change the installed set both suppressed genuine external
+signals and paid a full re-snapshot it could learn nothing from.)
 
 #### Scenario: An external install is reflected without user action
 
@@ -354,9 +364,9 @@ cleared state after a subsequent successful refresh.
 - WHEN twenty change signals are emitted within the quiet window
 - THEN exactly one additional brew invocation is recorded
 
-#### Scenario: Signals during a mutation are suppressed and settled once
+#### Scenario: Signals during an inventory-invalidating mutation are suppressed and settled once
 
-- GIVEN a Cellar-initiated mutation in flight
+- GIVEN a Cellar-initiated mutation declaring the installed set, in flight
 - WHEN change signals are emitted continuously until that mutation reaches a terminal outcome
 - THEN no re-snapshot runs while the mutation is in flight
 - AND exactly one re-snapshot runs at the terminal outcome
@@ -368,11 +378,11 @@ cleared state after a subsequent successful refresh.
 - THEN a second invocation is performed
 - AND the inventory reflects `P2`
 
-#### Scenario: A window opened before a mutation began does not fire during it
+#### Scenario: A window opened before an inventory-invalidating mutation began does not fire during it
 
 - GIVEN a change signal that opened the quiet window
-- WHEN a Cellar-initiated mutation begins before that window elapses, and the window then elapses
-  while the mutation is still in flight
+- WHEN a Cellar-initiated mutation declaring the installed set begins before that window elapses, and
+  the window then elapses while the mutation is still in flight
 - THEN no re-snapshot runs while the mutation is in flight
 - AND exactly one re-snapshot runs at the mutation's terminal outcome
 
@@ -391,6 +401,22 @@ cleared state after a subsequent successful refresh.
   reports a valid installation and a refresh is requested
 - THEN that refresh performs an invocation and publishes its snapshot
 - AND the inventory does not remain empty
+
+#### Scenario: An operation that does not invalidate the installed set forces no re-snapshot
+
+- GIVEN a Cellar-initiated operation whose declared invalidation scope excludes the installed set
+- WHEN it reaches a successful terminal outcome, and separately a failed and a cancelled one
+- THEN no inventory re-snapshot is forced in any of the three cases
+- AND no `brew info --installed --json=v2` invocation is recorded for them
+
+#### Scenario: External signals are not suppressed by a non-invalidating operation
+
+- GIVEN a Cellar-initiated operation whose declared invalidation scope excludes the installed set, in
+  flight, and a change source under test control
+- WHEN the underlying snapshot gains a package and one change signal is emitted while that operation
+  is still running
+- THEN after the quiet window the inventory lists the new package, without waiting for that operation
+  to finish
 
 ### Requirement: Refresh loops are owned for the app's lifetime
 
@@ -689,3 +715,37 @@ be impossible for the control to announce one number and submit a different set.
   headless; the app-target wiring rests on `xcodebuild build` plus manual check 9.1(c), which
   observed a real one-gesture multi-add submitting in displayed order. Tracked as follow-up **(c)**
   in the M3-0 archive report.
+- **Amended by change `m3-services` (archived `2026-08-03`, PRD milestone **M3**, slice M3-1 —
+  Service Management)**: **1 MODIFIED** requirement replaced as a whole block — "External changes
+  invalidate the inventory, debounced and coalesced" — adding **2 scenarios**. 14 requirements / 55
+  scenarios → **14 requirements / 57 scenarios**. Nothing was added, removed or renamed; the other
+  thirteen requirements are byte-identical, and the replacement is a strict superset of the text it
+  replaced. Previously suppression and the owed re-snapshot applied to **every** Cellar-initiated
+  mutation unconditionally, so a mutation that cannot change the installed set both suppressed
+  genuine external signals and paid a full `brew info --installed --json=v2` probe (1.27 s / 663 KB)
+  it could learn nothing from.
+  - **This is the other half of `package-mutation` PM6's typed invalidation scope**, amended in the
+    same change. The two requirements were written to be read together and MUST NOT drift: PM6 says
+    the command declares what it invalidates; this says what the inventory does with that
+    declaration. A services toggle now costs zero inventory re-snapshots.
+  - **Delivered with `InstalledChangeObserving.swift` byte-unchanged** — asserted, not assumed
+    (`git diff main...HEAD` on that file returns 0 lines). Scoping falls out of `MutationGates` never
+    calling `begin()` on the installed gate for a command that does not declare `.installedInventory`,
+    so `isMutating` stays false (no suppression) and the `terminals` stream never fires (no forced
+    re-snapshot). No new suppression branch was added to the observer at all.
+  - **The post-terminal FSEvents grace window (M2-2 follow-up #6) was deliberately NOT specified, and
+    an earlier draft that folded it in was wrong.** A grace guard sits exactly where the
+    carried-forward clause "An acquisition already in flight MUST NOT be used to answer a change
+    signal that arrived after that acquisition started … so the inventory converges on state observed
+    at or after the newest signal" fires its further re-snapshot, and **drops** it. For a mutation's
+    own echo that is harmless, but the rule cannot tell that echo apart from a genuine external change
+    landing in the same window, which would then be silently lost. The draft cited the in-flight
+    suppression paragraph as cover; that governs a different moment and a different guarantee.
+    Closing #6 requires an explicit amendment **narrowing this requirement's convergence guarantee**,
+    which this slice did not take — it stays open, with that amendment named as its precondition.
+    Guarded rather than trusted: a repo scan for `isSettling|settleGrace` returns zero.
+  - **"Multi-select is explicit, ordered, and offered only for bulk-eligible verbs" is untouched, and
+    that is load-bearing.** This slice ships **no** bulk service affordance; `service-management`
+    carries a guard scenario asserting the installed list's bulk vocabulary is still exactly upgrade
+    and uninstall, so a future services multi-select must be its own type over its own entity rather
+    than a third case here.

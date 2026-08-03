@@ -8,15 +8,42 @@ concurrent-read queue. Owned by `Packages/CellarCore` target `BrewProcess`.
 
 ### Requirement: Normalized brew environment
 
-Every `brew` invocation MUST run with `HOMEBREW_NO_AUTO_UPDATE=1`, `HOMEBREW_COLOR=0`,
+Every `brew` invocation MUST run with `HOMEBREW_NO_AUTO_UPDATE=1`, `HOMEBREW_NO_COLOR=1`,
 `HOMEBREW_NO_EMOJI=1`. `HOMEBREW_NO_INSTALL_FROM_API` MUST NOT be set (default API mode).
+
+`HOMEBREW_COLOR` MUST NOT be set to any value, including `"0"`. It is a force-colour boolean whose
+mere presence enables ANSI output regardless of value, so setting it to a falsy-looking string
+produces the opposite of the intended effect. Colour MUST be disabled through `HOMEBREW_NO_COLOR`
+only.
+
+Suppression MUST happen at the source. Because captured output is required to be byte-identical to
+what `brew` emitted, the capability MUST NOT strip, filter, rewrite or otherwise post-process escape
+bytes out of a captured line in order to satisfy this requirement. Consequently no ESC byte (`0x1B`)
+MUST appear in output captured from a `brew` invocation run with this environment.
+(Previously: the requirement mandated `HOMEBREW_COLOR=0`, which forces ANSI on rather than off, and
+said nothing about where suppression must happen.)
 
 #### Scenario: Environment applied to every invocation
 
 - GIVEN a runner backed by a recording process spawner
 - WHEN any command is executed
-- THEN the recorded environment contains the three variables with those exact values
+- THEN the recorded environment contains `HOMEBREW_NO_AUTO_UPDATE=1`, `HOMEBREW_NO_COLOR=1` and
+  `HOMEBREW_NO_EMOJI=1` with those exact values
 - AND contains no `HOMEBREW_NO_INSTALL_FROM_API` key
+
+#### Scenario: The force-colour key is never set at any value
+
+- GIVEN the pinned brew environment
+- WHEN its keys are enumerated
+- THEN no `HOMEBREW_COLOR` key is present, at `"0"` or at any other value
+
+#### Scenario: No ANSI escape byte survives capture
+
+- GIVEN a `brew` invocation executed with the pinned environment and its output captured
+  non-interactively
+- WHEN every captured line's bytes are inspected
+- THEN no line contains the ESC byte `0x1B`
+- AND no line was altered, trimmed or re-encoded to achieve that
 
 ### Requirement: Verbatim line-oriented output streaming
 
@@ -282,3 +309,35 @@ Every type crossing an isolation boundary (`LogLine`, results, errors, configura
   - **Native review note (lineage `review-fa82e5eaa3023fc4`)**: the reviewer positively verified the
     `.unknownOperation` decision is made **before** the stderr scan, so no fault classification can
     re-fabricate a success from it.
+- **Amended by change `m3-services` (archived `2026-08-03`, PRD milestone **M3**, slice M3-1 —
+  Service Management)**: **1 MODIFIED** requirement replaced as a whole block — "Normalized brew
+  environment" — adding **2 scenarios**. 6 requirements / 20 scenarios → **6 requirements / 22
+  scenarios**. Nothing was added, removed or renamed; the other five requirements are byte-identical,
+  and the replacement is a strict superset of the text it replaced. **The shipped requirement
+  mandated the exact opposite of its own stated intent**: it named `HOMEBREW_COLOR=0` verbatim while
+  `HOMEBREW_COLOR` is a *force-colour* boolean in brew (`Library/Homebrew/env_config.rb:249-252`,
+  declared `disabled_by: :HOMEBREW_NO_COLOR`) whose mere **presence** enables ANSI regardless of
+  value — so Cellar was forcing colour on and then capturing the escape bytes (defect Engram `#7179`).
+  - **Confirmed by a three-way `od -c` probe**, not by reading the source alone: under
+    `HOMEBREW_COLOR=0` the captured bytes carry `\033[34m==>\033[0m` even with stdout redirected to a
+    file, while `HOMEBREW_NO_COLOR=1` comes back clean. Re-confirmed on brew 6.0.15 during apply on
+    this slice's own `brew services list` command: 0 ESC bytes under the new key, 3 ESC-carrying lines
+    under the old one.
+  - **Suppression is required to happen at the source, and stripping is now explicitly forbidden.**
+    "Verbatim line-oriented output streaming" requires a line containing ANSI bytes to be delivered
+    byte-identically, so a future change that "fixed" colour by filtering ESC bytes in the core would
+    satisfy this requirement while silently breaking that one. The amendment says so in requirement
+    text rather than leaving it to reviewer memory.
+  - Delivered as a one-key change in `BrewEnvironment.swift` — `pinned["HOMEBREW_COLOR"] = "0"`
+    became `pinned["HOMEBREW_NO_COLOR"] = "1"` — plus the doc comment that asserted the opposite of
+    the shipped behaviour. Pinned by `theForceColourKeyIsNeverSetAtAnyValue`, by a spawned-process
+    assertion through `RecordingProcessLauncher`, and by a self-skipping **integration** test that
+    runs a real `brew info --formula <discovered>` and asserts no `0x1B` byte survives capture. A
+    fake process cannot prove anything about brew's own colour decision, which is why the integration
+    half exists.
+  - **"Terminal result and exit handling" was deliberately NOT re-modified.** M2-3 follow-up **S1**
+    was already closed by `m3-hardening-prelude` above; the umbrella explore's §3 row listing it as
+    M3 work was stale. Re-modifying it would have been a no-op block carrying regression risk.
+  - **"Serialized mutations with concurrent reads" is unchanged and load-bearing.** Every command
+    family this slice introduces is a mutation and inherits the existing FIFO gate, the read/mutation
+    split, the SIGINT→SIGTERM escalation and the SIGKILL ban verbatim.
