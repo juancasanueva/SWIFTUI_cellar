@@ -104,6 +104,10 @@ MUST NOT be implied by an ordinary uninstall. Install, reinstall, upgrade, pin a
 require confirmation. Declining a confirmation MUST spawn no process, submit nothing to the queue,
 and leave the inventory untouched.
 
+A bulk uninstall MUST be confirmed once for the whole selection, and that single confirmation MUST
+name every package it will remove — not a count alone and not an elided subset. Confirming it MUST
+submit the whole selection; declining it MUST submit none of it, never a partial subset.
+
 #### Scenario: Uninstall asks first and shows the exact command
 
 - GIVEN the installed formula `wget`
@@ -130,6 +134,19 @@ and leave the inventory untouched.
 - WHEN install, upgrade, pin and unpin mutations are requested for it
 - THEN no confirmation is requested for any of them
 - AND each is submitted to the queue directly
+
+#### Scenario: A bulk uninstall confirmation names every selected package
+
+- GIVEN a selection of the formulae `wget` and `git` and the cask `iterm2`
+- WHEN a bulk uninstall is requested
+- THEN exactly one confirmation is requested before anything is submitted
+- AND the text it presents names all three packages
+
+#### Scenario: Declining a bulk uninstall submits none of it
+
+- GIVEN a pending bulk uninstall confirmation over three packages
+- WHEN it is declined
+- THEN no process is spawned and no operation is enqueued for any of the three
 
 ### Requirement: A sudo or password prompt is a typed failure, never an interactive prompt
 
@@ -272,6 +289,73 @@ app.
 - WHEN detection transitions to a valid installation
 - THEN a mutation requested afterwards is built and submitted normally
 
+### Requirement: A bulk selection expands to one invocation per selected package
+
+A bulk upgrade or bulk uninstall over a selection MUST expand into one operation per selected
+package, each naming exactly that one package with its own kind flag, enqueued in selection order and
+serialized through the existing mutation gate. No generated argv MUST name more than one package, so
+kind mixing is structurally impossible and every selected package gets its own queue item, log,
+copy-command, cancel and terminal outcome. A failure or cancellation of one operation MUST NOT cancel
+or suppress the remaining operations in the batch, and MUST attribute to exactly one package. Bulk
+expansion MUST be offered for upgrade and uninstall only; no other verb MUST accept a selection.
+
+#### Scenario: A bulk uninstall expands to one invocation per package
+
+- GIVEN a confirmed bulk uninstall over the formulae `wget` and `git` and the cask `iterm2`, in that
+  order
+- WHEN the mutations are built
+- THEN exactly three operations are enqueued, with the argvs `uninstall --formula wget`,
+  `uninstall --formula git` and `uninstall --cask iterm2`, in that order
+- AND no argv names more than one package
+
+#### Scenario: A mid-batch failure attributes to one package and does not stop the batch
+
+- GIVEN a bulk action over three packages where the second operation exits non-zero
+- WHEN all three reach their terminal outcomes
+- THEN the failure is reported against the second package only
+- AND the third operation still ran
+
+#### Scenario: Cancelling one operation of a batch leaves the rest queued
+
+- GIVEN a bulk action over three packages with the first running and the other two pending
+- WHEN the second is cancelled
+- THEN the second is reported cancelled and spawned no process
+- AND the third still runs after the first completes
+
+#### Scenario: No other verb accepts a selection
+
+- GIVEN a non-empty selection
+- WHEN the mutation surface is asked to build pin, unpin or reinstall mutations for it
+- THEN no such bulk mutation is available
+
+### Requirement: Every mutation command is validated at construction, with no bypass
+
+A mutation command MUST be constructible only through a path that validates the package identity it
+names, so the by-construction validation claim holds at every call site with no exception. A name
+that is empty, that is only whitespace, or that begins with `-` — which would otherwise be
+interpreted by brew as an option rather than a package — MUST be rejected at construction and MUST
+NOT reach the queue or a spawned process. No alternate constructor, initializer or convenience
+overload MUST exist that produces a command from an unvalidated identity.
+
+#### Scenario: An empty or whitespace name is rejected
+
+- GIVEN package identities whose names are the empty string and a single space
+- WHEN a mutation command is constructed for each
+- THEN construction fails for both and no operation is enqueued
+
+#### Scenario: A name that looks like an option is rejected
+
+- GIVEN a package identity named `--force`
+- WHEN a mutation command is constructed for it
+- THEN construction fails
+- AND no argv containing `--force` was produced or spawned
+
+#### Scenario: No construction path skips validation
+
+- GIVEN the public construction surface of the mutation command type
+- WHEN every way to obtain a command instance is enumerated
+- THEN each one applies the same identity validation
+
 ## Provenance
 
 - Established by change `m2-mutations-activity` (archived `2026-08-02`, PRD milestone **M2**, slice
@@ -321,3 +405,34 @@ app.
 - **`brew-execution` owns the mechanism, this capability owns the vocabulary.** Serialization,
   streaming, cancellation escalation and the SIGKILL ban are referenced, never restated, so a future
   change cannot fork a second execution policy under this capability's name.
+- **Amended by change `m2-local-metadata-history` (archived `2026-08-03`, PRD milestone **M2**, slice
+  M2-3 — the last M2 slice)**: **1 MODIFIED** requirement replaced as a whole block (adding
+  **2 scenarios**) and **2 ADDED** requirements (**7 scenarios**). 7 requirements / 25 scenarios →
+  **9 requirements / 34 scenarios**. Nothing was removed or renamed; the other six requirements are
+  byte-identical, and the MODIFIED replacement is a strict superset of the text it replaced.
+  - **"Uninstall and zap are the only mutations behind a confirmation gate"** gained the bulk-uninstall
+    disclosure rule: one confirmation for the whole selection, naming **every** package it will remove
+    — not a count and not an elided subset — with confirming submitting all of it and declining
+    submitting none. Previously the requirement governed single-package uninstall and zap only and said
+    nothing about what a confirmation covering several packages must disclose or submit. Delivered as
+    a `ConfirmationRequest` storing head + tail (`command` + `additional`) so non-emptiness is a
+    **type fact**, with `confirm(_:)` returning `[ActivityItem]`.
+  - **"A bulk selection expands to one invocation per selected package"** extends the M2-2
+    upgrade-selected ruling (Engram `#7101`) to uninstall on the same terms — per-package attribution,
+    log, copy-command, cancel and terminal outcome, and a mid-batch failure attributing to exactly one
+    package. Upgrade and uninstall are the only bulk-eligible verbs (settled 2026-08-02); the
+    restriction is proven exhaustively over `BulkSelection.Action.allCases`, not by convention.
+  - **"Every mutation command is validated at construction, with no bypass"** closed M2-2 follow-up 3:
+    `MutationMenu.swift` and `PackageDetailView.swift` built commands from a raw, unvalidated
+    `PackageID`, which made `MutationCommand`'s by-construction validation claim untrue at exactly
+    those two sites. Delivered as a `PackageTarget` wrapper with a failable init, so **no enum case
+    takes a bare `PackageID`** — a compiler fact, asserted by
+    `MutationCommandTargetTests > noEnumCaseTakesABarePackageID`. The rule itself lives in exactly one
+    place (`MutationName.isSafe` at `MutationCommand.swift:104-107`: non-empty, no leading `-`, no
+    whitespace), pinned by `theSafetyRuleIsDefinedOnce`.
+  - **The `-` prefix rejection is new in this slice.** The M2-2 spec forbade empty and whitespace-only
+    names; option-injection hardening (a name such as `--force` reaching argv) was tightened here and
+    is triangulated over 10 hostile names × 3 constructors.
+- **`installed-inventory` owns the selection model; this capability owns its expansion.** The
+  selection's order, its reconciliation against the inventory, and which verbs offer a bulk affordance
+  are specified there. `installation-history` owns the durable record each terminal outcome writes.

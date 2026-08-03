@@ -22,6 +22,10 @@ whole lifetime. Pending operations MUST be enumerated in the order brew will act
 A terminal operation MUST remain enumerable for the rest of the session. Enumerating MUST be
 read-only: it MUST NOT start, delay, reorder or otherwise perturb any operation.
 
+This session-long enumeration MUST NOT depend on the execution layer retaining its own record of an
+operation. When `brew-execution` retires a terminal, fully drained record, the operation MUST still
+be enumerated here with its identity, argv and terminal outcome for the rest of the session.
+
 #### Scenario: Pending operations are visible before they run, in run order
 
 - GIVEN mutation A is running and mutations B and C are submitted in that order
@@ -46,6 +50,12 @@ read-only: it MUST NOT start, delay, reorder or otherwise perturb any operation.
 - WHEN the queue projection is enumerated afterwards
 - THEN the operation is still listed with its terminal outcome
 - AND enumerating it did not spawn or restart anything
+
+#### Scenario: A retired execution record does not remove the queue item
+
+- GIVEN a terminal, fully drained operation whose execution-layer record has been retired
+- WHEN the queue projection is enumerated
+- THEN the operation is still listed with its identity, its argv and its terminal outcome
 
 ### Requirement: Copy command yields exactly the command that runs
 
@@ -115,6 +125,13 @@ a failure, and the next pending operation MUST then start. This capability MUST 
 or removal of queued operations, and the queue order MUST NOT be mutable from any surface it
 exposes.
 
+Cancel MUST remain effective for an operation that is actually running, regardless of whether the
+queue is currently attached to the executing backend. The capability MUST NOT report an operation as
+cancelled while its process is still running: a cancel MUST signal the running process, and the item
+MUST settle as cancelled only at the real terminal outcome. The mutation gate MUST NOT be released,
+and the forced re-snapshot MUST NOT be taken, before that real terminal outcome — so a cancel issued
+while detached can never leave a running, uncancellable operation behind an already-reopened gate.
+
 #### Scenario: Cancelling a pending operation spawns nothing
 
 - GIVEN mutation B pending behind running mutation A
@@ -134,6 +151,21 @@ exposes.
 - WHEN the controls the queue projection exposes for a pending operation are enumerated
 - THEN cancel is present
 - AND no reorder, move or remove control is present
+
+#### Scenario: Cancelling while detached still stops the process
+
+- GIVEN a running mutation whose queue has been detached from its executing backend
+- WHEN the operation is cancelled
+- THEN the running process is signalled through the ordinary cancellation escalation
+- AND the operation is reported cancelled only once that process has stopped
+
+#### Scenario: A detached cancel does not release the gate early
+
+- GIVEN a running mutation, detached as above, with another mutation pending behind it
+- WHEN the operation is cancelled and its process has not yet stopped
+- THEN the pending mutation has not started
+- AND no inventory re-snapshot has been forced
+- AND both happen exactly once when the real terminal outcome arrives
 
 ### Requirement: Summary and detail projections come from one source of truth
 
@@ -162,6 +194,42 @@ or running, the summary MUST report idle and MUST NOT claim work is in progress.
 - WHEN the summary's running operation and pending count are compared with the detail listing
 - THEN the summary's running operation is the one the detail lists as running
 - AND the summary's pending count equals the number of operations the detail lists as pending
+
+### Requirement: Every terminal outcome records exactly one history entry
+
+When an operation this capability projects reaches a terminal outcome, exactly one history entry MUST
+be submitted for it — never zero and never two — carrying that operation's package identity when it
+has one, its verb, its exact argv and its outcome. Success, failure and cancellation MUST each be
+recorded. Nothing MUST be submitted while the operation is pending or running. Recording MUST be a
+side effect: if it is unavailable or fails, the operation's reported outcome, its log, and the forced
+re-snapshot owed at that outcome MUST be unchanged. What the entry stores and how long it is kept are
+owned by `installation-history`.
+
+#### Scenario: A successful operation records once
+
+- GIVEN a submitted install for the cask `iterm2` that exits with status 0
+- WHEN it reaches its terminal outcome
+- THEN exactly one history entry was submitted for it, carrying the argv `install --cask iterm2` and
+  a successful outcome
+
+#### Scenario: A cancelled operation records its cancellation
+
+- GIVEN a running mutation
+- WHEN it is cancelled and reaches the cancelled outcome
+- THEN exactly one history entry was submitted for it, carrying the cancelled outcome
+
+#### Scenario: Nothing is recorded before the terminal outcome
+
+- GIVEN a mutation that is pending, and separately one that is running
+- WHEN the recorded entries are enumerated
+- THEN no entry exists for either operation
+
+#### Scenario: A failing recorder does not change what the queue reports
+
+- GIVEN a history recorder that fails on every write
+- WHEN a mutation reaches its terminal outcome
+- THEN the operation's reported outcome and log are identical to the same run with a working recorder
+- AND exactly one inventory re-snapshot was forced
 
 ## Provenance
 
@@ -193,3 +261,34 @@ or running, the summary MUST report idle and MUST NOT claim work is in progress.
   sheet read — which sentence to show, whether cancel is offered, whether confirmation is required —
   is a computed property in `BrewClient` (design D10), so it is covered by the fast package test loop
   rather than by app-target UI tests.
+- **Amended by change `m2-local-metadata-history` (archived `2026-08-03`, PRD milestone **M2**, slice
+  M2-3 — the last M2 slice)**: **2 MODIFIED** requirements replaced as whole blocks (adding
+  **3 scenarios**) and **1 ADDED** requirement (**4 scenarios**). 5 requirements / 15 scenarios →
+  **6 requirements / 22 scenarios**. Nothing was removed or renamed; the other three requirements are
+  byte-identical, and both MODIFIED replacements are strict supersets of the text they replaced.
+  - **"The operation queue is enumerable, ordered, and carries each operation's argv"** gained the
+    rule that the session-long enumeration MUST NOT depend on the execution layer retaining its own
+    record, plus 1 scenario. Previously the requirement said a terminal operation remains enumerable
+    for the session but did not say where that guarantee is sourced from; the execution layer never
+    retired a record, so the distinction had no consequence. M2-3 makes `brew-execution` retire
+    terminal, drained records, so without this clause the two capabilities would silently contradict
+    each other.
+  - **"Cancel is offered from pending and running, and is the only queue control"** gained the
+    detached-cancel rule, plus 2 scenarios. This closed M2-2 follow-up 2: a cancel issued while the
+    queue was detached from its runner settled the item as cancelled **without signalling the
+    process** and paid the mutation gate's `end()` early, after which the still-running operation
+    could not be cancelled again. Bulk multi-select, which M2-3 ships, multiplies the exposure — which
+    is why the M2-2 archive routed the fix to this slice rather than fixing it speculatively.
+  - **"Every terminal outcome records exactly one history entry"** is the new bridge to
+    `installation-history`, which owns what is written and how long it is kept. Recording travels
+    through a `HistoryRecording` protocol seam whose default is a no-op, so `BrewClient` never links
+    SwiftData and a recorder failure is provably inert
+    (`OperationCenterHistoryTests > aRecorderFailureNeverReachesTheOperation`, parameterised over
+    working / absent / failing recorders).
+- **Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
+  WARNING, non-blocking)**: the **no-runner submit path** settles an item as `.launchFailed` without
+  going through `finish()`, so that one path produces a terminal outcome with **no** history entry —
+  a narrow exception to "Every terminal outcome records exactly one history entry"
+  (`OperationCenter.swift:159-163`). It is reachable only when a mutation is submitted while no runner
+  is attached. The requirement text is unchanged and every scenario is COMPLIANT; tracked as
+  follow-up W1 in the M2-3 archive report and routed to the next cycle.

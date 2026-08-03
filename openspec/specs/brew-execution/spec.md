@@ -98,6 +98,16 @@ expose a read-only enumeration of its operations — each with its identity, its
 Enumerating MUST NOT start, delay, reorder, cancel or otherwise perturb any operation, and MUST NOT
 block on one in flight.
 
+Retention of those records MUST be bounded: they MUST NOT accumulate for the lifetime of the process.
+A record MUST be retired only once its operation is terminal **and** its result has been drained, so
+the operation's exit MUST remain answerable for any operation still being awaited, and retiring a
+record MUST never affect a pending or running operation. A retired operation MUST NOT be reported as
+pending or running by the enumeration, and MUST NOT be re-spawned, re-queued or resurrected in any
+form.
+
+An operation's observable phase MUST NOT be republished when its value has not changed, so observers
+see one change per real transition rather than one per yield.
+
 #### Scenario: Two mutations never overlap
 
 - GIVEN mutation A is in flight
@@ -136,6 +146,33 @@ block on one in flight.
 - WHEN the operations are enumerated repeatedly while A runs
 - THEN no additional process is spawned
 - AND the start order after A completes is still B then C
+
+#### Scenario: Records stop accumulating
+
+- GIVEN a runner over which many operations have each reached a terminal outcome and had their
+  results drained
+- WHEN the number of records the runner holds is read
+- THEN it is bounded rather than growing with the number of operations run
+
+#### Scenario: A terminal operation not yet drained is still answerable
+
+- GIVEN a terminal operation whose result has not yet been awaited
+- WHEN its exit is requested
+- THEN it is answered with that operation's terminal outcome
+
+#### Scenario: Retirement never touches a pending or running operation
+
+- GIVEN a runner with one running operation, one pending operation, and several drained terminal
+  operations
+- WHEN retirement occurs
+- THEN the running and pending operations are still enumerated in their original order
+- AND no process was spawned, cancelled or restarted by the retirement
+
+#### Scenario: An unchanged phase is not republished
+
+- GIVEN an observer of the runner's queue phase
+- WHEN the same phase value is produced repeatedly without a real transition
+- THEN the observer sees one change for the transition into that phase and none for the repeats
 
 ### Requirement: Swift 6 concurrency and platform baseline
 
@@ -179,3 +216,31 @@ Every type crossing an isolation boundary (`LogLine`, results, errors, configura
   operation identity. Duplicate submissions of the same command are permitted and are told apart by
   identity rather than deduplicated (`m2-mutations-activity` verify ruling 3, 2026-08-02) — which is
   exactly what "MUST distinguish two otherwise identical submissions" buys.
+- **Amended by change `m2-local-metadata-history` (archived `2026-08-03`, PRD milestone **M2**, slice
+  M2-3 — the last M2 slice)**: **1 MODIFIED** requirement replaced as a whole block — "Serialized
+  mutations with concurrent reads" — adding **4 scenarios**. 6 requirements / 15 scenarios →
+  **6 requirements / 19 scenarios**. Nothing was added, removed or renamed; the other five
+  requirements are byte-identical, and the amendment is a strict superset of the text it replaced.
+  Previously the records were retained for the whole process lifetime with no retirement rule at all,
+  and the queue phase was published on every yield without an equality guard. This closed M2-2
+  follow-up 4, which the M2-2 archive routed here as a **hard prerequisite** for
+  `installation-history`: a durable history is dishonest if the in-memory execution records it is
+  derived alongside grow without bound.
+  - **Retirement is ownership-based, not time-based** (design D6). `BrewOperation.deinit` calls
+    `release(_:)`, and `evictRetiredRecords()` retires only records that are both compacted and
+    released, sorted by ordinal, dropping only the overflow past
+    `BrewRunner.defaultRetainedTerminalRecords == 200`. The cap is injectable purely as a test seam
+    (`retainedTerminalRecords: 0` makes retirement observable without a 260-operation loop); the
+    shipped default is the pinned 200.
+  - **`exit(of:)` stays answerable for anything still awaited.** A compacted record still answers its
+    exit and its fault — pinned by `RetentionTests > aTerminalRecordAnswersExitAfterItsExecutionResourcesAreReleased`
+    and `aCompactedRecordStillAnswersFault`.
+- **`operation-activity` states the other half of the retirement contract.** Its amended "The
+  operation queue is enumerable, ordered, and carries each operation's argv" says a retired execution
+  record does not remove its queue item, so the session-long projection survives this bound. The two
+  clauses were written in the same change to be read together and MUST NOT drift.
+- **Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
+  SUGGESTION, non-blocking)**: `exit(of:)` answers an *unknown* operation id with a fabricated
+  `BrewExit(status: 0)` rather than a typed "unknown operation" result; only the `isReleased` gate
+  prevents that value from being observed today. The requirement text is unchanged and every scenario
+  is COMPLIANT. Tracked as follow-up S1 in the M2-3 archive report, not as a spec gap.
