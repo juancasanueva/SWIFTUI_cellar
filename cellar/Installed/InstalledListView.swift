@@ -53,25 +53,25 @@ struct InstalledListView: View {
             Divider()
 
             List(selection: $selected) {
-                if !outdated.isEmpty {
+                if !sections.outdated.isEmpty {
                     Section("Outdated") {
-                        ForEach(outdated) { entry in
+                        ForEach(sections.outdated) { entry in
                             row(entry)
                         }
                     }
                 }
-                if !selfUpdating.isEmpty {
+                if !sections.selfUpdating.isEmpty {
                     // Separate on purpose: these apps update themselves, so
                     // presenting them as outdated would ask the user to fix
                     // something that is not broken (product decision Q3).
                     Section("Updates itself") {
-                        ForEach(selfUpdating) { entry in
+                        ForEach(sections.selfUpdating) { entry in
                             row(entry)
                         }
                     }
                 }
                 Section(includeDependencies ? "All packages" : "Installed on request") {
-                    ForEach(rest) { entry in
+                    ForEach(sections.rest) { entry in
                         row(entry)
                     }
                 }
@@ -112,9 +112,14 @@ struct InstalledListView: View {
     /// sequence non-reproducible. A single click adds exactly one id, so click
     /// order is click order; a shift-click or Select All adds many at once, and
     /// those arrive as the list shows them.
+    ///
+    /// It reads `sections.displayed` rather than `entries`, which is what makes
+    /// the second sentence true: `entries` is flat inventory order, so a bulk
+    /// add used to enter — and submit — in an order the user never saw (II13,
+    /// design D9).
     private func reconcileOrder(with current: Set<PackageID>) {
         order.removeAll { !current.contains($0) }
-        let added = entries.map(\.id).filter { current.contains($0) && !order.contains($0) }
+        let added = sections.displayed.map(\.id).filter { current.contains($0) && !order.contains($0) }
         order.append(contentsOf: added)
         // The detail column follows a single selection only: two selected
         // packages have no one package to show.
@@ -180,25 +185,16 @@ struct InstalledListView: View {
         BulkSelection(selection: order, entries: entries, metadata: lookup)
     }
 
-    /// Snoozed packages leave this section — and the count above it — through
-    /// the same set, so the two cannot disagree (II12).
-    private var outdated: [PackageEntry] {
-        let eligible = browse.outdatedIDs(metadata: lookup)
-        return entries.filter { eligible.contains($0.id) }
-    }
-
-    private var selfUpdating: [PackageEntry] {
-        entries.filter { $0.installed?.hasNewerVersion == true }
-    }
-
-    /// A snooze never removes a package from the list: it suppresses a badge and
-    /// a count, and hiding the row would take the package out of reach entirely
-    /// (LPM5 sc5, II12 sc4).
-    private var rest: [PackageEntry] {
-        let outdatedIDs = Set(outdated.map(\.id))
-        return entries.filter {
-            !outdatedIDs.contains($0.id) && $0.installed?.hasNewerVersion != true
-        }
+    /// The one projection the three sections and `reconcileOrder` all read, so
+    /// what is rendered and what a bulk selection enters cannot drift apart.
+    ///
+    /// Snoozed packages leave the outdated section — and the count above it —
+    /// through the same set, so the two cannot disagree (II12). A snooze never
+    /// removes a package from the list: it suppresses a badge and a count, and
+    /// hiding the row would take the package out of reach entirely (LPM5 sc5,
+    /// II12 sc4).
+    private var sections: InstalledSections {
+        InstalledSections(entries: entries, outdatedIDs: browse.outdatedIDs(metadata: lookup))
     }
 }
 

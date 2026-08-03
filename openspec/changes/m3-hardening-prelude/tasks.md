@@ -197,15 +197,15 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 7: Bulk selection in displayed order — D9 (item #7, `installed-inventory`)
 
-- [ ] 7.1 **RED** `Tests/BrewClientTests/InstalledSectionsTests.swift` (new) —
+- [x] 7.1 **RED** `Tests/BrewClientTests/InstalledSectionsTests.swift` (new) —
       `theDisplayedOrderIsOutdatedThenSelfUpdatingThenTheRest`. — design D9.
-- [ ] 7.2 **RED** same file — `bulkAddEntersTheSelectionInDisplayedOrderNotInventoryOrder`: inventory
+- [x] 7.2 **RED** same file — `bulkAddEntersTheSelectionInDisplayedOrderNotInventoryOrder`: inventory
       `git, pcre2, iterm2` displaying as `iterm2, git, pcre2`; a one-shot bulk add reports
       `iterm2, git, pcre2`. — sc *"A bulk add enters the selection in displayed order"*.
-- [ ] 7.3 **GREEN** create `Sources/BrewClient/InstalledSections.swift` —
+- [x] 7.3 **GREEN** create `Sources/BrewClient/InstalledSections.swift` —
       `public struct InstalledSections: Sendable, Equatable { init(entries:outdatedIDs:); let outdated, selfUpdating, rest: [PackageEntry]; var displayed: [PackageEntry] { outdated + selfUpdating + rest } }`.
       One projection read twice — the `upgradableIDs` precedent (II14).
-- [ ] 7.4 **Wire** `cellar/Installed/InstalledListView.swift` — replace the private `outdated` /
+- [x] 7.4 **Wire** `cellar/Installed/InstalledListView.swift` — replace the private `outdated` /
       `selfUpdating` / `rest` computeds (`:185-202`) with one `InstalledSections`; the three
       `Section`s at `:56-77` render from it, and `reconcileOrder` at `:117` maps over
       `sections.displayed` instead of `entries`. Section **titles stay exactly as rendered today**
