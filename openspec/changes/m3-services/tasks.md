@@ -122,10 +122,12 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 0: Baseline and delivery precondition
 
-- [ ] 0.1 Record the baseline on `3f2c166`: `swift test --package-path Packages/CellarCore` test/suite
+- [x] 0.1 Record the baseline on `3f2c166`: `swift test --package-path Packages/CellarCore` test/suite
       counts (expect **571 / 77**) and `swiftlint --quiet` finding count (expect **60**). No commit —
       this is the number task 17.1 compares against.
-- [ ] 0.2 **Record the accepted `size:exception` before any code is written** (ruling #7182-1). The
+      **Measured 2026-08-03 on `284aab9`: 571 tests / 77 suites passed, 1 known issue; `swiftlint --quiet`
+      = 60 findings. Both match the expectation exactly.**
+- [x] 0.2 **Record the accepted `size:exception` before any code is written** (ruling #7182-1). The
       forecast above, this task's timestamp and the user's acceptance are the record. Apply MUST NOT
       start until this is checked.
 
@@ -140,26 +142,26 @@ If the split is taken, exactly four things must move with it — nothing else:
 > would satisfy this phase's success criterion while breaking a shipped scenario. The fix is
 > **environment-only**. No task below touches `LineSplitter`, `LogLine` or `SystemProcess`.
 
-- [ ] 1.1 **RED** `Tests/BrewProcessTests/EnvironmentTests.swift` —
+- [x] 1.1 **RED** `Tests/BrewProcessTests/EnvironmentTests.swift` —
       `theForceColourKeyIsNeverSetAtAnyValue`: `#expect(BrewEnvironment.pinned["HOMEBREW_COLOR"] == nil)`
       and `#expect(BrewEnvironment.pinned["HOMEBREW_NO_COLOR"] == "1")`. — sc *"The force-colour key is
       never set at any value"*.
-- [ ] 1.2 **RED** same file — `theSpawnedProcessReceivesTheSuppressionKeyAndNotTheForceKey`: drive a
+- [x] 1.2 **RED** same file — `theSpawnedProcessReceivesTheSuppressionKeyAndNotTheForceKey`: drive a
       real spawn through `Tests/BrewClientTests/Fakes/RecordingProcessLauncher.swift`'s
       `BrewProcessTests` equivalent and assert the **recorded** environment, so the key cannot be
       reintroduced anywhere between `pinned` and `SystemProcess`. — sc *"Environment applied to every
       invocation"*.
-- [ ] 1.3 **GREEN** `Sources/BrewProcess/BrewEnvironment.swift:22` — `"HOMEBREW_COLOR": "0"` →
+- [x] 1.3 **GREEN** `Sources/BrewProcess/BrewEnvironment.swift:22` — `"HOMEBREW_COLOR": "0"` →
       `"HOMEBREW_NO_COLOR": "1"`, and correct the doc comment at `:15`, which today asserts the
       opposite of the shipped behaviour.
-- [ ] 1.4 **RED (integration, self-skipping)** `Tests/BrewProcessTests/BrewIntegrationTests.swift` —
+- [x] 1.4 **RED (integration, self-skipping)** `Tests/BrewProcessTests/BrewIntegrationTests.swift` —
       `noEscapeByteSurvivesCaptureFromARealBrewInvocation`: discover a formula via
       `brew list --formula`, run `brew info --formula <name>`, assert
       `log.allSatisfy { !$0.text.utf8.contains(0x1B) }`. Guard with `.enabled(if:)` on the real brew
       binary and tag it so the fast loop can exclude it. A fake process cannot prove anything about
       brew's own colour decision — this is the honest form of the success criterion. — sc *"No ANSI
       escape byte survives capture"*.
-- [ ] 1.5 `openspec/changes/m3-services-cleanup-taps/explore.md:207-208` — correct the repeated false
+- [x] 1.5 `openspec/changes/m3-services-cleanup-taps/explore.md:207-208` — correct the repeated false
       claim that `HOMEBREW_COLOR=0` stops ANSI. Prose only; do not restructure the section. **Commit 1.**
 
 ## Phase 2: Services wire and decoders — D7, SM1 / SM2 (decode)
