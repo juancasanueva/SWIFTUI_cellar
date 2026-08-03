@@ -72,12 +72,16 @@ reordered by one writer, but not parallelised across worktrees.
       issue.` · `swiftlint --quiet` = **60** findings.
 - [x] 0.2 `openspec/config.yaml`: `:7` `review_budget_lines: 800 → 2000`, and `:59` prose
       "Forecast the 800-line review budget" → `2,000`. — proposal item #10. **Commit 0a.**
-- [ ] 0.3 `git mv openspec/changes/m2-mutations-installed openspec/changes/archive/2026-08-03-m2-mutations-installed`,
+- [x] 0.3 `git mv openspec/changes/m2-mutations-installed openspec/changes/archive/2026-08-03-m2-mutations-installed`,
       then repoint the citation at `openspec/specs/installed-inventory/spec.md:547` to the archive
       path (**path text only — not a spec delta**). Re-run `rg m2-mutations-installed` and record the
       result: `openspec/changes/archive/**` reports and `m3-services-cleanup-taps/explore.md:4,:309`
       keep their historical references **unchanged** and are the expected residue. — item #10.
       **Commit 0b.**
+      **Recorded**: after the move, `rg m2-mutations-installed` outside `openspec/changes/archive/**`
+      and this change's own artifacts returns only `m3-services-cleanup-taps/explore.md:4,:309` (the
+      untracked M3 umbrella, unchanged) and `openspec/specs/installed-inventory/spec.md:557`, which
+      names the slice rather than citing a path. The `:547` path citation now reads the archive path.
 
 ## Phase 1: Catalog adoption ordinal — D1, D2 (item #1, `catalog-sync`)
 

@@ -544,7 +544,7 @@ be impossible for the control to announce one number and submit a different set.
   failing a scenario in *this* capability too.
 - **Implementation note for "On-request and dependency-only are derived, and the default view is
   on-request"** (recorded at archive, from the docs review of
-  `openspec/changes/m2-mutations-installed/explore.md`): the requirement's premise "the payload
+  `openspec/changes/archive/2026-08-03-m2-mutations-installed/explore.md`): the requirement's premise "the payload
   carries no `installed_as_dependency` field" is the *derivation contract this capability
   implements*, and the derivation is a correct fallback either way. The blanket claim that the field
   does not exist in `brew info --json=v2` is over-generalised — the change's own fixture models the
