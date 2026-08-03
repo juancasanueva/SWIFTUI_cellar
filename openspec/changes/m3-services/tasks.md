@@ -400,27 +400,27 @@ If the split is taken, exactly four things must move with it — nothing else:
 > **family-owned** (`ServiceCommand` overrides `classify`; the protocol default is untouched), so it
 > cannot reach `install`/`upgrade`. Task 11.6 is the test that makes that claim falsifiable.
 
-- [ ] 11.1 **RED** `Tests/BrewClientTests/ServiceCommandTests.swift` (new) —
+- [x] 11.1 **RED** `Tests/BrewClientTests/ServiceCommandTests.swift` (new) —
       `anUnsafeServiceNameIsRejectedAtConstructionAndBuildsNoArgv`, parameterized over a name with a
       leading `-`, an empty name, whitespace, `;`, `$(…)` and a name equal to `--all`. Each rejected
       at construction, **no argv built**. — threat matrix, *Subprocess argument composition*.
       `ServiceTarget` is expressed over `MutationName.isSafe` (`MutationCommand.swift:104`) exactly as
       `PackageTarget` is; that stays the single gate.
-- [ ] 11.2 **RED** same file — `eachVerbProducesItsExactArgv` (`services start atuin`,
+- [x] 11.2 **RED** same file — `eachVerbProducesItsExactArgv` (`services start atuin`,
       `services stop atuin`, `services restart atuin`, `services run atuin`);
       `noServiceArgvEverContainsAll`; `killAndStopKeepAreNotOffered`. — SM4 sc 1–3.
-- [ ] 11.3 **RED** same file — `theRowControlSurfaceIsExactlyTheFiveEnumeratedControls`:
+- [x] 11.3 **RED** same file — `theRowControlSurfaceIsExactlyTheFiveEnumeratedControls`:
       `ServiceRowControl.allCases == [.start, .run, .stop, .restart, .copyCommand]`, the
       `ActivityItem.Control` / `HistoryRecord.Control` idiom, so *"no hidden default"* is a claim about
       the whole surface rather than an unwritten omission. — SM5 sc *"Neither action is a hidden
       default"* (ruling #7182-3).
-- [ ] 11.4 **GREEN** create `Sources/BrewClient/ServiceCommand.swift` — `ServiceTarget` plus
+- [x] 11.4 **GREEN** create `Sources/BrewClient/ServiceCommand.swift` — `ServiceTarget` plus
       `enum ServiceCommand: Sendable, Equatable, BrewMutating { case start/run/stop/restart(ServiceTarget) }`.
       `arguments` = `["services", <verb>, target.name]`; **`--all` is unrepresentable** because no case
       omits a target. `invalidates` = `.services`; `packageID` = `nil` (ruling #7180 a);
       `requiresConfirmation` = **false** for all four — recorded, not silent: none destroys anything,
       each is reversible in one click, and start-vs-run is already an explicit user choice.
-- [ ] 11.5 **RED** `Tests/BrewClientTests/ServiceClassificationTests.swift` (new), fixture `LogLine`
+- [x] 11.5 **RED** `Tests/BrewClientTests/ServiceClassificationTests.swift` (new), fixture `LogLine`
       arrays — `aColdStartIsClassifiedAsStarted`;
       `aStartOnAnAlreadyRunningServiceIsClassifiedFromTheMarkerNotTheExitCode` (exit **0**, stdout
       ``Service `atuin` already started, use …``, no `Successfully` line → `.noChange`, not a failure);
@@ -428,12 +428,12 @@ If the split is taken, exactly four things must move with it — nothing else:
       ``Warning: Service `atuin` is not started.`` → `.noChange`);
       `anUnmatchedOutcomeIsNeverASuccess` (non-zero + no marker → `.failed` with the log verbatim;
       exit 0 + no marker → not reported as a state change that did not happen). — SM6 sc 1–4.
-- [ ] 11.6 **RED** same file — `packageClassificationIsByteIdentical` (a regression anchor over the
+- [x] 11.6 **RED** same file — `packageClassificationIsByteIdentical` (a regression anchor over the
       existing `ClassificationTests` cases) and
       `aPayloadContainingAServiceMarkerCannotReclassifyAnInstall` (feed `already started, use` into an
       install's log; classification unchanged). — threat matrix, *Untrusted subprocess payload as
       classification input*.
-- [ ] 11.7 **GREEN** `Sources/BrewClient/MutationOutcome.swift` — add exactly one case, `.noChange`
+- [x] 11.7 **GREEN** `Sources/BrewClient/MutationOutcome.swift` — add exactly one case, `.noChange`
       (`isSuccess == false`, `isFailure == false` — the `.cancelled` shape; `summaryLabel` `"No
       change"`). Cost is four compiler-enforced exhaustive switches. Rejected and recorded: an
       associated value on `.succeeded` (breaks `==` across many shipped tests); a display-only note
@@ -443,15 +443,15 @@ If the split is taken, exactly four things must move with it — nothing else:
       never anchored and never whole-sentence, because brew interpolates the service name into every
       one; `"Successfully started"`/`"Successfully stopped"` are **corroboration only**, never the
       sole success test.
-- [ ] 11.8 **RED** same file — `aRootDomainWarningOnAZeroExitIsASuccessNotAPrivilegeFailure` and
+- [x] 11.8 **RED** same file — `aRootDomainWarningOnAZeroExitIsASuccessNotAPrivilegeFailure` and
       `aRejectedBootstrapIsAGenericFailureWithItsLogIntactAndNoRetry`. `.needsPrivileges` only when
       the exit is **non-zero** and the marker is present; the exact bootstrap signature is unprobed
       (U5 residual), so the default degrades to a generic failure with the output on screen. — SM7
       sc 1–2, PM4 sc *"A non-fatal privilege warning on a successful run is not a sudo failure"*;
       threat matrix, *Privilege boundary*.
-- [ ] 11.9 **RED** same file — `nothingParsedFromBrewsOutputReachesAnArgv`: trace every value the
+- [x] 11.9 **RED** same file — `nothingParsedFromBrewsOutputReachesAnArgv`: trace every value the
       classification surface extracts and assert none builds, extends or modifies an argv. — SM6 sc 5.
-- [ ] 11.10 **GREEN** `Sources/Persistence/SwiftDataHistoryRecorder.swift` — map `.noChange` to
+- [x] 11.10 **GREEN** `Sources/Persistence/SwiftDataHistoryRecorder.swift` — map `.noChange` to
       `(raw: "noChange", exitStatus: 0)`. **Commit 11.**
 
 ## Phase 12: The services submit path and the duplicate guard — D6 (c), SM8 / SM10, PM7

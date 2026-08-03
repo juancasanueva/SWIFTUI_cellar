@@ -69,6 +69,10 @@ public final class SwiftDataHistoryRecorder: HistoryRecording {
     static func classify(_ outcome: MutationOutcome) -> (raw: String, exitStatus: Int?) {
         switch outcome {
         case .succeeded: ("succeeded", 0)
+        // Exit 0 by definition — brew ran, reported that nothing needed doing,
+        // and returned cleanly. The status is known here, unlike for the
+        // failures below, so it is recorded rather than invented.
+        case .noChange: ("noChange", 0)
         case .failed(let status): ("failed", Int(status))
         case .busy: ("busy", nil)
         case .needsPrivileges: ("needsPrivileges", nil)

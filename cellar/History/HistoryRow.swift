@@ -69,6 +69,7 @@ struct HistoryRow: View {
     private var outcomeLabel: String {
         switch record.outcomeRaw {
         case "succeeded": "Done"
+        case "noChange": "No change"
         case "failed": record.exitStatus.map { "Failed (\($0))" } ?? "Failed"
         case "busy": "Homebrew busy"
         case "needsPrivileges": "Needs Terminal"

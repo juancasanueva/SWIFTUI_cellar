@@ -32,6 +32,20 @@ public enum MutationOutcome: Sendable, Equatable {
     case busy
     /// The command needs privileges Cellar will not acquire.
     case needsPrivileges
+    /// It exited 0, and said so in words: nothing changed, because the thing
+    /// was already in the state that was asked for.
+    ///
+    /// `brew services` exits 0 both for a state change and for a no-op, so the
+    /// exit code cannot separate them and something has to read the prose
+    /// (live probe, brew 6.0.14 — gate U8). This is the `.cancelled` shape:
+    /// neither a success nor a failure, because nothing happened and nothing
+    /// went wrong.
+    ///
+    /// Rejected, and recorded so the decision is not silently reopened: an
+    /// associated value on `.succeeded` (it breaks `==` across many shipped
+    /// tests), and a display-only note (it would leave the durable history
+    /// saying "Done" about a no-op, which is a lie).
+    case noChange
     /// Cellar cancelled it, and it stopped.
     case cancelled
     /// Cellar cancelled it, brew ignored both signals, and it is still running
@@ -127,7 +141,7 @@ public enum MutationOutcome: Sendable, Equatable {
     public var isFailure: Bool {
         switch self {
         case .failed, .busy, .needsPrivileges, .launchFailed: true
-        case .succeeded, .cancelled, .abandoned: false
+        case .succeeded, .noChange, .cancelled, .abandoned: false
         }
     }
 
@@ -162,6 +176,11 @@ public enum MutationOutcome: Sendable, Equatable {
             This needs an administrator password, which Cellar does not ask for. \
             Run \(command.displayCommand) in Terminal instead.
             """
+        case .noChange:
+            """
+            No change: it was already in that state. Homebrew reported this \
+            rather than doing anything.
+            """
         case .cancelled:
             """
             Cancelled. Homebrew may have left a partial change; refreshing now.
@@ -180,6 +199,7 @@ public enum MutationOutcome: Sendable, Equatable {
     public var summaryLabel: String {
         switch self {
         case .succeeded: "Done"
+        case .noChange: "No change"
         case .failed: "Failed"
         case .busy: "Homebrew busy"
         case .needsPrivileges: "Needs Terminal"

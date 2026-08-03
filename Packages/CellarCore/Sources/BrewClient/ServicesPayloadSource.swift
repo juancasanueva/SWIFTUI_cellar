@@ -1,32 +1,6 @@
 import BrewProcess
 import Foundation
 
-/// A service name, proven safe to put in argv.
-///
-/// The services detail probe is the **only parameterised read argv** in the
-/// codebase, so the guarantee `PackageTarget` gives the mutating commands has
-/// to hold here too — and it holds the same way, through the one
-/// `MutationName.isSafe` gate. An unvalidated services read is unrepresentable
-/// rather than merely discouraged.
-///
-/// A service is its own entity: this is deliberately **not** a `PackageID`, and
-/// nothing derives one from the other (service-management SM12).
-public struct ServiceTarget: Sendable, Hashable {
-    public let name: String
-
-    /// Fails when the name could be read by brew as an option rather than as a
-    /// service — which includes a name equal to `--all`.
-    public init?(name: String) {
-        guard MutationName.isSafe(name) else { return nil }
-        self.name = name
-    }
-
-    /// Lifts a decoded record into a target, when its name survives the gate.
-    public init?(_ record: ServiceRecord) {
-        self.init(name: record.name)
-    }
-}
-
 /// The seam that produces one services list payload.
 public protocol ServicesPayloadSourcing: Sendable {
     func payload(using installation: BrewInstallation) async throws(ServicesError) -> Data
