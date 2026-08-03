@@ -9,6 +9,7 @@ import AppKit
 import BrewClient
 import BrewProcess
 import Catalog
+import Persistence
 import SwiftUI
 
 @main
@@ -34,6 +35,21 @@ struct cellarApp: App {
     /// shipped with no callers at all.
     @State private var operations: OperationCenter
 
+    /// Favorites, notes and snoozes, and the durable mutation history.
+    ///
+    /// Owned here as `@State` on the `CatalogStore` precedent, and injected
+    /// down. There is deliberately **no `.modelContainer(…)` scene modifier and
+    /// no `@Query`**: the stores publish plain `Sendable` values, so no `@Model`
+    /// instance ever leaves `Persistence` and every composition rule stays
+    /// provable over values in `BrewClient` (design D3). Adding the modifier
+    /// later remains a one-line option if `@Query` is ever wanted.
+    ///
+    /// Neither initialiser throws. A store that cannot be opened is a *state*
+    /// the UI renders disabled with its reason attached — a `try!` here would
+    /// turn a recoverable disk problem into a boot loop (D4).
+    @State private var metadata = MetadataStore()
+    @State private var history: HistoryStore
+
     /// The app's long-lived loops.
     ///
     /// App-level state outlives every scene, so closing the window that started
@@ -44,12 +60,24 @@ struct cellarApp: App {
     init() {
         let installed = InstalledStore()
         let mutations = InstalledMutationGate()
+        let history = HistoryStore()
         _installed = State(initialValue: installed)
         _mutations = State(initialValue: mutations)
+        _history = State(initialValue: history)
         _refresher = State(
             initialValue: InstalledRefreshCoordinator(store: installed, mutations: mutations)
         )
-        _operations = State(initialValue: OperationCenter(gate: mutations))
+        // The recorder is injected once, here, and nowhere else: `finish` is the
+        // only caller, so this is the whole of "history is written" as a wiring
+        // fact. Removing this argument returns the centre to its M2-2 behaviour
+        // exactly, which is what makes the feature one injection from revertible
+        // (installation-history IH7).
+        _operations = State(
+            initialValue: OperationCenter(
+                gate: mutations,
+                history: SwiftDataHistoryRecorder(store: history)
+            )
+        )
     }
 
     var body: some Scene {
@@ -58,7 +86,9 @@ struct cellarApp: App {
                 brewDetection: brewDetection,
                 catalog: catalog,
                 installed: installed,
-                operations: operations
+                operations: operations,
+                metadata: metadata,
+                history: history
             )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed

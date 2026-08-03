@@ -23,7 +23,7 @@ struct OperationCenterTests {
     @Test("A submission produces one item whose identity and copy text never change")
     func aSubmissionProducesOneStableItem() async throws {
         let harness = CenterHarness()
-        let command = MutationCommand.install(CenterHarness.iterm)
+        let command = MutationCommand.install(PackageTarget(CenterHarness.iterm)!)
 
         let item = harness.center.submit(command)
         await harness.settle()
@@ -34,7 +34,7 @@ struct OperationCenterTests {
         #expect(item.displayCommand == "brew install --cask iterm2")
         #expect(pendingCopy == "brew install --cask iterm2")
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
 
         #expect(item.id == id, "the identity changed between states")
         #expect(item.copyText == pendingCopy, "copy text differed once terminal")
@@ -46,11 +46,11 @@ struct OperationCenterTests {
     @Test("The item carries the exact argv in every state")
     func theItemCarriesTheExactArgv() async throws {
         let harness = CenterHarness()
-        let item = harness.center.submit(.install(CenterHarness.iterm))
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.iterm)!))
         await harness.settle()
 
         #expect(item.arguments == ["install", "--cask", "iterm2"])
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(item.arguments == ["install", "--cask", "iterm2"])
 
         // And that is the vector that reached the process seam.
@@ -62,7 +62,7 @@ struct OperationCenterTests {
     @Test("The log drains verbatim, tagged, in emission order")
     func theLogDrainsVerbatim() async throws {
         let harness = CenterHarness()
-        let item = harness.center.submit(.install(CenterHarness.wget))
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
         await harness.launcher.waitForLaunches(atLeast: 1)
         let process = harness.launcher.launchedProcesses[0]
 
@@ -77,14 +77,14 @@ struct OperationCenterTests {
 
         // Readable while still running, which is the point of streaming.
         #expect(item.isTerminal == false)
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
         #expect(item.log.count == 3, "the terminal outcome dropped the log")
     }
 
     @Test("The 2,001st line evicts the oldest and raises the truncation marker")
     func theLogRingEvictsTheOldest() async throws {
         let harness = CenterHarness()
-        let item = harness.center.submit(.install(CenterHarness.wget))
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
         await harness.launcher.waitForLaunches(atLeast: 1)
         let process = harness.launcher.launchedProcesses[0]
 
@@ -109,12 +109,12 @@ struct OperationCenterTests {
         // Still verbatim and still tagged.
         #expect(item.log.allSatisfy { $0.stream == .stdout })
 
-        await harness.finish(call: 0)
+        try await harness.finish(call: 0)
     }
 
     // MARK: - Per-package fan-out (PM2 sc2 — the settled shape)
 
-    /// The user ruling: a selected upgrade is N ordinary `.upgrade(id)`
+    /// The user ruling: a selected upgrade is N ordinary `.upgrade(PackageTarget(id)!)`
     /// submissions, not one grouped invocation. There is no `upgradeSelected`
     /// case anywhere in the API.
     @Test("A selection fans out into exactly one operation per package, in order")
@@ -138,7 +138,7 @@ struct OperationCenterTests {
             #expect(names.count == 1, "an argv named \(names.count) packages")
         }
 
-        for index in 0..<3 { await harness.finish(call: index) }
+        for index in 0..<3 { try await harness.finish(call: index) }
     }
 
     /// The reason the fan-out was chosen over kind-grouped argv: attribution.
@@ -148,9 +148,9 @@ struct OperationCenterTests {
         let items = harness.center.submitUpgrades(for: [CenterHarness.wget, CenterHarness.git, CenterHarness.iterm])
         await harness.settle()
 
-        await harness.finish(call: 0, status: 0)
-        await harness.finish(call: 1, status: 1)
-        await harness.finish(call: 2, status: 0)
+        try await harness.finish(call: 0, status: 0)
+        try await harness.finish(call: 1, status: 1)
+        try await harness.finish(call: 2, status: 0)
 
         #expect(items[0].outcome == .succeeded)
         #expect(items[1].outcome == .failed(status: 1))
@@ -175,7 +175,11 @@ struct OperationCenterTests {
             )
         ])
 
-        let items = harness.center.submitUpgradesForOutdated(in: inventory)
+        let browse = InstalledBrowse(inventory: inventory, isAvailable: true)
+        let items = harness.center.submitUpgrades(
+            for: browse.upgradableIDs(includingDependencies: true),
+            in: inventory
+        )
         await harness.settle()
 
         #expect(items.map(\.arguments) == [["upgrade", "--formula", "wget"]])
@@ -187,8 +191,8 @@ struct OperationCenterTests {
         let all = harness.center.submit(.upgradeAll)
         #expect(all.arguments == ["upgrade"])
 
-        await harness.finish(call: 0)
-        await harness.finish(call: 1)
+        try await harness.finish(call: 0)
+        try await harness.finish(call: 1)
     }
 
 }

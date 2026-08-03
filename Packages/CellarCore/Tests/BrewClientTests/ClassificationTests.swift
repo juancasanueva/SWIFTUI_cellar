@@ -77,7 +77,7 @@ struct ClassificationTests {
 
     @Test("The busy message tells the user Homebrew is busy in another terminal")
     func theBusyMessageNamesTheRealCause() {
-        let message = MutationOutcome.busy.message(for: .uninstall(Self.hello))
+        let message = MutationOutcome.busy.message(for: .uninstall(PackageTarget(Self.hello)!))
 
         #expect(message.lowercased().contains("homebrew"))
         #expect(message.lowercased().contains("terminal"))
@@ -113,7 +113,7 @@ struct ClassificationTests {
         let outcome = Self.classify(status: 1, stderr: hostile)
         #expect(outcome == .busy)
 
-        let message = outcome.message(for: .uninstall(Self.wget))
+        let message = outcome.message(for: .uninstall(PackageTarget(Self.wget)!))
         #expect(
             message.contains("some-other-package") == false,
             "brew's guessed command name was parsed out and presented as the lock holder"
@@ -153,7 +153,7 @@ struct ClassificationTests {
 
     @Test("The privilege guidance echoes the exact command and names the package")
     func privilegeGuidanceEchoesTheCommand() {
-        let command = MutationCommand.install(PackageID(kind: .cask, name: "docker"))
+        let command = MutationCommand.install(PackageTarget(PackageID(kind: .cask, name: "docker"))!)
         let message = MutationOutcome.needsPrivileges.message(for: command)
 
         #expect(message.contains(command.displayCommand))
@@ -286,8 +286,8 @@ struct ClassificationTests {
         #expect(outcome == .abandoned(after: .seconds(7)))
         #expect(outcome != .cancelled)
 
-        let message = outcome.message(for: .install(Self.wget))
-        #expect(message != MutationOutcome.cancelled.message(for: .install(Self.wget)))
+        let message = outcome.message(for: .install(PackageTarget(Self.wget)!))
+        #expect(message != MutationOutcome.cancelled.message(for: .install(PackageTarget(Self.wget)!)))
         #expect(message.lowercased().contains("still running"))
     }
 
@@ -310,8 +310,8 @@ struct ClassificationTests {
     @Test("The cancelled message is one generic sentence for every command")
     func theCancelledMessageIsGeneric() throws {
         let commands: [MutationCommand] = [
-            .install(Self.wget),
-            .uninstall(Self.hello),
+            .install(PackageTarget(Self.wget)!),
+            .uninstall(PackageTarget(Self.hello)!),
             .upgradeAll,
             .zap(CaskID(PackageID(kind: .cask, name: "iterm2"))!)
         ]

@@ -101,9 +101,11 @@ public struct InstalledBrowse: Sendable {
         query: String,
         filters: SearchFilters,
         catalogResults: [CatalogPackage],
-        catalogLookup: (PackageID) -> CatalogPackage?
+        catalogLookup: (PackageID) -> CatalogPackage?,
+        metadata: MetadataLookup? = nil,
+        favoritesOnly: Bool = false
     ) -> [PackageEntry] {
-        switch effectiveMode(mode) {
+        let rows: [PackageEntry] = switch effectiveMode(mode) {
         case .all:
             catalogResults.map { entry(catalog: $0) }
         case .notInstalled:
@@ -118,23 +120,108 @@ public struct InstalledBrowse: Sendable {
                 catalogLookup: catalogLookup
             )
         case .outdated:
+            // The snooze exclusion is applied through the same set the list and
+            // the count read, so the filter and the list cannot disagree (II12).
             entries(
-                from: inventory.packages.filter(\.isOutdated),
+                from: inventory.packages.filter { outdatedIDs(metadata: metadata).contains($0.id) },
                 query: query,
                 filters: filters,
                 catalogLookup: catalogLookup
             )
         }
+        return applyingFavorites(favoritesOnly, metadata: metadata, to: rows)
     }
 
     /// The Installed list itself, under the dependency toggle.
+    ///
+    /// `metadata` is accepted for the favorites filter only. A snooze **never**
+    /// removes a package from this list: it suppresses a badge and a count, and
+    /// hiding the row instead would take the package out of reach entirely
+    /// (LPM5 sc5, II12 sc4).
     public func entries(
         includingDependencies: Bool,
-        catalogLookup: (PackageID) -> CatalogPackage?
+        catalogLookup: (PackageID) -> CatalogPackage?,
+        metadata: MetadataLookup? = nil,
+        favoritesOnly: Bool = false
     ) -> [PackageEntry] {
-        inventory
+        let rows = inventory
             .packages(includingDependencies: includingDependencies)
             .map { entry(installed: $0, catalogLookup: catalogLookup) }
+        return applyingFavorites(favoritesOnly, metadata: metadata, to: rows)
+    }
+
+    // MARK: - Metadata-aware projections (design D5, D8)
+
+    /// Whether the favorites filter should be interactive.
+    ///
+    /// Disabled with no metadata, exactly as the installed-state filters are
+    /// disabled with no inventory — and, like them, disabled means the results
+    /// are identical to the same query with no favorites filtering at all
+    /// (installed-inventory II8).
+    public func isFavoritesFilterEnabled(metadata: MetadataLookup?) -> Bool {
+        metadata != nil
+    }
+
+    /// The outdated set, with snoozed packages projected out.
+    ///
+    /// A **projection over** (inventory outdated state × stored snooze), never a
+    /// mutation of the inventory's own derivation — so the self-updating-cask
+    /// exclusion still comes from `isOutdated`, and a cold, empty or unavailable
+    /// store degrades to today's behaviour with no branch (LPM6 sc1).
+    public func outdatedIDs(metadata: MetadataLookup?) -> Set<PackageID> {
+        guard let metadata else { return inventory.outdatedIDs }
+        return inventory.outdatedIDs.filter { id in
+            guard let package = inventory.package(id) else { return true }
+            return !PackageMetadata.isSnoozed(
+                offering: package.catalogVersion,
+                snoozedVersion: metadata(id)?.snoozedVersion
+            )
+        }
+    }
+
+    public func outdatedCount(metadata: MetadataLookup?) -> Int {
+        outdatedIDs(metadata: metadata).count
+    }
+
+    /// Everything a bulk upgrade would submit: outdated, not pinned, not snoozed.
+    ///
+    /// **The one projection** the label, the outdated section, the badge and the
+    /// submission all read. That is what makes them agree structurally rather
+    /// than by four filters happening to concur — the M2-2 defect where the
+    /// button counted the dependency-filtered entries while the submission
+    /// filtered the whole inventory (design D8, installed-inventory II14).
+    ///
+    /// The pinned exclusion lives here and **no unpin is submitted on their
+    /// behalf**: brew's own defaults skip them, and defeating that would upgrade
+    /// something the user explicitly held back (package-mutation PM2).
+    public func upgradableIDs(
+        includingDependencies: Bool,
+        metadata: MetadataLookup? = nil
+    ) -> [PackageID] {
+        let eligible = outdatedIDs(metadata: metadata)
+        return inventory
+            .packages(includingDependencies: includingDependencies)
+            .filter { eligible.contains($0.id) && !$0.isPinned }
+            .map(\.id)
+    }
+
+    /// The favorite membership set, or `nil` when there is no metadata to
+    /// intersect with.
+    public func favoriteIDs(metadata: MetadataLookup?) -> Set<PackageID>? {
+        guard let metadata else { return nil }
+        return Set(inventory.packages.map(\.id).filter { metadata($0)?.isFavorite == true })
+    }
+
+    /// Intersects with the favorite membership set on **exactly** the terms the
+    /// installed-state filters already use: it composes with them rather than
+    /// replacing them, and it is a no-op when unavailable.
+    private func applyingFavorites(
+        _ favoritesOnly: Bool,
+        metadata: MetadataLookup?,
+        to rows: [PackageEntry]
+    ) -> [PackageEntry] {
+        guard favoritesOnly, let favorites = favoriteIDs(metadata: metadata) else { return rows }
+        return rows.filter { favorites.contains($0.id) }
     }
 
     // MARK: - Building rows

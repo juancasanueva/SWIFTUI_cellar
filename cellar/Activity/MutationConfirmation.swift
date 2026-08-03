@@ -32,7 +32,11 @@ struct MutationConfirmation: ViewModifier {
                 center.decline(request)
             }
         } message: { request in
-            Text("This will run:\n\(request.displayCommand)")
+            // Every command, verbatim, one per line. A bulk uninstall discloses
+            // all of them — not a count and not an elided subset, because an
+            // all-or-nothing destructive action must never be confirmed blind
+            // (package-mutation PM3 sc5).
+            Text(request.isBulk ? bulkMessage(request) : "This will run:\n\(request.displayCommand)")
         }
     }
 
@@ -48,16 +52,25 @@ struct MutationConfirmation: ViewModifier {
         )
     }
 
+    private func bulkMessage(_ request: OperationCenter.ConfirmationRequest) -> String {
+        "This will run \(request.commands.count) commands:\n"
+            + request.displayCommands.joined(separator: "\n")
+    }
+
     private var title: String {
-        guard let command = center.pendingConfirmation?.command else { return "" }
-        return switch command {
+        guard let request = center.pendingConfirmation else { return "" }
+        if request.isBulk {
+            return "Uninstall \(request.commands.count) packages?"
+        }
+        return switch request.command {
         case .zap: "Remove this cask and everything it left behind?"
         default: "Uninstall this package?"
         }
     }
 
     private func confirmLabel(for request: OperationCenter.ConfirmationRequest) -> String {
-        switch request.command {
+        if request.isBulk { return "Uninstall \(request.commands.count)" }
+        return switch request.command {
         case .zap: "Uninstall and Zap"
         default: "Uninstall"
         }

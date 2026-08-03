@@ -10,6 +10,7 @@
 		BC0000010000000000000001 /* BrewProcess in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000003 /* BrewProcess */; };
 		BC0000010000000000000004 /* Catalog in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000005 /* Catalog */; };
 		BC0000010000000000000006 /* BrewClient in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000007 /* BrewClient */; };
+		BC0000010000000000000008 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000009 /* Persistence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +62,7 @@
 				BC0000010000000000000001 /* BrewProcess in Frameworks */,
 				BC0000010000000000000004 /* Catalog in Frameworks */,
 				BC0000010000000000000006 /* BrewClient in Frameworks */,
+				BC0000010000000000000008 /* Persistence in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -124,6 +126,7 @@
 				BC0000010000000000000003 /* BrewProcess */,
 				BC0000010000000000000005 /* Catalog */,
 				BC0000010000000000000007 /* BrewClient */,
+				BC0000010000000000000009 /* Persistence */,
 			);
 			productName = cellar;
 			productReference = BCDBE97B301E2D410013A38D /* cellar.app */;
@@ -608,6 +611,10 @@
 		BC0000010000000000000007 /* BrewClient */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BrewClient;
+		};
+		BC0000010000000000000009 /* Persistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Persistence;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
