@@ -295,9 +295,12 @@ reordered by one writer, but not parallelised across worktrees.
       `MutationOutcome.swift` diff at all (PM6 untouched). The delta set is five files, each with
       exactly one `## MODIFIED Requirements` header and no ADDED / REMOVED / RENAMED header.
       **Candidate size**: `git diff main...HEAD --shortstat` = **1,808 insertions + 72 deletions =
-      1,880** changed lines against the 2,000 budget. No item was dropped; no `size:exception` is
-      requested. Roughly 120 lines of headroom remain for the verify report — see the apply report's
-      risk note.
+      1,880** changed lines at the time this gate ran. No item was dropped.
+      **[Superseded 2026-08-03, verify W1]**: the artifacts drifted upward as evidence was amended —
+      verify re-measured 1,915 by git shortstat, and the attempt ledger's own accounting reached
+      2,018 vs the 2,000 cap. The user accepted a **small `size:exception`** (~2,400 effective,
+      recorded in the ledger reset and Engram `manual-9-1`), covering the verify report as well.
+      The drop-first order was not exercised.
 
 ---
 
