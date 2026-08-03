@@ -158,6 +158,13 @@ clear MUST remove every entry and MUST remove nothing else — locally stored fa
 snoozes MUST be untouched. Declining MUST delete nothing. The capability MUST NOT offer selective or
 per-entry deletion.
 
+A confirmed clear that fails MUST remain all-or-nothing and MUST be observable. Every entry MUST
+still be present and readable afterwards, and the history MUST NOT be presented as emptied or as
+healthy. The failure MUST be reported inline with a reason, through the projection's own availability
+and error surface, and that reason MUST survive the projection reload that follows the attempt rather
+than being overwritten by it. A failed clear MUST NOT raise a blocking alert and MUST NOT offer a
+retry affordance.
+
 #### Scenario: A confirmed clear empties the history
 
 - GIVEN a history of several entries
@@ -169,6 +176,21 @@ per-entry deletion.
 - GIVEN a history of several entries and a pending clear confirmation
 - WHEN the confirmation is declined
 - THEN every entry is still present
+
+#### Scenario: A failed clear leaves every entry present and reports why
+
+- GIVEN a history of three entries and a store whose deletion fails
+- WHEN clear is requested and confirmed
+- THEN all three entries are still present and readable, with their original fields
+- AND the failure is reported with a reason rather than as an empty history
+
+#### Scenario: A failed clear's reason survives the reload that follows it
+
+- GIVEN a confirmed clear that has just failed
+- WHEN the projection reloads after the attempt and its availability and error surface is read
+- THEN the clear failure and its reason are still reported, not a healthy or available-and-empty
+  history
+- AND no blocking alert and no retry control is presented for it
 
 #### Scenario: Clearing history leaves local metadata intact
 
@@ -247,9 +269,39 @@ exactly once, and nothing MUST be thrown into the operation's path.
   `clearAll()` inside the `role: .destructive` button only, and `clearAll()` is the store's sole
   deleting API (`HistoryStoreTests > noPerEntryDeleteControlExists`). Converting this into an
   automated regression gate is registered as follow-up **VS3** in the M2-3 archive report.
-- **Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
+- ~~**Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
   WARNING, non-blocking)**: a **failed** Clear History is silently masked — `clearAll()` sets the
   availability reason and then an unconditional `reload()` overwrites it back to `.available` while
   `lastError` is never set (`HistoryStore.swift:181-190`), so a clear that did not delete can render
-  as if it had. No requirement here mandates surfacing the failure and every scenario is COMPLIANT;
-  tracked as follow-up **W2** in the M2-3 archive report and routed to the next cycle.
+  as if it had.~~ **CLOSED by `m3-hardening-prelude` (M3-0, archived 2026-08-03)** — see the
+  amendment below, which turns the silent mask into requirement text.
+- **Amended by change `m3-hardening-prelude` (archived `2026-08-03`, PRD milestone **M3**, slice
+  M3-0 — the hardening prelude)**: **1 MODIFIED** requirement replaced as a whole block — "Clear
+  history is a single confirmed all-or-nothing action" — adding **2 scenarios**. 7 requirements / 21
+  scenarios → **7 requirements / 23 scenarios**. Nothing was added, removed or renamed; the other six
+  requirements are byte-identical, and the replacement is a strict superset of the text it replaced.
+  Previously the requirement governed only a *confirmed* clear and a *declined* clear; a clear that
+  **failed** was undefined, and the delivered code presented it as an emptied, healthy history with
+  no reason reported — M2-3 follow-up **W2**.
+  - **The surface is inline, with no alert and no retry** (settled product decision Q1, 2026-08-03,
+    Engram `#7130`): the reason travels through the projection's existing availability and
+    `lastError` surface. Entries stay visible; the clear stays all-or-nothing.
+  - Delivered by an internal `init(container:clearing:)` seam — an **injected closure**, deliberately
+    not a filesystem-permission fake (design D5) — plus a `clearAll()` that now calls `reload()`
+    **first** and applies `availability = .unavailable(reason:)` and `lastError` **after**. Reloading
+    afterwards was the bug itself. Pinned by `HistoryStoreTests >
+    aFailedClearKeepsEveryEntryAndReportsTheReason` and `aSuccessfulClearLeavesNoStaleFailureReason`.
+  - **Manual-coverage boundary, stated rather than papered over**: forcing a SwiftData delete to
+    throw is not reliably reachable through the UI, so the failed-clear path's runtime evidence is
+    the headless seam tests. Manual check 9.1(d) confirmed only the reachable half — Clear presents a
+    confirmation with no blocking alert and no retry control.
+- **Known follow-up (`m3-hardening-prelude` native review lineage `review-fa82e5eaa3023fc4`,
+  WARNING, non-blocking — introduced by this slice's own fix)**: the failed-clear reason is durable
+  only **until the next reload**. The history search field reloads the projection on every keystroke
+  (`didSet`), and that reload sets `availability` back to `.available` while `lastError` survives —
+  so the *availability* half of the surface, which this requirement names, can be cleared by an
+  unrelated interaction. Every scenario is COMPLIANT as written: the requirement binds the reason to
+  "the projection reload that **follows the attempt**", which the delivery satisfies. The gap is that
+  a reader may reasonably expect the reason to persist until acknowledged. Tracked as follow-up
+  **(a)** in the M3-0 archive report — the top absorption candidate for M3-1, either as a fix or as a
+  deliberate spec clarification of how long the reason must live.

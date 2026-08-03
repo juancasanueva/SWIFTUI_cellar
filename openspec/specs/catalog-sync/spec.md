@@ -250,6 +250,13 @@ adoptions overlap, the catalog MUST end up serving the newer snapshot; an adopti
 snapshot that completes later MUST be discarded rather than installed. Cached results MUST remain
 queryable for the whole duration of an adoption.
 
+"Newer" MUST be determined by the snapshot's own revision — the order snapshots were materialized —
+and MUST NOT be determined by the order in which adoption was called. An older snapshot whose
+adoption is called after a newer snapshot has already been installed MUST therefore be discarded on
+exactly the same terms as one whose adoption merely finishes late. The record of which revision has
+been adopted MUST NOT regress to an older revision, so a snapshot that was discarded MUST NOT
+disarm the deduplication of the newer one that is being served.
+
 #### Scenario: A manual refresh adopts its snapshot once
 
 - GIVEN a running catalog that is also observing the sync event stream
@@ -263,6 +270,14 @@ queryable for the whole duration of an adoption.
 - WHEN `B` finishes adopting first and `A`'s adoption completes afterwards
 - THEN the catalog still serves `B`
 - AND the served record count and results are `B`'s, not `A`'s
+
+#### Scenario: An older snapshot arriving after a newer one has installed is discarded
+
+- GIVEN a catalog already serving snapshot `B`, whose revision is newer than snapshot `A`'s
+- WHEN adoption is called for `A` only after `B` has been fully installed
+- THEN the catalog still serves `B`'s record count and results, and `A` is never installed
+- AND the adopted-revision record still names `B`'s revision, so a re-delivery of `B` is still
+  deduplicated
 
 #### Scenario: Results never blank while a snapshot is adopted
 
@@ -417,5 +432,29 @@ usable cache.
     so a poisoned snapshot sitting beside a *fresh* sidecar leaves an empty, silent catalog until the
     staleness window passes. The requirement text is unchanged — tightening the trigger is tracked as
     a follow-up, not a spec gap.
+- **Amended by change `m3-hardening-prelude` (archived `2026-08-03`, PRD milestone **M3**, slice
+  M3-0 — the hardening prelude)**: **1 MODIFIED** requirement replaced as a whole block — "A snapshot
+  is adopted exactly once, in order" — adding **1 scenario**. 13 requirements / 39 scenarios →
+  **13 requirements / 40 scenarios**. Nothing was added, removed or renamed; the other twelve
+  requirements are byte-identical, and the replacement is a strict superset of the text it replaced.
+  Previously the requirement ordered adoptions but left "newer" **undefined**, so it was decided by
+  the order adoption was *called*: an older snapshot whose adoption began after a newer one had
+  already installed replaced it, and overwrote the adopted-revision record with the older revision,
+  disarming the deduplication of the snapshot actually being served
+  (`CatalogStore.swift:179-183`). This closed **M2-0 #1 / M2-2 #12**, the oldest open defect in the
+  project, which three consecutive slices had carried forward.
+  - **"Newer" is the snapshot's `revision.ordinal`** — materialization order, already monotonic — and
+    deliberately **not** a `fetchedAt` timestamp, so no new state was introduced (settled product
+    decision Q5, 2026-08-03, Engram `#7130`).
+  - Delivered as a single ordinal guard that makes the `adoptedRevision =` assignment unreachable for
+    an older snapshot. `adoptionSequence` / `installedSequence` are **unchanged** — they guard build
+    completion, not arrival (design D2) — and an **equal** ordinal keeps the existing
+    join-a-duplicate contract byte-for-byte. Pinned by `CatalogAdoptionTests >
+    anOlderSnapshotArrivingAfterANewerOneIsDiscarded` and
+    `theAdoptedRevisionDoesNotRegressAfterDiscardingAnOlderSnapshot`; the suite also gained
+    `.timeLimit(.minutes(1))` (M2-0 #4).
+  - **Native review note (lineage `review-fa82e5eaa3023fc4`)**: the reviewer positively verified the
+    guard is race-free — `CatalogStore` is `@MainActor` and the check-then-assign sequence contains
+    no suspension point.
 - The archived delta specs are the verbatim audit trail; this file adds only the header, the
   `## Requirements` wrapper, and this provenance section.

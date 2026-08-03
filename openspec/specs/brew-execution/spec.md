@@ -53,12 +53,26 @@ raised as a thrown error, because `brew` uses exit codes semantically. A process
 cancellation escalation MUST be reported as cancelled, which is likewise a value and not an error.
 The result MUST NOT be delivered before all lines produced by the process are observable.
 
+An identity the execution layer does not know — one never submitted, or one whose record has already
+been retired — MUST yield a typed **unknown-operation** result, distinguishable from every one of the
+outcomes above. A successful `BrewExit(status: 0, reason: .exited)` MUST NOT be fabricated for it, and
+no other exit status MUST be invented. That result MUST remain a value rather than a thrown error, so
+no caller gains a throwing path, and it MUST be surfaced as a failure rather than a success.
+
 #### Scenario: Non-zero exit is reported as a value carrying its status
 
 - GIVEN a fake process emitting one stdout line then exiting with code 1
 - WHEN the operation completes
 - THEN the runner reports `BrewExit(status: 1, reason: .exited)` and nothing is thrown
 - AND the emitted line was observable before the exit resolved
+
+#### Scenario: An unknown operation identity yields a typed unknown result
+
+- GIVEN an operation identity the runner was never asked to run
+- WHEN its exit is requested
+- THEN the answer is a typed unknown-operation result, distinguishable from every exit status
+- AND it is not `BrewExit(status: 0, reason: .exited)`, it is surfaced as a failure, and nothing is
+  thrown
 
 #### Scenario: Unlaunchable binary reports spawn failure
 
@@ -239,8 +253,32 @@ Every type crossing an isolation boundary (`LogLine`, results, errors, configura
   operation queue is enumerable, ordered, and carries each operation's argv" says a retired execution
   record does not remove its queue item, so the session-long projection survives this bound. The two
   clauses were written in the same change to be read together and MUST NOT drift.
-- **Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
+- ~~**Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
   SUGGESTION, non-blocking)**: `exit(of:)` answers an *unknown* operation id with a fabricated
   `BrewExit(status: 0)` rather than a typed "unknown operation" result; only the `isReleased` gate
-  prevents that value from being observed today. The requirement text is unchanged and every scenario
-  is COMPLIANT. Tracked as follow-up S1 in the M2-3 archive report, not as a spec gap.
+  prevents that value from being observed today.~~ **CLOSED by `m3-hardening-prelude` (M3-0, archived
+  2026-08-03)** — see the amendment below.
+- **Amended by change `m3-hardening-prelude` (archived `2026-08-03`, PRD milestone **M3**, slice
+  M3-0 — the hardening prelude)**: **1 MODIFIED** requirement replaced as a whole block — "Terminal
+  result and exit handling" — adding **1 scenario**. 6 requirements / 19 scenarios → **6 requirements
+  / 20 scenarios**. Nothing was added, removed or renamed; the other five requirements are
+  byte-identical, and the replacement is a strict superset of the text it replaced. Previously the
+  requirement enumerated four terminal outcomes and said nothing about an identity the runner does
+  not know, which `exit(of:)` answered with a fabricated `BrewExit(status: 0, reason: .exited)` —
+  M2-3 follow-up **S1**.
+  - **The result stayed a value, not a thrown error** (settled at proposal): `exit(of:)` reaches
+    ~30 call sites through `BrewOperation.exit()`, and making it throwing would have given every one
+    of them a throwing path for a condition none of them can act on.
+  - Delivered as `case unknownOperation` **inside** the `BrewExit.Reason` declaration — a Swift enum
+    case cannot be added in an extension, so the design sketch's extension form was invalid — plus
+    `BrewExit.unknownOperation = BrewExit(status: -1, reason: .unknownOperation)`. `-1` cannot
+    collide with a wait status (0–255) or a signalled `128+n`, and because `isSuccess` is
+    `reason == .exited && status == 0`, the fabricated success is now **unrepresentable by
+    construction** rather than merely avoided. It classifies to the **existing**
+    `MutationOutcome.launchFailed` ("the process never started"), so no new outcome case, message or
+    `summaryLabel` was introduced. Pinned by `ExitTests >
+    anUnknownOperationYieldsATypedUnknownResultRatherThanSuccess` and
+    `UnknownOperationTests > anUnknownOperationClassifiesAsLaunchFailedNotSucceeded`.
+  - **Native review note (lineage `review-fa82e5eaa3023fc4`)**: the reviewer positively verified the
+    `.unknownOperation` decision is made **before** the stderr scan, so no fault classification can
+    re-fabricate a success from it.

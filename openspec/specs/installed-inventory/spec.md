@@ -459,11 +459,25 @@ action can be submitted for a package the app no longer lists. Bulk affordances 
 upgrade and uninstall only; pin, unpin, snooze, favorite and note MUST offer no bulk affordance, and
 a bulk control that cannot act on the current selection MUST be unavailable rather than inert.
 
+When more than one package enters the selection in a single action — select-all, or any multi-package
+add — they MUST enter it in the order the list displays them: section by section from top to bottom,
+and within each section in that section's displayed order. They
+MUST NOT enter it in the underlying inventory's order. Because selection order determines submission
+order, the order the resulting operations are submitted MUST therefore match the order the user sees.
+
 #### Scenario: Selection preserves order
 
 - GIVEN an installed list containing `git`, `wget` and `iterm2`
 - WHEN `wget`, then `iterm2`, then `git` are selected
 - THEN the selection is reported in the order `wget`, `iterm2`, `git`
+
+#### Scenario: A bulk add enters the selection in displayed order
+
+- GIVEN an installed list whose inventory order is `git`, `pcre2`, `iterm2`, and whose displayed
+  order — as rendered by its sections, top to bottom — is `iterm2`, then `git`, then `pcre2`
+- WHEN all three are added to the selection in one bulk add
+- THEN the selection is reported in the order `iterm2`, `git`, `pcre2`
+- AND their operations are submitted in that same order, not in inventory order
 
 #### Scenario: Deselecting removes exactly one package
 
@@ -640,9 +654,38 @@ be impossible for the control to announce one number and submit a different set.
     (`InstalledListView.swift:83`). Closed by deriving both from one projection — the count is
     computed from `upgradableIDs`, the exact set the action submits — and the old divergent helper was
     deleted outright.
-- **Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
+- ~~**Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
   SUGGESTION, non-blocking)**: `InstalledListView.reconcileOrder(with:)` appends newly selected ids in
   **flat inventory order**, while a nearby comment claims the three-section displayed order. Selection
   order is still deterministic and reproducible — never `Set` iteration order — so no scenario is
-  violated; the divergence is between the code and its own comment for a multi-add gesture. Tracked as
-  follow-up S2 in the M2-3 archive report.
+  violated; the divergence is between the code and its own comment for a multi-add gesture.~~
+  **CLOSED by `m3-hardening-prelude` (M3-0, archived 2026-08-03)** — see the amendment below, which
+  promotes the comment's claim into requirement text and then makes the code honour it.
+- **Amended by change `m3-hardening-prelude` (archived `2026-08-03`, PRD milestone **M3**, slice
+  M3-0 — the hardening prelude)**: **1 MODIFIED** requirement replaced as a whole block —
+  "Multi-select is explicit, ordered, and offered only for bulk-eligible verbs" — adding **1
+  scenario**. 14 requirements / 54 scenarios → **14 requirements / 55 scenarios**. Nothing was added,
+  removed or renamed; the other thirteen requirements are byte-identical, and the replacement is a
+  strict superset of the text it replaced. Previously the requirement fixed selection order only for
+  packages selected **one at a time**; the order in which a *bulk* add entered them was unspecified,
+  so it followed flat inventory order and operations were submitted in an order the user never saw —
+  M2-3 follow-up **S2**.
+  - **The scenario deliberately does not enumerate the section names.** The section set belongs to
+    the view and has already changed once; naming it in the spec would make a layout change a spec
+    change. As rendered today the order is Outdated → Updates itself → All packages / Installed on
+    request, and the delivered `InstalledSections` type preserves those titles exactly.
+  - Delivered as a package-level `InstalledSections` value (`outdated` / `selfUpdating` / `rest`,
+    with a `displayed` concatenation) that the view renders its three `Section`s from and
+    `reconcileOrder` maps over — **one projection read twice**, following the `upgradableIDs`
+    precedent. Pinned by `InstalledSectionsTests >
+    theDisplayedOrderIsOutdatedThenSelfUpdatingThenTheRest` and
+    `bulkAddEntersTheSelectionInDisplayedOrderNotInventoryOrder`.
+  - **This slice added no bulk verb**, so the exhaustive "only upgrade and uninstall" scenario —
+    asserted over `BulkSelection.Action.allCases` — is carried forward unchanged.
+- **Known follow-up (`m3-hardening-prelude` native review lineage `review-fa82e5eaa3023fc4`,
+  SUGGESTION, non-blocking)**: the app-target `reconcileOrder` expression itself is **unproved by an
+  automated test** — `InstalledSectionsTests` composes the reconciliation in-test rather than calling
+  the app-target function, which lives outside the package suite. The ordering *rule* is fully proven
+  headless; the app-target wiring rests on `xcodebuild build` plus manual check 9.1(c), which
+  observed a real one-gesture multi-add submitting in displayed order. Tracked as follow-up **(c)**
+  in the M3-0 archive report.

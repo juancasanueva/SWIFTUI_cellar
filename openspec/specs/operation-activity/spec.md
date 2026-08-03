@@ -205,6 +205,13 @@ side effect: if it is unavailable or fails, the operation's reported outcome, it
 re-snapshot owed at that outcome MUST be unchanged. What the entry stores and how long it is kept are
 owned by `installation-history`.
 
+An operation that reaches a terminal outcome **without ever spawning a process** MUST be treated as a
+terminal outcome like any other: no runner configured to execute it, a launch that fails before a
+process exists, and an identity the execution layer cannot answer MUST each record exactly one entry
+carrying that operation's argv and its failure outcome. This rule MUST hold with no carve-out — a
+settled outcome that is reported to the queue but writes no entry is forbidden, whatever path settled
+it.
+
 #### Scenario: A successful operation records once
 
 - GIVEN a submitted install for the cask `iterm2` that exits with status 0
@@ -217,6 +224,13 @@ owned by `installation-history`.
 - GIVEN a running mutation
 - WHEN it is cancelled and reaches the cancelled outcome
 - THEN exactly one history entry was submitted for it, carrying the cancelled outcome
+
+#### Scenario: An operation that never spawns still records once
+
+- GIVEN a queue with no runner configured to execute submissions
+- WHEN a mutation is submitted and settles at its terminal outcome without a process ever existing
+- THEN it is reported as a failed terminal outcome, not as pending, running or successful
+- AND exactly one history entry was submitted for it, carrying its argv and that failure outcome
 
 #### Scenario: Nothing is recorded before the terminal outcome
 
@@ -285,10 +299,28 @@ owned by `installation-history`.
     SwiftData and a recorder failure is provably inert
     (`OperationCenterHistoryTests > aRecorderFailureNeverReachesTheOperation`, parameterised over
     working / absent / failing recorders).
-- **Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
+- ~~**Known follow-up (`m2-local-metadata-history` native review lineage `review-e07590a04c4aff38`,
   WARNING, non-blocking)**: the **no-runner submit path** settles an item as `.launchFailed` without
   going through `finish()`, so that one path produces a terminal outcome with **no** history entry —
   a narrow exception to "Every terminal outcome records exactly one history entry"
   (`OperationCenter.swift:159-163`). It is reachable only when a mutation is submitted while no runner
-  is attached. The requirement text is unchanged and every scenario is COMPLIANT; tracked as
-  follow-up W1 in the M2-3 archive report and routed to the next cycle.
+  is attached.~~ **CLOSED by `m3-hardening-prelude` (M3-0, archived 2026-08-03)** — see the amendment
+  below, which promotes the missing guarantee into requirement text rather than leaving it implied.
+- **Amended by change `m3-hardening-prelude` (archived `2026-08-03`, PRD milestone **M3**, slice
+  M3-0 — the hardening prelude)**: **1 MODIFIED** requirement replaced as a whole block — "Every
+  terminal outcome records exactly one history entry" — adding **1 scenario**. 6 requirements / 22
+  scenarios → **6 requirements / 23 scenarios**. Nothing was added, removed or renamed; the other
+  five requirements are byte-identical, and the replacement is a strict superset of the text it
+  replaced. Previously the exactly-one-entry rule was stated for every terminal outcome but was only
+  *satisfied* on paths that had spawned a process, so an operation settled without ever spawning
+  reached its terminal outcome and recorded **zero** entries — M2-3 follow-up **W1**.
+  - **No carve-out was granted** (settled product decision Q4, 2026-08-03, Engram `#7130`): the
+    universal rule was kept and the implementation made to honour it, rather than the rule being
+    narrowed to spawning paths.
+  - Delivered by hoisting `gate?.begin()` **above** the `guard let runner` and routing the no-runner
+    branch through `finish(item, with: .launchFailed)` — the single settle site, which already writes
+    the entry idempotently — so there is one `begin()` per submit and one `end()` per finish. Pinned
+    by `OperationCenterTests > aSubmitWithNoRunnerRecordsExactlyOneHistoryEntry`.
+  - **Native review note (lineage `review-fa82e5eaa3023fc4`)**: the reviewer positively verified
+    begin/end pairing is structurally sound — every `ActivityItem` is constructed only inside
+    `submit`, so no path can reach a terminal outcome outside the funnel.
