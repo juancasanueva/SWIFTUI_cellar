@@ -195,6 +195,67 @@ struct HistoryStoreTests {
         #expect(try container.mainContext.fetch(FetchDescriptor<Snooze>()).count == 1)
     }
 
+    // MARK: - IH6 — a clear that fails stays observable
+
+    /// A clear that fails was indistinguishable from a healthy empty history:
+    /// the `catch` set the availability and the unconditional `reload()` below
+    /// it immediately overwrote that with `.available`, and `lastError` was
+    /// never touched at all.
+    ///
+    /// The failure is injected through the clear seam rather than by making a
+    /// real SwiftData delete fail: a read-only directory or a corrupted file is
+    /// flaky in the `swift test` loop, and what is under test is the store's
+    /// reaction, not SwiftData's (design D5).
+    @Test("A failed clear keeps every entry and reports the reason")
+    func aFailedClearKeepsEveryEntryAndReportsTheReason() throws {
+        let container = try PersistenceContainer.inMemory()
+        let context = container.mainContext
+        context.insert(Self.entry(named: "wget", verb: "install", at: 1_000))
+        context.insert(Self.entry(named: "git", verb: "uninstall", at: 2_000))
+        context.insert(Self.entry(named: "iterm2", verb: "upgrade", kind: .cask, at: 3_000))
+        try context.save()
+
+        let store = HistoryStore(container: container, clearing: { _ in throw ClearFailure() })
+        #expect(store.records.count == 3)
+
+        store.clearAll()
+
+        // Every entry, with its original fields — read back after the reload the
+        // attempt performs, so this is the rebuilt projection, not a stale one.
+        #expect(store.records.count == 3, "a failed clear deleted \(3 - store.records.count) entries")
+        #expect(store.records.map(\.name) == ["iterm2", "git", "wget"])
+        #expect(store.records.map(\.verb) == ["upgrade", "uninstall", "install"])
+        #expect(store.records.map(\.commandText) == [
+            "upgrade --cask iterm2",
+            "uninstall --formula git",
+            "install --formula wget"
+        ])
+        #expect(try context.fetch(FetchDescriptor<HistoryEntry>()).count == 3)
+
+        // And the failure survived that reload rather than being overwritten by
+        // it: not an empty history, and not a healthy one.
+        #expect(store.availability.isAvailable == false, "a failed clear reported a healthy history")
+        #expect(store.availability.reason?.isEmpty == false)
+        #expect(store.lastError?.isEmpty == false, "a failed clear reported no reason")
+    }
+
+    @Test("A successful clear leaves no stale failure reason")
+    func aSuccessfulClearLeavesNoStaleFailureReason() throws {
+        let (container, store) = try Self.seeded()
+        #expect(store.records.count == 3)
+
+        store.clearAll()
+
+        #expect(store.records.isEmpty)
+        #expect(try container.mainContext.fetch(FetchDescriptor<HistoryEntry>()).isEmpty)
+        #expect(store.availability.isAvailable, "a successful clear reported an unavailable store")
+        #expect(store.lastError == nil, "a successful clear left a failure reason behind")
+    }
+
+    /// Stands in for whatever SwiftData raises: the store reacts to *a* thrown
+    /// error, never to a particular one.
+    private struct ClearFailure: Error {}
+
     // MARK: - IH6 sc4 — no per-entry delete affordance exists
 
     /// The `ActivityItem.Control` technique: the candidate controls are

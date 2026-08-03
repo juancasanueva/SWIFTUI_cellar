@@ -141,18 +141,18 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 4: Failed clear stays observable — D4, D5 (item #3, `installation-history`)
 
-- [ ] 4.1 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
+- [x] 4.1 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
       `aFailedClearKeepsEveryEntryAndReportsTheReason`: three entries, injected clear closure that
       throws; expect all three records present with original fields, `availability` unavailable
       **after** the reload, `lastError` set. — sc *"A failed clear leaves every entry present and
       reports why"* + *"A failed clear's reason survives the reload that follows it"*.
-- [ ] 4.2 **RED** same file — `aSuccessfulClearLeavesNoStaleFailureReason`: expect `records.isEmpty`,
+- [x] 4.2 **RED** same file — `aSuccessfulClearLeavesNoStaleFailureReason`: expect `records.isEmpty`,
       `lastError == nil`, `.available`. — sc *"A confirmed clear empties the history"*.
-- [ ] 4.3 **GREEN** `Sources/Persistence/HistoryStore.swift` — add the internal
+- [x] 4.3 **GREEN** `Sources/Persistence/HistoryStore.swift` — add the internal
       `init(container:clearing:)` seam (default closure = `try context.delete(model:) ; try save()`)
       and an internal `init(unavailable:)` mirroring `MetadataStore`'s. Injected seam, not a
       filesystem-permission fake (D5).
-- [ ] 4.4 **GREEN** `clearAll()` (`:181-191`) — on failure `rollback()` and capture the reason, call
+- [x] 4.4 **GREEN** `clearAll()` (`:181-191`) — on failure `rollback()` and capture the reason, call
       `reload()` **first**, then apply `availability = .unavailable(reason:)` and set `lastError`
       exactly as `append` does. Inline surface only: no alert, no retry affordance (settled Q1).
       **Commit 4.**
