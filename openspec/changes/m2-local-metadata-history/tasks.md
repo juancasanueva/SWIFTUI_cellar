@@ -499,6 +499,9 @@ Phases 5–7.
   rows in that order (user-observed).
   (d) History search by name, verb and argv fragment each worked; confirmed Clear emptied history
   while favorites, notes and snoozes stayed intact (user-observed).
+  **(d-addendum, 2026-08-03, closes verify CRITICAL 1 / IH6 "Declining deletes nothing":** with one
+  history row present (Cellar-submitted install of `hello`), the Clear history dialog was opened and
+  **Cancel** pressed — the history row remained; nothing was deleted (user-observed).)
   Sudo and lock paths deliberately not exercised, per this task's own instruction.
 - [x] 9.3 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
   deleted), `FULL` green, `swiftlint` on changed files with new findings separated from the 33
