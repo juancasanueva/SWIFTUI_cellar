@@ -233,22 +233,22 @@ If the split is taken, exactly four things must move with it — nothing else:
 > a poll registered there would run once and never restart after the first hide. `LoopOwner.start("services")`
 > runs the **terminals consumer only** (Phase 14); the poll task is owned by the coordinator.
 
-- [ ] 5.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` (new), suite trait
+- [x] 5.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` (new), suite trait
       `.timeLimit(.minutes(1))` — **whole minutes only**, `.seconds(30)` traps at runtime (M3-0
       task 1.4) — `theListRefreshesOnTheFiveSecondCadenceWhileVisible`: `TestClock` from
       `Sources/CellarTestSupport/TestClock.swift`, advance 5 s three times, expect one baseline plus
       exactly three refreshes, no wall-clock sleep. — sc *"The list refreshes on the poll cadence
       while visible"*.
-- [ ] 5.2 **RED** same file — `hidingTheSurfaceStopsPollingEntirely`: after `setVisible(false)`,
+- [x] 5.2 **RED** same file — `hidingTheSurfaceStopsPollingEntirely`: after `setVisible(false)`,
       advance **60 s** and expect zero further invocations; `setVisible(true)` again performs a
       baseline refresh. — sc *"Hiding the surface stops polling entirely"*. Also the threat-matrix
       **Process integration** row: *no spawn after hide across 60 s of simulated time*.
-- [ ] 5.3 **RED** same file — `onlyOnePollLoopRunsPerLaunch`: visible → hidden → visible twice over,
+- [x] 5.3 **RED** same file — `onlyOnePollLoopRunsPerLaunch`: visible → hidden → visible twice over,
       expect a single loop throughout. — sc *"Only one poll loop runs per launch"*.
-- [ ] 5.4 **RED** same file — `aPollTickFetchesNoDetail`: with nothing selected, every recorded
+- [x] 5.4 **RED** same file — `aPollTickFetchesNoDetail`: with nothing selected, every recorded
       invocation is the list probe and no `services info` invocation exists. — sc *"A poll tick
       fetches no detail"*.
-- [ ] 5.5 **GREEN** create `Sources/BrewClient/ServicesRefreshCoordinator.swift` — baseline on
+- [x] 5.5 **GREEN** create `Sources/BrewClient/ServicesRefreshCoordinator.swift` — baseline on
       `setVisible(true)`, poll task created there and `cancel()`-ed **and niled** by
       `setVisible(false)`, cadence `.seconds(5)` on an injected `any Clock<Duration>`. The terminals
       consumer and mutation suppression are **Phase 14** — leave the seam, do not fake it.
