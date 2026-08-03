@@ -150,6 +150,63 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
     }
 }
 
+/// The gates one submission opens, chosen by what its command invalidates.
+///
+/// The whole of scoped invalidation lives here, and it is deliberately small:
+/// `begin` and `end` walk the registered domains and touch **only the ones the
+/// command's scope intersects**. Everything else follows from that.
+///
+/// - A services toggle never calls `begin()` on the installed gate, so
+///   `InstalledMutationGate.isMutating` stays false and external change signals
+///   are not suppressed while it runs. That is why
+///   `InstalledChangeObserving.swift` needs **zero edits** for this change: the
+///   scoping is an absence of a call, not a new flag inside the observer.
+/// - Its `terminals` stream never fires either, so no inventory re-snapshot is
+///   forced — 1.27 s and 663 KB saved per toggle, on a probe that could not have
+///   observed a difference (design D2).
+///
+/// The services gate is a **second instance of the shipped
+/// `InstalledMutationGate` type**, not a new type: that type is already a depth
+/// counter plus a `terminals` stream, with nothing installed-specific in its
+/// body. The rename it now deserves is deliberately not done here — it is public
+/// API with test call sites and buys no behaviour — and the naming debt is
+/// registered rather than hidden.
+@MainActor
+public final class MutationGates {
+    private let entries: [(scope: InvalidationScope, gate: InstalledMutationGate)]
+
+    /// - Parameter entries: one gate per state domain. A domain with no gate
+    ///   registered is simply not watched here; a command may still declare it.
+    public init(_ entries: [(InvalidationScope, InstalledMutationGate)]) {
+        self.entries = entries.map { (scope: $0.0, gate: $0.1) }
+    }
+
+    /// The single-domain convenience the app and every shipped test used before
+    /// there was more than one domain.
+    public convenience init(installed gate: InstalledMutationGate) {
+        self.init([(.installedInventory, gate)])
+    }
+
+    /// Opens every gate this command invalidates. Nothing else moves.
+    public func begin(_ scope: InvalidationScope) {
+        for entry in entries where entry.scope.isDisjoint(with: scope) == false {
+            entry.gate.begin()
+        }
+    }
+
+    /// Closes them again, which is what yields each domain's one terminal.
+    ///
+    /// Exactly symmetric with `begin`: the scope comes from the same command, so
+    /// a domain cannot be ended that was never begun, and every domain that was
+    /// begun is ended — which is what makes "exactly one refresh per declared
+    /// domain, never zero and never two" hold for every terminal outcome (PM6).
+    public func end(_ scope: InvalidationScope) {
+        for entry in entries where entry.scope.isDisjoint(with: scope) == false {
+            entry.gate.end()
+        }
+    }
+}
+
 /// The six package commands, on the shared spine.
 ///
 /// Everything the protocol asks for is already a computed property on the enum;

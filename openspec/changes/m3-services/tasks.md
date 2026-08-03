@@ -346,37 +346,37 @@ If the split is taken, exactly four things must move with it — nothing else:
 > (no suppression) and its `terminals` stream never fires (no forced re-snapshot). Task 9.7 asserts
 > that file is byte-unchanged. **No settle-grace, no `isSettling`** — see Phase 15.
 
-- [ ] 9.1 **RED** `Tests/BrewClientTests/MutationGatesTests.swift` (new) —
+- [x] 9.1 **RED** `Tests/BrewClientTests/MutationGatesTests.swift` (new) —
       `aCommandDeclaringTheInstalledSetRefreshesItExactlyOnceAtEveryTerminal`: success, non-zero exit,
       typed busy failure and cancellation, each forcing exactly one re-snapshot. This is the
       carried-forward PM6 invariant and must stay green. — PM6 sc 1–3.
-- [ ] 9.2 **RED** same file — `aCommandThatDoesNotDeclareTheInstalledSetTakesNoInventorySnapshot`:
+- [x] 9.2 **RED** same file — `aCommandThatDoesNotDeclareTheInstalledSetTakesNoInventorySnapshot`:
       zero `brew info --installed --json=v2` invocations across successful, failed **and** cancelled
       terminals, and exactly one refresh of each domain it *did* declare. — PM6 sc 4–5,
       `service-management` sc *"A successful service verb refreshes services once and the inventory
       never"* / *"A failed or cancelled service verb still refreshes services once"*, II10 sc *"An
       operation that does not invalidate the installed set forces no re-snapshot"*.
-- [ ] 9.3 **RED** `Tests/BrewClientTests/InstalledRefreshTests.swift` —
+- [x] 9.3 **RED** `Tests/BrewClientTests/InstalledRefreshTests.swift` —
       `externalSignalsAreNotSuppressedByANonInvalidatingOperation`: a change signal emitted while a
       services command runs is answered after the quiet window, without waiting for that operation. —
       II10 sc *"External signals are not suppressed by a non-invalidating operation"*.
-- [ ] 9.4 **RED** `Tests/BrewClientTests/OperationCenterHistoryTests.swift` —
+- [x] 9.4 **RED** `Tests/BrewClientTests/OperationCenterHistoryTests.swift` —
       `aFailingRecorderChangesNeitherTheOutcomeNorThePerDomainRefreshCounts` for a non-package
       operation: identical outcome, exactly one refresh per declared domain and none for any it did
       not declare, nothing thrown. — IH7 sc 3, OA6 sc *"A failing recorder does not change what the
       queue reports"*.
-- [ ] 9.5 **GREEN** `Sources/BrewClient/BrewMutating.swift` — add `MutationGates`, mapping scope →
+- [x] 9.5 **GREEN** `Sources/BrewClient/BrewMutating.swift` — add `MutationGates`, mapping scope →
       gate and beginning/ending **only the intersecting** gates. The services gate is a **second
       instance of the shipped `InstalledMutationGate` type**, not a new type — it is already a depth
       counter plus a `terminals` stream with nothing installed-specific in its body. The rename it
       deserves is deliberately **not** done here (public API, test call sites, buys no behaviour); the
       naming debt is registered in task 15.4, not hidden.
-- [ ] 9.6 **GREEN** `Sources/BrewClient/MutationOutcome.swift` and `OperationCenter.swift` — **delete**
+- [x] 9.6 **GREEN** `Sources/BrewClient/MutationOutcome.swift` and `OperationCenter.swift` — **delete**
       `MutationOutcome.forcesReSnapshot`; what a command invalidates is a property of what ran, not of
       how it ended. `OperationCenter.init(gates:…)` is the new form; keep `init(gate:)` as a
       convenience building `[(.installedInventory, gate)]` so every current test and the app's
       composition root compile unchanged.
-- [ ] 9.7 **Scope guard** — `git diff main -- Packages/CellarCore/Sources/BrewClient/InstalledChangeObserving.swift`
+- [x] 9.7 **Scope guard** — `git diff main -- Packages/CellarCore/Sources/BrewClient/InstalledChangeObserving.swift`
       must be **empty**. Any hunk there means the settle-grace crept back in. **Commit 9.**
 
 ## Phase 10: `ConfirmationBox` — D6 (b), register item VS2

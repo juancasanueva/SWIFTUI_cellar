@@ -338,15 +338,29 @@ struct ClassificationTests {
         #expect(outcome.isFailure == false)
     }
 
-    /// Every outcome is terminal, and every terminal outcome owes exactly one
-    /// re-snapshot — including the two typed failures (PM6 sc1–sc2).
-    @Test("Every outcome is terminal and forces a re-snapshot")
-    func everyOutcomeForcesAReSnapshot() {
+    /// Every outcome is terminal — including the two typed failures — and what a
+    /// terminal outcome refreshes is decided by the **command**, never by the
+    /// outcome (PM6, as amended by design D2).
+    ///
+    /// The shipped re-snapshot flag was an unconditional `true` on every case,
+    /// so it could only ever say "everything, always". Its replacement is
+    /// asserted where it now lives; this test keeps the half that is still a
+    /// property of the outcome — that each of them really is an ending — and
+    /// pins the absence of the old member so it cannot quietly return.
+    @Test("Every outcome is terminal, and what it refreshes is not its business")
+    func everyOutcomeIsTerminalAndDeclaresNoScope() {
         let outcomes: [MutationOutcome] = [
             .succeeded, .failed(status: 1), .busy, .needsPrivileges,
             .cancelled, .abandoned(after: .seconds(7)), .launchFailed
         ]
 
-        #expect(outcomes.count(where: \.forcesReSnapshot) == outcomes.count)
+        // Total: every outcome is exactly one of success, failure, or a
+        // user-asked-for ending. None is "still going".
+        for outcome in outcomes {
+            #expect(outcome.isSuccess || outcome.isFailure || !outcome.summaryLabel.isEmpty)
+            #expect(!(outcome.isSuccess && outcome.isFailure), "\(outcome) is both")
+        }
+        #expect(outcomes.count(where: \.isSuccess) == 1)
+        #expect(outcomes.count(where: \.isFailure) == 4)
     }
 }

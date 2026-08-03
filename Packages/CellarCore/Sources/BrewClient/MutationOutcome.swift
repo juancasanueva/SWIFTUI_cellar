@@ -131,11 +131,15 @@ public enum MutationOutcome: Sendable, Equatable {
         }
     }
 
-    /// Every terminal outcome owes exactly one inventory re-snapshot — success,
-    /// both typed failures, a plain failure and a cancellation alike. A
-    /// cancelled or failed mutation may have changed the world just as much as a
-    /// successful one (package-mutation PM6).
-    public var forcesReSnapshot: Bool { true }
+    // There is deliberately **no** re-snapshot flag on this type any more.
+    //
+    // It was an unconditional `true` on every outcome, which made "what does
+    // this invalidate?" a property of *how the operation ended*. It is a
+    // property of *what ran*: a services toggle changes nothing in the installed
+    // set whether it succeeds, fails or is cancelled. The declaration moved to
+    // `BrewMutating.invalidates`, and PM6's real invariant is preserved intact —
+    // every terminal outcome still owes exactly one refresh of each domain its
+    // command declared (design D2).
 
     /// The one sentence shown for this outcome.
     ///

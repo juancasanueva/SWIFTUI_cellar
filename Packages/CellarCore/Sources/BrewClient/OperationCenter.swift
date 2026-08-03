@@ -32,7 +32,12 @@ public final class OperationCenter {
     /// outside this module can write it.
     public internal(set) var pendingConfirmation: ConfirmationRequest?
 
-    @ObservationIgnored private let gate: InstalledMutationGate?
+    /// The state domains this centre can invalidate, and the gate for each.
+    ///
+    /// A command opens only the ones its own `invalidates` scope names, so a
+    /// family that cannot change the installed set neither suppresses external
+    /// change signals nor forces an inventory re-snapshot (design D2).
+    @ObservationIgnored private let gates: MutationGates?
     /// Where a terminal outcome's durable record goes.
     ///
     /// Defaulted to the no-op so an app with no store configured behaves exactly
@@ -44,13 +49,32 @@ public final class OperationCenter {
     @ObservationIgnored private var installation: BrewInstallation?
 
     public init(
+        gates: MutationGates,
+        history: any HistoryRecording = NoHistoryRecording(),
+        launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
+            SystemProcessLauncher()
+        }
+    ) {
+        self.gates = gates
+        self.history = history
+        self.launcherFactory = launcherFactory
+    }
+
+    /// The single-domain form, kept so every shipped test and the app's
+    /// composition root compile unchanged.
+    ///
+    /// It is exactly `MutationGates([(.installedInventory, gate)])`, which is
+    /// what the centre did unconditionally before there was more than one
+    /// domain. `gates` has no default here precisely so this initialiser stays
+    /// the one an argument-free `OperationCenter()` resolves to.
+    public init(
         gate: InstalledMutationGate? = nil,
         history: any HistoryRecording = NoHistoryRecording(),
         launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
             SystemProcessLauncher()
         }
     ) {
-        self.gate = gate
+        gates = gate.map { MutationGates(installed: $0) }
         self.history = history
         self.launcherFactory = launcherFactory
     }
@@ -190,7 +214,11 @@ public final class OperationCenter {
         // one `end()` per finish is an invariant of *submission* rather than of
         // the happy path: every exit from this method below here goes through
         // `finish`, which is the only settle site (design D3).
-        gate?.begin()
+        //
+        // Scoped to what this command invalidates, so a family that cannot
+        // change the installed set never opens that gate at all — which is the
+        // whole of the scoping, and why the change observer needs no edit.
+        gates?.begin(command.invalidates)
 
         guard let runner else {
             item.queuePhase = .terminal(BrewExit(status: 127, reason: .exited), fault: nil)
@@ -278,9 +306,11 @@ public final class OperationCenter {
     private func finish(_ item: ActivityItem, with outcome: MutationOutcome) {
         guard item.outcome == nil else { return }
         item.settle(outcome)
-        // Every terminal outcome owes exactly one re-snapshot — success, both
-        // typed failures, a plain failure and a cancellation alike (PM6).
-        gate?.end()
+        // Every terminal outcome owes exactly one refresh of **each domain the
+        // command declared** — success, both typed failures, a plain failure and
+        // a cancellation alike (PM6). The scope is read from the item's own
+        // erased command, so `end` closes exactly what `submit` opened.
+        gates?.end(item.command.invalidates)
         // Last, and deliberately: recording is a **side effect** of the outcome,
         // never a precondition of it. The protocol is synchronous and
         // non-throwing, so an absent or failing recorder cannot change what this

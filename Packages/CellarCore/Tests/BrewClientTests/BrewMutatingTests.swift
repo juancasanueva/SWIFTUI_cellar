@@ -17,21 +17,6 @@ import Testing
 @Suite("Brew mutating spine", .timeLimit(.minutes(1)))
 struct BrewMutatingTests {
 
-    /// A conformer from no capability at all.
-    ///
-    /// Deliberately **not** `ServiceCommand` — that type does not exist until
-    /// Phase 11, and using it here would make this suite prove "services can
-    /// enter the spine" when the claim under test is the stronger "*anything*
-    /// conforming can". Its argv is a services one only because that is the
-    /// shape the slice is heading for.
-    struct ProbeMutation: BrewMutating, Equatable {
-        var arguments: [String] = ["services", "start", "atuin"]
-        var verb = "probeStart"
-        var packageID: PackageID?
-        var requiresConfirmation = false
-        var invalidates: InvalidationScope = .services
-    }
-
     // MARK: - PM1 sc6 — another family enters without becoming a case
 
     /// Every shipped case, mapped by a switch the **compiler** keeps exhaustive.
