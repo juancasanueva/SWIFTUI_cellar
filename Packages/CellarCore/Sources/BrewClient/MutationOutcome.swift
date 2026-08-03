@@ -142,7 +142,7 @@ public enum MutationOutcome: Sendable, Equatable {
     /// Built entirely from Cellar's own typed `command` — never from the
     /// subprocess's bytes — which is what makes the "brew's guessed command
     /// name is never presented" property structural rather than careful.
-    public func message(for command: MutationCommand) -> String {
+    public func message(for command: some BrewMutating) -> String {
         switch self {
         case .succeeded:
             "Done."

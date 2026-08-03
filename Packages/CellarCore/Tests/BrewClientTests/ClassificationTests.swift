@@ -77,7 +77,7 @@ struct ClassificationTests {
 
     @Test("The busy message tells the user Homebrew is busy in another terminal")
     func theBusyMessageNamesTheRealCause() {
-        let message = MutationOutcome.busy.message(for: .uninstall(PackageTarget(Self.hello)!))
+        let message = MutationOutcome.busy.message(for: MutationCommand.uninstall(PackageTarget(Self.hello)!))
 
         #expect(message.lowercased().contains("homebrew"))
         #expect(message.lowercased().contains("terminal"))
@@ -113,7 +113,7 @@ struct ClassificationTests {
         let outcome = Self.classify(status: 1, stderr: hostile)
         #expect(outcome == .busy)
 
-        let message = outcome.message(for: .uninstall(PackageTarget(Self.wget)!))
+        let message = outcome.message(for: MutationCommand.uninstall(PackageTarget(Self.wget)!))
         #expect(
             message.contains("some-other-package") == false,
             "brew's guessed command name was parsed out and presented as the lock holder"
@@ -286,8 +286,8 @@ struct ClassificationTests {
         #expect(outcome == .abandoned(after: .seconds(7)))
         #expect(outcome != .cancelled)
 
-        let message = outcome.message(for: .install(PackageTarget(Self.wget)!))
-        #expect(message != MutationOutcome.cancelled.message(for: .install(PackageTarget(Self.wget)!)))
+        let message = outcome.message(for: MutationCommand.install(PackageTarget(Self.wget)!))
+        #expect(message != MutationOutcome.cancelled.message(for: MutationCommand.install(PackageTarget(Self.wget)!)))
         #expect(message.lowercased().contains("still running"))
     }
 

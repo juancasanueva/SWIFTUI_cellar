@@ -148,10 +148,35 @@ public final class OperationCenter {
     /// `versions` is the transition Cellar **intends**, captured here rather
     /// than observed at the terminal: the durable record then says what was
     /// attempted, and its outcome says whether it happened (design D7).
+    /// The concrete overload exists so a leading-dot literal still resolves.
+    ///
+    /// `operations.submit(.upgradeAll)` cannot infer a contextual base against a
+    /// generic parameter, so without this the app target would have to spell the
+    /// type at every call site. It forwards immediately; there is one submission
+    /// path, not two (design D1).
     @discardableResult
     public func submit(
         _ command: MutationCommand,
         versions: VersionTransition? = nil
+    ) -> ActivityItem {
+        perform(command, versions: versions)
+    }
+
+    @discardableResult
+    public func submit(
+        _ command: some BrewMutating,
+        versions: VersionTransition? = nil
+    ) -> ActivityItem {
+        perform(command, versions: versions)
+    }
+
+    /// The one submission path. Both overloads above forward here unchanged, so
+    /// "exactly one `begin()` per submit and one `end()` per finish" stays an
+    /// invariant of *submission* rather than of whichever spelling was used.
+    @discardableResult
+    private func perform(
+        _ command: some BrewMutating,
+        versions: VersionTransition?
     ) -> ActivityItem {
         let item = ActivityItem(id: UUID(), command: command, versions: versions)
         items.append(item)
@@ -189,8 +214,12 @@ public final class OperationCenter {
 
     // MARK: - One operation, start to finish
 
+    /// Generic, so `classify` dispatches to the **concrete** command's own
+    /// implementation. That is what makes "a family may read its own markers
+    /// without any other family paying for it" a property of the spine rather
+    /// than of a switch somebody has to keep exhaustive (design D4).
     private func run(
-        _ command: MutationCommand,
+        _ command: some BrewMutating,
         for item: ActivityItem,
         on runner: BrewRunner
     ) async {
@@ -231,7 +260,11 @@ public final class OperationCenter {
 
         let exit = await operation.exit()
         let fault = await operation.fault()
-        finish(item, with: .classify(exit: exit, fault: fault, log: item.log))
+        // Through the **command**, not through the static classifier: a family
+        // that overrides `classify` is answered by its own implementation, and
+        // one that does not gets the protocol default, which is today's logic
+        // verbatim.
+        finish(item, with: command.classify(exit: exit, fault: fault, log: item.log))
     }
 
     /// Settles an item exactly once, pays the re-snapshot it owes, and records

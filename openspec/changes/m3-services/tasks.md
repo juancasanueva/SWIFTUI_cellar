@@ -305,17 +305,17 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 8: `BrewMutating`, `AnyBrewMutation`, `InvalidationScope` — D1, D2, `package-mutation` PM1
 
-- [ ] 8.1 **RED** `Tests/BrewClientTests/BrewMutatingTests.swift` (new) —
+- [x] 8.1 **RED** `Tests/BrewClientTests/BrewMutatingTests.swift` (new) —
       `anotherFamilyEntersTheSpineWithoutBecomingACaseOfTheMutationCommandType`: submit a non-package
       conformer through the spine, then assert `MutationCommand` still carries exactly the six package
       commands, and that the submitted command was still projected with its argv, its verb and its
       terminal outcome. — PM1 sc *"Another family enters the spine without becoming a case of this
       type"*.
-- [ ] 8.2 **RED** same file — `anErasedMutationCarriesOnlyProjectionsAndCompareByValue`: build
+- [x] 8.2 **RED** same file — `anErasedMutationCarriesOnlyProjectionsAndCompareByValue`: build
       `AnyBrewMutation` from two equal and two differing conformers; assert synthesized `==` holds and
       that **nothing** can be parsed back out of it (no case payload to recover). This strengthens the
       shipped "nothing is parsed back out of a command" property rather than weakening it.
-- [ ] 8.3 **GREEN** create `Sources/BrewClient/BrewMutating.swift` — the `Sendable`-only protocol
+- [x] 8.3 **GREEN** create `Sources/BrewClient/BrewMutating.swift` — the `Sendable`-only protocol
       (`arguments`, `verb`, `packageID`, `requiresConfirmation`, `invalidates`, `classify`), its
       default `displayCommand` / `brewCommand` / `classify` (today's logic **verbatim**), the
       `AnyBrewMutation` erased value, and `InvalidationScope` as a `Sendable, Hashable` `OptionSet`
@@ -323,16 +323,16 @@ If the split is taken, exactly four things must move with it — nothing else:
       by comment, **not declared**. No `Equatable`/`Hashable` `Self`-requirement: it would make the
       protocol unusable as a stored property and break `ConfirmationRequest: Equatable` and its four
       existing assertions.
-- [ ] 8.4 **GREEN** `Sources/BrewClient/MutationCommand.swift` — add
+- [x] 8.4 **GREEN** `Sources/BrewClient/MutationCommand.swift` — add
       `extension MutationCommand: BrewMutating { var invalidates: InvalidationScope { .installedInventory } }`
       and **nothing else**.
-- [ ] 8.5 **GREEN** `Sources/BrewClient/OperationCenter.swift`, `OperationCenterBulk.swift`,
+- [x] 8.5 **GREEN** `Sources/BrewClient/OperationCenter.swift`, `OperationCenterBulk.swift`,
       `ActivityItem.swift` — `submit(_ command: some BrewMutating, versions:)` and
       `request(_ commands: [some BrewMutating])` are **generic, not existential**, so every app-target
       call site (`MutationMenu.swift:83-84`, `InstalledListView`, `ActivityBar`, `BrowseView`)
       compiles **unchanged**. `ActivityItem.command` and `ConfirmationRequest.command`/`additional`
       store `AnyBrewMutation`.
-- [ ] 8.6 **RED** `Tests/BrewClientTests/MutationCommandTests.swift` — extend the existing VS1-style
+- [x] 8.6 **RED** `Tests/BrewClientTests/MutationCommandTests.swift` — extend the existing VS1-style
       structural scan over `Sources/BrewClient/*Command.swift` with the positive anchor and the new
       structural rule: *a conformer's `arguments` may contain only literal verb/flag enum raw values
       plus tokens taken from a validated wrapper*. Keep the M3-0 lesson from task 8.1 — the scan must

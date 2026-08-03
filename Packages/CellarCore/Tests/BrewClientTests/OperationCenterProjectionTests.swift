@@ -115,7 +115,7 @@ struct OperationCenterProjectionTests {
         #expect(pending.outcome == .cancelled)
         #expect(pending.message.lowercased().contains("partial"))
         let git = try #require(PackageTarget(CenterHarness.git))
-        #expect(pending.message == MutationOutcome.cancelled.message(for: .uninstall(git)))
+        #expect(pending.message == MutationOutcome.cancelled.message(for: MutationCommand.uninstall(git)))
 
         try await harness.finish(call: 0)
     }

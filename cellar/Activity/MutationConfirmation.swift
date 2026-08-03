@@ -62,19 +62,27 @@ struct MutationConfirmation: ViewModifier {
         if request.isBulk {
             return "Uninstall \(request.commands.count) packages?"
         }
-        return switch request.command {
-        case .zap: "Remove this cask and everything it left behind?"
-        default: "Uninstall this package?"
-        }
+        return request.isZap
+            ? "Remove this cask and everything it left behind?"
+            : "Uninstall this package?"
     }
 
     private func confirmLabel(for request: OperationCenter.ConfirmationRequest) -> String {
         if request.isBulk { return "Uninstall \(request.commands.count)" }
-        return switch request.command {
-        case .zap: "Uninstall and Zap"
-        default: "Uninstall"
-        }
+        return request.isZap ? "Uninstall and Zap" : "Uninstall"
     }
+}
+
+private extension OperationCenter.ConfirmationRequest {
+    /// Whether this is the zap confirmation rather than the ordinary uninstall.
+    ///
+    /// Read from the request's **verb** rather than by switching on a command
+    /// case: the request carries an erased `AnyBrewMutation` now, so any family
+    /// may reach this sheet and only this capability's `zap` should retitle it.
+    /// `MutationCommand.verb` is the same projection the durable history is
+    /// searched by, and it already distinguishes zap from an ordinary uninstall
+    /// for exactly this reason.
+    var isZap: Bool { command.verb == "zap" }
 }
 
 extension View {

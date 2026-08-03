@@ -109,7 +109,15 @@ extension OperationCenter {
     /// Returns `nil` for everything that does not — install, reinstall,
     /// upgrade, upgrade-all, pin and unpin — so a caller can treat "no request"
     /// as "submit directly" without restating the rule (product Q2).
+    /// The concrete overload, for the same reason `submit` has one: a
+    /// leading-dot literal cannot infer a contextual base against a generic
+    /// parameter. It forwards to the batch form, which is the only
+    /// implementation.
     public func request(_ command: MutationCommand) -> ConfirmationRequest? {
+        request([command])
+    }
+
+    public func request(_ command: some BrewMutating) -> ConfirmationRequest? {
         request([command])
     }
 
@@ -119,15 +127,15 @@ extension OperationCenter {
     /// destructive action must be agreed once, on the whole of what it will do.
     /// Confirming submits every command it listed; declining submits none of
     /// them, never a partial subset (package-mutation PM3 sc5–6).
-    public func request(_ commands: [MutationCommand]) -> ConfirmationRequest? {
+    public func request(_ commands: [some BrewMutating]) -> ConfirmationRequest? {
         guard let first = commands.first,
               commands.contains(where: \.requiresConfirmation)
         else { return nil }
 
         let request = ConfirmationRequest(
             id: UUID(),
-            command: first,
-            additional: Array(commands.dropFirst())
+            command: AnyBrewMutation(first),
+            additional: commands.dropFirst().map(AnyBrewMutation.init)
         )
         pendingConfirmation = request
         return request
@@ -170,12 +178,17 @@ extension OperationCenter {
     public struct ConfirmationRequest: Identifiable, Sendable, Equatable {
         public let id: UUID
         /// The first command. A single-package confirmation has only this one.
-        public let command: MutationCommand
+        ///
+        /// Erased, for the reason `ActivityItem.command` is: the request is a
+        /// stored value the sheet reads, so it cannot be generic. Erasure is
+        /// also what keeps this type `Equatable`, which the presentation
+        /// binding and its four shipped assertions depend on (design D1).
+        public let command: AnyBrewMutation
         /// Everything else the same yes covers, in selection order.
-        public let additional: [MutationCommand]
+        public let additional: [AnyBrewMutation]
 
         /// Every command this confirmation will submit, in order.
-        public var commands: [MutationCommand] { [command] + additional }
+        public var commands: [AnyBrewMutation] { [command] + additional }
 
         /// True when one yes covers more than one package.
         public var isBulk: Bool { !additional.isEmpty }
