@@ -287,12 +287,12 @@ If the split is taken, exactly four things must move with it — nothing else:
 > unconditional `availability = .available` (`:170`), so a failed clear's reason is erased by the next
 > character the user types.
 
-- [ ] 7.1 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
+- [x] 7.1 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
       `aFailedClearReasonSurvivesASearchDrivenReload`: fail a clear through the M3-0 injected clear
       seam, then set `search` (triggering the `didSet` reload), and expect **both** the
       `.unavailable(reason:)` availability and `lastError` still present afterwards.
-- [ ] 7.2 **RED** same file — `aSuccessfulAppendOrClearLeavesNoStaleFailureReason`.
-- [ ] 7.3 **GREEN** `Sources/Persistence/HistoryStore.swift` — a private sticky failure reason set by
+- [x] 7.2 **RED** same file — `aSuccessfulAppendOrClearLeavesNoStaleFailureReason`.
+- [x] 7.3 **GREEN** `Sources/Persistence/HistoryStore.swift` — a private sticky failure reason set by
       `clearAll()`'s catch; `reload()` ends with `availability = sticky.map(.unavailable) ?? <fetch outcome>`
       instead of the unconditional `.available` at `:170`; a successful `append`/`clearAll` clears it.
       **Commit 7.**
