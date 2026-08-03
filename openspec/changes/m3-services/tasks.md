@@ -166,27 +166,27 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 2: Services wire and decoders — D7, SM1 / SM2 (decode)
 
-- [ ] 2.1 Create `Tests/BrewClientTests/Fakes/ServicesFixture.swift` — a `services list --json` payload
+- [x] 2.1 Create `Tests/BrewClientTests/Fakes/ServicesFixture.swift` — a `services list --json` payload
       carrying one record per status (`started`, `none`, `scheduled`, `stopped`, `error`, `unknown`,
       `other`) plus one carrying `mystery`; a record with `user` and `exit_code` both JSON **null**;
       an unparseable record; and two `services info --json` payloads — one with `log_path`,
       `error_log_path` and `pid` all null, one where `log_path == error_log_path`.
       **Fixture-first is mandatory**: the dev machine shows one service and only `none` is observable.
-- [ ] 2.2 **RED** `Tests/BrewClientTests/ServicesDecodeTests.swift` (new) —
+- [x] 2.2 **RED** `Tests/BrewClientTests/ServicesDecodeTests.swift` (new) —
       `allSevenStatusesDecodeToTheirOwnCase`, `anUnrecognisedStatusPreservesTheRawStringAndNeverFailsThePayload`
       (three records in, three out, third reports `mystery`),
       `anUndecodableRecordIsSkippedRatherThanFailingThePayload`. — sc *"All seven statuses decode"*,
       *"An unrecognised status never fails the payload"*.
-- [ ] 2.3 **RED** same file — `aNullUserAndNullExitCodeDecodeAsAbsent`: nothing thrown, no default
+- [x] 2.3 **RED** same file — `aNullUserAndNullExitCodeDecodeAsAbsent`: nothing thrown, no default
       substituted. — sc *"Null user and null exit code decode as absent"*.
-- [ ] 2.4 **GREEN** create `Sources/BrewClient/ServicesWire.swift` — tolerant decoders plus
+- [x] 2.4 **GREEN** create `Sources/BrewClient/ServicesWire.swift` — tolerant decoders plus
       `ServiceStatus { started, none, scheduled, stopped, error, unknown, other, unrecognised(String) }`.
       brew's own `other` is a real value, so the catch-all needs a different name. Decoding runs off
       the main actor.
-- [ ] 2.5 **RED** same test file — `nullOptionalInfoKeysDecodeAsAbsent` and
+- [x] 2.5 **RED** same test file — `nullOptionalInfoKeysDecodeAsAbsent` and
       `identicalLogAndErrorLogPathsArePresentedOnce` (plus the differing-paths half). — sc *"Null
       optional keys decode as absent"*, *"Identical log and error-log paths are presented once"*.
-- [ ] 2.6 **GREEN** same file — `ServiceDetail` with `logPaths: [URL]` **deduped and order-stable**
+- [x] 2.6 **GREEN** same file — `ServiceDetail` with `logPaths: [URL]` **deduped and order-stable**
       (log first, error second only when different). A service declaring no log location reports
       none, never an empty or placeholder path. **Commit 2.**
 
