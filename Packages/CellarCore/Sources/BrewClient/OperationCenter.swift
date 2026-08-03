@@ -51,6 +51,15 @@ public final class OperationCenter {
         confirmations.pending = request
     }
 
+    /// The services-scoped duplicate-submit guard.
+    ///
+    /// Internal rather than private because the services submit path lives in
+    /// `OperationCenterServices.swift`. Unlike the confirmation box, nothing
+    /// about this is a security position — it holds the most recent item per
+    /// service name and answers "is that one still in flight?", which any file
+    /// in the module could compute from `items` anyway.
+    @ObservationIgnored let serviceSubmissions = ServiceSubmissionGuard()
+
     /// The state domains this centre can invalidate, and the gate for each.
     ///
     /// A command opens only the ones its own `invalidates` scope names, so a

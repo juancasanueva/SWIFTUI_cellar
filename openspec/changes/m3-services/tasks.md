@@ -456,24 +456,24 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 12: The services submit path and the duplicate guard — D6 (c), SM8 / SM10, PM7
 
-- [ ] 12.1 **RED** `Tests/BrewClientTests/ServiceSubmissionTests.swift` (new) —
+- [x] 12.1 **RED** `Tests/BrewClientTests/ServiceSubmissionTests.swift` (new) —
       `aSecondOperationForTheSameServiceIsRefusedWhileOneIsInFlight` (no second operation enqueued, no
       process spawned); `aDifferentServiceIsNotBlocked`;
       `theGuardIsReleasedAtTheTerminalOutcome` across succeeded, failed **and** cancelled. — SM10
       sc 1–3.
-- [ ] 12.2 **RED** same file — `actingOnSeveralServicesEnqueuesOneOperationEachInOrder`: `atuin`,
+- [x] 12.2 **RED** same file — `actingOnSeveralServicesEnqueuesOneOperationEachInOrder`: `atuin`,
       `postgresql`, `redis` chosen in that order produce exactly three operations with those argvs, in
       that order. — SM4 sc *"Acting on several services enqueues one operation each, in order"* (M2
       fan-out ruling, PM2 sc2).
-- [ ] 12.3 **RED** same file — `absentBrewSpawnsNothingForAnyOfTheFourVerbs`, also for an invalid
+- [x] 12.3 **RED** same file — `absentBrewSpawnsNothingForAnyOfTheFourVerbs`, also for an invalid
       configured path: nothing thrown, the affordance reports itself unavailable with the rejection
       reason as guidance. — SM11 sc 2, PM7 sc *"A non-package family is equally unavailable when brew
       is absent"*.
-- [ ] 12.4 **RED** same file — `theInstalledBulkVocabularyIsUnchanged`:
+- [x] 12.4 **RED** same file — `theInstalledBulkVocabularyIsUnchanged`:
       `BulkSelection.Action.allCases == [.upgrade, .uninstall]`, still exactly two, no service verb.
       This assertion is load-bearing for `installed-inventory` II13 sc4 and must not be relaxed. —
       SM4 sc 5.
-- [ ] 12.5 **GREEN** create `Sources/BrewClient/OperationCenterServices.swift` — the services submit
+- [x] 12.5 **GREEN** create `Sources/BrewClient/OperationCenterServices.swift` — the services submit
       path plus `ServiceSubmissionGuard`, keyed on `ServiceTarget.name`, **on this path only**. A
       second services command for a name with a non-terminal one already in flight returns that
       existing `ActivityItem` instead of queueing an opposite operation. Explicitly services-scoped:
