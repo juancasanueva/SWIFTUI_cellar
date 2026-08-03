@@ -44,10 +44,16 @@ struct cellarApp: App {
     /// provable over values in `BrewClient` (design D3). Adding the modifier
     /// later remains a one-line option if `@Query` is ever wanted.
     ///
-    /// Neither initialiser throws. A store that cannot be opened is a *state*
-    /// the UI renders disabled with its reason attached — a `try!` here would
-    /// turn a recoverable disk problem into a boot loop (D4).
-    @State private var metadata = MetadataStore()
+    /// Both come from one `LocalStores`, which opens **one** `ModelContainer`
+    /// over the store file and injects it into both. They used to be built
+    /// separately here, and each opened its own container over the same file:
+    /// two stacks and two sets of pending changes writing one SQLite file.
+    ///
+    /// `LocalStores` does not throw. A store that cannot be opened is a *state*
+    /// the UI renders disabled with its reason attached — one failure, one
+    /// reason, on both — and a `try!` here would turn a recoverable disk problem
+    /// into a boot loop (D4, D6).
+    @State private var metadata: MetadataStore
     @State private var history: HistoryStore
 
     /// The app's long-lived loops.
@@ -60,10 +66,12 @@ struct cellarApp: App {
     init() {
         let installed = InstalledStore()
         let mutations = InstalledMutationGate()
-        let history = HistoryStore()
+        // One container, opened once, shared by both stores.
+        let stores = LocalStores()
         _installed = State(initialValue: installed)
         _mutations = State(initialValue: mutations)
-        _history = State(initialValue: history)
+        _metadata = State(initialValue: stores.metadata)
+        _history = State(initialValue: stores.history)
         _refresher = State(
             initialValue: InstalledRefreshCoordinator(store: installed, mutations: mutations)
         )
@@ -75,7 +83,7 @@ struct cellarApp: App {
         _operations = State(
             initialValue: OperationCenter(
                 gate: mutations,
-                history: SwiftDataHistoryRecorder(store: history)
+                history: SwiftDataHistoryRecorder(store: stores.history)
             )
         )
     }

@@ -159,21 +159,21 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 5: One container, both stores — D6 (item #4) — **before any other store wiring**
 
-- [ ] 5.1 **RED** `Tests/PersistenceTests/LocalStoresTests.swift` (new) —
+- [x] 5.1 **RED** `Tests/PersistenceTests/LocalStoresTests.swift` (new) —
       `oneContainerServesBothStores`: a row written through one store is visible to the other, and
       both report the identical container. — design D6 (no spec delta; success criterion 4).
-- [ ] 5.2 **RED** same file — `aStoreThatCannotBeOpenedGivesBothStoresTheSameReason`: point at a path
+- [x] 5.2 **RED** same file — `aStoreThatCannotBeOpenedGivesBothStoresTheSameReason`: point at a path
       blocked by a regular file where the directory must go; expect both stores
       `.unavailable(reason:)` with the same reason and **no throw**. — design D6.
-- [ ] 5.3 **GREEN** `Sources/Persistence/MetadataStore.swift:65` — widen
+- [x] 5.3 **GREEN** `Sources/Persistence/MetadataStore.swift:65` — widen
       `private convenience init(unavailable:)` to internal so `LocalStores` can fold one error into
       both stores.
-- [ ] 5.4 **GREEN** create `Sources/Persistence/LocalStores.swift` —
+- [x] 5.4 **GREEN** create `Sources/Persistence/LocalStores.swift` —
       `@MainActor public struct LocalStores { public let metadata: MetadataStore; public let history: HistoryStore; public init(at url: URL = PersistenceContainer.defaultURL()) }`.
       Opens **one** `PersistenceContainer.onDisk(at:)` and injects it into both `init(container:)`;
       an open failure folds into both stores' `.unavailable(reason:)`. Keep both `init(at:)`
       convenience initializers for tests. M3-1's services store joins here rather than opening a third.
-- [ ] 5.5 **Wire** `cellar/cellarApp.swift` — `:50` becomes `@State private var metadata: MetadataStore`
+- [x] 5.5 **Wire** `cellar/cellarApp.swift` — `:50` becomes `@State private var metadata: MetadataStore`
       (no inline default); in `init()` (`:60-66`) build `let stores = LocalStores()` and seed both
       `_metadata` and `_history` from it, dropping the standalone `HistoryStore()` at `:63`. Verified
       by `xcodebuild build` plus **manual step 9.1(a)** — a package test cannot see `cellarApp`, and

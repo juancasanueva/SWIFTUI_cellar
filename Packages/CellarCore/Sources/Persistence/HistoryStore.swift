@@ -102,7 +102,9 @@ public final class HistoryStore {
         try context.save()
     }
 
-    @ObservationIgnored private let container: ModelContainer?
+    /// Internal rather than private so "one container, both stores" is an
+    /// invariant a test can state directly rather than infer (design D6).
+    @ObservationIgnored let container: ModelContainer?
     @ObservationIgnored private let clearing: Clearing
 
     private var context: ModelContext? { container?.mainContext }

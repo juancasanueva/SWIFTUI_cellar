@@ -38,7 +38,9 @@ public final class MetadataStore {
     /// Never thrown, and never allowed to reach an unrelated path.
     public private(set) var lastError: String?
 
-    @ObservationIgnored private let container: ModelContainer?
+    /// Internal rather than private so "one container, both stores" is an
+    /// invariant a test can state directly rather than infer (design D6).
+    @ObservationIgnored let container: ModelContainer?
 
     private var context: ModelContext? { container?.mainContext }
 
@@ -62,7 +64,10 @@ public final class MetadataStore {
         }
     }
 
-    private convenience init(unavailable error: any Error) {
+    /// One open failure, folded into a reason. Internal rather than private so
+    /// `LocalStores` can give both stores the *same* reason when the single
+    /// container it opens for them fails (design D6).
+    convenience init(unavailable error: any Error) {
         self.init(container: nil)
         availability = .unavailable(reason: Self.describe(error))
     }
