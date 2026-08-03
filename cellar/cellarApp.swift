@@ -25,8 +25,14 @@ struct cellarApp: App {
 
     /// What this machine has installed.
     @State private var installed: InstalledStore
-    /// The seam M2-2 will drive while a Cellar-initiated mutation runs.
+    /// The seam driven while a Cellar-initiated mutation that invalidates the
+    /// **installed set** runs.
     @State private var mutations: InstalledMutationGate
+    /// The same seam for the **services** domain. A second instance of the same
+    /// type, because a gate is a depth counter plus a terminals stream and there
+    /// is nothing installed-specific in it — the rename it deserves is recorded
+    /// as debt rather than taken here (design D2).
+    @State private var serviceMutations: InstalledMutationGate
     /// Owns cadence: launch, activation, and debounced external changes.
     @State private var refresher: InstalledRefreshCoordinator
 
@@ -56,22 +62,49 @@ struct cellarApp: App {
     @State private var metadata: MetadataStore
     @State private var history: HistoryStore
 
+    /// The background services Homebrew manages, and the poll that keeps them
+    /// current.
+    ///
+    /// The store opens **no** `ModelContainer`: service state is launchd's
+    /// truth, re-read every five seconds while the surface is visible, so there
+    /// is nothing here worth persisting and nothing a user could lose.
+    @State private var services: ServicesStore
+    @State private var servicesRefresher: ServicesRefreshCoordinator
+
     /// The app's long-lived loops.
     ///
     /// App-level state outlives every scene, so closing the window that started
     /// Cellar no longer cancels the catalog refresh schedule or drops the sync
     /// event subscription (M1 follow-ups #8 and #9).
+    ///
+    /// The services **poll** is deliberately not one of them: a `LoopOwner`
+    /// slot stays claimed for the rest of the launch even after its body
+    /// returns, so a poll started there would never restart after the first
+    /// hide. The coordinator owns it instead, and only its app-lifetime
+    /// terminals consumer takes a slot here.
     @State private var loops = LoopOwner()
+
+    /// Whether the app itself is in the foreground. One of the two reported
+    /// halves of "the services surface is visible"; the other is the view's
+    /// `onAppear`/`onDisappear`.
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let installed = InstalledStore()
         let mutations = InstalledMutationGate()
+        let serviceMutations = InstalledMutationGate()
+        let services = ServicesStore()
         // One container, opened once, shared by both stores.
         let stores = LocalStores()
         _installed = State(initialValue: installed)
         _mutations = State(initialValue: mutations)
+        _serviceMutations = State(initialValue: serviceMutations)
         _metadata = State(initialValue: stores.metadata)
         _history = State(initialValue: stores.history)
+        _services = State(initialValue: services)
+        _servicesRefresher = State(
+            initialValue: ServicesRefreshCoordinator(store: services, mutations: serviceMutations)
+        )
         _refresher = State(
             initialValue: InstalledRefreshCoordinator(store: installed, mutations: mutations)
         )
@@ -80,9 +113,15 @@ struct cellarApp: App {
         // fact. Removing this argument returns the centre to its M2-2 behaviour
         // exactly, which is what makes the feature one injection from revertible
         // (installation-history IH7).
+        // Two domains, and a command opens only the gates its own `invalidates`
+        // scope names — so a service toggle costs zero inventory probes and does
+        // not suppress the installed watcher while it runs (design D2).
         _operations = State(
             initialValue: OperationCenter(
-                gate: mutations,
+                gates: MutationGates([
+                    (.installedInventory, mutations),
+                    (.services, serviceMutations)
+                ]),
                 history: SwiftDataHistoryRecorder(store: stores.history)
             )
         )
@@ -96,19 +135,32 @@ struct cellarApp: App {
                 installed: installed,
                 operations: operations,
                 metadata: metadata,
-                history: history
+                history: history,
+                services: services,
+                servicesRefresher: servicesRefresher
             )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
                 // from a terminal while Cellar was in the background.
                 .task { await refreshEverything() }
                 .task { await observeActivations() }
+                // The app half of "visible". The view reports the other half;
+                // the poll runs only when both agree, so ⌘H with Services
+                // selected costs zero probes.
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    servicesRefresher.setActive(phase == .active)
+                }
                 // Owned by `loops`, not by this scene: `start` is idempotent per
                 // id, so a second window joins rather than starting a second
                 // loop, and closing this one leaves both running.
                 .task { loops.start("catalog") { await catalog.start() } }
                 .task { loops.start("installed") { await refresher.run() } }
                 .task { loops.start("installed-watcher") { await watchInstalledRoots() } }
+                // The **terminals consumer only** — never the poll. A `LoopOwner`
+                // slot stays claimed for the rest of the launch even after its
+                // body returns, so a poll started here would never restart after
+                // the first hide. The coordinator owns the poll itself.
+                .task { loops.start("services") { await servicesRefresher.run() } }
         }
     }
 
@@ -122,6 +174,10 @@ struct cellarApp: App {
         await brewDetection.refresh()
         operations.attach(installation: brewDetection.state.installation)
         await refresher.refresh(for: brewDetection.state)
+        // Services becomes available the moment brew does, and the poll starts
+        // itself if the surface is already showing — which is the ordinary
+        // launch order, since detection resolves after the first render.
+        await servicesRefresher.refresh(for: brewDetection.state)
     }
 
     @MainActor

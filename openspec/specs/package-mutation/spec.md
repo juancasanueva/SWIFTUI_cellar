@@ -2,9 +2,16 @@
 
 Changing the installed set through `brew`: the six typed mutating commands and the argv they
 generate, the three upgrade scopes, the destructive-action confirmation gate, the typed sudo and
-external-lock failures, the forced inventory re-snapshot and honest cancel reporting at every
-terminal outcome, and refusing to mutate when brew is absent. Owned by `Packages/CellarCore` target
-`BrewClient` — the only target that sees both `BrewProcess` and `Catalog`, one-directionally.
+external-lock failures, the **typed invalidation scope each command declares** and the honest cancel
+reporting owed at every terminal outcome, and refusing to mutate when brew is absent. Owned by
+`Packages/CellarCore` target `BrewClient` — the only target that sees both `BrewProcess` and
+`Catalog`, one-directionally.
+
+This capability also owns the **shared mutation spine** — the queue, the activity projection, the
+confirmation gate and the history recorder — which other capabilities' commands enter through a
+shared abstraction rather than as additional cases of this capability's own command type. A command
+that does not declare the installed set forces no inventory re-snapshot at any terminal outcome; the
+exactly-once obligation is per declared domain, not unconditional.
 
 Process spawning, output streaming, cancellation escalation and queue serialization belong to
 `brew-execution` and are referenced here, never restated. Queue presentation belongs to
@@ -20,6 +27,18 @@ the inventory. Every generated argv MUST pass the kind explicitly as `--formula`
 MUST NOT rely on brew's token disambiguation, because a token such as `docker` exists in both
 namespaces. A single invocation MUST NOT carry both kind flags. The argv MUST be inspectable before
 the operation is submitted, and the argv actually spawned MUST be identical to the inspected one.
+
+This capability's mutating-command type MUST continue to carry exactly those six commands and no
+others. The shared mutation spine MAY carry commands belonging to other capabilities, and every such
+command MUST enter it through a shared abstraction rather than as an additional case of this
+capability's command type. Adding a non-package verb as a seventh case is forbidden, because that
+type's identity, verb and argv are package-shaped by construction. Everything the spine needs from a
+command — its argv, its verb, the package identity it acts on **when it has one**, its display
+command, whether it requires confirmation, and the state domains it invalidates — MUST be readable
+through that shared abstraction, so no consumer of the spine needs to know which capability a command
+came from.
+(Previously: the requirement fixed the command count at six but said nothing about how a command from
+another capability may reach the shared spine, leaving "add a case" as the path of least resistance.)
 
 #### Scenario: Installing a formula names it as a formula
 
@@ -52,6 +71,13 @@ the operation is submitted, and the argv actually spawned MUST be identical to t
 - WHEN an install mutation is built for the cask `docker`
 - THEN the argv contains `--cask` and does not contain `--formula`
 - AND the spawned command is the cask install, not the formula install
+
+#### Scenario: Another family enters the spine without becoming a case of this type
+
+- GIVEN a command belonging to a different capability, submitted through the shared mutation spine
+- WHEN this capability's mutating-command type is enumerated
+- THEN it still carries exactly the six package commands, with no case for that other command
+- AND the submitted command was still projected with its argv, its verb and its terminal outcome
 
 ### Requirement: Upgrade has three scopes and follows brew's own defaults
 
@@ -158,6 +184,21 @@ command in Terminal. It MUST NOT be reported as a generic error, MUST NOT be ret
 and MUST NOT be presented as a Cellar defect. Output matching no known signature MUST fall back to
 the ordinary failure surface with the raw log preserved verbatim.
 
+These rules MUST hold for every command submitted through the shared mutation spine, not only for
+package mutations: no family MAY open an interactive stdin, prompt for credentials, or escalate
+privileges.
+
+The typed sudo failure MUST additionally require that the operation actually **failed**. Privilege
+wording that appears in the output of an operation which reaches a **successful** terminal outcome
+MUST NOT be classified as the typed sudo failure, because `brew` emits non-fatal privilege warnings
+on paths that then succeed — a service registered into the user domain after a
+"must be run as root to start at system startup!" warning is a success, not a sudo-required failure.
+An operation that failed with output matching no known signature MUST be reported as a generic
+failure with its raw log preserved, and MUST NEVER be reported as a success.
+(Previously: the rule was scoped to package mutations, and classification keyed on the signature
+alone without requiring the operation to have failed — so a non-fatal privilege warning on a
+successful run could be surfaced as a sudo-required failure.)
+
 #### Scenario: A cask that asks for a password fails with Terminal guidance
 
 - GIVEN a mutation whose output contains a sudo password prompt signature and which then exits
@@ -198,6 +239,21 @@ promise the implementation never made. No line is ever mutilated, re-encoded, re
 annotated — the bound is on how many lines stay visible, and it is never silent. The same reword is
 applied to `operation-activity`'s "A terminal operation's log stays readable".)
 
+#### Scenario: A non-fatal privilege warning on a successful run is not a sudo failure
+
+- GIVEN an operation whose output contains the privilege warning
+  "must be run as root to start at system startup!" and which then exits with status 0
+- WHEN it reaches its terminal outcome
+- THEN it is reported as successful, not as the typed sudo-required failure
+- AND no Terminal guidance is surfaced for it
+
+#### Scenario: A non-package operation runs with the same non-interactive stdin
+
+- GIVEN a command from another family submitted through the shared mutation spine
+- WHEN the process it spawns is observed
+- THEN that process's standard input is the null device
+- AND no password input surface was offered to the user
+
 ### Requirement: An external brew lock is a typed busy failure
 
 A mutation that exits non-zero with output matching brew's lock-conflict signature — `has already
@@ -231,35 +287,63 @@ signature MUST NOT be classified as busy.
 - WHEN the operation reaches its terminal outcome
 - THEN it is reported as a generic failure, not as busy
 
-### Requirement: Every terminal outcome forces one re-snapshot, and cancel is reported honestly
+### Requirement: Every terminal outcome forces one refresh of each state domain the command invalidates, and cancel is reported honestly
+
+Every command submitted through the mutation spine MUST declare the set of state domains it
+invalidates. That declaration MUST be carried by the **command**, MUST be readable before the
+operation is submitted, MUST NOT be derived from the outcome, and MUST NOT be a single unconditional
+value shared by every command.
 
 Success, failure — including the typed sudo and busy failures — and cancellation MUST each force
-exactly one inventory re-snapshot at the terminal outcome, never zero and never two. A cancelled
-mutation MUST be reported with one generic message stating that brew may have left a partial change
-and that the inventory is being refreshed. That message MUST NOT be tailored per command, and MUST
-NOT claim the change was rolled back, that nothing happened, or that the package is in a known
-state.
+exactly one refresh of **each state domain the command declares**: never zero and never two, for
+each declared domain. A command that does not declare the installed set MUST NOT force an
+installed-inventory re-snapshot at any terminal outcome, because a probe that cannot observe a change
+is pure cost. A command that declares no domain at all MUST still reach its terminal outcome, MUST
+still record its history entry, and MUST still report its outcome on exactly the same terms.
 
-#### Scenario: A successful mutation refreshes the inventory exactly once
+A cancelled mutation MUST be reported with one generic message stating that brew may have left a
+partial change and that the affected state is being refreshed. That message MUST NOT be tailored per
+command, and MUST NOT claim the change was rolled back, that nothing happened, or that the package is
+in a known state.
+(Previously: every terminal outcome forced exactly one **inventory** re-snapshot unconditionally, so
+a command that cannot change the installed set had no way to opt out and paid a full
+`brew info --installed --json=v2` probe it could never learn anything from.)
 
-- GIVEN a mutation that exits with status 0
+#### Scenario: A successful mutation refreshes each declared domain exactly once
+
+- GIVEN a mutation declaring the installed set, that exits with status 0
 - WHEN it reaches its terminal outcome
 - THEN exactly one inventory re-snapshot is forced
 
-#### Scenario: A failed mutation still refreshes the inventory
+#### Scenario: A failed mutation still refreshes what it declared
 
-- GIVEN a mutation that exits non-zero, and separately a mutation that ends in the typed busy
-  failure
+- GIVEN a mutation declaring the installed set that exits non-zero, and separately one that ends in
+  the typed busy failure
 - WHEN each reaches its terminal outcome
 - THEN exactly one inventory re-snapshot is forced for each
 
 #### Scenario: A cancelled mutation refreshes and admits partial state
 
-- GIVEN a running mutation
+- GIVEN a running mutation declaring the installed set
 - WHEN it is cancelled and reaches the cancelled outcome
 - THEN exactly one inventory re-snapshot is forced
 - AND the reported message is the same generic partial-state message for every command, and does not
   claim the change was undone
+
+#### Scenario: A command that does not declare the installed set takes no inventory snapshot
+
+- GIVEN a command whose declared invalidation scope does not include the installed set
+- WHEN it reaches a successful terminal outcome
+- THEN no `brew info --installed --json=v2` invocation was recorded
+- AND exactly one refresh was forced for each domain it did declare
+
+#### Scenario: A failed or cancelled non-inventory command still refreshes what it declared
+
+- GIVEN a command declaring one non-inventory domain, run once to a non-zero exit and once to
+  cancellation
+- WHEN each reaches its terminal outcome
+- THEN exactly one refresh of that declared domain is forced in each case
+- AND still no inventory re-snapshot is forced
 
 ### Requirement: No mutation is built or spawned when brew is absent or invalid
 
@@ -268,6 +352,13 @@ spawn any mutation. Mutation affordances MUST be unavailable rather than failing
 nothing MUST be thrown or blocked, and the same read-only guidance the inventory surfaces MUST
 apply. When brew later becomes available, mutations MUST become available without restarting the
 app.
+
+This rule MUST hold for every command family submitted through the mutation spine, not only for
+package mutations. Each family's own surface MUST render the same read-only guidance rather than
+failing at spawn time, MUST spawn nothing while brew is absent or invalid, and MUST become available
+again when brew appears without restarting the app.
+(Previously: the rule was written for package mutations only, so a new family's availability
+behaviour was unspecified.)
 
 #### Scenario: Absent brew spawns nothing
 
@@ -288,6 +379,13 @@ app.
 - GIVEN mutations are unavailable because detection reported absent
 - WHEN detection transitions to a valid installation
 - THEN a mutation requested afterwards is built and submitted normally
+
+#### Scenario: A non-package family is equally unavailable when brew is absent
+
+- GIVEN brew detection reports absent
+- WHEN a command from another family is requested through the shared mutation spine
+- THEN no process is spawned and nothing is thrown
+- AND that family's affordance reports itself unavailable with the same read-only guidance
 
 ### Requirement: A bulk selection expands to one invocation per selected package
 
@@ -436,3 +534,54 @@ overload MUST exist that produces a command from an unvalidated identity.
 - **`installed-inventory` owns the selection model; this capability owns its expansion.** The
   selection's order, its reconciliation against the inventory, and which verbs offer a bulk affordance
   are specified there. `installation-history` owns the durable record each terminal outcome writes.
+- **Amended by change `m3-services` (archived `2026-08-03`, PRD milestone **M3**, slice M3-1 —
+  Service Management)**: **4 MODIFIED** requirements replaced as whole blocks — "Every mutation is a
+  typed command carrying an explicit kind flag" (PM1), "A sudo or password prompt is a typed failure,
+  never an interactive prompt" (PM4), "Every terminal outcome forces one re-snapshot, and cancel is
+  reported honestly" (PM6) and "No mutation is built or spawned when brew is absent or invalid"
+  (PM7) — adding **6 scenarios**. 9 requirements / 34 scenarios → **9 requirements / 40 scenarios**.
+  Nothing was added or removed; all four replacements are strict supersets of the text they replaced.
+  Services is the first **non-package** mutation family, so this slice generalised the shared mutation
+  spine — the queue, the activity projection, the confirmation gate and the history recorder — so a
+  second family can enter it **without any package rule being loosened**.
+  - **PM6 was RENAMED IN PLACE, not merely re-bodied.** Its title changed from "Every terminal outcome
+    forces one re-snapshot, and cancel is reported honestly" to "Every terminal outcome forces one
+    refresh of each state domain the command invalidates, and cancel is reported honestly". Because
+    promotion replaces a MODIFIED requirement by **name**, a naive promotion would have *added* the
+    new requirement while *leaving the old one in place*, and this spec would have carried two
+    contradictory versions of PM6 — one saying the re-snapshot is unconditional and one saying it is
+    scoped. The old-titled block was removed in the **same edit** that added the new one, and the
+    absence of the old title was verified after promotion.
+  - **The invalidation scope is carried by the COMMAND, declared before submission, never derived from
+    the outcome.** `MutationOutcome.forcesReSnapshot` was **deleted** — what a command invalidates is
+    a property of what ran, not of how it ended. The exactly-once invariant is preserved **per
+    declared domain**, including failed and cancelled terminals. `installed-inventory` II10 and
+    `installation-history` IH7 state the other halves of the same contract and were amended in the
+    same change so the three cannot drift.
+  - **PM1's "exactly six" stays literally true by construction.** `ServiceCommand` enters the spine
+    through a shared `BrewMutating` abstraction rather than as a seventh case, and `MutationCommand`
+    conforms in a three-line extension supplying only `invalidates`. The protocol is `Sendable`-only —
+    a `Self`-requiring `Equatable` protocol would have broken the stored `ActivityItem.command` and
+    `ConfirmationRequest: Equatable`'s four shipped assertions — and the erased `AnyBrewMutation`
+    stores only the six projections, which *strengthens* rather than weakens the shipped "nothing is
+    parsed back out of a command" property. `submit` is **generic, not existential**, so every
+    existing app-target call site compiled unchanged.
+  - **PM4 now requires the operation to have actually failed** before the typed sudo failure applies.
+    Gate U5 established from source that a root-domain start as a non-root user never invokes sudo and
+    cannot reach a password prompt: brew emits a non-fatal "must be run as root to start at system
+    startup!" warning and then installs into the **user** domain. Without this clause a run that
+    emitted that warning and then exited 0 would have been surfaced as a sudo-required failure.
+  - **The capability header prose was reconciled during apply**, not at archive: it described the
+    unconditional re-snapshot at every terminal outcome, sits outside delta scope, and would otherwise
+    have survived promotion still contradicting the amended PM6.
+  - **PM2, PM3, PM5, PM8 and PM9 are untouched and byte-identical.** No service verb is destructive,
+    so none enters the confirmation gate; services ship no bulk affordance; and PM9's construction
+    rules stay exactly where they are — `ServiceTarget` is expressed over the **same**
+    `MutationName.isSafe` gate as `PackageTarget` rather than widening it. Shell metacharacters are
+    neutralised structurally rather than by rejection: argv is a vector and no shell exists, pinned by
+    `shellMetacharactersSurviveAsOneLiteralArgument` driving `$(whoami)`, `atuin;rm`, `` `id` ``,
+    `a|b`, `a&b` and `a>b` through the real process seam.
+  - **A product ruling that produces no spec text, recorded so its absence is not read as an
+    oversight** (Engram `#7182` ruling 4): uninstalling a formula whose service is running **defers to
+    brew**. Cellar adds no warning and no cross-capability rule, so PM3's confirmation disclosure is
+    untouched on this point.

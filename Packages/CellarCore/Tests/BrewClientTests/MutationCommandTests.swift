@@ -255,6 +255,89 @@ struct MutationCommandTests {
         }
     }
 
+    // MARK: - The rule every command family inherits (design D1, threat matrix)
+
+    /// The structural rule the shared spine rests on:
+    ///
+    /// > A conformer's `arguments` may contain only literal verb/flag enum raw
+    /// > values plus tokens taken from a validated wrapper.
+    ///
+    /// Scanned over **every** `*Command.swift` in `BrewClient`, not just this
+    /// one, so a family added later is covered the day its file lands rather
+    /// than the day somebody remembers to widen a list.
+    ///
+    /// **Anchored positively first** (the M3-0 task 8.1 lesson): a glob that
+    /// silently matched nothing would make every forbidden-token expectation
+    /// below pass vacuously, which is the exact failure mode this idiom exists
+    /// to avoid. So the file set is asserted to be non-empty, to contain the
+    /// file we know is there, and each member is asserted to actually declare
+    /// the property being scanned.
+    @Test("Every command family builds argv from literals and validated wrappers only")
+    func everyCommandFamilyBuildsArgvStructurally() throws {
+        let files = try Self.commandFiles()
+
+        #expect(files.isEmpty == false, "the *Command.swift scan matched no files at all")
+        #expect(
+            files.keys.contains("MutationCommand.swift"),
+            "the scan did not find the file it is known to cover — the glob is wrong"
+        )
+
+        for (name, source) in files {
+            // Positive anchor, per file: it really does lower to an argv vector.
+            let body = try #require(
+                Self.argumentsBody(of: source),
+                "\(name) declares no `var arguments: [String]` to scan"
+            )
+            #expect(body.contains("["), "\(name)'s arguments body builds no vector")
+
+            // The rule, as forbidden constructs. Each one is a way a token
+            // could enter argv without passing the validated wrapper.
+            for construct in ["\\(", "joined(", "components(separatedBy:", "split(", "+ \" \""] {
+                #expect(
+                    body.contains(construct) == false,
+                    "\(name) composes argv with \(construct) — a token may bypass the name gate"
+                )
+            }
+
+            // And the names it does place in argv come through the single gate.
+            #expect(
+                source.contains("MutationName.isSafe"),
+                "\(name) does not route its names through the one `isSafe` gate"
+            )
+        }
+    }
+
+    /// Every `*Command.swift` in `BrewClient`, keyed by file name.
+    private static func commandFiles() throws -> [String: String] {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/BrewClient")
+        let names = try FileManager.default
+            .contentsOfDirectory(atPath: sources.path)
+            .filter { $0.hasSuffix("Command.swift") }
+
+        return try names.reduce(into: [:]) { files, name in
+            files[name] = try String(
+                contentsOf: sources.appendingPathComponent(name),
+                encoding: .utf8
+            )
+        }
+    }
+
+    /// The body of `var arguments: [String]`, up to its closing brace.
+    ///
+    /// Textual because the claim is textual: what matters is which *constructs*
+    /// appear between the braces, and a parser would buy nothing a reader of
+    /// this file could not already check by eye.
+    private static func argumentsBody(of source: String) -> String? {
+        guard let start = source.range(of: "var arguments: [String]") else { return nil }
+        let rest = source[start.upperBound...]
+        guard let end = rest.range(of: "\n    }") else { return String(rest) }
+        return String(rest[..<end.lowerBound])
+    }
+
     /// And the structural claim, checked behaviourally: round-tripping a display
     /// string is impossible because the only way to build a command is from a
     /// typed `PackageID`, which a string cannot become without a parser.

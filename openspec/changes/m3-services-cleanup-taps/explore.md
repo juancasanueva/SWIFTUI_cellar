@@ -204,8 +204,13 @@ Parsing rules this dictates:
 - the **footer total is authoritative**; the sum of per-row sizes must never be presented as the
   headline number (rows include empty directories with no size, and brew rounds);
 - unparsed rows must be *carried through verbatim*, never dropped and never fatal;
-- `HOMEBREW_COLOR=0` / `HOMEBREW_NO_EMOJI=1` are already set by `BrewEnvironment.current()`, which is
-  what makes the `==>` marker stable.
+- `HOMEBREW_NO_COLOR=1` / `HOMEBREW_NO_EMOJI=1` are set by `BrewEnvironment.current()`, which is what
+  makes the `==>` marker stable. **Corrected in M3-1** (defect #7179): this said `HOMEBREW_COLOR=0`,
+  and so did the shipped code. `HOMEBREW_COLOR` is a *force*-colour boolean in brew
+  (`env_config.rb:249-252`), so any value — `"0"` included — turns ANSI **on**: an `od -c` probe with
+  stdout redirected to a file came back carrying `\033[34m==>\033[0m`. An anchored `==>` match built
+  on that claim would have failed. Suppression is environment-only; nothing may strip ESC bytes out of
+  a captured line, because `brew-execution` BE2 requires them delivered byte-identically.
 
 ### 2.5 `brew autoremove --dry-run` — VERIFIED (as an empty result)
 

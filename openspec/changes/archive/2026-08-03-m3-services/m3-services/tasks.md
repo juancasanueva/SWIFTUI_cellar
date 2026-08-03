@@ -122,10 +122,12 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 0: Baseline and delivery precondition
 
-- [ ] 0.1 Record the baseline on `3f2c166`: `swift test --package-path Packages/CellarCore` test/suite
+- [x] 0.1 Record the baseline on `3f2c166`: `swift test --package-path Packages/CellarCore` test/suite
       counts (expect **571 / 77**) and `swiftlint --quiet` finding count (expect **60**). No commit —
       this is the number task 17.1 compares against.
-- [ ] 0.2 **Record the accepted `size:exception` before any code is written** (ruling #7182-1). The
+      **Measured 2026-08-03 on `284aab9`: 571 tests / 77 suites passed, 1 known issue; `swiftlint --quiet`
+      = 60 findings. Both match the expectation exactly.**
+- [x] 0.2 **Record the accepted `size:exception` before any code is written** (ruling #7182-1). The
       forecast above, this task's timestamp and the user's acceptance are the record. Apply MUST NOT
       start until this is checked.
 
@@ -140,85 +142,85 @@ If the split is taken, exactly four things must move with it — nothing else:
 > would satisfy this phase's success criterion while breaking a shipped scenario. The fix is
 > **environment-only**. No task below touches `LineSplitter`, `LogLine` or `SystemProcess`.
 
-- [ ] 1.1 **RED** `Tests/BrewProcessTests/EnvironmentTests.swift` —
+- [x] 1.1 **RED** `Tests/BrewProcessTests/EnvironmentTests.swift` —
       `theForceColourKeyIsNeverSetAtAnyValue`: `#expect(BrewEnvironment.pinned["HOMEBREW_COLOR"] == nil)`
       and `#expect(BrewEnvironment.pinned["HOMEBREW_NO_COLOR"] == "1")`. — sc *"The force-colour key is
       never set at any value"*.
-- [ ] 1.2 **RED** same file — `theSpawnedProcessReceivesTheSuppressionKeyAndNotTheForceKey`: drive a
+- [x] 1.2 **RED** same file — `theSpawnedProcessReceivesTheSuppressionKeyAndNotTheForceKey`: drive a
       real spawn through `Tests/BrewClientTests/Fakes/RecordingProcessLauncher.swift`'s
       `BrewProcessTests` equivalent and assert the **recorded** environment, so the key cannot be
       reintroduced anywhere between `pinned` and `SystemProcess`. — sc *"Environment applied to every
       invocation"*.
-- [ ] 1.3 **GREEN** `Sources/BrewProcess/BrewEnvironment.swift:22` — `"HOMEBREW_COLOR": "0"` →
+- [x] 1.3 **GREEN** `Sources/BrewProcess/BrewEnvironment.swift:22` — `"HOMEBREW_COLOR": "0"` →
       `"HOMEBREW_NO_COLOR": "1"`, and correct the doc comment at `:15`, which today asserts the
       opposite of the shipped behaviour.
-- [ ] 1.4 **RED (integration, self-skipping)** `Tests/BrewProcessTests/BrewIntegrationTests.swift` —
+- [x] 1.4 **RED (integration, self-skipping)** `Tests/BrewProcessTests/BrewIntegrationTests.swift` —
       `noEscapeByteSurvivesCaptureFromARealBrewInvocation`: discover a formula via
       `brew list --formula`, run `brew info --formula <name>`, assert
       `log.allSatisfy { !$0.text.utf8.contains(0x1B) }`. Guard with `.enabled(if:)` on the real brew
       binary and tag it so the fast loop can exclude it. A fake process cannot prove anything about
       brew's own colour decision — this is the honest form of the success criterion. — sc *"No ANSI
       escape byte survives capture"*.
-- [ ] 1.5 `openspec/changes/m3-services-cleanup-taps/explore.md:207-208` — correct the repeated false
+- [x] 1.5 `openspec/changes/m3-services-cleanup-taps/explore.md:207-208` — correct the repeated false
       claim that `HOMEBREW_COLOR=0` stops ANSI. Prose only; do not restructure the section. **Commit 1.**
 
 ## Phase 2: Services wire and decoders — D7, SM1 / SM2 (decode)
 
-- [ ] 2.1 Create `Tests/BrewClientTests/Fakes/ServicesFixture.swift` — a `services list --json` payload
+- [x] 2.1 Create `Tests/BrewClientTests/Fakes/ServicesFixture.swift` — a `services list --json` payload
       carrying one record per status (`started`, `none`, `scheduled`, `stopped`, `error`, `unknown`,
       `other`) plus one carrying `mystery`; a record with `user` and `exit_code` both JSON **null**;
       an unparseable record; and two `services info --json` payloads — one with `log_path`,
       `error_log_path` and `pid` all null, one where `log_path == error_log_path`.
       **Fixture-first is mandatory**: the dev machine shows one service and only `none` is observable.
-- [ ] 2.2 **RED** `Tests/BrewClientTests/ServicesDecodeTests.swift` (new) —
+- [x] 2.2 **RED** `Tests/BrewClientTests/ServicesDecodeTests.swift` (new) —
       `allSevenStatusesDecodeToTheirOwnCase`, `anUnrecognisedStatusPreservesTheRawStringAndNeverFailsThePayload`
       (three records in, three out, third reports `mystery`),
       `anUndecodableRecordIsSkippedRatherThanFailingThePayload`. — sc *"All seven statuses decode"*,
       *"An unrecognised status never fails the payload"*.
-- [ ] 2.3 **RED** same file — `aNullUserAndNullExitCodeDecodeAsAbsent`: nothing thrown, no default
+- [x] 2.3 **RED** same file — `aNullUserAndNullExitCodeDecodeAsAbsent`: nothing thrown, no default
       substituted. — sc *"Null user and null exit code decode as absent"*.
-- [ ] 2.4 **GREEN** create `Sources/BrewClient/ServicesWire.swift` — tolerant decoders plus
+- [x] 2.4 **GREEN** create `Sources/BrewClient/ServicesWire.swift` — tolerant decoders plus
       `ServiceStatus { started, none, scheduled, stopped, error, unknown, other, unrecognised(String) }`.
       brew's own `other` is a real value, so the catch-all needs a different name. Decoding runs off
       the main actor.
-- [ ] 2.5 **RED** same test file — `nullOptionalInfoKeysDecodeAsAbsent` and
+- [x] 2.5 **RED** same test file — `nullOptionalInfoKeysDecodeAsAbsent` and
       `identicalLogAndErrorLogPathsArePresentedOnce` (plus the differing-paths half). — sc *"Null
       optional keys decode as absent"*, *"Identical log and error-log paths are presented once"*.
-- [ ] 2.6 **GREEN** same file — `ServiceDetail` with `logPaths: [URL]` **deduped and order-stable**
+- [x] 2.6 **GREEN** same file — `ServiceDetail` with `logPaths: [URL]` **deduped and order-stable**
       (log first, error second only when different). A service declaring no log location reports
       none, never an empty or placeholder path. **Commit 2.**
 
 ## Phase 3: Payload sources and argv — D7, SM1 / SM2 (argv)
 
-- [ ] 3.1 **RED** `Tests/BrewClientTests/ServicesPayloadTests.swift` (new) —
+- [x] 3.1 **RED** `Tests/BrewClientTests/ServicesPayloadTests.swift` (new) —
       `oneRefreshRecordsExactlyOneInvocationWithTheExactArgv`: assert `services list --json`, element
       for element, through `RecordingProcessLauncher`. — sc *"One invocation per refresh, with the
       exact argv"*.
-- [ ] 3.2 **RED** same file — `theDetailProbeNamesExactlyOneServiceAndNeverUsesAll`: the info argv is
+- [x] 3.2 **RED** same file — `theDetailProbeNamesExactlyOneServiceAndNeverUsesAll`: the info argv is
       `["services","info","--json", name]` with `name` as the **last, separate** element, never
       interpolated; no invocation carries `--all`. — sc *"Detail is fetched only for the selected
       service"*.
-- [ ] 3.3 **GREEN** create `Sources/BrewClient/ServicesPayloadSource.swift` —
+- [x] 3.3 **GREEN** create `Sources/BrewClient/ServicesPayloadSource.swift` —
       `ServicesListPayloadSource` on the compile-time-constant `BrewCommand.read(["services","list","--json"])`
       (exactly `BrewInfoPayloadSource`'s pattern) and `ServiceInfoPayloadSource`, the codebase's only
       parameterised read argv. Closed error enum
       `ServicesError { brewUnavailable, commandFailed(status:message:), malformedPayload, cancelled }`.
-- [ ] 3.4 **RED** same file — `aNonZeroExitIsAnErrorAndNeverAnEmptyList`,
+- [x] 3.4 **RED** same file — `aNonZeroExitIsAnErrorAndNeverAnEmptyList`,
       `stderrNeverEntersTheDocument`, `aBlankDocumentIsMalformed`. — copies `InstalledPayload`'s rules
       verbatim (design D7).
-- [ ] 3.5 **GREEN** same source file — the pure `ServicesPayload.payload(from:exit:)` function.
+- [x] 3.5 **GREEN** same source file — the pure `ServicesPayload.payload(from:exit:)` function.
       **Commit 3.**
 
 ## Phase 4: `ServicesStore` — D7, SM11 (read half)
 
-- [ ] 4.1 **RED** `Tests/BrewClientTests/ServicesStoreTests.swift` (new) — three tests mirroring
+- [x] 4.1 **RED** `Tests/BrewClientTests/ServicesStoreTests.swift` (new) — three tests mirroring
       `InstalledStoreTests`: overlapping refreshes coalesce onto the one in flight keyed by request
       URL + invalidation mark; an older ordinal arriving after a newer one is discarded; a failed
       refresh leaves the last good list intact.
-- [ ] 4.2 **RED** same file — `absentBrewGivesAnEmptyListWithGuidanceAndNoSpawn`: empty list, nothing
+- [x] 4.2 **RED** same file — `absentBrewGivesAnEmptyListWithGuidanceAndNoSpawn`: empty list, nothing
       thrown, `absence` carries the guidance, **zero** recorded invocations, no poll loop running. —
       sc *"Absent brew produces an empty services list with guidance"*.
-- [ ] 4.3 **GREEN** create `Sources/BrewClient/ServicesStore.swift` — `InstalledStore`'s shape over
+- [x] 4.3 **GREEN** create `Sources/BrewClient/ServicesStore.swift` — `InstalledStore`'s shape over
       services. **It opens no `ModelContainer`**: services state is launchd truth and persists
       nothing, so W3's one-container invariant holds *a fortiori* and
       `LocalStoresTests > oneContainerServesBothStores` remains the assertion. This is a deliberate,
@@ -231,22 +233,22 @@ If the split is taken, exactly four things must move with it — nothing else:
 > a poll registered there would run once and never restart after the first hide. `LoopOwner.start("services")`
 > runs the **terminals consumer only** (Phase 14); the poll task is owned by the coordinator.
 
-- [ ] 5.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` (new), suite trait
+- [x] 5.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` (new), suite trait
       `.timeLimit(.minutes(1))` — **whole minutes only**, `.seconds(30)` traps at runtime (M3-0
       task 1.4) — `theListRefreshesOnTheFiveSecondCadenceWhileVisible`: `TestClock` from
       `Sources/CellarTestSupport/TestClock.swift`, advance 5 s three times, expect one baseline plus
       exactly three refreshes, no wall-clock sleep. — sc *"The list refreshes on the poll cadence
       while visible"*.
-- [ ] 5.2 **RED** same file — `hidingTheSurfaceStopsPollingEntirely`: after `setVisible(false)`,
+- [x] 5.2 **RED** same file — `hidingTheSurfaceStopsPollingEntirely`: after `setVisible(false)`,
       advance **60 s** and expect zero further invocations; `setVisible(true)` again performs a
       baseline refresh. — sc *"Hiding the surface stops polling entirely"*. Also the threat-matrix
       **Process integration** row: *no spawn after hide across 60 s of simulated time*.
-- [ ] 5.3 **RED** same file — `onlyOnePollLoopRunsPerLaunch`: visible → hidden → visible twice over,
+- [x] 5.3 **RED** same file — `onlyOnePollLoopRunsPerLaunch`: visible → hidden → visible twice over,
       expect a single loop throughout. — sc *"Only one poll loop runs per launch"*.
-- [ ] 5.4 **RED** same file — `aPollTickFetchesNoDetail`: with nothing selected, every recorded
+- [x] 5.4 **RED** same file — `aPollTickFetchesNoDetail`: with nothing selected, every recorded
       invocation is the list probe and no `services info` invocation exists. — sc *"A poll tick
       fetches no detail"*.
-- [ ] 5.5 **GREEN** create `Sources/BrewClient/ServicesRefreshCoordinator.swift` — baseline on
+- [x] 5.5 **GREEN** create `Sources/BrewClient/ServicesRefreshCoordinator.swift` — baseline on
       `setVisible(true)`, poll task created there and `cancel()`-ed **and niled** by
       `setVisible(false)`, cadence `.seconds(5)` on an injected `any Clock<Duration>`. The terminals
       consumer and mutation suppression are **Phase 14** — leave the seam, do not fake it.
@@ -254,27 +256,27 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 6: The services read surface — D8, SM9 / SM11 / SM12
 
-- [ ] 6.1 `cellar/Shell/AppSection.swift` — add `.services` as the 5th case. Verified safe: no test
+- [x] 6.1 `cellar/Shell/AppSection.swift` — add `.services` as the 5th case. Verified safe: no test
       asserts a case count on `AppSection`; `BulkSelection.Action.allCases == [.upgrade, .uninstall]`
       is the suite's only exhaustive enum assertion and is untouched here.
-- [ ] 6.2 Create `cellar/Services/ServicesListView.swift` and `cellar/Services/ServiceRow.swift` —
+- [x] 6.2 Create `cellar/Services/ServicesListView.swift` and `cellar/Services/ServiceRow.swift` —
       name plus colour-coded status. **No controls yet** (Phase 14). `onAppear`/`onDisappear` *report*
       visibility to the coordinator; they never decide it.
-- [ ] 6.3 **RED** `Tests/BrewClientTests/ServicesPresentationTests.swift` (new) — the status → label +
+- [x] 6.3 **RED** `Tests/BrewClientTests/ServicesPresentationTests.swift` (new) — the status → label +
       colour mapping as a **pure projection**, one case per status including `unrecognised`. This is
       the headless substitute for the six statuses that cannot be produced on the dev machine; MV-9
       corroborates it under a temporary fixture patch.
-- [ ] 6.4 **RED** same file — `aChangedStatusReplacesThePreviousOne` (no stale status retained) and a
+- [x] 6.4 **RED** same file — `aChangedStatusReplacesThePreviousOne` (no stale status retained) and a
       structural assertion that the services surface declares **no** notification request, no
       permission prompt, no badge and no blocking alert. — sc *"A service that dies is shown as failed
       at the next poll"*, *"No notification is requested or delivered for it"* (ruling #7182-2).
-- [ ] 6.5 **GREEN** create `Sources/BrewClient/LogFileOpening.swift` — the open-in-Console protocol
+- [x] 6.5 **GREEN** create `Sources/BrewClient/LogFileOpening.swift` — the open-in-Console protocol
       seam (`rules.design`: a protocol boundary for every external dependency). The **single**
       `NSWorkspace` implementation lives in the app target, not in CellarCore.
-- [ ] 6.6 Create `cellar/Services/ServiceDetailView.swift` — status, user, plist `file`, deduped log
+- [x] 6.6 Create `cellar/Services/ServiceDetailView.swift` — status, user, plist `file`, deduped log
       paths, open-in-Console. Brew-absent renders `ServicesStore.absence` / `OperationCenter.unavailableGuidance`
       as read-only guidance; no new rule.
-- [ ] 6.7 **Wire** `cellar/ContentView.swift` (services column) and `cellar/cellarApp.swift` (DI,
+- [x] 6.7 **Wire** `cellar/ContentView.swift` (services column) and `cellar/cellarApp.swift` (DI,
       `scenePhase` → `setVisible`). `loops.start("services")` is **Phase 14** — the terminals consumer
       does not exist yet. Verified by `xcodebuild build` plus manual steps **MV-1, MV-5, MV-10**.
       **Commit 6.**
@@ -285,12 +287,12 @@ If the split is taken, exactly four things must move with it — nothing else:
 > unconditional `availability = .available` (`:170`), so a failed clear's reason is erased by the next
 > character the user types.
 
-- [ ] 7.1 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
+- [x] 7.1 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
       `aFailedClearReasonSurvivesASearchDrivenReload`: fail a clear through the M3-0 injected clear
       seam, then set `search` (triggering the `didSet` reload), and expect **both** the
       `.unavailable(reason:)` availability and `lastError` still present afterwards.
-- [ ] 7.2 **RED** same file — `aSuccessfulAppendOrClearLeavesNoStaleFailureReason`.
-- [ ] 7.3 **GREEN** `Sources/Persistence/HistoryStore.swift` — a private sticky failure reason set by
+- [x] 7.2 **RED** same file — `aSuccessfulAppendOrClearLeavesNoStaleFailureReason`.
+- [x] 7.3 **GREEN** `Sources/Persistence/HistoryStore.swift` — a private sticky failure reason set by
       `clearAll()`'s catch; `reload()` ends with `availability = sticky.map(.unavailable) ?? <fetch outcome>`
       instead of the unconditional `.available` at `:170`; a successful `append`/`clearAll` clears it.
       **Commit 7.**
@@ -303,17 +305,17 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 8: `BrewMutating`, `AnyBrewMutation`, `InvalidationScope` — D1, D2, `package-mutation` PM1
 
-- [ ] 8.1 **RED** `Tests/BrewClientTests/BrewMutatingTests.swift` (new) —
+- [x] 8.1 **RED** `Tests/BrewClientTests/BrewMutatingTests.swift` (new) —
       `anotherFamilyEntersTheSpineWithoutBecomingACaseOfTheMutationCommandType`: submit a non-package
       conformer through the spine, then assert `MutationCommand` still carries exactly the six package
       commands, and that the submitted command was still projected with its argv, its verb and its
       terminal outcome. — PM1 sc *"Another family enters the spine without becoming a case of this
       type"*.
-- [ ] 8.2 **RED** same file — `anErasedMutationCarriesOnlyProjectionsAndCompareByValue`: build
+- [x] 8.2 **RED** same file — `anErasedMutationCarriesOnlyProjectionsAndCompareByValue`: build
       `AnyBrewMutation` from two equal and two differing conformers; assert synthesized `==` holds and
       that **nothing** can be parsed back out of it (no case payload to recover). This strengthens the
       shipped "nothing is parsed back out of a command" property rather than weakening it.
-- [ ] 8.3 **GREEN** create `Sources/BrewClient/BrewMutating.swift` — the `Sendable`-only protocol
+- [x] 8.3 **GREEN** create `Sources/BrewClient/BrewMutating.swift` — the `Sendable`-only protocol
       (`arguments`, `verb`, `packageID`, `requiresConfirmation`, `invalidates`, `classify`), its
       default `displayCommand` / `brewCommand` / `classify` (today's logic **verbatim**), the
       `AnyBrewMutation` erased value, and `InvalidationScope` as a `Sendable, Hashable` `OptionSet`
@@ -321,16 +323,16 @@ If the split is taken, exactly four things must move with it — nothing else:
       by comment, **not declared**. No `Equatable`/`Hashable` `Self`-requirement: it would make the
       protocol unusable as a stored property and break `ConfirmationRequest: Equatable` and its four
       existing assertions.
-- [ ] 8.4 **GREEN** `Sources/BrewClient/MutationCommand.swift` — add
+- [x] 8.4 **GREEN** `Sources/BrewClient/MutationCommand.swift` — add
       `extension MutationCommand: BrewMutating { var invalidates: InvalidationScope { .installedInventory } }`
       and **nothing else**.
-- [ ] 8.5 **GREEN** `Sources/BrewClient/OperationCenter.swift`, `OperationCenterBulk.swift`,
+- [x] 8.5 **GREEN** `Sources/BrewClient/OperationCenter.swift`, `OperationCenterBulk.swift`,
       `ActivityItem.swift` — `submit(_ command: some BrewMutating, versions:)` and
       `request(_ commands: [some BrewMutating])` are **generic, not existential**, so every app-target
       call site (`MutationMenu.swift:83-84`, `InstalledListView`, `ActivityBar`, `BrowseView`)
       compiles **unchanged**. `ActivityItem.command` and `ConfirmationRequest.command`/`additional`
       store `AnyBrewMutation`.
-- [ ] 8.6 **RED** `Tests/BrewClientTests/MutationCommandTests.swift` — extend the existing VS1-style
+- [x] 8.6 **RED** `Tests/BrewClientTests/MutationCommandTests.swift` — extend the existing VS1-style
       structural scan over `Sources/BrewClient/*Command.swift` with the positive anchor and the new
       structural rule: *a conformer's `arguments` may contain only literal verb/flag enum raw values
       plus tokens taken from a validated wrapper*. Keep the M3-0 lesson from task 8.1 — the scan must
@@ -344,49 +346,49 @@ If the split is taken, exactly four things must move with it — nothing else:
 > (no suppression) and its `terminals` stream never fires (no forced re-snapshot). Task 9.7 asserts
 > that file is byte-unchanged. **No settle-grace, no `isSettling`** — see Phase 15.
 
-- [ ] 9.1 **RED** `Tests/BrewClientTests/MutationGatesTests.swift` (new) —
+- [x] 9.1 **RED** `Tests/BrewClientTests/MutationGatesTests.swift` (new) —
       `aCommandDeclaringTheInstalledSetRefreshesItExactlyOnceAtEveryTerminal`: success, non-zero exit,
       typed busy failure and cancellation, each forcing exactly one re-snapshot. This is the
       carried-forward PM6 invariant and must stay green. — PM6 sc 1–3.
-- [ ] 9.2 **RED** same file — `aCommandThatDoesNotDeclareTheInstalledSetTakesNoInventorySnapshot`:
+- [x] 9.2 **RED** same file — `aCommandThatDoesNotDeclareTheInstalledSetTakesNoInventorySnapshot`:
       zero `brew info --installed --json=v2` invocations across successful, failed **and** cancelled
       terminals, and exactly one refresh of each domain it *did* declare. — PM6 sc 4–5,
       `service-management` sc *"A successful service verb refreshes services once and the inventory
       never"* / *"A failed or cancelled service verb still refreshes services once"*, II10 sc *"An
       operation that does not invalidate the installed set forces no re-snapshot"*.
-- [ ] 9.3 **RED** `Tests/BrewClientTests/InstalledRefreshTests.swift` —
+- [x] 9.3 **RED** `Tests/BrewClientTests/InstalledRefreshTests.swift` —
       `externalSignalsAreNotSuppressedByANonInvalidatingOperation`: a change signal emitted while a
       services command runs is answered after the quiet window, without waiting for that operation. —
       II10 sc *"External signals are not suppressed by a non-invalidating operation"*.
-- [ ] 9.4 **RED** `Tests/BrewClientTests/OperationCenterHistoryTests.swift` —
+- [x] 9.4 **RED** `Tests/BrewClientTests/OperationCenterHistoryTests.swift` —
       `aFailingRecorderChangesNeitherTheOutcomeNorThePerDomainRefreshCounts` for a non-package
       operation: identical outcome, exactly one refresh per declared domain and none for any it did
       not declare, nothing thrown. — IH7 sc 3, OA6 sc *"A failing recorder does not change what the
       queue reports"*.
-- [ ] 9.5 **GREEN** `Sources/BrewClient/BrewMutating.swift` — add `MutationGates`, mapping scope →
+- [x] 9.5 **GREEN** `Sources/BrewClient/BrewMutating.swift` — add `MutationGates`, mapping scope →
       gate and beginning/ending **only the intersecting** gates. The services gate is a **second
       instance of the shipped `InstalledMutationGate` type**, not a new type — it is already a depth
       counter plus a `terminals` stream with nothing installed-specific in its body. The rename it
       deserves is deliberately **not** done here (public API, test call sites, buys no behaviour); the
       naming debt is registered in task 15.4, not hidden.
-- [ ] 9.6 **GREEN** `Sources/BrewClient/MutationOutcome.swift` and `OperationCenter.swift` — **delete**
+- [x] 9.6 **GREEN** `Sources/BrewClient/MutationOutcome.swift` and `OperationCenter.swift` — **delete**
       `MutationOutcome.forcesReSnapshot`; what a command invalidates is a property of what ran, not of
       how it ended. `OperationCenter.init(gates:…)` is the new form; keep `init(gate:)` as a
       convenience building `[(.installedInventory, gate)]` so every current test and the app's
       composition root compile unchanged.
-- [ ] 9.7 **Scope guard** — `git diff main -- Packages/CellarCore/Sources/BrewClient/InstalledChangeObserving.swift`
+- [x] 9.7 **Scope guard** — `git diff main -- Packages/CellarCore/Sources/BrewClient/InstalledChangeObserving.swift`
       must be **empty**. Any hunk there means the settle-grace crept back in. **Commit 9.**
 
 ## Phase 10: `ConfirmationBox` — D6 (b), register item VS2
 
-- [ ] 10.1 **RED** `Tests/BrewClientTests/ConfirmationBoxTests.swift` (new) —
+- [x] 10.1 **RED** `Tests/BrewClientTests/ConfirmationBoxTests.swift` (new) —
       `pendingConfirmationHasNoSetterAtAll`: a structural scan proving `OperationCenter.pendingConfirmation`
       is a computed getter with no setter — strictly stronger than the `private(set)` VS2 asked to
       restore. Anchor the scan positively first (M3-0 task 8.1).
-- [ ] 10.2 **RED** same file — `requestingAndConfirmingStillPropagatesThroughTheNestedObservable`:
+- [x] 10.2 **RED** same file — `requestingAndConfirmingStillPropagatesThroughTheNestedObservable`:
       `request` → `confirm`/`decline` still drive the same observable transitions, so the sheet still
       updates.
-- [ ] 10.3 **GREEN** `Sources/BrewClient/OperationCenter.swift` — a small `@Observable ConfirmationBox`
+- [x] 10.3 **GREEN** `Sources/BrewClient/OperationCenter.swift` — a small `@Observable ConfirmationBox`
       held `@ObservationIgnored private let`; `pendingConfirmation` becomes a computed getter over it.
       Observation propagates through the nested observable read. **Commit 10.**
 
@@ -398,27 +400,37 @@ If the split is taken, exactly four things must move with it — nothing else:
 > **family-owned** (`ServiceCommand` overrides `classify`; the protocol default is untouched), so it
 > cannot reach `install`/`upgrade`. Task 11.6 is the test that makes that claim falsifiable.
 
-- [ ] 11.1 **RED** `Tests/BrewClientTests/ServiceCommandTests.swift` (new) —
+- [x] 11.1 **RED** `Tests/BrewClientTests/ServiceCommandTests.swift` (new) —
       `anUnsafeServiceNameIsRejectedAtConstructionAndBuildsNoArgv`, parameterized over a name with a
-      leading `-`, an empty name, whitespace, `;`, `$(…)` and a name equal to `--all`. Each rejected
-      at construction, **no argv built**. — threat matrix, *Subprocess argument composition*.
-      `ServiceTarget` is expressed over `MutationName.isSafe` (`MutationCommand.swift:104`) exactly as
-      `PackageTarget` is; that stays the single gate.
-- [ ] 11.2 **RED** same file — `eachVerbProducesItsExactArgv` (`services start atuin`,
+      leading `-`, an empty name, whitespace and a name equal to `--all`. Each rejected at
+      construction, **no argv built**; `legitimateServiceNamesAreAccepted` stops the gate passing
+      vacuously. — threat matrix, *Subprocess argument composition*. `ServiceTarget` is expressed over
+      `MutationName.isSafe` (`MutationCommand.swift:104`) exactly as `PackageTarget` is; that stays
+      the single gate.
+      **Corrected during remediation — this task originally also required `;` and `$(…)` to be
+      rejected at construction, and they are not.** `MutationName.isSafe` is exactly
+      "non-empty, no leading `-`, no whitespace", the `package-mutation` delta says PM9 is untouched,
+      and widening the shared gate would change package construction rules the delta explicitly
+      preserves. No spec scenario requires the rejection. The guarantee that actually protects the
+      user is covered instead by `shellMetacharactersSurviveAsOneLiteralArgument`, which drives
+      `$(whoami)`, `atuin;rm`, `` `id` ``, `a|b`, `a&b` and `a>b` through the **real** `BrewRunner`
+      and process seam and asserts `spec.arguments == ["services","stop",name]` — argv is a vector and
+      no shell exists. See verify ADJUDICATION 2.
+- [x] 11.2 **RED** same file — `eachVerbProducesItsExactArgv` (`services start atuin`,
       `services stop atuin`, `services restart atuin`, `services run atuin`);
       `noServiceArgvEverContainsAll`; `killAndStopKeepAreNotOffered`. — SM4 sc 1–3.
-- [ ] 11.3 **RED** same file — `theRowControlSurfaceIsExactlyTheFiveEnumeratedControls`:
+- [x] 11.3 **RED** same file — `theRowControlSurfaceIsExactlyTheFiveEnumeratedControls`:
       `ServiceRowControl.allCases == [.start, .run, .stop, .restart, .copyCommand]`, the
       `ActivityItem.Control` / `HistoryRecord.Control` idiom, so *"no hidden default"* is a claim about
       the whole surface rather than an unwritten omission. — SM5 sc *"Neither action is a hidden
       default"* (ruling #7182-3).
-- [ ] 11.4 **GREEN** create `Sources/BrewClient/ServiceCommand.swift` — `ServiceTarget` plus
+- [x] 11.4 **GREEN** create `Sources/BrewClient/ServiceCommand.swift` — `ServiceTarget` plus
       `enum ServiceCommand: Sendable, Equatable, BrewMutating { case start/run/stop/restart(ServiceTarget) }`.
       `arguments` = `["services", <verb>, target.name]`; **`--all` is unrepresentable** because no case
       omits a target. `invalidates` = `.services`; `packageID` = `nil` (ruling #7180 a);
       `requiresConfirmation` = **false** for all four — recorded, not silent: none destroys anything,
       each is reversible in one click, and start-vs-run is already an explicit user choice.
-- [ ] 11.5 **RED** `Tests/BrewClientTests/ServiceClassificationTests.swift` (new), fixture `LogLine`
+- [x] 11.5 **RED** `Tests/BrewClientTests/ServiceClassificationTests.swift` (new), fixture `LogLine`
       arrays — `aColdStartIsClassifiedAsStarted`;
       `aStartOnAnAlreadyRunningServiceIsClassifiedFromTheMarkerNotTheExitCode` (exit **0**, stdout
       ``Service `atuin` already started, use …``, no `Successfully` line → `.noChange`, not a failure);
@@ -426,12 +438,12 @@ If the split is taken, exactly four things must move with it — nothing else:
       ``Warning: Service `atuin` is not started.`` → `.noChange`);
       `anUnmatchedOutcomeIsNeverASuccess` (non-zero + no marker → `.failed` with the log verbatim;
       exit 0 + no marker → not reported as a state change that did not happen). — SM6 sc 1–4.
-- [ ] 11.6 **RED** same file — `packageClassificationIsByteIdentical` (a regression anchor over the
+- [x] 11.6 **RED** same file — `packageClassificationIsByteIdentical` (a regression anchor over the
       existing `ClassificationTests` cases) and
       `aPayloadContainingAServiceMarkerCannotReclassifyAnInstall` (feed `already started, use` into an
       install's log; classification unchanged). — threat matrix, *Untrusted subprocess payload as
       classification input*.
-- [ ] 11.7 **GREEN** `Sources/BrewClient/MutationOutcome.swift` — add exactly one case, `.noChange`
+- [x] 11.7 **GREEN** `Sources/BrewClient/MutationOutcome.swift` — add exactly one case, `.noChange`
       (`isSuccess == false`, `isFailure == false` — the `.cancelled` shape; `summaryLabel` `"No
       change"`). Cost is four compiler-enforced exhaustive switches. Rejected and recorded: an
       associated value on `.succeeded` (breaks `==` across many shipped tests); a display-only note
@@ -441,37 +453,37 @@ If the split is taken, exactly four things must move with it — nothing else:
       never anchored and never whole-sentence, because brew interpolates the service name into every
       one; `"Successfully started"`/`"Successfully stopped"` are **corroboration only**, never the
       sole success test.
-- [ ] 11.8 **RED** same file — `aRootDomainWarningOnAZeroExitIsASuccessNotAPrivilegeFailure` and
+- [x] 11.8 **RED** same file — `aRootDomainWarningOnAZeroExitIsASuccessNotAPrivilegeFailure` and
       `aRejectedBootstrapIsAGenericFailureWithItsLogIntactAndNoRetry`. `.needsPrivileges` only when
       the exit is **non-zero** and the marker is present; the exact bootstrap signature is unprobed
       (U5 residual), so the default degrades to a generic failure with the output on screen. — SM7
       sc 1–2, PM4 sc *"A non-fatal privilege warning on a successful run is not a sudo failure"*;
       threat matrix, *Privilege boundary*.
-- [ ] 11.9 **RED** same file — `nothingParsedFromBrewsOutputReachesAnArgv`: trace every value the
+- [x] 11.9 **RED** same file — `nothingParsedFromBrewsOutputReachesAnArgv`: trace every value the
       classification surface extracts and assert none builds, extends or modifies an argv. — SM6 sc 5.
-- [ ] 11.10 **GREEN** `Sources/Persistence/SwiftDataHistoryRecorder.swift` — map `.noChange` to
+- [x] 11.10 **GREEN** `Sources/Persistence/SwiftDataHistoryRecorder.swift` — map `.noChange` to
       `(raw: "noChange", exitStatus: 0)`. **Commit 11.**
 
 ## Phase 12: The services submit path and the duplicate guard — D6 (c), SM8 / SM10, PM7
 
-- [ ] 12.1 **RED** `Tests/BrewClientTests/ServiceSubmissionTests.swift` (new) —
+- [x] 12.1 **RED** `Tests/BrewClientTests/ServiceSubmissionTests.swift` (new) —
       `aSecondOperationForTheSameServiceIsRefusedWhileOneIsInFlight` (no second operation enqueued, no
       process spawned); `aDifferentServiceIsNotBlocked`;
       `theGuardIsReleasedAtTheTerminalOutcome` across succeeded, failed **and** cancelled. — SM10
       sc 1–3.
-- [ ] 12.2 **RED** same file — `actingOnSeveralServicesEnqueuesOneOperationEachInOrder`: `atuin`,
+- [x] 12.2 **RED** same file — `actingOnSeveralServicesEnqueuesOneOperationEachInOrder`: `atuin`,
       `postgresql`, `redis` chosen in that order produce exactly three operations with those argvs, in
       that order. — SM4 sc *"Acting on several services enqueues one operation each, in order"* (M2
       fan-out ruling, PM2 sc2).
-- [ ] 12.3 **RED** same file — `absentBrewSpawnsNothingForAnyOfTheFourVerbs`, also for an invalid
+- [x] 12.3 **RED** same file — `absentBrewSpawnsNothingForAnyOfTheFourVerbs`, also for an invalid
       configured path: nothing thrown, the affordance reports itself unavailable with the rejection
       reason as guidance. — SM11 sc 2, PM7 sc *"A non-package family is equally unavailable when brew
       is absent"*.
-- [ ] 12.4 **RED** same file — `theInstalledBulkVocabularyIsUnchanged`:
+- [x] 12.4 **RED** same file — `theInstalledBulkVocabularyIsUnchanged`:
       `BulkSelection.Action.allCases == [.upgrade, .uninstall]`, still exactly two, no service verb.
       This assertion is load-bearing for `installed-inventory` II13 sc4 and must not be relaxed. —
       SM4 sc 5.
-- [ ] 12.5 **GREEN** create `Sources/BrewClient/OperationCenterServices.swift` — the services submit
+- [x] 12.5 **GREEN** create `Sources/BrewClient/OperationCenterServices.swift` — the services submit
       path plus `ServiceSubmissionGuard`, keyed on `ServiceTarget.name`, **on this path only**. A
       second services command for a name with a non-terminal one already in flight returns that
       existing `ActivityItem` instead of queueing an opposite operation. Explicitly services-scoped:
@@ -484,20 +496,20 @@ If the split is taken, exactly four things must move with it — nothing else:
 > deterministic timestamp — the claims are "exactly N entries", "null package identity", "typed verb"
 > and "exact argv". Do not add the seam speculatively; it stays open on the register (task 15.4).
 
-- [ ] 13.1 **RED** `Tests/BrewClientTests/ServiceHistoryTests.swift` (new), over
+- [x] 13.1 **RED** `Tests/BrewClientTests/ServiceHistoryTests.swift` (new), over
       `Tests/BrewClientTests/Fakes/OperationCenterHarness.swift` —
       `eachServiceVerbWritesOneEntryWithANullPackageIdentity`: four operations → exactly four entries,
       each with its own verb, its outcome and its exact argv; every one carrying a **null** package
       identity, no version-from, no version-to, and none storing `atuin` as a package identity. —
       IH1 sc 5, OA6 sc *"An operation with no package identity records exactly one entry"*.
-- [ ] 13.2 **RED** same file — `repeatedTogglingAppendsOneEntryPerOperation`: five start/stop pairs →
+- [x] 13.2 **RED** same file — `repeatedTogglingAppendsOneEntryPerOperation`: five start/stop pairs →
       exactly ten entries in submission order, nothing collapsed, deduplicated or netted out. — IH1
       sc 6. The chatty-history cost is accepted and recorded (ruling #7180 a), not papered over.
-- [ ] 13.3 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
+- [x] 13.3 **RED** `Tests/PersistenceTests/HistoryStoreTests.swift` —
       `aNullPackageServiceEntryIsFindableByVerbAndByItsArgv`: searching `STOP` and then `atuin` each
       returns only the service entry, and it is present in the unfiltered newest-first projection. —
       IH5 sc 5.
-- [ ] 13.4 **GREEN** the verb vocabulary — `verb` = `"serviceStart" | "serviceRun" | "serviceStop" |
+- [x] 13.4 **GREEN** the verb vocabulary — `verb` = `"serviceStart" | "serviceRun" | "serviceStop" |
       "serviceRestart"`, camelCase on the `upgradeAll` precedent and **namespaced** so an IH5 search
       for "start" cannot collide with a package verb. Update `Sources/BrewClient/HistoryRecording.swift`
       and `Sources/Persistence/SwiftDataHistoryRecorder.swift` for the null-package draft form.
@@ -505,16 +517,16 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 14: Poll control half and the row controls — D3, D8, SM3 (suppression) / SM8
 
-- [ ] 14.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` —
+- [x] 14.1 **RED** `Tests/BrewClientTests/ServicesRefreshTests.swift` —
       `pollingIsSuppressedWhileAServiceMutationIsInFlight`: advance the `TestClock` past several
       intervals before the terminal; expect **zero** poll refreshes while in flight and **exactly
       one** refresh at the terminal, not duplicated by the poll. — SM3 sc 4.
-- [ ] 14.2 **RED** same file — `aFailedOrCancelledServiceVerbStillForcesExactlyOneServicesRefresh`,
+- [x] 14.2 **RED** same file — `aFailedOrCancelledServiceVerbStillForcesExactlyOneServicesRefresh`,
       and zero inventory re-snapshots in both cases. — SM8 sc 2.
-- [ ] 14.3 **GREEN** `Sources/BrewClient/ServicesRefreshCoordinator.swift` — the terminals consumer
+- [x] 14.3 **GREEN** `Sources/BrewClient/ServicesRefreshCoordinator.swift` — the terminals consumer
       (forced refresh at every service-mutation terminal) and suppression while
       `serviceGate.isMutating`.
-- [ ] 14.4 **Wire** `cellar/Services/ServiceControls.swift` (new) — all four verbs as **separately
+- [x] 14.4 **Wire** `cellar/Services/ServiceControls.swift` (new) — all four verbs as **separately
       labelled, separately invoked** controls, each label stating which it does ("Start at login" vs
       "Run once"), plus copy-command. `cellar/cellarApp.swift` gains `loops.start("services")` running
       the terminals consumer only — **not** the poll (see the Phase 5 trap). Verified by
@@ -522,20 +534,20 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 15: Reconciliation — specs, register, docs
 
-- [ ] 15.1 **PM6 is RETITLED, not merely re-bodied.** Old title: *"Every terminal outcome forces one
+- [x] 15.1 **PM6 is RETITLED, not merely re-bodied.** Old title: *"Every terminal outcome forces one
       re-snapshot"*. New title: *"Every terminal outcome forces one refresh of each state domain the
       command invalidates, and cancel is reported honestly"*. The archive step replaces by requirement
       **NAME**, so promotion MUST be treated as a **rename-in-place**: the old-titled requirement is
       removed from `openspec/specs/package-mutation/spec.md` in the same edit that adds the new one.
       Otherwise the main spec ends up carrying **both** titles. Record this instruction inside the
       delta header so the archive agent cannot miss it.
-- [ ] 15.2 **Reconcile the `package-mutation` capability header prose**,
+- [x] 15.2 **Reconcile the `package-mutation` capability header prose**,
       `openspec/specs/package-mutation/spec.md:1-12`, which still describes the old **unconditional**
       re-snapshot at every terminal outcome. That prose is **outside delta scope** and will therefore
       survive the archive untouched unless it is fixed deliberately. Same treatment for any header
       sentence in `installation-history` naming "the forced inventory re-snapshot" in the singular.
       Prose only — no requirement text, no scenario.
-- [ ] 15.3 **Re-register M2-2 #6 (post-terminal FSEvents echo) as an OPEN follow-up**, with its reason
+- [x] 15.3 **Re-register M2-2 #6 (post-terminal FSEvents echo) as an OPEN follow-up**, with its reason
       stated: closing it requires an explicit `installed-inventory` **II10 amendment** narrowing the
       `:334-337` convergence guarantee, so a post-terminal echo can be dropped without also dropping a
       genuine external signal landing in the same window. The earlier draft's `isSettling` grace sat
@@ -543,7 +555,7 @@ If the split is taken, exactly four things must move with it — nothing else:
       governs *in-flight* suppression — a different moment and a different guarantee. The register
       already classifies the redundant re-snapshot as **conforming, not a defect**. That is a spec
       decision, and this slice does not take it.
-- [ ] 15.4 Re-register the remaining open items with their reasons: **VS3** (no XCUITest harness;
+- [x] 15.4 Re-register the remaining open items with their reasons: **VS3** (no XCUITest harness;
       a dedicated harness slice remains the eventual answer, funded separately); **VS4** (clock seam —
       still unneeded, see Phase 13); the **`InstalledMutationGate` naming debt** (now serving two
       domains under an installed-specific name; renaming is public-API churn that buys no behaviour);
@@ -551,7 +563,7 @@ If the split is taken, exactly four things must move with it — nothing else:
       a message-quality gap, not a correctness gap); and the **`services info --json <name>` cost
       question** (probed only via `--all` at n=1; the mitigation is a cache, not a redesign, because
       the fetch is already lazy and selection-keyed).
-- [ ] 15.5 Mark **S1** and **W1** closed on the register, citing `BrewRunner.swift:288/293` and
+- [x] 15.5 Mark **S1** and **W1** closed on the register, citing `BrewRunner.swift:288/293` and
       `OperationCenter.swift:168-177`. No code task exists for either. **Commit 15.**
 
 ## Phase 16: Manual verification — VS3, written now, executed at apply/verify
@@ -566,10 +578,138 @@ If the split is taken, exactly four things must move with it — nothing else:
 > corroborated by the one fixture-driven check, MV-9. Every check below is labelled **LIVE**,
 > **FIXTURE-DRIVEN** or **HEADLESS-ONLY**.
 
-- [ ] 16.1 **Manual verification — reserved for the orchestrator/user, leave unchecked until run.**
+- [x] 16.1 **Manual verification — RUN 2026-08-03 with the user driving the GUI. Closed on the
+      archive-blocking subset; the remainder is deferred by an explicit user decision, not dropped.**
+      OBTAINED: **MV-1**, **MV-3** (control enumeration in the app + the LaunchAgents discriminator
+      headlessly), **MV-4** (all four summary labels verbatim), **MV-5 dedupe half**, **MV-7 in
+      full** including both search filters, **MV-11 byte half**. `sdd-verify` pass 2 named **MV-1 and
+      MV-7 as the only archive-blocking checks**; both PASS. DEFERRED by user decision, registered as
+      owed rather than claimed: MV-2 (a)(b)(d), MV-5 GUI half, MV-6, MV-8, MV-9 (needs an
+      uncommittable fixture patch), MV-10, MV-11 GUI half, MV-12. Machine returned to baseline:
+      `atuin` at status `none`, no `~/Library/LaunchAgents/homebrew.mxcl.atuin.plist`.
       Build with `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       and run the twelve checks below in order. Record the **actual** observation for each, not just
       PASS.
+
+      > **GUI evidence obtained by the user, 2026-08-03 — screenshot of the running app.**
+      >
+      > **MV-1 — PASS.** Services is present in the sidebar and selected. `atuin` is listed with
+      > status **"Not running"**, matching `brew services list`'s `none`. No error state and no
+      > empty-state placeholder is shown. The detail pane renders the service name, its status, and
+      > the property list path `/opt/homebrew/opt/atuin/homebrew.mxcl.atuin.plist`.
+      >
+      > **MV-3, control-enumeration half — PASS.** The `atuin` row offers **exactly five** controls,
+      > in this order: **Start at login · Run once · Stop · Restart · Copy command**. Each is labelled
+      > with what it does, and no single control would choose between start and run on the user's
+      > behalf. This satisfies SM "Neither action is a hidden default" sc2 for a stopped service.
+      > The `~/Library/LaunchAgents` half of MV-3 was already obtained headlessly (below).
+      >
+      > **MV-5, dedupe half — PASS (in the stopped state).** `brew services info atuin --json`
+      > reports `log_path` and `error_log_path` as the **same** file
+      > (`/opt/homebrew/var/log/atuin.log`), and the pane shows **exactly one** log location plus an
+      > **Open in Console** affordance — no duplicated row, no placeholder. The started-state half of
+      > MV-5 (status/user fields against the JSON, and the Console click) is still owed.
+      >
+      > **MV-4 — PASS. All four summary labels recorded verbatim from the Activity list**, in click
+      > order, each its own row with its own argv and none collapsed or deduplicated:
+      >
+      > | # | Command shown | Summary | Detail line |
+      > |---|---|---|---|
+      > | 1 | `brew services start atuin` | **Done** | `Done.` |
+      > | 2 | `brew services start atuin` | **No change** | `No change: it was already in that state. Homebrew reported this rather than doing anything.` |
+      > | 3 | `brew services stop atuin` | **Done** | `Done.` |
+      > | 4 | `brew services stop atuin` | **No change** | `No change: it was already in that state. Homebrew reported this rather than doing anything.` |
+      >
+      > All four brew invocations exit 0, and the two no-ops are still told apart from the two real
+      > state changes — never "Done", never a failure, never an error row. This is the end-to-end
+      > proof of SM "Outcome classification comes from output markers, never from the exit code
+      > alone", and it confirms the `.noChange` case renders as neither success nor failure. The row
+      > returned to **Not running** at the end, so the machine is at baseline.
+      >
+      > **MV-7 — PASS on its central claim. This is the check that predicted CRITICAL 1 verbatim,
+      > and the remediation holds in the window.** History lists **four** service entries, one per
+      > click, nothing collapsed or deduplicated, newest first:
+      >
+      > | Title | Verb badge | Command | Outcome |
+      > |---|---|---|---|
+      > | **No package** | `serviceStop` | `services stop atuin` | No change |
+      > | **No package** | `serviceStop` | `services stop atuin` | Done |
+      > | **No package** | `serviceStart` | `services start atuin` | No change |
+      > | **No package** | `serviceStart` | `services start atuin` | Done |
+      >
+      > Every service row is titled **"No package"** — **not** "All packages". `HistoryRecord.subject`
+      > resolves `.noPackage` and the view renders it, so the CRITICAL fix is proven end to end and
+      > not merely in the package tests. Newest-first ordering is the exact reverse of the click
+      > order, satisfying IH5. **No regression on package rows**: the pre-existing entry still reads
+      > `hello` / `install` / `install --formula hello`, so `.package(name)` is unaffected. Still
+      > owed to close MV-7 fully: the two search filters (`atuin` → only service entries, `stop` →
+      > only the stop entries).
+      >
+      > **MV-7 search half — PASS, obtained.** Search `atuin` → **only the four service entries**;
+      > the pre-existing `hello` / `install` row correctly drops out. Search `stop` → **exactly the
+      > two `serviceStop` entries**; both `serviceStart` rows drop out, so the substring match does
+      > not bleed across verbs in the direction that matters here. IH5's searchable vocabulary is
+      > satisfied for the new verbs, and this is the end-to-end vindication of shipping them
+      > **namespaced** rather than bare — the adjudication `sdd-verify` made against the delta text.
+      > **MV-7 is now fully closed.**
+      >
+      > **Observation, LOW, not blocking — the same stale vocabulary appears twice more.** The
+      > History empty/detail pane reads "Every **package** change Cellar made, newest first", which
+      > is now incomplete for the same reason as the activity bar: History carries service operations
+      > too. Cosmetic copy, no false statement about any row. Registered with the bar nit.
+      >
+      > **Observation, LOW, not blocking — stale copy in the collapsed activity bar.** With nothing
+      > running the bar reads "No package changes running" (`cellar/Activity/ActivityBar.swift:85`),
+      > which is now incomplete vocabulary: that bar also carries service operations. Verified NOT a
+      > misreport — `OperationCenterSummary.runningCommand` returns the running item's
+      > `displayCommand` for any family, so a live service operation does show its own argv there;
+      > the package-specific wording is only the **idle fallback**. Registered as a follow-up.
+      >
+      > Offering **Stop** and **Restart** on a not-running service is **conformant, not a defect**:
+      > MV-4 exercises stop-on-stopped deliberately and expects a "No change" summary, and the spec
+      > constrains only that start-at-login and run-once both be present and separately invocable.
+      >
+      > **Partial evidence obtained during apply — recorded honestly, and it does NOT check this
+      > task.** Everything below was obtained live on brew **6.0.15-4-gd610afe** (the design's probes
+      > were taken on 6.0.14, so these also re-confirm the markers on a newer brew). The machine was
+      > returned to its exact baseline afterwards: `atuin` status `none`, no
+      > `~/Library/LaunchAgents/homebrew.mxcl.atuin.plist`, no `atuin` daemon running.
+      >
+      > **MV-3, the live discriminator — OBTAINED, and it found something.** With `atuin` stopped:
+      > `brew services run atuin` → exit 0, stdout ``==> Successfully ran `atuin` (label:
+      > homebrew.mxcl.atuin)``, and `ls ~/Library/LaunchAgents | rg atuin` **still empty** — run does
+      > not register. `brew services start atuin` from **stopped** → exit 0, stdout
+      > ``==> Successfully started `atuin` …``, and the plist **is** now present, with
+      > `brew services list` showing `File` as `~/Library/LaunchAgents/homebrew.mxcl.atuin.plist` and
+      > `User` as the logged-in user. **The finding:** `start` on a service that is *already running*
+      > does **not** register it — it takes the already-started branch and returns without touching
+      > login items. So MV-3 must be run from a **stopped** service, exactly as written; running it
+      > from a service started by "Run once" would report a false negative.
+      >
+      > **MV-4, the classification half — OBTAINED for all four clicks** (the Activity-drawer labels
+      > still need the GUI). Byte-for-byte on 6.0.15: cold start → exit **0**, stdout
+      > ``==> Successfully started `atuin` (label: homebrew.mxcl.atuin)``. Start again → exit **0**,
+      > stdout ``Service `atuin` already started, use `brew services restart atuin` to restart.``,
+      > no `Successfully` line, nothing on stderr. Stop → exit **0**, stdout `Stopping \`atuin\`…` +
+      > ``==> Successfully stopped `atuin` …``. Stop again → exit **0**, **stderr**
+      > ``Warning: Service `atuin` is not started.``, stdout empty. Every one of the four markers the
+      > classifier matches is confirmed live, and both no-op cases genuinely exit **0** — which is
+      > the whole reason `.noChange` exists.
+      >
+      > **MV-5, the data half — OBTAINED.** `brew services info --json atuin` while started:
+      > `log_path` and `error_log_path` are **the same file**, `/opt/homebrew/var/log/atuin.log`. The
+      > dedupe rule is load-bearing on this machine on day one, so the pane must show **one** log
+      > location. `pid`, `user` and `file` all present and non-null. The pane itself needs the GUI.
+      >
+      > **MV-11, the byte half — OBTAINED on the services path specifically.** `brew services list`
+      > under the pinned environment: **0** ESC bytes by `od -c`. The same command under the old
+      > `HOMEBREW_COLOR=0` key: **3** ESC-carrying lines. Defect #7179 re-confirmed on 6.0.15, on this
+      > slice's own command. The Activity-drawer half needs the GUI.
+      >
+      > **NOT obtained, and not claimed:** MV-1, MV-2 (a)(b)(d), MV-6, MV-7, MV-8, MV-9, MV-10, MV-12,
+      > and the GUI halves of MV-3, MV-4, MV-5 and MV-11. Every one of them needs a human to click
+      > something or to read a window. MV-9 additionally requires a temporary fixture patch that
+      > **must not be committed**, so it was deliberately not attempted.
 
       **MV-1 (LIVE) — The services surface exists and lists real state.** Launch, select Services in
       the sidebar. *Expect*: `atuin` listed with status `none`, matching `brew services list` in
@@ -655,7 +795,7 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 17: Full gate and scope guard
 
-- [ ] 17.1 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ the 0.1
+- [x] 17.1 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ the 0.1
       baseline of 571 plus the new tests; (ii)
       `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       — BUILD SUCCEEDED, zero concurrency warnings; (iii) `swiftlint --quiet` — finding count equal to
@@ -663,18 +803,109 @@ If the split is taken, exactly four things must move with it — nothing else:
       `OperationCenter.swift`, `MutationOutcome.swift`, `HistoryStore.swift` and `InstalledStore.swift`,
       each under SwiftLint's default 400-line `file_length` warning. `ServicesStore.swift` and
       `ServicesWire.swift` are the two most likely to breach — split rather than suppress.
-- [ ] 17.2 **Scope guard.** `git diff main...HEAD --name-only` must contain **no** taps, cleanup or
+      **Measured 2026-08-03 at `7814d79`+: (i) `swift test` = 676 tests / 94 suites passed, 1
+      pre-existing known issue (baseline 571/77, so +105 tests); full `xcodebuild test` =
+      \*\* TEST SUCCEEDED \*\*, `cellarUITests` 4/4 and `cellarTests` green. (ii) `xcodebuild build`
+      = BUILD SUCCEEDED, **zero** warnings of any kind in the raw log. (iii) `swiftlint --quiet` =
+      **60**, equal to the 0.1 baseline — zero new. (iv) largest file `OperationCenter.swift` at
+      **391**; every new and touched file under 400. Four files were split rather than suppressed
+      along the way: `OperationCenterSummary`, `InstalledRefreshScopeTests`,
+      `OperationCenterScopedHistoryTests`, `ServiceClassificationContainmentTests`.**
+- [x] 17.2 **Scope guard.** `git diff main...HEAD --name-only` must contain **no** taps, cleanup or
       disk-usage file, and **no** edit to
       `Packages/CellarCore/Sources/BrewClient/InstalledChangeObserving.swift` (task 9.7). Then
       `rg 'isSettling|settleGrace'` over `Sources/` and `cellar/` must return **zero** — the deferred
       M2-2 #6 grace must not have crept back. `rg 'forcesReSnapshot'` must return **zero** (deleted in
       9.6). `BulkSelection.Action.allCases` must still be exactly two cases.
-- [ ] 17.3 **Candidate size.** Record `git diff main...HEAD --shortstat` and compare it against the
+      **Measured: taps/cleanup/disk-usage — the only match is
+      `m3-services-cleanup-taps/explore.md`, which task 1.5 *requires*; no taps or disk-usage source
+      file is in the candidate. `git diff main...HEAD -- InstalledChangeObserving.swift` = **0 lines**
+      (task 9.7 holds). `isSettling|settleGrace` over `Sources/` and `cellar/` = **0**.
+      `forcesReSnapshot` over `Sources/` and `cellar/` = **0**; **one** mention survives in
+      `MutationGatesTests.swift:255`, and it is the assertion that the member is gone — a guard cannot
+      name what it forbids without naming it. Recorded as the single deliberate exception rather than
+      weakened. `BulkSelection.Action` = exactly `upgrade`, `uninstall`.**
+- [x] 17.3 **Candidate size.** Record `git diff main...HEAD --shortstat` and compare it against the
       forecast band above. If it lands outside ~5,700–6,800, say so and say why — a forecast that is
       never checked against the outcome is how this project under-priced M2-0 by 1.67× and M2-1 by
       1.82×. The accepted `size:exception` covers the verify report as well.
+      **Measured `git diff main...HEAD --shortstat` at the final head: 60 files changed,
+      +6,940 / −188 = **7,128 changed lines**. (It read 6,851 before this record was itself written;
+      the apply-progress artifact adds ~277 lines to the candidate it measures, which is a real cost
+      of recording and is counted rather than excluded.) Against the forecast band of 5,700–6,800
+      that is **4.8% above the top** — but the totals agree by near-*coincidence*, and the honest
+      reading is two large errors of opposite sign:**
+
+      | Bucket | Forecast | Measured | Delta |
+      |---|---|---|---|
+      | SDD markdown | 1,744 (counted inside the ledger) | **474** | −1,270 — the planning markdown landed on `main` in PR #8, so it is not in this candidate at all |
+      | `Sources/` + `cellar/` | 1,870–2,100 | **2,421** | +15% to +29% over |
+      | Tests | 1,400–1,900 | **3,956** | **2.1×–2.8× over — the real miss** |
+
+      **The lesson, stated plainly so the next forecast can use it.** This project has now
+      under-priced three slices in a row (M2-0 1.67×, M2-1 1.82×, and this one's *test* bucket
+      2.1–2.8×), and the cause here is specific: the forecast priced ~60–70 test functions at 20–25
+      lines each. The suite's real cost is nearer **55 lines per test function** once the
+      threat-matrix rows, the mutation-verified assertions and the doc comments this project requires
+      are counted — and 105 tests shipped, not 70. A test-line forecast for this codebase should
+      start from 45–55 lines per test, not 20–25. Batch 2 alone (Phases 8–17) measured
+      **40 files, +3,510 / −176**.
+
+## Phase 18: Remediation of the verify findings — added after `sdd-verify` returned FAIL
+
+Added during batch 3. Every task here answers a numbered finding in
+`openspec/changes/m3-services/verify-report.md`; nothing here is new feature work. Strict TDD applies
+unchanged, and the two production defects both live in the app target — the one target with no
+automated coverage — so each fix hoists its rule into CellarCore where `swift test` can prove it,
+following the project's own `InstalledPresentation` / `ServicesPresentation` precedent.
+
+- [x] 18.1 **RED** `Tests/PersistenceTests/HistorySubjectTests.swift` (new) — `HistoryRecord.subject`
+      is three facts, not two: `.package(name)`, `.everyPackage`, `.noPackage`. Four service verbs
+      read off `ServiceCommand.allVerbs(for:)` must each be `.noPackage` and never `.everyPackage`;
+      the grouped verb's durable spelling is pinned; an unrecognised null-identity verb degrades to
+      `.noPackage`. — **CRITICAL 1**, `installation-history` IH1 sc *"A null-package entry is never
+      displayed as a package or as every package"*.
+- [x] 18.2 **GREEN** `Sources/Persistence/HistoryPresentation.swift` (new) — `HistoryRecord.Subject`
+      and `subject`, decided by identity first and **verb** second. The grouped label is opt-in by
+      `MutationCommand.upgradeAll.verb`, never a default.
+- [x] 18.3 **GREEN** `cellar/History/HistoryRow.swift` — `title` reads `record.subject.label`. The
+      view owns no rule. Replaces `record.name.isEmpty ? "All packages" : record.name`, which titled
+      every service entry "All packages".
+- [x] 18.4 **RED** `Tests/BrewClientTests/ServicesEmptyStateTests.swift` (new) —
+      `ServicesLoadState.emptyState` maps all five cases; `.idle`/`.loading` are `.reading`, `.failed`
+      carries `ServicesError.shortDescription`, and **exactly one** of the eight probed states claims
+      there are no services. — **HIGH 1**.
+- [x] 18.5 **GREEN** `Sources/BrewClient/ServicesPresentation.swift` — `ServicesError.shortDescription`
+      (mirroring `InstalledInventoryError`'s), `ServicesEmptyState` with its `title`/`message`, and
+      the total `ServicesLoadState.emptyState` mapping.
+- [x] 18.6 **GREEN** `cellar/Services/ServicesListView.swift` — private `ServicesEmptyStateView`
+      switching the four projected cases, mirroring `InstalledEmptyState`. Three previews added so
+      the states a human cannot easily provoke are still inspectable.
+- [x] 18.7 **RED (by mutation, named)** `Tests/BrewProcessTests/SystemProcessTests.swift` — a real
+      `/usr/bin/stat -f "%i %HT" /dev/fd/0` spawned through `BrewRunner` + `SystemProcessLauncher`
+      makes the **child report its own standard input**, compared by inode against `/dev/null`, on
+      both the `.read` and the `.mutate` path. — **HIGH 2**, `service-management` SM7 sc3,
+      `package-mutation` PM4 sc2 and sc5. Production is byte-unchanged, so RED could only come by
+      mutation: commenting out `SystemProcess.swift:50`
+      (`process.standardInput = FileHandle.nullDevice`) failed both tests on the naming assertion —
+      `(reported.text → ["1530140395 Fifo File"]) == ["336 Character Device"]` — and the mutation was
+      reverted, leaving the file byte-identical to `main`. **No `ProcessSpec` change; M2-2 #8 stays
+      deferred.**
+- [x] 18.8 **Spec amendment.** `specs/installation-history/spec.md` IH1: verbs restated as
+      `serviceStart`/`serviceStop`/`serviceRestart`/`serviceRun` in the requirement body and in sc5,
+      with the namespacing reason stated; a new presentation clause and scenario forbidding a
+      null-package entry from being rendered as a package or as every package. — verify
+      ADJUDICATION 1 plus CRITICAL 1. **The code was right; the spec text was wrong.**
+- [x] 18.9 **Residual text.** Task 11.1 above and `design.md`'s *Subprocess argument composition*
+      threat row corrected: `;` and `$(…)` are **not** rejected at construction, must not be, and are
+      neutralised structurally instead. — verify ADJUDICATION 2 / LOW 1.
+- [x] 18.10 **Full gate, re-run.** `swift test --package-path Packages/CellarCore` → **693 tests /
+      96 suites**, 1 pre-existing known issue. `xcodebuild build` → BUILD SUCCEEDED.
+      `xcodebuild test` (run alone) → TEST SUCCEEDED. `swiftlint --quiet` = **60**, equal to the 0.1
+      baseline, zero new. Largest touched file 167 lines. `InstalledChangeObserving.swift` still
+      0 changed lines; `BulkSelection.Action` still two cases; both D4 containment anchors still bite.
 
 ---
 
-**Counts.** 84 tasks across 18 phases; 44 RED tasks, 12 pre-written manual checks, 15 work-unit
-commits. Split boundary after Phase 7 / commit 7.
+**Counts.** 94 tasks across 19 phases (84 across 0–17, plus Phase 18's 10 remediation tasks); 47 RED
+tasks, 12 pre-written manual checks, 15 work-unit commits. Split boundary after Phase 7 / commit 7.

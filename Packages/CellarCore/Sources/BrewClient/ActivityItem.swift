@@ -60,9 +60,16 @@ public final class ActivityItem: Identifiable {
     /// outside it, with no handle, means no runner ever existed (design D10).
     @ObservationIgnored internal var isStartInFlight = false
 
-    /// The typed command. Everything displayed is rendered from this, never
-    /// from bytes the subprocess wrote.
-    public let command: MutationCommand
+    /// The typed command, erased to its projections. Everything displayed is
+    /// rendered from this, never from bytes the subprocess wrote.
+    ///
+    /// Erased rather than generic because the item is *stored*, in an array the
+    /// activity surfaces enumerate; a generic item would make that array
+    /// impossible. `AnyBrewMutation` carries argv, verb, package identity,
+    /// confirmation and invalidation scope — everything the surfaces and the
+    /// terminal funnel read — and carries no path back to a concrete command
+    /// (design D1).
+    public let command: AnyBrewMutation
 
     /// The version move Cellar **intended** when it submitted this command.
     ///
@@ -85,9 +92,9 @@ public final class ActivityItem: Identifiable {
     /// its presence *is* what "terminal" means for this item.
     public private(set) var outcome: MutationOutcome?
 
-    init(id: UUID, command: MutationCommand, versions: VersionTransition? = nil) {
+    init(id: UUID, command: some BrewMutating, versions: VersionTransition? = nil) {
         self.id = id
-        self.command = command
+        self.command = AnyBrewMutation(command)
         self.versions = versions
     }
 
@@ -104,7 +111,8 @@ public final class ActivityItem: Identifiable {
     public var copyText: String { command.displayCommand }
 
     /// The package this operation acts on, when it acts on one. `upgradeAll`
-    /// names none, which is why this is optional rather than defaulted.
+    /// names none and no non-package family ever does, which is why this is
+    /// optional rather than defaulted.
     public var packageID: PackageID? { command.packageID }
 
     /// The one sentence to show for the current state.

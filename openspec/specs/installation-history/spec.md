@@ -14,12 +14,40 @@ one.
 
 ### Requirement: Every mutation Cellar performs writes exactly one durable entry
 
-Each mutation Cellar submits MUST produce exactly one history entry — never zero and never two — at
-that operation's terminal outcome. The entry MUST carry the date it reached that outcome, the package
-identity it acted on when it has one, the mutation verb, the version it moved from and the version it
-moved to when both are known, its outcome, and the exact argv the operation ran. Success, failure
-(including the typed sudo and busy failures) and cancellation MUST each be recorded. Nothing MUST be
-written before the operation reaches a terminal outcome. Entries MUST survive an app relaunch.
+Each operation Cellar submits through its mutation spine MUST produce exactly one history entry —
+never zero and never two — at that operation's terminal outcome. The entry MUST carry the date it
+reached that outcome, the package identity it acted on **when it has one**, the operation's verb, the
+version it moved from and the version it moved to when both are known, its outcome, and the exact
+argv the operation ran. Success, failure (including the typed sudo and busy failures) and
+cancellation MUST each be recorded. Nothing MUST be written before the operation reaches a terminal
+outcome. Entries MUST survive an app relaunch.
+
+The verb vocabulary MUST NOT be limited to package verbs. A non-package operation MUST record its own
+typed verb — for services, exactly `serviceStart`, `serviceStop`, `serviceRestart` and `serviceRun` —
+and MUST store a **null** package identity. A non-package family MUST namespace its stored verbs so
+they cannot collide with a package verb: the vocabulary already holds `install`, `upgrade`, `pin` and
+`upgradeAll`, and an IH5 search must never leave the user unable to tell which family they matched.
+The namespaced form still satisfies IH5's case-insensitive `start` / `stop` / `restart` / `run`
+search, because each contains its bare verb as a substring.
+
+Such an entry MUST NOT synthesize, borrow or infer a package identity from the operation's arguments:
+the name of the service the operation acted on MUST NOT be stored as a package identity, and the
+version-from and version-to fields MUST be absent. The subject of a null-package entry remains
+discoverable through its stored argv, which the searchable projection already matches.
+
+A presentation of the history MUST NOT reconstruct an identity that storage refused to synthesize.
+A null package identity and a grouped operation over every package are two different facts and MUST
+NOT be rendered as one: an entry with no package identity MUST NOT be presented as acting on every
+package, and MUST NOT be presented under the service's own name as though it were a package.
+
+Repetition MUST NOT be collapsed: N submitted operations produce N entries. The capability MUST NOT
+deduplicate, coalesce, throttle or suppress an entry because an identical or opposite one was written
+recently, and MUST NOT collapse a start/stop pair into a net change.
+(Previously: the requirement was written for package mutations, so the verb vocabulary and the shape
+of an entry with no package identity were undefined; it constrained **storage** only and said nothing
+about how an entry carrying no package identity must be **presented**, which is how a null-package
+service entry came to be displayed as "All packages"; and nothing said whether repeated identical
+operations may be collapsed.)
 
 #### Scenario: A successful mutation writes one complete entry
 
@@ -48,6 +76,33 @@ written before the operation reaches a terminal outcome. Entries MUST survive an
 - GIVEN three recorded entries
 - WHEN the store is closed and reopened against the same location
 - THEN all three entries are present with their original fields
+
+#### Scenario: Each service verb writes one entry with a null package identity
+
+- GIVEN the four operations `services start atuin`, `services stop atuin`, `services restart atuin`
+  and `services run atuin`, each reaching a terminal outcome
+- WHEN the history is read
+- THEN exactly four entries exist, one per operation, each carrying its own namespaced verb —
+  `serviceStart`, `serviceStop`, `serviceRestart`, `serviceRun` — its outcome and its exact argv
+- AND none of those four verbs is also a package verb
+- AND every one of them carries a null package identity, no version-from and no version-to, and none
+  stores `atuin` as a package identity
+
+#### Scenario: A null-package entry is never displayed as a package or as every package
+
+- GIVEN one recorded `services stop atuin` entry and one recorded grouped `upgradeAll` entry, both of
+  which store no package identity
+- WHEN the history is presented
+- THEN the grouped entry is presented as acting on every package
+- AND the service entry is presented as acting on no package, never as acting on every package and
+  never under the name `atuin`
+
+#### Scenario: Repeated toggling appends one entry per operation
+
+- GIVEN the same service started and stopped five times, each operation reaching a terminal outcome
+- WHEN the history is read
+- THEN exactly ten entries exist, in submission order
+- AND no pair was collapsed, deduplicated or netted out
 
 ### Requirement: A grouped upgrade is one entry; a fanned-out selection is one entry per package
 
@@ -123,9 +178,16 @@ those records MUST NOT remove or alter any history entry.
 ### Requirement: History is searchable and ordered newest first
 
 The history MUST be readable as an ordered projection, newest entry first. It MUST support a text
-search that matches at least the package name, the mutation verb and the argv, case-insensitively. An
-empty search MUST return every entry. A search matching nothing MUST return an empty result without
-removing, hiding or altering any stored entry.
+search that matches at least the package name, the operation verb — including the non-package service
+verbs `start`, `stop`, `restart` and `run` — and the argv, case-insensitively. An empty search MUST
+return every entry. A search matching nothing MUST return an empty result without removing, hiding or
+altering any stored entry.
+
+An entry with no package identity MUST NOT be excluded from the projection or from search. Its argv
+MUST remain matchable, so the subject of a non-package operation is findable by name even though no
+package identity is stored for it.
+(Previously: the searchable vocabulary named only the package verbs, and nothing said that a
+null-package entry stays listed and matchable.)
 
 #### Scenario: Entries are ordered newest first
 
@@ -150,6 +212,14 @@ removing, hiding or altering any stored entry.
 - GIVEN a history of three entries
 - WHEN it is searched for a term matching none of them, and then searched again with an empty term
 - THEN the first search returns nothing and the second returns all three
+
+#### Scenario: A null-package service entry is findable by verb and by its argv
+
+- GIVEN one entry for `services stop atuin` with a null package identity and one entry for
+  `install --formula wget`
+- WHEN the history is searched for `STOP`, and then for `atuin`
+- THEN each search returns only the service entry
+- AND the service entry is present in the unfiltered, newest-first projection as well
 
 ### Requirement: Clear history is a single confirmed all-or-nothing action
 
@@ -208,22 +278,36 @@ retry affordance.
 
 Recording MUST be a side effect of a terminal outcome, never a precondition of it. If the recorder is
 absent, unavailable, or fails while writing, the operation MUST still reach and report its own
-terminal outcome unchanged, the forced inventory re-snapshot owed at that outcome MUST still happen
-exactly once, and nothing MUST be thrown into the operation's path.
+terminal outcome unchanged, every refresh owed at that outcome MUST still happen exactly once for
+each state domain the operation invalidates, and nothing MUST be thrown into the operation's path. An
+operation that invalidates no state domain MUST still reach and report its terminal outcome
+unchanged.
+(Previously: the requirement promised "the forced inventory re-snapshot owed at that outcome MUST
+still happen exactly once" for every operation, which contradicts `package-mutation`'s typed
+invalidation scope — an operation that cannot change the installed set owes zero inventory
+re-snapshots, not one.)
 
 #### Scenario: An absent recorder does not affect the operation
 
 - GIVEN no history recorder is configured
-- WHEN a mutation reaches a successful terminal outcome
+- WHEN a mutation declaring the installed set reaches a successful terminal outcome
 - THEN it is reported as successful and exactly one inventory re-snapshot is forced
 - AND nothing is thrown
 
 #### Scenario: A failing recorder does not affect the operation
 
 - GIVEN a recorder that fails on every write
-- WHEN a mutation reaches its terminal outcome
+- WHEN a mutation declaring the installed set reaches its terminal outcome
 - THEN the operation's reported outcome is identical to the same run with a working recorder
 - AND exactly one inventory re-snapshot is forced
+
+#### Scenario: A failing recorder does not affect a non-package operation either
+
+- GIVEN a recorder that fails on every write
+- WHEN an operation with no package identity reaches its terminal outcome
+- THEN its reported outcome is identical to the same run with a working recorder
+- AND exactly one refresh is forced for each domain it declared, and none for any it did not
+- AND nothing is thrown
 
 ## Provenance
 
@@ -304,4 +388,56 @@ exactly once, and nothing MUST be thrown into the operation's path.
   "the projection reload that **follows the attempt**", which the delivery satisfies. The gap is that
   a reader may reasonably expect the reason to persist until acknowledged. Tracked as follow-up
   **(a)** in the M3-0 archive report — the top absorption candidate for M3-1, either as a fix or as a
-  deliberate spec clarification of how long the reason must live.
+  deliberate spec clarification of how long the reason must live. **CLOSED by `m3-services` (M3-1,
+  archived 2026-08-03)** as a fix rather than a clarification: `HistoryStore` now keeps a private
+  sticky failure reason, and `reload()` ends with `sticky.map(.unavailable) ?? <fetch outcome>`
+  instead of the unconditional `.available`, so a failed clear's reason survives a keystroke-driven
+  reload. Pinned by `aFailedClearReasonSurvivesASearchDrivenReload` and
+  `aSuccessfulAppendOrClearLeavesNoStaleFailureReason`. The requirement text needed no amendment — the
+  delivery now satisfies what it already said, for longer than it strictly demanded.
+- **Amended by change `m3-services` (archived `2026-08-03`, PRD milestone **M3**, slice M3-1 —
+  Service Management)**: **3 MODIFIED** requirements replaced as whole blocks — "Every mutation Cellar
+  performs writes exactly one durable entry" (IH1), "History is searchable and ordered newest first"
+  (IH5) and "A recording failure never changes a mutation's outcome" (IH7) — adding **5 scenarios**.
+  7 requirements / 23 scenarios → **7 requirements / 28 scenarios**. Nothing was added, removed or
+  renamed; all three replacements are strict supersets of the text they replaced.
+  - **Binding product ruling, settled before the delta was written** (user, 2026-08-03, Engram
+    `#7180` ruling a): **service toggles DO write history.** All four verbs each write exactly one
+    entry with a **null package identity** and a typed service verb. This honours IH1 as written (the
+    funnel writes by construction) and keeps one auditable trail of everything Cellar submitted. The
+    accepted cost is a chatty history under repeated toggling, and IH1 now says so in requirement
+    text — repetition MUST NOT be collapsed, deduplicated, coalesced or netted out — rather than
+    leaving it as an unstated consequence.
+  - **The stored verbs are namespaced**: `serviceStart`, `serviceStop`, `serviceRestart`,
+    `serviceRun`. The delta's first draft said the bare `start` / `stop` / `restart` / `run`, and
+    verify adjudicated that **the code was right and the spec text was wrong** — a bare `run` or
+    `start` entering a vocabulary that already holds `install`, `upgrade`, `pin` and `upgradeAll`
+    would leave the user unable to tell which family an IH5 search matched. The namespaced form still
+    satisfies IH5's case-insensitive substring search because each contains its bare verb. Confirmed
+    end-to-end in the built app: searching `stop` returned exactly the two `serviceStop` rows and
+    neither `serviceStart` row. No code changed; the spec text was amended.
+  - **IH1 gained a presentation clause, and it closed a shipped user-visible false statement.** A null
+    package identity and a grouped operation over every package are two different facts. `HistoryRow`
+    titled every entry with an empty name "All packages", so all four service entries were displayed
+    as acting on **every package** — a statement that was simply untrue and that violated no scenario,
+    because IH1 had constrained **storage** only and said nothing about presentation. Delivered as
+    `HistoryRecord.Subject` (`.package(name)` / `.everyPackage` / `.noPackage`) decided identity-first
+    and verb-second, with the grouped label opt-in by `MutationCommand.upgradeAll.verb` and never a
+    default; the view owns no rule. The degradation path is pinned specifically:
+    `anUnknownNullIdentityVerbDegradesToNoPackage` drives `""`, `"somethingNew"`, `"upgradeall"`,
+    `"UpgradeAll"` and `"upgrade"` through an exact, case-sensitive comparison, so an unrecognised
+    null-identity verb **cannot** reach `.everyPackage`. Verified in the running app: four service
+    rows titled "No package", never "All packages", with the pre-existing `hello` / `install` row
+    still rendering its package name.
+  - **IH7 was amended without being on the change's own checklist**, because it was a live
+    contradiction: its "the forced inventory re-snapshot owed at that outcome MUST still happen
+    exactly once" was **universally quantified** and would have contradicted `package-mutation` PM6
+    the moment a non-invalidating command existed. It is now scoped per declared domain.
+  - **IH3 gets NO carve-out and is untouched.** Rejected alternatives, recorded so the decision is not
+    silently reopened: an IH3 carve-out excluding service verbs; recording start/stop only; a separate
+    services activity store. IH2, IH4 and IH6 are likewise byte-identical.
+  - **Known follow-up (LOW, non-blocking, found during M3-1 manual verification)**: the History
+    empty/detail pane reads "Every **package** change Cellar made, newest first", which is now
+    incomplete vocabulary since History carries service operations too. Every row renders its own
+    subject correctly, so this is stale copy rather than a false statement about any entry; deferred
+    to a vocabulary review when a third command family lands.

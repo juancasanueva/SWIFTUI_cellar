@@ -16,6 +16,13 @@ import Testing
 struct CenterHarness {
     let launcher: ControllableProcessLauncher
     let gate: InstalledMutationGate
+    /// The second domain, registered so a non-package family submitted through
+    /// the same centre has a gate of its own to settle.
+    ///
+    /// Registering it changes nothing for the package suites: every package
+    /// command declares `.installedInventory` only, so this gate is never
+    /// opened by one — which is itself worth being able to assert.
+    let servicesGate: InstalledMutationGate
     let center: OperationCenter
     /// The drafts the centre submitted, when the harness's own recorder is the
     /// one wired in. A test that injects `history:` reads that one instead.
@@ -32,9 +39,10 @@ struct CenterHarness {
     ) {
         launcher = ControllableProcessLauncher(honoursInterrupt: honoursInterrupt)
         gate = InstalledMutationGate()
+        servicesGate = InstalledMutationGate()
         recorder = RecordingHistoryRecorder()
         center = OperationCenter(
-            gate: gate,
+            gates: MutationGates([(.installedInventory, gate), (.services, servicesGate)]),
             history: history ?? recorder,
             launcherFactory: { [launcher] _ in launcher }
         )

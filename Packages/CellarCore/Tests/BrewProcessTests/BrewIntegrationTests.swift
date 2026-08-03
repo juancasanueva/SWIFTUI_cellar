@@ -7,6 +7,12 @@ import Testing
 private let realBrewPath = "/opt/homebrew/bin/brew"
 private let hasRealBrew = FileManager.default.isExecutableFile(atPath: realBrewPath)
 
+extension Tag {
+    /// Spawns the real `brew`. Excluded from the fast inner loop with
+    /// `swift test --skip tag:realBrew`.
+    @Tag static var realBrew: Self
+}
+
 /// End-to-end coverage against a real Homebrew install.
 ///
 /// Gated with `.enabled(if:)` so a machine without Homebrew skips these rather
@@ -14,6 +20,7 @@ private let hasRealBrew = FileManager.default.isExecutableFile(atPath: realBrewP
 @Suite(
     "Real Homebrew integration",
     .enabled(if: hasRealBrew),
+    .tags(.realBrew),
     .timeLimit(.minutes(1))
 )
 struct BrewIntegrationTests {
@@ -69,6 +76,53 @@ struct BrewIntegrationTests {
         let stderr = lines.filter { $0.stream == .stderr }
         #expect(stderr.isEmpty == false)
         #expect(stderr.contains { $0.text.contains("definitely-not-a-brew-command") })
+    }
+
+    /// The honest form of `brew-execution`'s "no ANSI escape byte survives
+    /// capture": a fake process cannot prove anything about brew's own colour
+    /// decision, because the decision is made inside brew from the environment
+    /// it was handed. Only a real invocation can.
+    ///
+    /// `brew info --formula <name>` is the probe because it is the shape that
+    /// colours: brew paints its `==>` headers, its `Warning:` prefixes and its
+    /// bottle table. It is also read-only and free.
+    ///
+    /// The formula is **discovered**, never hardcoded — a name this machine does
+    /// not have installed would exit non-zero and print nothing worth
+    /// inspecting, which is a test that passes because it observed nothing.
+    @Test("No escape byte survives capture from a real brew invocation")
+    func noEscapeByteSurvivesCaptureFromARealBrewInvocation() async throws {
+        let installation = try #require(
+            await DefaultBrewLocator().detect(configuredPath: nil).installation
+        )
+        let runner = BrewRunner(installation: installation)
+
+        let listing = try await runner.start(.read(["list", "--formula"]))
+        var installed: [String] = []
+        for await line in listing.lines where line.stream == .stdout {
+            installed.append(contentsOf: line.text.split(separator: " ").map(String.init))
+        }
+        _ = await listing.exit()
+        let formula = try #require(
+            installed.first { !$0.isEmpty },
+            "this machine has no installed formula to inspect"
+        )
+
+        let info = try await runner.start(.read(["info", "--formula", formula]))
+        var log: [LogLine] = []
+        for await line in info.lines { log.append(line) }
+        let exit = await info.exit()
+
+        // A run that produced nothing would satisfy `allSatisfy` vacuously.
+        #expect(exit.isSuccess)
+        #expect(log.isEmpty == false, "brew info printed nothing, so nothing was inspected")
+        #expect(log.contains { $0.text.contains(formula) })
+
+        let coloured = log.filter { $0.text.utf8.contains(0x1B) }
+        #expect(
+            coloured.isEmpty,
+            "\(coloured.count) captured line(s) carry an ESC byte: \(coloured.map(\.text).prefix(3))"
+        )
     }
 
     @Test("A configured path pointing at a non-Homebrew binary is rejected")

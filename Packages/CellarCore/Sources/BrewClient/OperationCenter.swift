@@ -27,12 +27,45 @@ public final class OperationCenter {
 
     /// The confirmation currently awaiting an answer, if any.
     ///
-    /// `internal(set)` rather than `private(set)` only because the confirmation
-    /// surface lives one file over, in `OperationCenterBulk.swift`. No surface
-    /// outside this module can write it.
-    public internal(set) var pendingConfirmation: ConfirmationRequest?
+    /// A **computed getter with no setter at all** — strictly stronger than the
+    /// `private(set)` it restores, because there is no setter left to widen a
+    /// second time. The value lives in a nested `@Observable` box, and
+    /// observation propagates through this read, so the sheet still updates
+    /// (design D6 — register item VS2).
+    public var pendingConfirmation: ConfirmationRequest? { confirmations.pending }
 
-    @ObservationIgnored private let gate: InstalledMutationGate?
+    /// The one writable position, reachable only from inside this type.
+    ///
+    /// `@ObservationIgnored` because the box publishes its own changes;
+    /// observing the reference as well would wake every observer twice.
+    @ObservationIgnored private let confirmations = ConfirmationBox()
+
+    /// The only writer, and deliberately a method rather than a property setter.
+    ///
+    /// The confirmation surface lives one file over, which is exactly why the
+    /// property was widened to `internal(set)` in the first place. A
+    /// module-internal *method* gives that file what it needs without giving the
+    /// rest of the module the ability to answer a confirmation on the user's
+    /// behalf.
+    func setPendingConfirmation(_ request: ConfirmationRequest?) {
+        confirmations.pending = request
+    }
+
+    /// The services-scoped duplicate-submit guard.
+    ///
+    /// Internal rather than private because the services submit path lives in
+    /// `OperationCenterServices.swift`. Unlike the confirmation box, nothing
+    /// about this is a security position — it holds the most recent item per
+    /// service name and answers "is that one still in flight?", which any file
+    /// in the module could compute from `items` anyway.
+    @ObservationIgnored let serviceSubmissions = ServiceSubmissionGuard()
+
+    /// The state domains this centre can invalidate, and the gate for each.
+    ///
+    /// A command opens only the ones its own `invalidates` scope names, so a
+    /// family that cannot change the installed set neither suppresses external
+    /// change signals nor forces an inventory re-snapshot (design D2).
+    @ObservationIgnored private let gates: MutationGates?
     /// Where a terminal outcome's durable record goes.
     ///
     /// Defaulted to the no-op so an app with no store configured behaves exactly
@@ -44,13 +77,32 @@ public final class OperationCenter {
     @ObservationIgnored private var installation: BrewInstallation?
 
     public init(
+        gates: MutationGates,
+        history: any HistoryRecording = NoHistoryRecording(),
+        launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
+            SystemProcessLauncher()
+        }
+    ) {
+        self.gates = gates
+        self.history = history
+        self.launcherFactory = launcherFactory
+    }
+
+    /// The single-domain form, kept so every shipped test and the app's
+    /// composition root compile unchanged.
+    ///
+    /// It is exactly `MutationGates([(.installedInventory, gate)])`, which is
+    /// what the centre did unconditionally before there was more than one
+    /// domain. `gates` has no default here precisely so this initialiser stays
+    /// the one an argument-free `OperationCenter()` resolves to.
+    public init(
         gate: InstalledMutationGate? = nil,
         history: any HistoryRecording = NoHistoryRecording(),
         launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
             SystemProcessLauncher()
         }
     ) {
-        self.gate = gate
+        gates = gate.map { MutationGates(installed: $0) }
         self.history = history
         self.launcherFactory = launcherFactory
     }
@@ -148,10 +200,35 @@ public final class OperationCenter {
     /// `versions` is the transition Cellar **intends**, captured here rather
     /// than observed at the terminal: the durable record then says what was
     /// attempted, and its outcome says whether it happened (design D7).
+    /// The concrete overload exists so a leading-dot literal still resolves.
+    ///
+    /// `operations.submit(.upgradeAll)` cannot infer a contextual base against a
+    /// generic parameter, so without this the app target would have to spell the
+    /// type at every call site. It forwards immediately; there is one submission
+    /// path, not two (design D1).
     @discardableResult
     public func submit(
         _ command: MutationCommand,
         versions: VersionTransition? = nil
+    ) -> ActivityItem {
+        perform(command, versions: versions)
+    }
+
+    @discardableResult
+    public func submit(
+        _ command: some BrewMutating,
+        versions: VersionTransition? = nil
+    ) -> ActivityItem {
+        perform(command, versions: versions)
+    }
+
+    /// The one submission path. Both overloads above forward here unchanged, so
+    /// "exactly one `begin()` per submit and one `end()` per finish" stays an
+    /// invariant of *submission* rather than of whichever spelling was used.
+    @discardableResult
+    private func perform(
+        _ command: some BrewMutating,
+        versions: VersionTransition?
     ) -> ActivityItem {
         let item = ActivityItem(id: UUID(), command: command, versions: versions)
         items.append(item)
@@ -165,7 +242,11 @@ public final class OperationCenter {
         // one `end()` per finish is an invariant of *submission* rather than of
         // the happy path: every exit from this method below here goes through
         // `finish`, which is the only settle site (design D3).
-        gate?.begin()
+        //
+        // Scoped to what this command invalidates, so a family that cannot
+        // change the installed set never opens that gate at all — which is the
+        // whole of the scoping, and why the change observer needs no edit.
+        gates?.begin(command.invalidates)
 
         guard let runner else {
             item.queuePhase = .terminal(BrewExit(status: 127, reason: .exited), fault: nil)
@@ -189,8 +270,12 @@ public final class OperationCenter {
 
     // MARK: - One operation, start to finish
 
+    /// Generic, so `classify` dispatches to the **concrete** command's own
+    /// implementation. That is what makes "a family may read its own markers
+    /// without any other family paying for it" a property of the spine rather
+    /// than of a switch somebody has to keep exhaustive (design D4).
     private func run(
-        _ command: MutationCommand,
+        _ command: some BrewMutating,
         for item: ActivityItem,
         on runner: BrewRunner
     ) async {
@@ -231,7 +316,11 @@ public final class OperationCenter {
 
         let exit = await operation.exit()
         let fault = await operation.fault()
-        finish(item, with: .classify(exit: exit, fault: fault, log: item.log))
+        // Through the **command**, not through the static classifier: a family
+        // that overrides `classify` is answered by its own implementation, and
+        // one that does not gets the protocol default, which is today's logic
+        // verbatim.
+        finish(item, with: command.classify(exit: exit, fault: fault, log: item.log))
     }
 
     /// Settles an item exactly once, pays the re-snapshot it owes, and records
@@ -245,9 +334,11 @@ public final class OperationCenter {
     private func finish(_ item: ActivityItem, with outcome: MutationOutcome) {
         guard item.outcome == nil else { return }
         item.settle(outcome)
-        // Every terminal outcome owes exactly one re-snapshot — success, both
-        // typed failures, a plain failure and a cancellation alike (PM6).
-        gate?.end()
+        // Every terminal outcome owes exactly one refresh of **each domain the
+        // command declared** — success, both typed failures, a plain failure and
+        // a cancellation alike (PM6). The scope is read from the item's own
+        // erased command, so `end` closes exactly what `submit` opened.
+        gates?.end(item.command.invalidates)
         // Last, and deliberately: recording is a **side effect** of the outcome,
         // never a precondition of it. The protocol is synchronous and
         // non-throwing, so an absent or failing recorder cannot change what this
@@ -296,32 +387,5 @@ public final class OperationCenter {
         if !item.isStartInFlight {
             finish(item, with: .cancelled)
         }
-    }
-
-    // MARK: - Summary (operation-activity OA5)
-
-    /// What an always-visible indicator needs, and nothing more.
-    ///
-    /// `@MainActor` rather than `Sendable`: it holds the live `ActivityItem`, so
-    /// the bar and the drawer are looking at one object rather than at a copy
-    /// that can fall behind it.
-    @MainActor
-    public struct Summary {
-        public let isBusy: Bool
-        public let running: ActivityItem?
-        public let pendingCount: Int
-
-        /// The running operation's command, for the collapsed bar.
-        public var runningCommand: String? { running?.displayCommand }
-    }
-
-    /// The summary, derived from the very same items the detail listing shows,
-    /// so the two cannot disagree about what is running or how much is queued.
-    public var summary: Summary {
-        Summary(
-            isBusy: items.contains { !$0.isTerminal },
-            running: items.first(where: \.isRunning),
-            pendingCount: items.count(where: \.isPending)
-        )
     }
 }

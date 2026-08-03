@@ -1,5 +1,6 @@
 import Catalog
 import Foundation
+import Observation
 
 /// Bulk submission, and the confirmation gate in front of it (design D6, D8 —
 /// package-mutation PM3, PM8).
@@ -109,7 +110,16 @@ extension OperationCenter {
     /// Returns `nil` for everything that does not — install, reinstall,
     /// upgrade, upgrade-all, pin and unpin — so a caller can treat "no request"
     /// as "submit directly" without restating the rule (product Q2).
+    ///
+    /// This concrete overload exists for the same reason `submit` has one: a
+    /// leading-dot literal cannot infer a contextual base against a generic
+    /// parameter. It forwards to the batch form, which is the only
+    /// implementation.
     public func request(_ command: MutationCommand) -> ConfirmationRequest? {
+        request([command])
+    }
+
+    public func request(_ command: some BrewMutating) -> ConfirmationRequest? {
         request([command])
     }
 
@@ -119,17 +129,17 @@ extension OperationCenter {
     /// destructive action must be agreed once, on the whole of what it will do.
     /// Confirming submits every command it listed; declining submits none of
     /// them, never a partial subset (package-mutation PM3 sc5–6).
-    public func request(_ commands: [MutationCommand]) -> ConfirmationRequest? {
+    public func request(_ commands: [some BrewMutating]) -> ConfirmationRequest? {
         guard let first = commands.first,
               commands.contains(where: \.requiresConfirmation)
         else { return nil }
 
         let request = ConfirmationRequest(
             id: UUID(),
-            command: first,
-            additional: Array(commands.dropFirst())
+            command: AnyBrewMutation(first),
+            additional: commands.dropFirst().map(AnyBrewMutation.init)
         )
-        pendingConfirmation = request
+        setPendingConfirmation(request)
         return request
     }
 
@@ -138,14 +148,14 @@ extension OperationCenter {
     @discardableResult
     public func confirm(_ request: ConfirmationRequest) -> [ActivityItem] {
         guard pendingConfirmation == request else { return [] }
-        pendingConfirmation = nil
+        setPendingConfirmation(nil)
         return request.commands.map { submit($0) }
     }
 
     /// Spawns nothing, enqueues nothing, leaves the inventory untouched.
     public func decline(_ request: ConfirmationRequest) {
         guard pendingConfirmation == request else { return }
-        pendingConfirmation = nil
+        setPendingConfirmation(nil)
     }
 
     /// The transition for a command that may name no package at all.
@@ -170,12 +180,17 @@ extension OperationCenter {
     public struct ConfirmationRequest: Identifiable, Sendable, Equatable {
         public let id: UUID
         /// The first command. A single-package confirmation has only this one.
-        public let command: MutationCommand
+        ///
+        /// Erased, for the reason `ActivityItem.command` is: the request is a
+        /// stored value the sheet reads, so it cannot be generic. Erasure is
+        /// also what keeps this type `Equatable`, which the presentation
+        /// binding and its four shipped assertions depend on (design D1).
+        public let command: AnyBrewMutation
         /// Everything else the same yes covers, in selection order.
-        public let additional: [MutationCommand]
+        public let additional: [AnyBrewMutation]
 
         /// Every command this confirmation will submit, in order.
-        public var commands: [MutationCommand] { [command] + additional }
+        public var commands: [AnyBrewMutation] { [command] + additional }
 
         /// True when one yes covers more than one package.
         public var isBulk: Bool { !additional.isEmpty }
@@ -188,4 +203,23 @@ extension OperationCenter {
         /// line, so a three-package uninstall discloses all three.
         public var displayCommand: String { displayCommands.joined(separator: "\n") }
     }
+}
+
+/// The one mutable cell behind `OperationCenter.pendingConfirmation`.
+///
+/// A separate `@Observable` object rather than a stored property on the centre,
+/// so the centre can expose the value as a getter with **no setter at all**
+/// while still being able to change it from inside. Observation is not lost by
+/// the extra hop: reading the computed property reads `pending` here, so a
+/// tracker registered on the centre's property is woken by a write to this one
+/// (design D6 — VS2).
+///
+/// Declared beside the confirmation surface it serves rather than in
+/// `OperationCenter.swift`, which is already at this package's 400-line bound.
+@MainActor
+@Observable
+final class ConfirmationBox {
+    var pending: OperationCenter.ConfirmationRequest?
+
+    init() {}
 }

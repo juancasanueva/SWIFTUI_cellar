@@ -25,9 +25,14 @@ struct ContentView: View {
     /// snapshot because the rows write to it as well as read from it.
     let metadata: MetadataStore
     let history: HistoryStore
+    let services: ServicesStore
+    let servicesRefresher: ServicesRefreshCoordinator
 
     @State private var section: AppSection = .browse
     @State private var selection: PackageID?
+    /// Services carry their own identity, not a `PackageID`: a service is its
+    /// own entity and never enters the package projection (SM12).
+    @State private var serviceSelection: String?
     @State private var isActivityExpanded = false
 
     var body: some View {
@@ -70,6 +75,14 @@ struct ContentView: View {
                     selection: $selection
                 )
                 .navigationSplitViewColumnWidth(min: 300, ideal: 380)
+            case .services:
+                ServicesListView(
+                    services: services,
+                    refresher: servicesRefresher,
+                    operations: operations,
+                    selection: $serviceSelection
+                )
+                .navigationSplitViewColumnWidth(min: 280, ideal: 340)
             case .history:
                 HistoryView(history: history)
                     .navigationSplitViewColumnWidth(min: 320, ideal: 460)
@@ -78,6 +91,8 @@ struct ContentView: View {
             switch section {
             case .home:
                 BrewDetectionSummary(state: brewDetection.state)
+            case .services:
+                ServiceDetailView(services: services)
             case .history:
                 // The list column already carries the whole record; a second
                 // pane would only repeat it.
@@ -103,12 +118,15 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(
+    let services = ServicesStore()
+    return ContentView(
         brewDetection: BrewDetectionStore(),
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
         installed: InstalledStore(),
         operations: OperationCenter(),
         metadata: MetadataStore(container: nil),
-        history: HistoryStore(container: nil)
+        history: HistoryStore(container: nil),
+        services: services,
+        servicesRefresher: ServicesRefreshCoordinator(store: services)
     )
 }

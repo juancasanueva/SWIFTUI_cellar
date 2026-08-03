@@ -81,6 +81,77 @@ struct SystemProcessTests {
         #expect(await operation.fault() == nil)
     }
 
+    // MARK: - SM7 sc3, PM4 sc2, PM4 sc5 — standard input is never interactive
+
+    /// The identity of `/dev/null` on this machine, read through the same
+    /// `stat(2)` the child reports from.
+    ///
+    /// Compared by **inode**, not by a device class: every character device
+    /// would answer "Character Device", so a type-only assertion would pass with
+    /// stdin wired to a terminal — which is the one thing it must catch.
+    private static func inode(of path: String) throws -> Int {
+        let attributes = try FileManager.default.attributesOfItem(atPath: path)
+        return try #require(attributes[.systemFileNumber] as? Int)
+    }
+
+    /// `stat -f "%i %HT" /dev/fd/0` makes the child report what its own standard
+    /// input actually is, so this is a runtime observation of the spawned
+    /// process rather than a source scan or a structural claim.
+    private func reportedStandardInput(kind: BrewCommand.Kind) async throws -> (text: [String], exit: BrewExit) {
+        let runner = BrewRunner(
+            installation: installation(at: "/usr/bin/stat"),
+            launcher: SystemProcessLauncher()
+        )
+        let arguments = ["-f", "%i %HT", "/dev/fd/0"]
+        let command = kind == .mutate ? BrewCommand.mutate(arguments) : .read(arguments)
+
+        let operation = try await runner.start(command)
+        var lines: [LogLine] = []
+        for await line in operation.lines { lines.append(line) }
+        return (lines.map(\.text), await operation.exit())
+    }
+
+    /// Cellar can give brew nothing to type, so brew must never be able to ask.
+    /// A password prompt, a `[y/N]` confirmation or a pager would otherwise hang
+    /// the operation with no visible cause and no way out.
+    @Test(
+        "A spawned read reports its own standard input as the null device",
+        .timeLimit(.minutes(1))
+    )
+    func aSpawnedReadReportsTheNullDeviceAsItsStandardInput() async throws {
+        let null = try Self.inode(of: "/dev/null")
+        let reported = try await reportedStandardInput(kind: .read)
+
+        #expect(reported.exit == BrewExit(status: 0, reason: .exited))
+        #expect(reported.text == ["\(null) Character Device"])
+    }
+
+    /// PM4 sc5: a **non-package** operation — every `brew services` verb — runs
+    /// through this same seam, so it inherits the same guarantee rather than
+    /// restating it. `.mutate` is the kind every service verb lowers to.
+    @Test(
+        "A spawned mutation reports the same null device, so a non-package verb is no different",
+        .timeLimit(.minutes(1))
+    )
+    func aSpawnedMutationReportsTheSameNullDevice() async throws {
+        let null = try Self.inode(of: "/dev/null")
+        let reported = try await reportedStandardInput(kind: .mutate)
+
+        #expect(reported.exit == BrewExit(status: 0, reason: .exited))
+        #expect(reported.text == ["\(null) Character Device"])
+    }
+
+    /// The discriminator is the inode, and the inode really does discriminate:
+    /// `/dev/zero` is also a character device and is a different file, so the
+    /// assertion above cannot be satisfied by "some character device".
+    @Test("The null device is identified by inode, which no other character device shares")
+    func theNullDeviceIsIdentifiedByInodeNotByBeingACharacterDevice() throws {
+        let null = try Self.inode(of: "/dev/null")
+        let zero = try Self.inode(of: "/dev/zero")
+
+        #expect(null != zero)
+    }
+
     @Test("Spawning a path that does not exist reports executableUnavailable")
     func missingBinaryReportsUnavailable() async {
         let missing = "/opt/homebrew/bin/definitely-not-a-real-binary"

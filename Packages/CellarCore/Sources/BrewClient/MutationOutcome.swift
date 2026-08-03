@@ -32,6 +32,20 @@ public enum MutationOutcome: Sendable, Equatable {
     case busy
     /// The command needs privileges Cellar will not acquire.
     case needsPrivileges
+    /// It exited 0, and said so in words: nothing changed, because the thing
+    /// was already in the state that was asked for.
+    ///
+    /// `brew services` exits 0 both for a state change and for a no-op, so the
+    /// exit code cannot separate them and something has to read the prose
+    /// (live probe, brew 6.0.14 — gate U8). This is the `.cancelled` shape:
+    /// neither a success nor a failure, because nothing happened and nothing
+    /// went wrong.
+    ///
+    /// Rejected, and recorded so the decision is not silently reopened: an
+    /// associated value on `.succeeded` (it breaks `==` across many shipped
+    /// tests), and a display-only note (it would leave the durable history
+    /// saying "Done" about a no-op, which is a lie).
+    case noChange
     /// Cellar cancelled it, and it stopped.
     case cancelled
     /// Cellar cancelled it, brew ignored both signals, and it is still running
@@ -127,22 +141,26 @@ public enum MutationOutcome: Sendable, Equatable {
     public var isFailure: Bool {
         switch self {
         case .failed, .busy, .needsPrivileges, .launchFailed: true
-        case .succeeded, .cancelled, .abandoned: false
+        case .succeeded, .noChange, .cancelled, .abandoned: false
         }
     }
 
-    /// Every terminal outcome owes exactly one inventory re-snapshot — success,
-    /// both typed failures, a plain failure and a cancellation alike. A
-    /// cancelled or failed mutation may have changed the world just as much as a
-    /// successful one (package-mutation PM6).
-    public var forcesReSnapshot: Bool { true }
+    // There is deliberately **no** re-snapshot flag on this type any more.
+    //
+    // It was an unconditional `true` on every outcome, which made "what does
+    // this invalidate?" a property of *how the operation ended*. It is a
+    // property of *what ran*: a services toggle changes nothing in the installed
+    // set whether it succeeds, fails or is cancelled. The declaration moved to
+    // `BrewMutating.invalidates`, and PM6's real invariant is preserved intact —
+    // every terminal outcome still owes exactly one refresh of each domain its
+    // command declared (design D2).
 
     /// The one sentence shown for this outcome.
     ///
     /// Built entirely from Cellar's own typed `command` — never from the
     /// subprocess's bytes — which is what makes the "brew's guessed command
     /// name is never presented" property structural rather than careful.
-    public func message(for command: MutationCommand) -> String {
+    public func message(for command: some BrewMutating) -> String {
         switch self {
         case .succeeded:
             "Done."
@@ -157,6 +175,11 @@ public enum MutationOutcome: Sendable, Equatable {
             """
             This needs an administrator password, which Cellar does not ask for. \
             Run \(command.displayCommand) in Terminal instead.
+            """
+        case .noChange:
+            """
+            No change: it was already in that state. Homebrew reported this \
+            rather than doing anything.
             """
         case .cancelled:
             """
@@ -176,6 +199,7 @@ public enum MutationOutcome: Sendable, Equatable {
     public var summaryLabel: String {
         switch self {
         case .succeeded: "Done"
+        case .noChange: "No change"
         case .failed: "Failed"
         case .busy: "Homebrew busy"
         case .needsPrivileges: "Needs Terminal"

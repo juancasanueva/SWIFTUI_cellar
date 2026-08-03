@@ -22,7 +22,7 @@ IH4 (append-only retention) and IH6 (clear history) are likewise untouched.
 
 | Req | Change |
 |---|---|
-| **IH1** "Every mutation Cellar performs writes exactly one durable entry" | Defines the non-package verb vocabulary, the null-package form, and that repetition is never collapsed |
+| **IH1** "Every mutation Cellar performs writes exactly one durable entry" | Defines the namespaced non-package verb vocabulary, the null-package form, that a presentation may not reconstruct the identity storage refused to synthesize, and that repetition is never collapsed |
 | **IH5** "History is searchable and ordered newest first" | The four service verbs enter the searchable vocabulary; a null-package entry stays findable through its argv |
 | **IH7** "A recording failure never changes a mutation's outcome" | Its "forced inventory re-snapshot ... exactly once" clause is scoped to the domains the operation invalidates, so it stops contradicting `package-mutation` PM6 |
 
@@ -39,11 +39,22 @@ cancellation MUST each be recorded. Nothing MUST be written before the operation
 outcome. Entries MUST survive an app relaunch.
 
 The verb vocabulary MUST NOT be limited to package verbs. A non-package operation MUST record its own
-typed verb — for services, exactly `start`, `stop`, `restart` and `run` — and MUST store a **null**
-package identity. Such an entry MUST NOT synthesize, borrow or infer a package identity from the
-operation's arguments: the name of the service the operation acted on MUST NOT be stored as a package
-identity, and the version-from and version-to fields MUST be absent. The subject of a null-package
-entry remains discoverable through its stored argv, which the searchable projection already matches.
+typed verb — for services, exactly `serviceStart`, `serviceStop`, `serviceRestart` and `serviceRun` —
+and MUST store a **null** package identity. A non-package family MUST namespace its stored verbs so
+they cannot collide with a package verb: the vocabulary already holds `install`, `upgrade`, `pin` and
+`upgradeAll`, and an IH5 search must never leave the user unable to tell which family they matched.
+The namespaced form still satisfies IH5's case-insensitive `start` / `stop` / `restart` / `run`
+search, because each contains its bare verb as a substring.
+
+Such an entry MUST NOT synthesize, borrow or infer a package identity from the operation's arguments:
+the name of the service the operation acted on MUST NOT be stored as a package identity, and the
+version-from and version-to fields MUST be absent. The subject of a null-package entry remains
+discoverable through its stored argv, which the searchable projection already matches.
+
+A presentation of the history MUST NOT reconstruct an identity that storage refused to synthesize.
+A null package identity and a grouped operation over every package are two different facts and MUST
+NOT be rendered as one: an entry with no package identity MUST NOT be presented as acting on every
+package, and MUST NOT be presented under the service's own name as though it were a package.
 
 Repetition MUST NOT be collapsed: N submitted operations produce N entries. The capability MUST NOT
 deduplicate, coalesce, throttle or suppress an entry because an identical or opposite one was written
@@ -85,10 +96,20 @@ operations may be collapsed.)
 - GIVEN the four operations `services start atuin`, `services stop atuin`, `services restart atuin`
   and `services run atuin`, each reaching a terminal outcome
 - WHEN the history is read
-- THEN exactly four entries exist, one per operation, each carrying its own verb — `start`, `stop`,
-  `restart`, `run` — its outcome and its exact argv
+- THEN exactly four entries exist, one per operation, each carrying its own namespaced verb —
+  `serviceStart`, `serviceStop`, `serviceRestart`, `serviceRun` — its outcome and its exact argv
+- AND none of those four verbs is also a package verb
 - AND every one of them carries a null package identity, no version-from and no version-to, and none
   stores `atuin` as a package identity
+
+#### Scenario: A null-package entry is never displayed as a package or as every package
+
+- GIVEN one recorded `services stop atuin` entry and one recorded grouped `upgradeAll` entry, both of
+  which store no package identity
+- WHEN the history is presented
+- THEN the grouped entry is presented as acting on every package
+- AND the service entry is presented as acting on no package, never as acting on every package and
+  never under the name `atuin`
 
 #### Scenario: Repeated toggling appends one entry per operation
 

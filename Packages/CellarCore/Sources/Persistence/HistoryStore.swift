@@ -107,6 +107,20 @@ public final class HistoryStore {
     @ObservationIgnored let container: ModelContainer?
     @ObservationIgnored private let clearing: Clearing
 
+    /// Why the last write did not land, kept across reloads.
+    ///
+    /// `reload()` used to end with an unconditional `availability = .available`,
+    /// and `search` reloads on **every keystroke**. So a failed clear survived
+    /// the reload its own attempt performs — M2-3's fix — and was then erased
+    /// by the next character the user typed, reporting a healthy history over a
+    /// clear that had not happened. A one-keystroke window is exactly the kind
+    /// that looks fixed.
+    ///
+    /// Sticky rather than re-derived because there is nothing to re-derive
+    /// from: a successful fetch says the *read* worked, which is a different
+    /// question from whether the last *write* did.
+    @ObservationIgnored private var stickyFailure: String?
+
     private var context: ModelContext? { container?.mainContext }
 
     init(container: ModelContainer?, clearing: @escaping Clearing) {
@@ -167,7 +181,10 @@ public final class HistoryStore {
                 sortBy: [SortDescriptor(\.date, order: .reverse)]
             )
             records = try context.fetch(descriptor).map(HistoryRecord.init)
-            availability = .available
+            // A read that worked does not make a failed write un-fail. The
+            // sticky reason wins over `.available`, and only over `.available`
+            // — a fetch that threw has its own, newer reason and keeps it.
+            availability = stickyFailure.map { .unavailable(reason: $0) } ?? .available
         } catch {
             records = []
             availability = .unavailable(reason: MetadataStore.describe(error))
@@ -192,9 +209,14 @@ public final class HistoryStore {
             context.insert(entry)
             try context.save()
             lastError = nil
+            // A write that landed answers the question the sticky reason was
+            // holding open.
+            stickyFailure = nil
         } catch {
             context.rollback()
-            lastError = MetadataStore.describe(error)
+            let reason = MetadataStore.describe(error)
+            lastError = reason
+            stickyFailure = reason
         }
         reload()
     }
@@ -221,13 +243,18 @@ public final class HistoryStore {
         guard let context else { return }
         do {
             try clearing(context)
+            stickyFailure = nil
             reload()
             lastError = nil
         } catch {
             context.rollback()
             let reason = MetadataStore.describe(error)
+            // Set **before** the reload rather than after it. Applying it
+            // afterwards was M2-3's fix and it worked exactly once; the reload
+            // now reads the sticky value on its way out, so every later reload
+            // reports the same thing this one does.
+            stickyFailure = reason
             reload()
-            availability = .unavailable(reason: reason)
             lastError = reason
         }
     }

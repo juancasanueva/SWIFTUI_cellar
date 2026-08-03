@@ -26,11 +26,14 @@ struct UnknownOperationTests {
         #expect(outcome.isSuccess == false, "an unknown identity was reported as a success")
         #expect(outcome != .failed(status: -1), "the unknown sentinel status was shown to the user")
         #expect(outcome.summaryLabel == "Could not start")
-        // A terminal outcome like any other, so it owes the same re-snapshot —
-        // and, through the single `finish` funnel, the same one history entry
-        // (operation-activity; asserted end to end by
-        // `aSubmitWithNoRunnerRecordsExactlyOneHistoryEntry`).
-        #expect(outcome.forcesReSnapshot)
+        // A terminal outcome like any other, so it owes the same refresh of
+        // whatever its **command** declared — and, through the single `finish`
+        // funnel, the same one history entry (operation-activity; asserted end
+        // to end by `aSubmitWithNoRunnerRecordsExactlyOneHistoryEntry`).
+        //
+        // The obligation is read from the command, so it survives an outcome
+        // that never had a process at all.
+        #expect(MutationCommand.upgradeAll.invalidates == .installedInventory)
     }
 
     /// The structural fact wins over prose, like every other one: an unknown
