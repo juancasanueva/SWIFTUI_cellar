@@ -9,7 +9,12 @@ import Testing
 /// `.serialized` because these tests hold two catalog-sized snapshots and their
 /// indexes alive at once; split from `CatalogStoreTests` so neither file
 /// outgrows the project's limits.
-@Suite("Catalog adoption", .serialized)
+///
+/// `.timeLimit` because three tests here poll or spin a watcher against a
+/// condition another task must satisfy: a regression that stops satisfying it
+/// should fail the run, not hang it. `TimeLimitTrait` only accepts whole
+/// minutes — `.seconds(30)` traps at runtime.
+@Suite("Catalog adoption", .serialized, .timeLimit(.minutes(1)))
 @MainActor
 struct CatalogAdoptionTests {
     // MARK: - Off-main, ordered, single adoption (CSA1)
@@ -103,6 +108,49 @@ struct CatalogAdoptionTests {
         #expect(store.results.map(\.name).sorted() == ["new0", "new1", "new2"])
         store.query = "old"
         #expect(store.results.isEmpty, "the discarded older build was installed after all")
+    }
+
+    @Test("An older snapshot arriving after a newer one has installed is discarded")
+    func anOlderSnapshotArrivingAfterANewerOneIsDiscarded() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+        // Materialization order is what mints the revision, so `older` is built
+        // first and carries the lower ordinal. Nothing about this test is a race:
+        // `newer` is fully installed before `older` is even offered, which is the
+        // case arrival order alone cannot tell from a legitimate update.
+        let older = Self.snapshot(of: 2, prefix: "old")
+        let newer = Self.snapshot(of: 3, prefix: "new")
+
+        await store.adopt(newer)
+        #expect(store.packageCount == 3)
+
+        await store.adopt(older)
+
+        #expect(store.packageCount == 3, "the older snapshot was installed over the newer one")
+        #expect(store.indexBuildCount == 1, "the discarded snapshot still cost an index build")
+        store.query = "new"
+        #expect(store.results.map(\.name).sorted() == ["new0", "new1", "new2"])
+        store.query = "old"
+        #expect(store.results.isEmpty, "the older snapshot's records are being served")
+    }
+
+    @Test("The adopted revision does not regress after discarding an older snapshot")
+    func theAdoptedRevisionDoesNotRegressAfterDiscardingAnOlderSnapshot() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+        let older = Self.snapshot(of: 2, prefix: "old")
+        let newer = Self.snapshot(of: 3, prefix: "new")
+
+        await store.adopt(newer)
+        await store.adopt(older)
+        // The re-delivery every ingress produces: if the discarded snapshot had
+        // overwritten the adopted-revision record, this would look like new
+        // content and rebuild.
+        await store.adopt(newer)
+
+        #expect(store.adoptionRequestCount == 3)
+        #expect(store.indexBuildCount == 1, "the discarded snapshot disarmed the newer one's dedup")
+        #expect(store.packageCount == 3)
     }
 
     @Test("A manual refresh with the event stream running builds one index for its snapshot")

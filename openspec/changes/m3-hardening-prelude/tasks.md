@@ -85,19 +85,19 @@ reordered by one writer, but not parallelised across worktrees.
 
 ## Phase 1: Catalog adoption ordinal — D1, D2 (item #1, `catalog-sync`)
 
-- [ ] 1.1 **RED** `Tests/CatalogTests/CatalogAdoptionTests.swift` —
+- [x] 1.1 **RED** `Tests/CatalogTests/CatalogAdoptionTests.swift` —
       `anOlderSnapshotArrivingAfterANewerOneIsDiscarded`: adopt `B` fully, then adopt older `A`;
       expect `packageCount` still `B`'s and `indexBuildCount == 1`. — sc *"An older snapshot arriving
       after a newer one has installed is discarded"*.
-- [ ] 1.2 **RED** same file — `theAdoptedRevisionDoesNotRegressAfterDiscardingAnOlderSnapshot`:
+- [x] 1.2 **RED** same file — `theAdoptedRevisionDoesNotRegressAfterDiscardingAnOlderSnapshot`:
       re-deliver `B` after the discarded `A`; expect no additional index build. — same scenario,
       second AND clause.
-- [ ] 1.3 **GREEN** `Sources/Catalog/CatalogStore.swift:179-183` — replace the equality guard with
+- [x] 1.3 **GREEN** `Sources/Catalog/CatalogStore.swift:179-183` — replace the equality guard with
       `snapshot.revision.ordinal > adoptedRevision?.ordinal`, older joins `adoptionInFlight` then
       returns, so the `adoptedRevision =` assignment at `:183` is unreachable for an older snapshot.
       Keep `adoptionSequence`/`installedSequence` (D2 — they guard build completion, not arrival).
       Equal ordinal keeps today's join-a-duplicate contract byte-for-byte.
-- [ ] 1.4 Add `.timeLimit(.minutes(1))` to the `@Suite("Catalog adoption", .serialized)` trait list.
+- [x] 1.4 Add `.timeLimit(.minutes(1))` to the `@Suite("Catalog adoption", .serialized)` trait list.
       **Whole minutes only** — `.seconds(30)` traps at runtime. — proposal item #9.
       **Commit 1.**
 

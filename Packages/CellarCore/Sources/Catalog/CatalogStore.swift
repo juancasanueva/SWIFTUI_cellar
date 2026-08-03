@@ -169,14 +169,25 @@ public final class CatalogStore {
     func adopt(_ snapshot: CatalogSnapshot) async {
         adoptionRequestCount += 1
 
-        // The same snapshot arrives through `refreshNow()` and through the sync
+        // Only a strictly newer materialization may install. "Newer" is the
+        // snapshot's own revision ordinal, minted when it was materialized —
+        // never the order `adopt` happened to be called, which would let an
+        // older snapshot entering after a newer one has installed win
+        // (catalog-sync, design D1).
+        //
+        // Equal ordinal is the duplicate case and keeps its existing contract:
+        // the same snapshot arrives through `refreshNow()` and through the sync
         // event stream, and a 304 poll re-emits the file already on disk. All of
-        // those are one materialization and must cost one index, not two
-        // (design D2). Claimed before any suspension, so a concurrent duplicate
-        // cannot slip past. The duplicate *joins* rather than returns: a manual
-        // refresh has to come back with its snapshot queryable, whichever
-        // ingress happened to claim it.
-        guard snapshot.revision != adoptedRevision else {
+        // those are one materialization and must cost one index, not two. The
+        // duplicate *joins* rather than returns: a manual refresh has to come
+        // back with its snapshot queryable, whichever ingress claimed it.
+        //
+        // Claimed before any suspension, so a concurrent duplicate cannot slip
+        // past. An older snapshot leaves through the same door, which is what
+        // makes the assignment below unreachable for it — the adopted-revision
+        // record cannot regress and disarm the newer snapshot's deduplication.
+        // Ordinals start at 1, so `0` stands for "nothing adopted yet".
+        guard snapshot.revision.ordinal > (adoptedRevision?.ordinal ?? 0) else {
             await adoptionInFlight?.value
             return
         }
