@@ -27,10 +27,29 @@ public final class OperationCenter {
 
     /// The confirmation currently awaiting an answer, if any.
     ///
-    /// `internal(set)` rather than `private(set)` only because the confirmation
-    /// surface lives one file over, in `OperationCenterBulk.swift`. No surface
-    /// outside this module can write it.
-    public internal(set) var pendingConfirmation: ConfirmationRequest?
+    /// A **computed getter with no setter at all** — strictly stronger than the
+    /// `private(set)` it restores, because there is no setter left to widen a
+    /// second time. The value lives in a nested `@Observable` box, and
+    /// observation propagates through this read, so the sheet still updates
+    /// (design D6 — register item VS2).
+    public var pendingConfirmation: ConfirmationRequest? { confirmations.pending }
+
+    /// The one writable position, reachable only from inside this type.
+    ///
+    /// `@ObservationIgnored` because the box publishes its own changes;
+    /// observing the reference as well would wake every observer twice.
+    @ObservationIgnored private let confirmations = ConfirmationBox()
+
+    /// The only writer, and deliberately a method rather than a property setter.
+    ///
+    /// The confirmation surface lives one file over, which is exactly why the
+    /// property was widened to `internal(set)` in the first place. A
+    /// module-internal *method* gives that file what it needs without giving the
+    /// rest of the module the ability to answer a confirmation on the user's
+    /// behalf.
+    func setPendingConfirmation(_ request: ConfirmationRequest?) {
+        confirmations.pending = request
+    }
 
     /// The state domains this centre can invalidate, and the gate for each.
     ///
@@ -359,32 +378,5 @@ public final class OperationCenter {
         if !item.isStartInFlight {
             finish(item, with: .cancelled)
         }
-    }
-
-    // MARK: - Summary (operation-activity OA5)
-
-    /// What an always-visible indicator needs, and nothing more.
-    ///
-    /// `@MainActor` rather than `Sendable`: it holds the live `ActivityItem`, so
-    /// the bar and the drawer are looking at one object rather than at a copy
-    /// that can fall behind it.
-    @MainActor
-    public struct Summary {
-        public let isBusy: Bool
-        public let running: ActivityItem?
-        public let pendingCount: Int
-
-        /// The running operation's command, for the collapsed bar.
-        public var runningCommand: String? { running?.displayCommand }
-    }
-
-    /// The summary, derived from the very same items the detail listing shows,
-    /// so the two cannot disagree about what is running or how much is queued.
-    public var summary: Summary {
-        Summary(
-            isBusy: items.contains { !$0.isTerminal },
-            running: items.first(where: \.isRunning),
-            pendingCount: items.count(where: \.isPending)
-        )
     }
 }

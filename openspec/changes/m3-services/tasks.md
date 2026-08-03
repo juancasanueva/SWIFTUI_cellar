@@ -381,14 +381,14 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 10: `ConfirmationBox` — D6 (b), register item VS2
 
-- [ ] 10.1 **RED** `Tests/BrewClientTests/ConfirmationBoxTests.swift` (new) —
+- [x] 10.1 **RED** `Tests/BrewClientTests/ConfirmationBoxTests.swift` (new) —
       `pendingConfirmationHasNoSetterAtAll`: a structural scan proving `OperationCenter.pendingConfirmation`
       is a computed getter with no setter — strictly stronger than the `private(set)` VS2 asked to
       restore. Anchor the scan positively first (M3-0 task 8.1).
-- [ ] 10.2 **RED** same file — `requestingAndConfirmingStillPropagatesThroughTheNestedObservable`:
+- [x] 10.2 **RED** same file — `requestingAndConfirmingStillPropagatesThroughTheNestedObservable`:
       `request` → `confirm`/`decline` still drive the same observable transitions, so the sheet still
       updates.
-- [ ] 10.3 **GREEN** `Sources/BrewClient/OperationCenter.swift` — a small `@Observable ConfirmationBox`
+- [x] 10.3 **GREEN** `Sources/BrewClient/OperationCenter.swift` — a small `@Observable ConfirmationBox`
       held `@ObservationIgnored private let`; `pendingConfirmation` becomes a computed getter over it.
       Observation propagates through the nested observable read. **Commit 10.**
 
