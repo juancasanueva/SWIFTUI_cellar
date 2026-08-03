@@ -1,4 +1,198 @@
-# Apply progress: m3-services — batch 1 (read half, Phases 0–7)
+# Apply progress: m3-services
+
+**Mode**: Strict TDD (`openspec/config.yaml` → `testing.strict_tdd: true`, `rules.apply.tdd: true`).
+**Artifact store**: hybrid — this file and Engram `sdd/m3-services/apply-progress`.
+**Branch**: `feature/m3-services`, base `main` @ `284aab9`. The planning markdown landed separately
+in PR #8, so this branch carries code plus only the markdown the apply phase itself produces.
+**Status**: **83 of 84 tasks complete.** Task 16.1 (manual verification) is reserved for the
+orchestrator/user and is deliberately left unchecked.
+
+Two batches. Batch 1 (Phases 0–7, the read half) is preserved verbatim at the end of this file;
+nothing in it has been rewritten. Batch 2 (Phases 8–17, the control half) is recorded here.
+
+---
+
+# Batch 2 — the control half, Phases 8–17
+
+**Batch scope**: Phases 8–17 inclusive, 48 tasks, of which 47 are complete and one (16.1) is the
+user's. Base for this batch: `24fe71a`, batch 1's head.
+
+## `size:exception`
+
+Recorded at task 0.2 before batch 1 wrote any code (ruling #7182-1), and it covers this batch and the
+verify report. `delivery_strategy: exception-ok`, chain strategy `size-exception`. The maintainer
+accepted it with the two-way split and the under-pricing record in front of them, so no decision is
+re-litigated here — but the outcome **is** measured against the forecast, in task 17.3 below.
+
+## Completed tasks
+
+Phase 8 — 8.1 … 8.6. Phase 9 — 9.1 … 9.7. Phase 10 — 10.1 … 10.3. Phase 11 — 11.1 … 11.10.
+Phase 12 — 12.1 … 12.5. Phase 13 — 13.1 … 13.4. Phase 14 — 14.1 … 14.4. Phase 15 — 15.1 … 15.5.
+Phase 16 — **16.1 deliberately unchecked** (partial evidence recorded in `tasks.md`, see below).
+Phase 17 — 17.1, 17.2, 17.3.
+
+**Cumulative: 83 of 84.**
+
+## Seven work-unit commits
+
+| Commit | Unit |
+|---|---|
+| `6fdec42` | `refactor(brew-client): generalize the mutation spine behind BrewMutating` |
+| `cfd2038` | `feat(brew-client): refresh only the state domains a command invalidates` |
+| `b968f47` | `fix(brew-client): close the pending-confirmation setter` |
+| `731bdfe` | `feat(brew-client): classify service outcomes from output markers` |
+| `059cc09` | `feat(brew-client): submit service verbs one per service, guarded` |
+| `1f1f0f4` | `feat(persistence): record service verbs with a null package identity` |
+| `20cf59b` | `feat(services): wire the row controls to the guarded submit path` |
+| `7814d79` | `docs(sdd): reconcile the spec headers, register and follow-ups` |
+
+## TDD Cycle Evidence
+
+Strict TDD was active throughout. Where a test was written **after** its production code — which
+happened four times, all recorded — RED was obtained by **mutation** instead of by ordering, and the
+mutation and its exact failing assertion are named. That is weaker than ordering and is not presented
+as equivalent.
+
+| Task | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| 8.1 | `BrewMutatingTests.swift` | Unit | 626/626 | ✅ `BrewMutating` not in scope | ✅ | ✅ foreign command through the real spine + the whole package vocabulary, kept exhaustive by the **compiler** | ✅ `ProbeMutation` extracted to `Fakes/` |
+| 8.2 | same | Unit | 626/626 | ✅ | ✅ | ✅ equal / differing / foreign erasures, plus a structural no-way-back scan | ➖ |
+| 8.3–8.5 | — (GREEN) | — | — | — | ✅ | — | ✅ concrete `submit`/`request` overloads so leading-dot literals still infer |
+| 8.6 | `MutationCommandTests.swift` | Unit | 630/630 | ✅ **verified by mutation** — one injected `\(` fails it *by file name* | ✅ | ✅ scans every `*Command.swift`, anchored positively first | ➖ |
+| 9.1 | `MutationGatesTests.swift` | Unit | 631/631 | ✅ `MutationGates` not in scope | ✅ | ✅ success / non-zero / typed busy / cancelled, each ×1 re-snapshot | ✅ harness tuple → struct with `stop()` |
+| 9.2 | same | Unit | 631/631 | ✅ | ✅ | ✅ three terminals, zero inventory probes asserted on the **literal argv** | ➖ |
+| 9.3 | `InstalledRefreshScopeTests.swift` | Unit | 635/635 | ⚠️ **written after GREEN; RED obtained by mutation** — broadcasting instead of intersecting fails it at `isMutating → true` | ✅ | ✅ paired with the shipped suppression test as its contrast | ✅ split out at `type_body_length` |
+| 9.4 | `OperationCenterScopedHistoryTests.swift` | Unit | 635/635 | ⚠️ **same** — the mutation fails it at `installed.value → 1` | ✅ | ✅ working / absent / failing recorder | ✅ split out at `type_body_length` |
+| 9.5–9.6 | — (GREEN) | — | — | — | ✅ | — | ✅ `forcesReSnapshot` deleted; two approval tests rewritten to the new truth |
+| 9.7 | — (scope guard) | — | — | — | ✅ `git diff main -- InstalledChangeObserving.swift` = **0 lines** | — | — |
+| 10.1 | `ConfirmationBoxTests.swift` | Unit | 637/637 | ✅ **failed on the real defect** — `internal(set)` present, direct assignment present | ✅ | ✅ four setter widths + an assignment scan over both files | ✅ scan tightened after it caught itself |
+| 10.2 | same | Unit | 637/637 | ✅ | ✅ | ✅ request → confirm → request → decline | ➖ |
+| 10.3 | — (GREEN) | — | — | — | ✅ | ✅ `withObservationTracking` proves the nested read still wakes observers | ✅ OA5 summary split to its own file at 409 lines |
+| 11.1–11.3 | `ServiceCommandTests.swift` | Unit | 640/640 | ✅ `ServiceCommand` not in scope | ✅ | ✅ 10 hostile names, 6 legitimate, 12 argv vectors, the 5-control surface | ✅ `ServiceTarget` **moved** (not redeclared) into `ServiceCommand.swift` |
+| 11.5 | `ServiceClassificationTests.swift` | Unit | 640/640 | ✅ `.noChange` not in scope | ✅ | ✅ cold start / already-started / not-started / unmatched both ways / 3 interpolated names | ➖ |
+| 11.6 | `ServiceClassificationContainmentTests.swift` | Unit | 640/640 | ✅ | ✅ | ✅ **55** command×payload pairs; **verified by mutation** — moving the marker pass to the shared default fails **both** containment tests | ✅ split out at `file_length`; tuple → named `Payload` |
+| 11.7, 11.10 | — (GREEN) | — | — | — | ✅ | — | ✅ four exhaustive switches updated; `HistoryRow` label added |
+| 11.8–11.9 | `ServiceClassification*Tests.swift` | Unit | 640/640 | ✅ | ✅ | ✅ root warning on 0 vs non-zero; hostile payload leaves argv byte-identical | ➖ |
+| 12.1–12.4 | `ServiceSubmissionTests.swift` | Unit | 662/662 | ✅ `submit(service:)` not in scope | ✅ | ✅ same/different service, 3 terminal kinds, 3-service fan-out, 2 brew-absent shapes | ✅ guard **verified by mutation** — deleting it fails 3 assertions |
+| 12.5 | — (GREEN) | — | — | — | ✅ | — | ✅ guard holds items, so release needs no hook in `finish` |
+| 13.1–13.2 | `ServiceHistoryTests.swift` | Unit | 668/668 | ⚠️ **written after GREEN; RED obtained by two mutations** — fabricating a `PackageID`, and de-namespacing a verb, each fail them by name | ✅ | ✅ 4 verbs, 10 toggles, a `.noChange` entry, a refused duplicate | ➖ |
+| 13.3 | `HistoryStoreTests.swift` | Unit | 668/668 | ⚠️ **same** | ✅ | ✅ verb search, argv search, unfiltered projection | ➖ |
+| 13.4 | — (GREEN) | — | — | — | ✅ (landed with 11.4) | — | — |
+| 14.1–14.2 | `ServicesRefreshControlTests.swift` | Unit (`TestClock`) | 673/673 | ✅ `mutations:` not in scope | ✅ | ✅ suppression across 4 intervals, then failed **and** cancelled terminals | ✅ split from `ServicesRefreshTests` at its length bound |
+| 14.3 | — (GREEN) | — | — | — | ✅ **verified by two mutations** — dropping the guard lets 5 refreshes run mid-mutation; emptying the consumer drops the owed refresh to 0 | — | ✅ |
+| 14.4 | — (views + wiring) | — | — | — | ✅ `xcodebuild build` SUCCEEDED | — | — |
+| 15.1–15.5 | — (docs) | — | — | — | — | — | — |
+
+### Test summary
+
+- Tests before this batch: **626 / 83 suites**. After: **676 / 94 suites**, 1 pre-existing known issue.
+- **50 tests added in this batch** (105 across the whole change, against the 571 baseline). All unit.
+- **9 mutation verifications**, every one of which failed the test it was aimed at, on the assertion
+  that names the defect. Listed in the table above.
+- Approval tests rewritten because the specified behaviour changed: **2**
+  (`everyOutcomeForcesAReSnapshot` and the `UnknownOperationTests` re-snapshot assertion).
+- New pure functions: `ServiceCommand.arguments` / `.verb` / `.classify`, `ServiceRowControl.command(for:)`,
+  `AnyBrewMutation.init`, `InvalidationScope`.
+
+## Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command | `swift test --package-path Packages/CellarCore` → **676 tests / 94 suites passed**, 1 known issue |
+| Full suite | `xcodebuild test … -destination 'platform=macOS,arch=arm64'` → **\*\* TEST SUCCEEDED \*\***, `cellarUITests` 4/4, `cellarTests` green. Run **alone**, per batch 1's false-red lesson |
+| Runtime harness | `xcodebuild build … -destination 'platform=macOS,arch=arm64'` → **BUILD SUCCEEDED**, **zero** warnings of any kind in the raw log. Live brew probes on 6.0.15 re-confirmed all four classification markers and both MV-3 discriminators (see task 16.1) |
+| Lint | `swiftlint --quiet` = **60**, equal to the 0.1 baseline. Zero new |
+| File length | Largest file `OperationCenter.swift` at **391**; every new and touched file under 400. Four splits rather than suppressions |
+| Rollback boundary | Eight commits, one per work unit. Reverting `20cf59b` removes the row controls and the poll's mutation half; `1f1f0f4`+`059cc09`+`731bdfe` remove the services command family entirely; `b968f47` restores the confirmation setter; `cfd2038` restores unconditional re-snapshot; `6fdec42` restores the package-only spine. Nothing outside the named files was touched |
+
+## Deviations from the design, all deliberate
+
+1. **`ServiceTarget` was *moved* into `ServiceCommand.swift`, not redeclared.** Batch 1 shipped it in
+   `ServicesPayloadSource.swift` because the read half needed it a phase early. Task 11.4 names it as
+   part of `ServiceCommand.swift`, and the structural scan from 8.6 requires every `*Command.swift` to
+   route names through `MutationName.isSafe` — which is only true if the wrapper lives there. One
+   declaration, one gate, and the read sources still use it.
+2. **The design under-counted the app-target call sites.** It claimed every existing site compiles
+   unchanged; `MutationConfirmation.swift` switched on `request.command` as a `MutationCommand` case
+   and could not. It now reads the request's **verb**, which is the projection the durable history is
+   searched by and already distinguishes zap from an ordinary uninstall. The four sites the design
+   named do compile unchanged.
+3. **`submit` and `request` gained concrete `MutationCommand` overloads.** A leading-dot literal —
+   `operations.submit(.upgradeAll)` — cannot infer a contextual base against a generic parameter, so
+   without them the "compiles unchanged" claim would have been false. Both forward to one
+   implementation; there is one submission path, not two.
+4. **`AnyBrewMutation` carries no classifier.** It conforms to `BrewMutating` with the protocol
+   default. Classification always runs on the **concrete** command at the terminal, because
+   `OperationCenter.run` is generic and holds it, so the erasure is never on that path — and
+   `ServiceHistoryTests > aNoChangeOutcomeRecordsOneEntryNamingItself` proves it end to end through
+   the real centre.
+5. **`OperationCenterSummary.swift` is a new file the design's table does not list**, and three test
+   suites were split for the same reason: SwiftLint's `file_length` / `type_body_length` bounds.
+   Task 17.1 requires a split rather than a suppression, and that rule was followed every time.
+6. **`ConfirmationBox` lives in `OperationCenterBulk.swift`**, beside the confirmation surface it
+   serves, rather than in `OperationCenter.swift` which was already at the 400-line bound.
+
+## Issues found
+
+1. **A task expectation that was simply wrong, corrected rather than papered over.** Task 11.1 listed
+   `$(…)` and `;` among names that must be "rejected at construction". They are **not** rejected:
+   `MutationName.isSafe` refuses exactly "empty, leading `-`, or containing whitespace", and the
+   `package-mutation` delta says PM9 is untouched — so widening the shared gate would change package
+   construction rules the delta explicitly preserves. The guarantee that actually holds is the one the
+   threat matrix names: **argv is a vector**. `Process.arguments` is handed the name as one literal
+   element and no shell is ever involved, so `$(whoami)` reaches brew as a service name that does not
+   exist. The test now asserts that, **through the real process seam**, rather than asserting a
+   rejection that would have been security theatre.
+2. **`brew services start` on an already-running service does not register it at login.** Found while
+   obtaining MV-3: starting a service that "Run once" had already started took brew's already-started
+   branch and left `~/Library/LaunchAgents` empty. MV-3 must therefore be run from a **stopped**
+   service — as `tasks.md` already says — or it reports a false negative about the start/run
+   distinction. Recorded because a reader running the check out of order would draw the wrong
+   conclusion.
+3. **A stale SwiftPM incremental build produced a wrong-case enum result.** Inserting `.noChange` into
+   the middle of `MutationOutcome` shifted the case tags, and one `swift test` run reported a draft
+   recorded as `.cancelled` coming back as `"noChange"`. The mapping was correct; a re-run was green
+   and has stayed green, including under a full `xcodebuild test`. **After inserting a case into a
+   public enum, re-run before believing a failure** — it cost twenty minutes of chasing a defect that
+   did not exist.
+4. **The `forcesReSnapshot` scope guard cannot reach zero, and that is correct.** Task 17.2 asks for
+   zero matches. `Sources/` and `cellar/` are at zero. One match survives in
+   `MutationGatesTests.swift:255`, and it is the assertion **that the member is gone** — a guard
+   cannot forbid a name without naming it. Recorded as the single deliberate exception rather than
+   quietly weakening the guard's wording.
+5. **A spec/design discrepancy this phase did not resolve on its own authority.** The shipped verbs
+   are `serviceStart`/`serviceRun`/`serviceStop`/`serviceRestart` (design D9, task 13.4, namespaced so
+   an IH5 search cannot collide with a package verb). The `installation-history` delta's IH1 sc5 text
+   says the verbs are `start`, `stop`, `restart`, `run`. Both readings satisfy every IH5 scenario,
+   because the namespaced form still matches a case-insensitive `stop` search and the service's name
+   is found through the argv either way. Implementation follows the design; **the delta text needs
+   reconciling**, and that is recorded in `follow-ups.md` rather than decided here.
+
+## Manual verification — what was and was not obtained
+
+Task 16.1 is **reserved for the orchestrator/user and remains unchecked**. Everything obtained is
+recorded in full inside `tasks.md` under 16.1, with the actual observed bytes. In summary, on brew
+**6.0.15** (newer than the 6.0.14 the design probed), with the machine restored to its exact baseline
+afterwards:
+
+| Check | Status |
+|---|---|
+| **MV-3** discriminator | **OBTAINED live.** `run` leaves `~/Library/LaunchAgents` empty; `start` from stopped creates `homebrew.mxcl.atuin.plist`. The GUI half — enumerating five controls and clicking them — is not obtainable |
+| **MV-4** classification | **OBTAINED live for all four clicks.** All four markers confirmed byte-for-byte, and both no-op cases genuinely exit **0**. The Activity-drawer labels need the GUI |
+| **MV-5** data half | **OBTAINED.** `log_path == error_log_path` on this machine, so the dedupe rule is load-bearing on day one. The pane needs the GUI |
+| **MV-11** byte half | **OBTAINED on the services path.** 0 ESC bytes pinned, 3 under the old key. The drawer half needs the GUI |
+| **MV-1, MV-2 (a)(b)(d), MV-6, MV-7, MV-8, MV-9, MV-10, MV-12** | **NOT obtained.** Every one needs a human to click something or read a window. MV-9 additionally requires a temporary fixture patch that must not be committed, so it was deliberately not attempted |
+
+Nothing above is claimed as covered that was not. This is the M2-3 IH6 lesson applied.
+
+## Next
+
+`sdd-verify`. All 17 implementation phases are complete; the only outstanding task is 16.1, which is
+the user's to run and which now has a written record of exactly which halves are already answered.
+
+---
+
+## Batch 1 — the read half, Phases 0–7 (preserved verbatim)
 
 **Mode**: Strict TDD (`openspec/config.yaml` → `testing.strict_tdd: true`, `rules.apply.tdd: true`).
 **Artifact store**: hybrid — this file and Engram `sdd/m3-services/apply-progress`.
@@ -173,7 +367,7 @@ checks, these fall inside Phases 1–7. Recorded honestly, per ruling #7180 c an
 
 Everything the machine could answer, it answered. Nothing above is claimed as covered that was not.
 
-## Next
+### Batch 1's "Next" — now discharged
 
 `sdd-apply` again for Phase 8 onward (the control half). Do **not** run `sdd-verify` yet: Phases 8–17
 are untouched, and Phase 17's full gate and Phase 16's manual checks are scoped to the whole change.

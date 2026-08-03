@@ -573,6 +573,48 @@ If the split is taken, exactly four things must move with it — nothing else:
       and run the twelve checks below in order. Record the **actual** observation for each, not just
       PASS.
 
+      > **Partial evidence obtained during apply — recorded honestly, and it does NOT check this
+      > task.** Everything below was obtained live on brew **6.0.15-4-gd610afe** (the design's probes
+      > were taken on 6.0.14, so these also re-confirm the markers on a newer brew). The machine was
+      > returned to its exact baseline afterwards: `atuin` status `none`, no
+      > `~/Library/LaunchAgents/homebrew.mxcl.atuin.plist`, no `atuin` daemon running.
+      >
+      > **MV-3, the live discriminator — OBTAINED, and it found something.** With `atuin` stopped:
+      > `brew services run atuin` → exit 0, stdout ``==> Successfully ran `atuin` (label:
+      > homebrew.mxcl.atuin)``, and `ls ~/Library/LaunchAgents | rg atuin` **still empty** — run does
+      > not register. `brew services start atuin` from **stopped** → exit 0, stdout
+      > ``==> Successfully started `atuin` …``, and the plist **is** now present, with
+      > `brew services list` showing `File` as `~/Library/LaunchAgents/homebrew.mxcl.atuin.plist` and
+      > `User` as the logged-in user. **The finding:** `start` on a service that is *already running*
+      > does **not** register it — it takes the already-started branch and returns without touching
+      > login items. So MV-3 must be run from a **stopped** service, exactly as written; running it
+      > from a service started by "Run once" would report a false negative.
+      >
+      > **MV-4, the classification half — OBTAINED for all four clicks** (the Activity-drawer labels
+      > still need the GUI). Byte-for-byte on 6.0.15: cold start → exit **0**, stdout
+      > ``==> Successfully started `atuin` (label: homebrew.mxcl.atuin)``. Start again → exit **0**,
+      > stdout ``Service `atuin` already started, use `brew services restart atuin` to restart.``,
+      > no `Successfully` line, nothing on stderr. Stop → exit **0**, stdout `Stopping \`atuin\`…` +
+      > ``==> Successfully stopped `atuin` …``. Stop again → exit **0**, **stderr**
+      > ``Warning: Service `atuin` is not started.``, stdout empty. Every one of the four markers the
+      > classifier matches is confirmed live, and both no-op cases genuinely exit **0** — which is
+      > the whole reason `.noChange` exists.
+      >
+      > **MV-5, the data half — OBTAINED.** `brew services info --json atuin` while started:
+      > `log_path` and `error_log_path` are **the same file**, `/opt/homebrew/var/log/atuin.log`. The
+      > dedupe rule is load-bearing on this machine on day one, so the pane must show **one** log
+      > location. `pid`, `user` and `file` all present and non-null. The pane itself needs the GUI.
+      >
+      > **MV-11, the byte half — OBTAINED on the services path specifically.** `brew services list`
+      > under the pinned environment: **0** ESC bytes by `od -c`. The same command under the old
+      > `HOMEBREW_COLOR=0` key: **3** ESC-carrying lines. Defect #7179 re-confirmed on 6.0.15, on this
+      > slice's own command. The Activity-drawer half needs the GUI.
+      >
+      > **NOT obtained, and not claimed:** MV-1, MV-2 (a)(b)(d), MV-6, MV-7, MV-8, MV-9, MV-10, MV-12,
+      > and the GUI halves of MV-3, MV-4, MV-5 and MV-11. Every one of them needs a human to click
+      > something or to read a window. MV-9 additionally requires a temporary fixture patch that
+      > **must not be committed**, so it was deliberately not attempted.
+
       **MV-1 (LIVE) — The services surface exists and lists real state.** Launch, select Services in
       the sidebar. *Expect*: `atuin` listed with status `none`, matching `brew services list` in
       Terminal. No error state, no empty-state placeholder.
@@ -657,7 +699,7 @@ If the split is taken, exactly four things must move with it — nothing else:
 
 ## Phase 17: Full gate and scope guard
 
-- [ ] 17.1 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ the 0.1
+- [x] 17.1 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ the 0.1
       baseline of 571 plus the new tests; (ii)
       `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       — BUILD SUCCEEDED, zero concurrency warnings; (iii) `swiftlint --quiet` — finding count equal to
@@ -665,16 +707,53 @@ If the split is taken, exactly four things must move with it — nothing else:
       `OperationCenter.swift`, `MutationOutcome.swift`, `HistoryStore.swift` and `InstalledStore.swift`,
       each under SwiftLint's default 400-line `file_length` warning. `ServicesStore.swift` and
       `ServicesWire.swift` are the two most likely to breach — split rather than suppress.
-- [ ] 17.2 **Scope guard.** `git diff main...HEAD --name-only` must contain **no** taps, cleanup or
+      **Measured 2026-08-03 at `7814d79`+: (i) `swift test` = 676 tests / 94 suites passed, 1
+      pre-existing known issue (baseline 571/77, so +105 tests); full `xcodebuild test` =
+      \*\* TEST SUCCEEDED \*\*, `cellarUITests` 4/4 and `cellarTests` green. (ii) `xcodebuild build`
+      = BUILD SUCCEEDED, **zero** warnings of any kind in the raw log. (iii) `swiftlint --quiet` =
+      **60**, equal to the 0.1 baseline — zero new. (iv) largest file `OperationCenter.swift` at
+      **391**; every new and touched file under 400. Four files were split rather than suppressed
+      along the way: `OperationCenterSummary`, `InstalledRefreshScopeTests`,
+      `OperationCenterScopedHistoryTests`, `ServiceClassificationContainmentTests`.**
+- [x] 17.2 **Scope guard.** `git diff main...HEAD --name-only` must contain **no** taps, cleanup or
       disk-usage file, and **no** edit to
       `Packages/CellarCore/Sources/BrewClient/InstalledChangeObserving.swift` (task 9.7). Then
       `rg 'isSettling|settleGrace'` over `Sources/` and `cellar/` must return **zero** — the deferred
       M2-2 #6 grace must not have crept back. `rg 'forcesReSnapshot'` must return **zero** (deleted in
       9.6). `BulkSelection.Action.allCases` must still be exactly two cases.
-- [ ] 17.3 **Candidate size.** Record `git diff main...HEAD --shortstat` and compare it against the
+      **Measured: taps/cleanup/disk-usage — the only match is
+      `m3-services-cleanup-taps/explore.md`, which task 1.5 *requires*; no taps or disk-usage source
+      file is in the candidate. `git diff main...HEAD -- InstalledChangeObserving.swift` = **0 lines**
+      (task 9.7 holds). `isSettling|settleGrace` over `Sources/` and `cellar/` = **0**.
+      `forcesReSnapshot` over `Sources/` and `cellar/` = **0**; **one** mention survives in
+      `MutationGatesTests.swift:255`, and it is the assertion that the member is gone — a guard cannot
+      name what it forbids without naming it. Recorded as the single deliberate exception rather than
+      weakened. `BulkSelection.Action` = exactly `upgrade`, `uninstall`.**
+- [x] 17.3 **Candidate size.** Record `git diff main...HEAD --shortstat` and compare it against the
       forecast band above. If it lands outside ~5,700–6,800, say so and say why — a forecast that is
       never checked against the outcome is how this project under-priced M2-0 by 1.67× and M2-1 by
       1.82×. The accepted `size:exception` covers the verify report as well.
+      **Measured `git diff main...HEAD --shortstat` at the final head: 60 files changed,
+      +6,940 / −188 = **7,128 changed lines**. (It read 6,851 before this record was itself written;
+      the apply-progress artifact adds ~277 lines to the candidate it measures, which is a real cost
+      of recording and is counted rather than excluded.) Against the forecast band of 5,700–6,800
+      that is **4.8% above the top** — but the totals agree by near-*coincidence*, and the honest
+      reading is two large errors of opposite sign:**
+
+      | Bucket | Forecast | Measured | Delta |
+      |---|---|---|---|
+      | SDD markdown | 1,744 (counted inside the ledger) | **474** | −1,270 — the planning markdown landed on `main` in PR #8, so it is not in this candidate at all |
+      | `Sources/` + `cellar/` | 1,870–2,100 | **2,421** | +15% to +29% over |
+      | Tests | 1,400–1,900 | **3,956** | **2.1×–2.8× over — the real miss** |
+
+      **The lesson, stated plainly so the next forecast can use it.** This project has now
+      under-priced three slices in a row (M2-0 1.67×, M2-1 1.82×, and this one's *test* bucket
+      2.1–2.8×), and the cause here is specific: the forecast priced ~60–70 test functions at 20–25
+      lines each. The suite's real cost is nearer **55 lines per test function** once the
+      threat-matrix rows, the mutation-verified assertions and the doc comments this project requires
+      are counted — and 105 tests shipped, not 70. A test-line forecast for this codebase should
+      start from 45–55 lines per test, not 20–25. Batch 2 alone (Phases 8–17) measured
+      **40 files, +3,510 / −176**.
 
 ---
 
