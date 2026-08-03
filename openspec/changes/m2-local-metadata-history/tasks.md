@@ -469,7 +469,7 @@ Phases 5–7.
   present-tense superseded facts needing an as-of anchor, and the six-slice arithmetic slip. Docs
   only — and it **must** land here: the umbrella exploration is archived after M2-3, so this is the
   last change that can correct it.
-- [ ] 9.2 **Manual verification (for the surfaces that are untested by design). Left unchecked for
+- [x] 9.2 **Manual verification (for the surfaces that are untested by design). Left unchecked for
   the orchestrator.** With the app running and brew present:
   (a) star a package, write a multi-line note, snooze an outdated one → **quit and relaunch** → all
   three survive against the **real on-disk SwiftData store** under
@@ -484,6 +484,22 @@ Phases 5–7.
   history empty, favorites/notes/snoozes intact.
   Record each observation verbatim in the apply report. Do **not** exercise sudo-requiring casks or a
   real lock conflict — both are covered by probe `#7097`'s captured strings.
+
+  **Executed 2026-08-03 (orchestrator + user), all four checks PASS.** Evidence:
+  (a) On first launch the on-disk store materialized at
+  `Application Support/com.juancasanueva.cellar/Metadata/Metadata.store` (SQLite with shm/wal
+  sidecars, orchestrator-observed); star, multi-line note and snooze all survived quit and relaunch
+  (user-observed).
+  (b) A snoozed, genuinely outdated package left the badge, the outdated count and the outdated
+  filter while remaining listed in Installed with its version (user-observed, live brew data).
+  (c) External `brew install hello cowsay` from Terminal surfaced both packages in Installed via the
+  watcher and wrote no history rows (IH3 scope — orchestrator-installed, user-observed). Selecting
+  cowsay then hello showed "Uninstall 2" with "Upgrade 0" disabled; the confirmation named both
+  packages; two per-package invocations ran in selection order (cowsay first) and wrote two history
+  rows in that order (user-observed).
+  (d) History search by name, verb and argv fragment each worked; confirmed Clear emptied history
+  while favorites, notes and snoozes stayed intact (user-observed).
+  Sudo and lock paths deliberately not exercised, per this task's own instruction.
 - [x] 9.3 Full gate: `FAST` green with the Phase 0 `@Test` count intact plus the new suites (none
   deleted), `FULL` green, `swiftlint` on changed files with new findings separated from the 33
   pre-existing source findings. Every changed file **under 400 lines** — check `OperationCenter.swift`,
