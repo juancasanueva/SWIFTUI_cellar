@@ -395,7 +395,8 @@ public final class OperationCenter {
         gates?.end(
             item.command.invalidates,
             token: item.refreshToken,
-            installationURL: item.installationURL
+            installationURL: item.installationURL,
+            diskAreas: item.command.diskAreas
         )
         settleForceRecovery(for: item, outcome: outcome)
     }

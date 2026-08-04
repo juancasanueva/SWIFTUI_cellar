@@ -1,5 +1,6 @@
 import BrewProcess
 import Catalog
+import DiskUsage
 import Foundation
 
 // MARK: - Threat response: subprocess argument composition, generalized
@@ -45,11 +46,8 @@ public struct InvalidationScope: OptionSet, Sendable, Hashable {
     public static let services = InvalidationScope(rawValue: 1 << 1)
     /// What `brew tap-info --installed --json` answers for.
     public static let taps = InvalidationScope(rawValue: 1 << 2)
-
-    // `1 << 2` taps (M3-2) and `1 << 3` disk usage (M3-3) are **reserved by this
-    // comment and deliberately not declared**: an undeclared bit cannot be
-    // begun, ended or asserted over, so neither milestone inherits a domain that
-    // silently does nothing.
+    /// Which Homebrew roots must be remeasured.
+    public static let diskUsage = InvalidationScope(rawValue: 1 << 3)
 }
 
 /// Everything the mutation spine needs from a command, whichever capability owns
@@ -78,6 +76,8 @@ public protocol BrewMutating: Sendable {
     var requiresConfirmation: Bool { get }
     /// The state domains one terminal outcome of this command invalidates.
     var invalidates: InvalidationScope { get }
+    /// Exact disk roots affected by this mutation. Empty when disk usage is unaffected.
+    var diskAreas: Set<DiskArea> { get }
 
     /// Decides the outcome from the terminal facts and the output.
     ///
@@ -89,6 +89,7 @@ public protocol BrewMutating: Sendable {
 }
 
 extension BrewMutating {
+    public var diskAreas: Set<DiskArea> { [] }
     /// The command as a human reads it — and as they can paste it.
     ///
     /// Display only. Nothing parses this back into argv, which is what makes
@@ -143,6 +144,7 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
     public let packageID: PackageID?
     public let requiresConfirmation: Bool
     public let invalidates: InvalidationScope
+    public let diskAreas: Set<DiskArea>
 
     public init(_ command: some BrewMutating) {
         arguments = command.arguments
@@ -150,6 +152,7 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
         packageID = command.packageID
         requiresConfirmation = command.requiresConfirmation
         invalidates = command.invalidates
+        diskAreas = command.diskAreas
     }
 }
 
@@ -206,13 +209,19 @@ public final class MutationGates {
     public func end(
         _ scope: InvalidationScope,
         token: MutationOperationToken? = nil,
-        installationURL: URL? = nil
+        installationURL: URL? = nil,
+        diskAreas: Set<DiskArea> = []
     ) {
         for entry in entries where entry.scope.isDisjoint(with: scope) == false {
             let event = token.flatMap { token in
                 installationURL.flatMap { url in
                     Self.domain(for: entry.scope).map {
-                        MutationTerminalEvent(token: token, domain: $0, installationURL: url)
+                        MutationTerminalEvent(
+                            token: token,
+                            domain: $0,
+                            installationURL: url,
+                            diskAreas: entry.scope == .diskUsage ? diskAreas : []
+                        )
                     }
                 }
             }
@@ -225,6 +234,7 @@ public final class MutationGates {
         case .taps: .taps
         case .installedInventory: .installedInventory
         case .services: .services
+        case .diskUsage: .diskUsage
         default: nil
         }
     }
@@ -239,5 +249,10 @@ public final class MutationGates {
 extension MutationCommand: BrewMutating {
     /// Every package mutation changes what is installed — including `pin` and
     /// `unpin`, which change the record `brew info --installed` publishes.
-    public var invalidates: InvalidationScope { .installedInventory }
+    public var invalidates: InvalidationScope { [.installedInventory, .diskUsage] }
+
+    public var diskAreas: Set<DiskArea> {
+        guard let packageID else { return [.cellar, .caskroom] }
+        return packageID.kind == .formula ? [.cellar] : [.caskroom]
+    }
 }

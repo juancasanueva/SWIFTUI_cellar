@@ -9,6 +9,28 @@ import Testing
 /// invocation.
 @Suite("Installed state derivation")
 struct InstalledDeriveTests {
+    @Test("Absent linked keg stays unlinked while an older linked keg remains exact")
+    func linkedKegStateIsNotInferredFromPrimaryKeg() throws {
+        let payload = Data(#"""
+        {"formulae":[
+          {"name":"unlinked","installed":[
+            {"version":"1.0","time":100,"installed_on_request":true},
+            {"version":"2.0","time":200,"installed_on_request":true}]},
+          {"name":"older-linked","linked_keg":"1.0","installed":[
+            {"version":"1.0","time":100,"installed_on_request":true},
+            {"version":"2.0","time":200,"installed_on_request":true}]}
+        ],"casks":[]}
+        """#.utf8)
+
+        let inventory = try InstalledDecoder.inventory(from: payload)
+        let unlinked = try #require(inventory.packages.first { $0.name == "unlinked" })
+        let linked = try #require(inventory.packages.first { $0.name == "older-linked" })
+
+        #expect(unlinked.linkedKeg == nil)
+        #expect(unlinked.primaryKeg.version == "2.0")
+        #expect(linked.linkedKeg == "1.0")
+        #expect(linked.formulaLinkState == .linked("1.0"))
+    }
     // MARK: - Outdated (II4)
 
     @Test("An outdated formula is in the outdated set and counted")

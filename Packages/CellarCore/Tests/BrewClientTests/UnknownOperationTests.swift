@@ -33,7 +33,7 @@ struct UnknownOperationTests {
         //
         // The obligation is read from the command, so it survives an outcome
         // that never had a process at all.
-        #expect(MutationCommand.upgradeAll.invalidates == .installedInventory)
+        #expect(MutationCommand.upgradeAll.invalidates == [.installedInventory, .diskUsage])
     }
 
     /// The structural fact wins over prose, like every other one: an unknown

@@ -55,7 +55,7 @@ struct TapCommandTests {
         #expect(request.arguments == ["untap", "--force", "acme/tools"])
         #expect(request.verb == "tapForceUntap")
         #expect(request.requiresConfirmation)
-        #expect(request.invalidates == [.taps, .installedInventory])
+        #expect(request.invalidates == [.taps, .installedInventory, .diskUsage])
         #expect(request.disclosure == .forceUntap(tap: tap, affected: affected))
 
         #expect(TapCommand.forceUntap(evidence: ForceUntapEvidence(

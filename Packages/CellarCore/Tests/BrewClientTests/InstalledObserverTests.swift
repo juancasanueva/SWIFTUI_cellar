@@ -5,6 +5,8 @@ import Testing
 
 @testable import BrewClient
 @testable import BrewProcess
+@testable import Catalog
+@testable import DiskUsage
 
 /// Construction-level cover for the one untested-by-design adapter.
 ///
@@ -16,6 +18,108 @@ import Testing
 /// retained box.
 @Suite("Installed change observer", .timeLimit(.minutes(1)))
 struct InstalledObserverTests {
+    @MainActor
+    @Test("One root stream fans out to installed and starts disk revalidation")
+    func oneStreamFansOutToBothConsumers() async {
+        let observer = FakeInstalledChangeObserver()
+        let installedSignals = Counter()
+        let scanner = RecordingDiskUsageScanner()
+        let store = DiskUsageStore(cache: ObserverMemoryDiskUsageCache())
+        let roots = HomebrewRoots(
+            installation: TestInstallation.appleSilicon,
+            userCacheDirectory: FileManager.default.temporaryDirectory
+        )
+        store.startScan(roots: roots, scanner: scanner)
+        await TestPoll.until(scanner.callCount == 1)
+        let coordinator = DiskUsageRefreshCoordinator(store: store)
+        let fanout = HomebrewChangeFanout(
+            observer: observer,
+            installedChanged: { installedSignals.increment() },
+            diskChanged: { areas in coordinator.invalidate(areas) }
+        )
+        let task = Task { await fanout.run() }
+        while observer.changesCallCount == 0 { await Task.yield() }
+
+        observer.emit()
+        await TestPoll.until(installedSignals.value == 1 && scanner.callCount == 2)
+
+        #expect(observer.changesCallCount == 1)
+        #expect(installedSignals.value == 1)
+        #expect(scanner.callCount == 2)
+        #expect(store.invalidatedAreas == [.cellar, .caskroom])
+        #expect(scanner.roots == [roots.identity, roots.identity])
+        observer.finish()
+        await task.value
+        store.cancel()
+    }
+
+    @MainActor
+    @Test("Production gates keep disk-only invalidation out of Installed refresh")
+    func diskMutationRevalidatesWithoutInstalledRefresh() async {
+        let scanner = RecordingDiskUsageScanner()
+        let diskStore = DiskUsageStore(cache: ObserverMemoryDiskUsageCache())
+        let roots = HomebrewRoots(
+            installation: TestInstallation.appleSilicon,
+            userCacheDirectory: FileManager.default.temporaryDirectory
+        )
+        diskStore.startScan(roots: roots, scanner: scanner)
+        await TestPoll.until(scanner.callCount == 1)
+
+        let installedLauncher = RecordingProcessLauncher()
+        let installedStore = InstalledStore(
+            source: BrewInfoPayloadSource(launcher: installedLauncher)
+        )
+        let installedGate = InstalledMutationGate()
+        let diskGate = InstalledMutationGate()
+        let gates = MutationGates([
+            (.installedInventory, installedGate),
+            (.diskUsage, diskGate)
+        ])
+        let installedCoordinator = InstalledRefreshCoordinator(
+            store: installedStore,
+            mutations: installedGate
+        )
+        let diskCoordinator = DiskUsageRefreshCoordinator(
+            store: diskStore,
+            mutations: diskGate
+        )
+        let installedLoop = Task { await installedCoordinator.run() }
+        let diskLoop = Task { await diskCoordinator.run() }
+        await installedCoordinator.refresh(using: TestInstallation.appleSilicon)
+        #expect(installedLauncher.launchCount == 1)
+
+        gates.begin(.diskUsage)
+        gates.end(
+            .diskUsage,
+            token: MutationOperationToken(),
+            installationURL: TestInstallation.appleSilicon.executableURL,
+            diskAreas: [.caskroom]
+        )
+
+        await TestPoll.until(scanner.callCount == 2)
+        #expect(scanner.callCount == 2)
+        #expect(diskStore.invalidatedAreas == [.caskroom])
+        #expect(installedLauncher.launchCount == 1)
+
+        gates.begin(.installedInventory)
+        gates.end(
+            .installedInventory,
+            token: MutationOperationToken(),
+            installationURL: TestInstallation.appleSilicon.executableURL
+        )
+        await TestPoll.until(installedLauncher.launchCount == 2)
+        #expect(installedLauncher.launchCount == 2)
+        #expect(installedLauncher.specs.allSatisfy {
+            $0.arguments == ["info", "--installed", "--json=v2"]
+        })
+
+        installedGate.shutdown()
+        diskGate.shutdown()
+        await installedLoop.value
+        await diskLoop.value
+        diskStore.cancel()
+    }
+
     /// An observer over a throwaway prefix, so nothing real is watched.
     private static func observer() throws -> (FSEventsInstalledObserver, URL) {
         let prefix = FileManager.default.temporaryDirectory
@@ -116,4 +220,24 @@ struct InstalledObserverTests {
         survivor.cancel()
         await survivor.value
     }
+}
+
+private final class RecordingDiskUsageScanner: DiskUsageScanning, @unchecked Sendable {
+    private let recordedRoots = Mutex<[DiskRootsIdentity]>([])
+
+    var callCount: Int { recordedRoots.withLock(\.count) }
+    var roots: [DiskRootsIdentity] { recordedRoots.withLock { $0 } }
+
+    func scan(
+        roots: HomebrewRoots,
+        formulaLinks: [PackageID: FormulaLinkState]
+    ) async -> DiskUsageEventStream {
+        recordedRoots.withLock { $0.append(roots.identity) }
+        return AsyncThrowingStream { _ in }
+    }
+}
+
+private actor ObserverMemoryDiskUsageCache: DiskUsageCaching {
+    func load() throws -> DiskUsageSnapshot? { nil }
+    func save(_ snapshot: DiskUsageSnapshot) throws {}
 }

@@ -1,5 +1,6 @@
 import BrewProcess
 import Catalog
+import DiskUsage
 import Foundation
 
 public struct TapName: Sendable, Hashable, CustomStringConvertible {
@@ -102,8 +103,13 @@ public enum TapCommand: Sendable, Equatable, BrewMutating {
     public var invalidates: InvalidationScope {
         switch self {
         case .addTap, .removeTap: .taps
-        case .forceRemoveTap: [.taps, .installedInventory]
+        case .forceRemoveTap: [.taps, .installedInventory, .diskUsage]
         }
+    }
+
+    public var diskAreas: Set<DiskArea> {
+        guard case .forceRemoveTap(let evidence) = self else { return [] }
+        return Set(evidence.affected.map { $0.kind == .formula ? .cellar : .caskroom })
     }
 
     public var disclosure: ConfirmationDisclosure {

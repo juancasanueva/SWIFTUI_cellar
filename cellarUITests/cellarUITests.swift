@@ -9,6 +9,46 @@ import XCTest
 
 final class cellarUITests: XCTestCase {
 
+    @MainActor
+    func testCleanupRouteShowsStablePackageFirstOnDiskRows() throws {
+        let app = launchDiskFixture()
+        app.staticTexts["Cleanup"].click()
+
+        XCTAssertTrue(app.outlines["disk-usage-list"].waitForExistence(timeout: 2))
+        let wget = app.staticTexts["disk-package-formula-wget"]
+        XCTAssertTrue(wget.exists)
+        XCTAssertTrue(app.staticTexts["disk-package-cask-ghostty"].exists)
+        XCTAssertTrue(wget.label.contains("20 kB on disk"))
+        let disclosure = app.disclosureTriangles.firstMatch
+        disclosure.click()
+        XCTAssertEqual(disclosure.value as? Int, 1)
+        XCTAssertTrue(app.staticTexts["1.25.0"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Last complete scan — revalidating"].exists)
+    }
+
+    @MainActor
+    func testCleanupAbsenceWarningsAndReadOnlyBoundary() throws {
+        let absent = launchDiskFixture("--ui-testing-m3-disk-usage-absent")
+        absent.staticTexts["Cleanup"].click()
+        XCTAssertTrue(absent.staticTexts["Homebrew is not installed"].waitForExistence(timeout: 2))
+        absent.terminate()
+
+        let warning = launchDiskFixture("--ui-testing-m3-disk-usage-warning")
+        warning.staticTexts["Cleanup"].click()
+        XCTAssertTrue(warning.staticTexts["Some storage could not be measured"].waitForExistence(timeout: 2))
+        XCTAssertTrue(warning.staticTexts["disk-package-formula-wget"].exists)
+        XCTAssertFalse(warning.buttons["Uninstall"].exists)
+        XCTAssertFalse(warning.staticTexts["reclaimable"].exists)
+    }
+
+    @MainActor
+    func testInstalledDoesNotGainASizeColumn() throws {
+        let app = launchDiskFixture()
+        app.staticTexts["Installed"].click()
+        XCTAssertTrue(app.outlines["installed-list"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.staticTexts["On disk"].exists)
+    }
+
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
 
@@ -149,6 +189,15 @@ final class cellarUITests: XCTestCase {
     private func launchTapFixture(_ mode: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("--ui-testing-m3-taps")
+        if let mode { app.launchArguments.append(mode) }
+        app.launch()
+        return app
+    }
+
+    @MainActor
+    private func launchDiskFixture(_ mode: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments.append("--ui-testing-m3-disk-usage")
         if let mode { app.launchArguments.append(mode) }
         app.launch()
         return app

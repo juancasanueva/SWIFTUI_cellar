@@ -4,6 +4,7 @@ import Testing
 
 @testable import BrewClient
 @testable import BrewProcess
+@testable import DiskUsage
 @testable import Catalog
 
 /// Scoped invalidation: a terminal outcome refreshes what its **command**
@@ -25,6 +26,46 @@ import Testing
 @Suite("Mutation gates", .timeLimit(.minutes(1)))
 struct MutationGatesTests {
     private static let wget = PackageID(kind: .formula, name: "wget")
+
+    @Test("Package and force-untap commands declare exact disk areas")
+    func commandsDeclareExactDiskAreas() throws {
+        let formula = try #require(MutationCommand.install(formula: "wget"))
+        let cask = try #require(MutationCommand.install(cask: "ghostty"))
+        let tap = try #require(TapName("acme/tools"))
+        let force = try #require(TapCommand.forceUntap(evidence: .init(
+            tap: tap,
+            affected: [Self.wget, PackageID(kind: .cask, name: "ghostty")],
+            isComplete: true
+        )))
+
+        #expect(formula.invalidates.contains(.diskUsage))
+        #expect(formula.diskAreas == [.cellar])
+        #expect(cask.diskAreas == [.caskroom])
+        #expect(MutationCommand.upgradeAll.diskAreas == [.cellar, .caskroom])
+        #expect(force.diskAreas == [.cellar, .caskroom])
+    }
+
+    @Test("A disk gate emits scoped areas without triggering the installed gate")
+    func diskGateIsIndependent() async throws {
+        let installed = InstalledMutationGate()
+        let disk = InstalledMutationGate()
+        let gates = MutationGates([(.installedInventory, installed), (.diskUsage, disk)])
+        let token = MutationOperationToken()
+        var iterator = disk.settlements.makeAsyncIterator()
+
+        gates.begin(.diskUsage)
+        gates.end(
+            .diskUsage,
+            token: token,
+            installationURL: TestInstallation.appleSilicon.executableURL,
+            diskAreas: [.caskroom]
+        )
+        let event = try #require(await iterator.next())
+
+        #expect(event?.domain == .diskUsage)
+        #expect(event?.diskAreas == [.caskroom])
+        #expect(installed.isMutating == false)
+    }
 
     /// The whole spine wired the way the app wires it, with two domains.
     private struct Harness {
@@ -246,7 +287,7 @@ struct MutationGatesTests {
     /// not derived from how the operation ended (PM6).
     @Test("The invalidation scope is readable before submission and never comes from the outcome")
     func theScopeIsAPropertyOfTheCommandNotOfTheOutcome() throws {
-        #expect(MutationCommand.upgradeAll.invalidates == .installedInventory)
+        #expect(MutationCommand.upgradeAll.invalidates == [.installedInventory, .diskUsage])
         #expect(ProbeMutation().invalidates == .services)
 
         // The replaced mechanism is gone: nothing on the outcome answers this

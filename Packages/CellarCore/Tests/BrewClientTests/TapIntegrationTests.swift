@@ -146,7 +146,7 @@ struct TapIntegrationTests {
         let tapPayload = try source("TapPayloadSource.swift", root: root)
         let tapCommand = try source("TapCommand.swift", root: root)
 
-        #expect(package.contains("name: \"BrewClient\",\n            dependencies: [\"BrewProcess\", \"Catalog\"]"))
+        #expect(package.contains("name: \"BrewClient\",\n            dependencies: [\"BrewProcess\", \"Catalog\", \"DiskUsage\"]"))
         #expect(tapWire.contains("import Persistence") == false)
         #expect(tapPayload.contains("write(") == false)
         #expect(tapCommand.contains("displayCommand.split") == false)

@@ -38,6 +38,22 @@ struct PackageGraphTests {
         #expect(dependents.isEmpty == false)
     }
 
+    @Test("Disk usage has only inward core dependencies")
+    func diskUsageDependenciesStayInward() throws {
+        let graph = try Self.graph()
+
+        #expect(graph["DiskUsage"] == ["BrewProcess", "Catalog"])
+        #expect(Self.reachable(from: "DiskUsage", in: graph).isDisjoint(with: ["BrewClient", "Persistence"]))
+    }
+
+    @Test("Brew client bridges disk usage without a reverse dependency")
+    func brewClientOwnsTheDiskUsageBridge() throws {
+        let graph = try Self.graph()
+
+        #expect(graph["BrewClient"]?.contains("DiskUsage") == true)
+        #expect(graph["DiskUsageTests"] == ["DiskUsage", "CellarTestSupport"])
+    }
+
     // MARK: - The manifest
 
     /// `Package.swift`, located from this file rather than the working

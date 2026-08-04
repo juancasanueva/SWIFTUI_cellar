@@ -21,6 +21,8 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// entity, not a field of a package, and one whose name matches an
     /// installed formula is still not that formula (service-management SM12).
     case services
+    /// Read-only package, version, and cache storage visibility.
+    case cleanup
     /// The durable record of every mutation Cellar performed.
     ///
     /// Favorites is deliberately **not** here: it is a filter chip on the
@@ -37,6 +39,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .installed: "Installed"
         case .taps: "Taps"
         case .services: "Services"
+        case .cleanup: "Cleanup"
         case .history: "History"
         }
     }
@@ -48,6 +51,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .installed: "shippingbox"
         case .taps: "externaldrive.connected.to.line.below"
         case .services: "bolt.horizontal.circle"
+        case .cleanup: "externaldrive.badge.timemachine"
         case .history: "clock.arrow.circlepath"
         }
     }

@@ -1,3 +1,4 @@
+import DiskUsage
 import Foundation
 
 public struct MutationOperationToken: Sendable, Hashable {
@@ -12,17 +13,25 @@ public enum RefreshDomain: Sendable, Hashable {
     case taps
     case installedInventory
     case services
+    case diskUsage
 }
 
 public struct MutationTerminalEvent: Sendable, Equatable {
     public let token: MutationOperationToken
     public let domain: RefreshDomain
     public let installationURL: URL
+    public let diskAreas: Set<DiskArea>
 
-    public init(token: MutationOperationToken, domain: RefreshDomain, installationURL: URL) {
+    public init(
+        token: MutationOperationToken,
+        domain: RefreshDomain,
+        installationURL: URL,
+        diskAreas: Set<DiskArea> = []
+    ) {
         self.token = token
         self.domain = domain
         self.installationURL = installationURL
+        self.diskAreas = diskAreas
     }
 }
 

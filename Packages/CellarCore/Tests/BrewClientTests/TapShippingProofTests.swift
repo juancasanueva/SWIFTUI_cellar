@@ -100,7 +100,11 @@ struct TapShippingProofTests {
             ["untap", "acme/tools"],
             ["untap", "--force", "acme/tools"]
         ])
-        #expect(commands.map(\.invalidates) == [.taps, .taps, [.taps, .installedInventory]])
+        #expect(commands.map(\.invalidates) == [
+            .taps,
+            .taps,
+            [.taps, .installedInventory, .diskUsage]
+        ])
         #expect(commands.allSatisfy { $0.packageID == nil })
         try assertBoundedUIControls()
     }
