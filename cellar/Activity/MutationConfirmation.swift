@@ -4,6 +4,7 @@
 //
 
 import BrewClient
+import Catalog
 import SwiftUI
 
 /// The confirmation for the two destructive commands.
@@ -17,48 +18,90 @@ import SwiftUI
 /// never implied by an ordinary uninstall (package-mutation PM3).
 struct MutationConfirmation: ViewModifier {
     let center: OperationCenter
+    let currentForceEvidence: @MainActor @Sendable (TapName) -> ForceUntapEvidence?
 
     func body(content: Content) -> some View {
-        content.confirmationDialog(
-            title,
-            isPresented: isPresented,
-            titleVisibility: .visible,
-            presenting: center.pendingConfirmation
-        ) { request in
-            Button(confirmLabel(for: request), role: .destructive) {
-                center.confirm(request)
-            }
-            Button("Cancel", role: .cancel) {
-                center.decline(request)
-            }
-        } message: { request in
-            // Every command, verbatim, one per line. A bulk uninstall discloses
-            // all of them — not a count and not an elided subset, because an
-            // all-or-nothing destructive action must never be confirmed blind
-            // (package-mutation PM3 sc5).
-            Text(request.isBulk ? bulkMessage(request) : "This will run:\n\(request.displayCommand)")
+        content.sheet(item: pending) { request in
+            MutationConfirmationSheet(
+                request: request,
+                center: center,
+                currentForceEvidence: currentForceEvidence
+            )
         }
     }
 
-    private var isPresented: Binding<Bool> {
+    private var pending: Binding<OperationCenter.ConfirmationRequest?> {
         Binding(
-            get: { center.pendingConfirmation != nil },
+            get: { center.pendingConfirmation },
             // Dismissing without choosing is a decline: nothing is submitted and
             // nothing is spawned.
             set: { presented in
-                guard !presented, let request = center.pendingConfirmation else { return }
+                guard presented == nil, let request = center.pendingConfirmation else { return }
                 center.decline(request)
             }
         )
     }
+}
 
-    private func bulkMessage(_ request: OperationCenter.ConfirmationRequest) -> String {
-        "This will run \(request.commands.count) commands:\n"
-            + request.displayCommands.joined(separator: "\n")
+private struct MutationConfirmationSheet: View {
+    let request: OperationCenter.ConfirmationRequest
+    let center: OperationCenter
+    let currentForceEvidence: @MainActor @Sendable (TapName) -> ForceUntapEvidence?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title)
+                .font(.title2.bold())
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(request.isBulk ? "This will run \(request.commands.count) commands:" : "This will run:")
+                    ForEach(Array(request.displayCommands.enumerated()), id: \.offset) { _, command in
+                        Text(command)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("confirmation-command")
+                    }
+                    Text(request.warningText)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("confirmation-warning")
+
+                    if !request.affectedPackages.isEmpty {
+                        Text("Affected packages")
+                            .font(.headline)
+                        ForEach(request.affectedPackages, id: \.self) { package in
+                            Text("\(package.kind.rawValue): \(package.name)")
+                                .accessibilityIdentifier(
+                                    "confirmation-affected-\(package.kind.rawValue)-\(package.name)"
+                                )
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) {
+                    center.decline(request)
+                }
+                .keyboardShortcut(.cancelAction)
+                Button(confirmLabel, role: .destructive) {
+                    confirm()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 460, idealWidth: 520, minHeight: 300, idealHeight: 380)
     }
 
     private var title: String {
-        guard let request = center.pendingConfirmation else { return "" }
+        switch request.disclosure {
+        case .tapTrust: return "Add this tap?"
+        case .forceUntap: return "Force-remove this tap?"
+        case .packageRemoval: break
+        }
         if request.isBulk {
             return "Uninstall \(request.commands.count) packages?"
         }
@@ -67,9 +110,26 @@ struct MutationConfirmation: ViewModifier {
             : "Uninstall this package?"
     }
 
-    private func confirmLabel(for request: OperationCenter.ConfirmationRequest) -> String {
+    private var confirmLabel: String {
+        switch request.disclosure {
+        case .tapTrust: return "Add Tap"
+        case .forceUntap: return "Force Untap"
+        case .packageRemoval: break
+        }
         if request.isBulk { return "Uninstall \(request.commands.count)" }
         return request.isZap ? "Uninstall and Zap" : "Uninstall"
+    }
+
+    private func confirm() {
+        guard case .forceUntap(let tap, _) = request.disclosure else {
+            center.confirm(request)
+            return
+        }
+        Task {
+            await center.confirmForceUntap(request) {
+                currentForceEvidence(tap)
+            }
+        }
     }
 }
 
@@ -87,7 +147,15 @@ private extension OperationCenter.ConfirmationRequest {
 
 extension View {
     /// Presents the centre's pending confirmation, if there is one.
-    func mutationConfirmation(_ center: OperationCenter) -> some View {
-        modifier(MutationConfirmation(center: center))
+    func mutationConfirmation(
+        _ center: OperationCenter,
+        currentForceEvidence: @escaping @MainActor @Sendable (TapName) -> ForceUntapEvidence? = { _ in nil }
+    ) -> some View {
+        modifier(
+            MutationConfirmation(
+                center: center,
+                currentForceEvidence: currentForceEvidence
+            )
+        )
     }
 }

@@ -49,7 +49,7 @@ public final class ActivityItem: Identifiable {
     ///
     /// `@ObservationIgnored` because it is plumbing: no view reads it, and
     /// publishing it would wake every observer twice per operation.
-    @ObservationIgnored internal var operation: BrewOperation?
+    @ObservationIgnored internal var operation: AuthorizedMutationOperation?
 
     /// True between `submit` handing the command to `run(_:for:on:)` and that
     /// method obtaining — or failing to obtain — a handle.
@@ -78,6 +78,8 @@ public final class ActivityItem: Identifiable {
     /// first (design D7). `nil` whenever either end is unknown: half a
     /// transition reads as data loss rather than as absence.
     @ObservationIgnored let versions: VersionTransition?
+    @ObservationIgnored let refreshToken: MutationOperationToken?
+    @ObservationIgnored let installationURL: URL?
 
     /// Where the queue says this operation is. Set by `OperationCenter` from
     /// the one `QueueSnapshot`, so the summary and the detail listing cannot
@@ -92,10 +94,18 @@ public final class ActivityItem: Identifiable {
     /// its presence *is* what "terminal" means for this item.
     public private(set) var outcome: MutationOutcome?
 
-    init(id: UUID, command: some BrewMutating, versions: VersionTransition? = nil) {
+    init(
+        id: UUID,
+        command: some BrewMutating,
+        versions: VersionTransition? = nil,
+        refreshToken: MutationOperationToken? = nil,
+        installationURL: URL? = nil
+    ) {
         self.id = id
         self.command = AnyBrewMutation(command)
         self.versions = versions
+        self.refreshToken = refreshToken
+        self.installationURL = installationURL
     }
 
     // MARK: - What the views render

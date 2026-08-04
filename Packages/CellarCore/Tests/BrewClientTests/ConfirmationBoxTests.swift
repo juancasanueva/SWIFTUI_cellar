@@ -22,6 +22,18 @@ import Testing
 @MainActor
 @Suite("Confirmation box", .timeLimit(.minutes(1)))
 struct ConfirmationBoxTests {
+
+    @Test("Package confirmations retain package-removal disclosure after tap presentation is added")
+    func packageConfirmationDisclosureRemainsCompatible() throws {
+        let harness = CenterHarness()
+        let command = MutationCommand.uninstall(try #require(PackageTarget(CenterHarness.wget)))
+
+        let request = try #require(harness.center.request(command))
+
+        #expect(request.disclosure == .packageRemoval)
+        #expect(request.affectedPackages.isEmpty)
+        #expect(request.displayCommand == "brew uninstall --formula wget")
+    }
     private static let wget = PackageID(kind: .formula, name: "wget")
     private static let git = PackageID(kind: .formula, name: "git")
 

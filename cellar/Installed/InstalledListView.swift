@@ -8,6 +8,17 @@ import Catalog
 import Persistence
 import SwiftUI
 
+enum InstalledSelection {
+    nonisolated static func adopting(
+        _ candidate: PackageID?,
+        into current: Set<PackageID>,
+        available: Set<PackageID>
+    ) -> Set<PackageID> {
+        guard let candidate, available.contains(candidate) else { return current }
+        return current.union([candidate])
+    }
+}
+
 /// What this machine has installed.
 ///
 /// The list is driven by the inventory, never by the catalog: everything a row
@@ -76,6 +87,7 @@ struct InstalledListView: View {
                     }
                 }
             }
+            .accessibilityIdentifier("installed-list")
             .overlay {
                 if entries.isEmpty {
                     InstalledEmptyState(state: installed.state)
@@ -84,18 +96,25 @@ struct InstalledListView: View {
             .onChange(of: selected) { _, current in
                 reconcileOrder(with: current)
             }
+            .onChange(of: selection) { _, current in
+                adoptExternalSelection(current)
+            }
             .onChange(of: entries) { _, _ in
                 // A package that has left the inventory leaves the selection at
                 // the next refresh, rather than producing an operation for
                 // something the app no longer lists (II13 sc3).
                 let live = Set(entries.map(\.id))
                 selected = selected.intersection(live)
+                adoptExternalSelection(selection)
             }
         }
         // No manual refresh control: the inventory refreshes at launch, on
         // activation, and within the quiet window of any external change, so a
         // button here would only ever duplicate work already scheduled.
         .navigationTitle(AppSection.installed.title)
+        .onAppear {
+            adoptExternalSelection(selection)
+        }
     }
 
     private func row(_ entry: PackageEntry) -> some View {
@@ -124,6 +143,18 @@ struct InstalledListView: View {
         // The detail column follows a single selection only: two selected
         // packages have no one package to show.
         selection = order.count == 1 ? order.first : nil
+    }
+
+    /// Adds a valid selection handed in by another app section without treating
+    /// a `nil` detail selection as a request to discard a legitimate bulk set.
+    private func adoptExternalSelection(_ candidate: PackageID?) {
+        let adopted = InstalledSelection.adopting(
+            candidate,
+            into: selected,
+            available: Set(entries.map(\.id))
+        )
+        guard adopted != selected else { return }
+        selected = adopted
     }
 
     /// The two bulk entry points offered when nothing is selected.

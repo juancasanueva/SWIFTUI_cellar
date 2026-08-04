@@ -12,6 +12,7 @@ struct Submission {
     let ordinal: Int
     let lines: AsyncStream<LogLine>
     let continuation: AsyncStream<LogLine>.Continuation
+    let authorizer: (any MutationLaunchAuthorizing)?
 
     func record(
         process: (any LaunchedProcess)? = nil,
@@ -23,6 +24,7 @@ struct Submission {
             ordinal: ordinal,
             lines: lines,
             continuation: continuation,
+            authorizer: authorizer,
             process: process,
             pump: pump
         )
@@ -51,14 +53,15 @@ struct OperationRecord {
     /// (R2), by which point the continuation has already finished.
     var lines: AsyncStream<LogLine>?
     var continuation: AsyncStream<LogLine>.Continuation?
+    let authorizer: (any MutationLaunchAuthorizing)?
     var process: (any LaunchedProcess)?
     /// Invariant I3: the pump is unstructured but owned by this record and
     /// cancelled when the operation ends.
     var pump: Task<Void, Never>?
     /// Completes only once the operation has a terminal result.
     var completion: Task<Void, Never>?
-    var resolvedExit: BrewExit?
-    var fault: BrewProcessError?
+    var terminal: OperationTerminal?
+    var pendingFault: BrewProcessError?
     /// Set before a signal is delivered, so the terminal result can be reported
     /// as cancelled rather than as a plain signal death.
     var cancellationSignal: Int32?
@@ -112,8 +115,13 @@ struct OperationRecord {
     /// whole truth. Storing a third field would let the projection drift from
     /// the state it describes (design D3).
     var projection: OperationSnapshot {
-        let phase: OperationSnapshot.Phase = if let resolvedExit {
-            .terminal(resolvedExit, fault: fault)
+        let phase: OperationSnapshot.Phase = if let terminal {
+            switch terminal {
+            case .process(let exit, let fault):
+                .terminal(exit, fault: fault)
+            case .authorizationDenied(let denial):
+                .authorizationDenied(denial)
+            }
         } else if process != nil {
             .running
         } else {
@@ -121,6 +129,11 @@ struct OperationRecord {
         }
         return OperationSnapshot(id: id, command: command, phase: phase)
     }
+}
+
+enum OperationTerminal {
+    case process(BrewExit, fault: BrewProcessError?)
+    case authorizationDenied(MutationLaunchDenial)
 }
 
 /// A handle to one running `brew` invocation.
@@ -166,6 +179,34 @@ public final class BrewOperation: Sendable, Identifiable {
     }
 
     /// Stops the operation, escalating `SIGINT` → `SIGTERM`.
+    public func cancel() async {
+        await runner.cancel(id)
+    }
+}
+
+/// A handle whose terminal can be either a process result or a pre-spawn denial.
+public final class AuthorizedMutationOperation: Sendable, Identifiable {
+    public let id: UUID
+    public let lines: AsyncStream<LogLine>
+
+    private let runner: BrewRunner
+
+    init(id: UUID, lines: AsyncStream<LogLine>, runner: BrewRunner) {
+        self.id = id
+        self.lines = lines
+        self.runner = runner
+    }
+
+    deinit {
+        let runner = runner
+        let id = id
+        Task { await runner.release(id) }
+    }
+
+    public func terminal() async -> AuthorizedMutationTerminal {
+        await runner.authorizedTerminal(of: id)
+    }
+
     public func cancel() async {
         await runner.cancel(id)
     }

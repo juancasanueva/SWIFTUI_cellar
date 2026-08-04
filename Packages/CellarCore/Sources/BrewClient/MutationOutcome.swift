@@ -54,6 +54,8 @@ public enum MutationOutcome: Sendable, Equatable {
     case abandoned(after: Duration)
     /// The process never started.
     case launchFailed
+    /// Queue-front evidence rejected the mutation before process launch.
+    case authorizationDenied(MutationLaunchDenial.Code)
 
     // MARK: - Classification
 
@@ -141,7 +143,7 @@ public enum MutationOutcome: Sendable, Equatable {
     public var isFailure: Bool {
         switch self {
         case .failed, .busy, .needsPrivileges, .launchFailed: true
-        case .succeeded, .noChange, .cancelled, .abandoned: false
+        case .succeeded, .noChange, .cancelled, .abandoned, .authorizationDenied: false
         }
     }
 
@@ -192,6 +194,10 @@ public enum MutationOutcome: Sendable, Equatable {
             """
         case .launchFailed:
             "Homebrew could not be started. Check the brew location in Settings."
+        case .authorizationDenied(.evidenceChanged):
+            "The affected packages changed. Review them and confirm again."
+        case .authorizationDenied(.evidenceUnavailable):
+            "Cellar could not verify the current affected packages. Refresh and try again."
         }
     }
 
@@ -206,6 +212,8 @@ public enum MutationOutcome: Sendable, Equatable {
         case .cancelled: "Cancelled"
         case .abandoned: "Cancelled, still running"
         case .launchFailed: "Could not start"
+        case .authorizationDenied(.evidenceChanged): "Needs fresh confirmation"
+        case .authorizationDenied(.evidenceUnavailable): "Could not verify current packages"
         }
     }
 }

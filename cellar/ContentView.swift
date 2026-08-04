@@ -27,12 +27,14 @@ struct ContentView: View {
     let history: HistoryStore
     let services: ServicesStore
     let servicesRefresher: ServicesRefreshCoordinator
+    let taps: TapStore
 
     @State private var section: AppSection = .browse
     @State private var selection: PackageID?
     /// Services carry their own identity, not a `PackageID`: a service is its
     /// own entity and never enters the package projection (SM12).
     @State private var serviceSelection: String?
+    @State private var tapSelection: String?
     @State private var isActivityExpanded = false
 
     var body: some View {
@@ -43,7 +45,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ActivityBar(center: operations, isExpanded: $isActivityExpanded)
             }
-            .mutationConfirmation(operations)
+            .mutationConfirmation(operations, currentForceEvidence: forceEvidence)
     }
 
     private var shell: some View {
@@ -75,6 +77,13 @@ struct ContentView: View {
                     selection: $selection
                 )
                 .navigationSplitViewColumnWidth(min: 300, ideal: 380)
+            case .taps:
+                TapsListView(
+                    taps: taps,
+                    operations: operations,
+                    selection: $tapSelection
+                )
+                .navigationSplitViewColumnWidth(min: 300, ideal: 380)
             case .services:
                 ServicesListView(
                     services: services,
@@ -93,6 +102,15 @@ struct ContentView: View {
                 BrewDetectionSummary(state: brewDetection.state)
             case .services:
                 ServiceDetailView(services: services)
+            case .taps:
+                TapDetailView(
+                    taps: taps,
+                    installed: installed,
+                    operations: operations,
+                    tapName: tapSelection,
+                    currentForceEvidence: forceEvidence,
+                    showInInstalled: showInInstalled
+                )
             case .history:
                 // The list column already carries the whole record; a second
                 // pane would only repeat it.
@@ -115,6 +133,26 @@ struct ContentView: View {
             }
         }
     }
+
+    private func forceEvidence(for tap: TapName) -> ForceUntapEvidence? {
+        guard case .loaded = taps.state,
+              case .loaded = installed.state,
+              taps.inventory.taps.contains(where: { $0.name == tap.rawValue })
+        else { return nil }
+
+        let affected = Set(
+            installed.inventory.packages.lazy
+                .filter { $0.tap == tap.rawValue }
+                .map(\.id)
+        )
+        guard !affected.isEmpty else { return nil }
+        return ForceUntapEvidence(tap: tap, affected: affected, isComplete: true)
+    }
+
+    private func showInInstalled(_ id: PackageID) {
+        selection = id
+        section = .installed
+    }
 }
 
 #Preview {
@@ -127,6 +165,7 @@ struct ContentView: View {
         metadata: MetadataStore(container: nil),
         history: HistoryStore(container: nil),
         services: services,
-        servicesRefresher: ServicesRefreshCoordinator(store: services)
+        servicesRefresher: ServicesRefreshCoordinator(store: services),
+        taps: TapStore()
     )
 }

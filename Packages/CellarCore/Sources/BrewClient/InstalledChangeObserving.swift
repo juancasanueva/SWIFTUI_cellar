@@ -35,9 +35,14 @@ public final class InstalledMutationGate {
     /// One element per mutation that reached a terminal outcome.
     @ObservationIgnored public let terminals: AsyncStream<Void>
     @ObservationIgnored private let continuation: AsyncStream<Void>.Continuation
+    /// Every terminal, with identity when a receipt was registered for it.
+    @ObservationIgnored public let settlements: AsyncStream<MutationTerminalEvent?>
+    @ObservationIgnored private let settlementContinuation:
+        AsyncStream<MutationTerminalEvent?>.Continuation
 
     public init() {
         (terminals, continuation) = AsyncStream<Void>.makeStream()
+        (settlements, settlementContinuation) = AsyncStream<MutationTerminalEvent?>.makeStream()
     }
 
     public func begin() {
@@ -55,9 +60,19 @@ public final class InstalledMutationGate {
     /// invisible until something else happened to invalidate the inventory. One
     /// wasted refresh is a far cheaper mistake than a stale list.
     public func end() {
+        end(event: nil)
+    }
+
+    public func end(event: MutationTerminalEvent?) {
         depth = max(0, depth - 1)
         isMutating = depth > 0
         continuation.yield()
+        settlementContinuation.yield(event)
+    }
+
+    public func shutdown() {
+        continuation.finish()
+        settlementContinuation.finish()
     }
 }
 
@@ -83,6 +98,7 @@ public final class InstalledRefreshCoordinator {
     private let mutations: InstalledMutationGate?
     private let clock: any Clock<Duration>
     private let quietWindow: Duration
+    private let refreshRegistry: MutationRefreshRegistry?
 
     /// The installation the baseline last refreshed with. The debounced path
     /// reuses it, so a change signal can never refresh against a `brew` the user
@@ -102,12 +118,14 @@ public final class InstalledRefreshCoordinator {
         store: InstalledStore,
         observer: (any InstalledChangeObserving)? = nil,
         mutations: InstalledMutationGate? = nil,
+        refreshRegistry: MutationRefreshRegistry? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
         quietWindow: Duration = InstalledRefreshCoordinator.defaultQuietWindow
     ) {
         self.store = store
         self.observer = observer
         self.mutations = mutations
+        self.refreshRegistry = refreshRegistry
         self.clock = clock
         self.quietWindow = quietWindow
     }
@@ -149,9 +167,9 @@ public final class InstalledRefreshCoordinator {
                 }
             }
             if let mutations {
-                group.addTask { [terminals = mutations.terminals] in
-                    for await _ in terminals {
-                        await self.mutationSettled()
+                group.addTask { [settlements = mutations.settlements] in
+                    for await event in settlements {
+                        await self.mutationSettled(event)
                     }
                 }
             }
@@ -224,13 +242,27 @@ public final class InstalledRefreshCoordinator {
     /// One mutation reached a terminal outcome: brew has just changed what is
     /// installed, so the mark moves for the same reason a watcher signal moves
     /// it, and exactly one re-snapshot is owed.
-    private func mutationSettled() async {
+    private func mutationSettled(_ event: MutationTerminalEvent?) async {
         store.invalidate()
-        await performRefresh()
+        let result = await performRefresh(for: event)
+        if let event, let refreshRegistry {
+            await refreshRegistry.complete(event, with: result)
+        }
     }
 
-    private func performRefresh() async {
-        guard let installation else { return }
+    @discardableResult
+    private func performRefresh(for event: MutationTerminalEvent? = nil) async -> RefreshResult {
+        guard let installation else { return .brewUnavailable }
+        if let event, event.installationURL != installation.executableURL {
+            return .installationChanged
+        }
         await store.refresh(using: installation)
+        if Task.isCancelled { return .cancelled }
+        switch store.state {
+        case .loaded: return .refreshed
+        case .failed: return .failed
+        case .brewAbsent: return .brewUnavailable
+        case .idle, .loading: return .failed
+        }
     }
 }

@@ -2,6 +2,23 @@ import BrewClient
 import Foundation
 
 extension HistoryRecord {
+    /// Human-readable terminal vocabulary shared by every history surface.
+    public var outcomeLabel: String {
+        switch outcomeRaw {
+        case "succeeded": "Done"
+        case "noChange": "No change"
+        case "failed": exitStatus.map { "Failed (\($0))" } ?? "Failed"
+        case "busy": "Homebrew busy"
+        case "needsPrivileges": "Needs Terminal"
+        case "cancelled": "Cancelled"
+        case "abandoned": "Cancelled, still running"
+        case "launchFailed": "Could not start"
+        case "authorizationDeniedEvidenceChanged": "Needs fresh confirmation"
+        case "authorizationDeniedEvidenceUnavailable": "Could not verify current packages"
+        default: outcomeRaw
+        }
+    }
+
     /// What one durable entry acted on, as **three** distinct facts.
     ///
     /// V1 storage spells absence as the empty string, and two entirely different

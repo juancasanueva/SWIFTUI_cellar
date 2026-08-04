@@ -79,6 +79,10 @@ public final class SwiftDataHistoryRecorder: HistoryRecording {
         case .cancelled: ("cancelled", nil)
         case .abandoned: ("abandoned", nil)
         case .launchFailed: ("launchFailed", nil)
+        case .authorizationDenied(.evidenceChanged):
+            ("authorizationDeniedEvidenceChanged", nil)
+        case .authorizationDenied(.evidenceUnavailable):
+            ("authorizationDeniedEvidenceUnavailable", nil)
         }
     }
 }

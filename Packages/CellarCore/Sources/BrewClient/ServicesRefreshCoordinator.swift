@@ -42,6 +42,7 @@ public final class ServicesRefreshCoordinator {
     private let mutations: InstalledMutationGate?
     private let clock: any Clock<Duration>
     private let interval: Duration
+    private let refreshRegistry: MutationRefreshRegistry?
 
     /// The installation the baseline last refreshed with. The poll reuses it,
     /// so a tick can never probe a `brew` the user has already moved away from.
@@ -70,11 +71,13 @@ public final class ServicesRefreshCoordinator {
     public init(
         store: ServicesStore,
         mutations: InstalledMutationGate? = nil,
+        refreshRegistry: MutationRefreshRegistry? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
         interval: Duration = ServicesRefreshCoordinator.defaultInterval
     ) {
         self.store = store
         self.mutations = mutations
+        self.refreshRegistry = refreshRegistry
         self.clock = clock
         self.interval = interval
     }
@@ -90,8 +93,8 @@ public final class ServicesRefreshCoordinator {
     /// poll — see the trap in this type's documentation.
     public func run() async {
         guard let mutations else { return }
-        for await _ in mutations.terminals {
-            await mutationSettled()
+        for await event in mutations.settlements {
+            await mutationSettled(event)
         }
     }
 
@@ -105,9 +108,12 @@ public final class ServicesRefreshCoordinator {
     /// mark this refresh could be answered by a poll acquisition that started
     /// *before* the mutation finished — a list from before the change, adopted
     /// after it.
-    private func mutationSettled() async {
+    private func mutationSettled(_ event: MutationTerminalEvent?) async {
         store.invalidate()
-        await performRefresh()
+        let result = await performRefresh(for: event)
+        if let event, let refreshRegistry {
+            await refreshRegistry.complete(event, with: result)
+        }
     }
 
     /// Whether a poll loop is running right now.
@@ -221,8 +227,19 @@ public final class ServicesRefreshCoordinator {
         }
     }
 
-    private func performRefresh() async {
-        guard let installation else { return }
+    @discardableResult
+    private func performRefresh(for event: MutationTerminalEvent? = nil) async -> RefreshResult {
+        guard let installation else { return .brewUnavailable }
+        if let event, event.installationURL != installation.executableURL {
+            return .installationChanged
+        }
         await store.refresh(using: installation)
+        if Task.isCancelled { return .cancelled }
+        switch store.state {
+        case .loaded: return .refreshed
+        case .failed: return .failed
+        case .brewAbsent: return .brewUnavailable
+        case .idle, .loading: return .failed
+        }
     }
 }

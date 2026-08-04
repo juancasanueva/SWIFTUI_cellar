@@ -26,10 +26,14 @@ public struct OperationSnapshot: Sendable, Identifiable, Equatable {
         /// Finished, however it finished. A cancelled run is a `BrewExit`
         /// reason, not a failure (M1 D3).
         case terminal(BrewExit, fault: BrewProcessError?)
+        /// Authorization refused the mutation before a process was launched.
+        case authorizationDenied(MutationLaunchDenial)
 
         public var isTerminal: Bool {
-            if case .terminal = self { return true }
-            return false
+            switch self {
+            case .terminal, .authorizationDenied: true
+            case .pending, .running: false
+            }
         }
 
         /// The terminal exit, when there is one.

@@ -10,6 +10,39 @@ import Testing
 @MainActor
 @Suite("History store")
 struct HistoryStoreTests {
+
+    @Test("Tap history is searchable by family action force and target")
+    func tapHistorySearchesNamespacedVerbsAndArgv() throws {
+        let container = try PersistenceContainer.inMemory()
+        let context = container.mainContext
+        for (index, pair) in [
+            ("tapAdd", ["tap", "acme/tools"]),
+            ("tapUntap", ["untap", "acme/tools"]),
+            ("tapForceUntap", ["untap", "--force", "acme/tools"])
+        ].enumerated() {
+            context.insert(HistoryEntry(
+                id: UUID(),
+                date: Date(timeIntervalSince1970: TimeInterval(index)),
+                kindRaw: "",
+                name: "",
+                verb: pair.0,
+                versionFrom: "",
+                versionTo: "",
+                outcomeRaw: "succeeded",
+                exitStatus: 0,
+                argv: pair.1,
+                commandText: pair.1.joined(separator: " ")
+            ))
+        }
+        try context.save()
+        let store = HistoryStore(container: container)
+
+        store.search = "FORCE"
+        #expect(store.records.map(\.verb) == ["tapForceUntap"])
+        store.search = "acme/tools"
+        #expect(store.records.count == 3)
+        #expect(store.records.allSatisfy { $0.packageID == nil })
+    }
     private static let wget = PackageID(kind: .formula, name: "wget")
 
     /// Three entries in a known order, oldest first as written.

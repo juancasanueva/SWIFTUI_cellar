@@ -19,6 +19,26 @@ import Testing
 /// identity" half; the GUI half is still owed.
 @Suite("History subject")
 struct HistorySubjectTests {
+
+    @Test("Tap denial outcome labels are presentation-ready without app-owned rules")
+    func tapDenialLabelsAreProjectedInPersistence() {
+        let changed = HistoryRecord(HistoryEntry(
+            id: UUID(),
+            date: Date(),
+            kindRaw: "",
+            name: "",
+            verb: "tapForceUntap",
+            versionFrom: "",
+            versionTo: "",
+            outcomeRaw: "authorizationDeniedEvidenceChanged",
+            exitStatus: nil,
+            argv: ["untap", "--force", "acme/tools"],
+            commandText: "untap --force acme/tools"
+        ))
+
+        #expect(changed.subject == .noPackage)
+        #expect(changed.outcomeLabel == "Needs fresh confirmation")
+    }
     private static func record(
         name: String,
         kind: PackageKind? = nil,
