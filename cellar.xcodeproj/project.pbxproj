@@ -11,6 +11,7 @@
 		BC0000010000000000000004 /* Catalog in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000005 /* Catalog */; };
 		BC0000010000000000000006 /* BrewClient in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000007 /* BrewClient */; };
 		BC0000010000000000000008 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000009 /* Persistence */; };
+		BC0000010000000000000010 /* DiskUsage in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000011 /* DiskUsage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +64,7 @@
 				BC0000010000000000000004 /* Catalog in Frameworks */,
 				BC0000010000000000000006 /* BrewClient in Frameworks */,
 				BC0000010000000000000008 /* Persistence in Frameworks */,
+				BC0000010000000000000010 /* DiskUsage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +129,7 @@
 				BC0000010000000000000005 /* Catalog */,
 				BC0000010000000000000007 /* BrewClient */,
 				BC0000010000000000000009 /* Persistence */,
+				BC0000010000000000000011 /* DiskUsage */,
 			);
 			productName = cellar;
 			productReference = BCDBE97B301E2D410013A38D /* cellar.app */;
@@ -615,6 +618,10 @@
 		BC0000010000000000000009 /* Persistence */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Persistence;
+		};
+		BC0000010000000000000011 /* DiskUsage */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DiskUsage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

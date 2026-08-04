@@ -8,6 +8,7 @@
 import BrewClient
 import BrewProcess
 import Catalog
+import DiskUsage
 import Persistence
 import SwiftUI
 
@@ -28,6 +29,7 @@ struct ContentView: View {
     let services: ServicesStore
     let servicesRefresher: ServicesRefreshCoordinator
     let taps: TapStore
+    let diskUsage: DiskUsageStore
 
     @State private var section: AppSection = .browse
     @State private var selection: PackageID?
@@ -92,6 +94,9 @@ struct ContentView: View {
                     selection: $serviceSelection
                 )
                 .navigationSplitViewColumnWidth(min: 280, ideal: 340)
+            case .cleanup:
+                CleanupView(detection: brewDetection, installed: installed, store: diskUsage)
+                    .navigationSplitViewColumnWidth(min: 360, ideal: 520)
             case .history:
                 HistoryView(history: history)
                     .navigationSplitViewColumnWidth(min: 320, ideal: 460)
@@ -110,6 +115,12 @@ struct ContentView: View {
                     tapName: tapSelection,
                     currentForceEvidence: forceEvidence,
                     showInInstalled: showInInstalled
+                )
+            case .cleanup:
+                ContentUnavailableView(
+                    "Storage visibility",
+                    systemImage: AppSection.cleanup.systemImage,
+                    description: Text("Expand a package to inspect its installed versions.")
                 )
             case .history:
                 // The list column already carries the whole record; a second
@@ -166,6 +177,9 @@ struct ContentView: View {
         history: HistoryStore(container: nil),
         services: services,
         servicesRefresher: ServicesRefreshCoordinator(store: services),
-        taps: TapStore()
+        taps: TapStore(),
+        diskUsage: DiskUsageStore(
+            cache: DiskUsageCache(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("preview-disk.json"))
+        )
     )
 }

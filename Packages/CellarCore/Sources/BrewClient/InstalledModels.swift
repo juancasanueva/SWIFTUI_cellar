@@ -43,6 +43,8 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
     public let kegs: [InstalledKeg]
     /// The keg brew linked, or the newest one when nothing is linked.
     public let primaryKeg: InstalledKeg
+    /// Exact payload state. `nil` means Homebrew reports the formula as unlinked.
+    public let linkedKeg: String?
     /// The snapshot's own outdated flag, verbatim.
     ///
     /// Kept separate from `isOutdated` because the cask rule narrows it
@@ -67,7 +69,8 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
         snapshotOutdated: Bool,
         isPinned: Bool,
         pinnedVersion: String?,
-        declaresAutoUpdates: Bool?
+        declaresAutoUpdates: Bool?,
+        linkedKeg: String? = nil
     ) {
         self.kind = kind
         self.name = name
@@ -78,6 +81,7 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
         self.catalogVersion = catalogVersion
         self.kegs = kegs
         self.primaryKeg = primaryKeg
+        self.linkedKeg = linkedKeg
         self.snapshotOutdated = snapshotOutdated
         self.isPinned = isPinned
         self.pinnedVersion = pinnedVersion

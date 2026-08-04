@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .library(name: "BrewProcess", targets: ["BrewProcess"]),
         .library(name: "Catalog", targets: ["Catalog"]),
+        .library(name: "DiskUsage", targets: ["DiskUsage"]),
         .library(name: "BrewClient", targets: ["BrewClient"]),
         .library(name: "Persistence", targets: ["Persistence"])
     ],
@@ -42,11 +43,21 @@ let package = Package(
             resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .target(
+            name: "DiskUsage",
+            dependencies: ["BrewProcess", "Catalog"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "DiskUsageTests",
+            dependencies: ["DiskUsage", "CellarTestSupport"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         // The only target that sees both libraries. The edge is one-directional:
         // nothing depends back on it, so `Catalog` stays brew-free (design D1).
         .target(
             name: "BrewClient",
-            dependencies: ["BrewProcess", "Catalog"],
+            dependencies: ["BrewProcess", "Catalog", "DiskUsage"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

@@ -82,7 +82,8 @@ public enum InstalledDecoder {
             pinnedVersion: formula.pinnedVersion,
             // Formulae have no auto-update concept at all — not "declared
             // false", simply not a question that applies.
-            declaresAutoUpdates: nil
+            declaresAutoUpdates: nil,
+            linkedKeg: formula.linkedKeg
         )
     }
 

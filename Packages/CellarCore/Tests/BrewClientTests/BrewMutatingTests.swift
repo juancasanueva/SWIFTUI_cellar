@@ -85,13 +85,17 @@ struct BrewMutatingTests {
         )
     }
 
-    /// Every package command declares the installed set, and nothing else —
+    /// Every package command declares the installed set and disk usage —
     /// so the scope is a real per-command declaration rather than a constant
     /// wearing a new name (PM6).
-    @Test("Every package command declares the installed set and only that")
+    @Test("Every package command declares installed inventory and disk usage")
     func everyPackageCommandDeclaresTheInstalledSet() {
         for command in Self.everyShippedCommand {
-            #expect(command.invalidates == .installedInventory, "\(command.verb) declared \(command.invalidates)")
+            #expect(
+                command.invalidates == [.installedInventory, .diskUsage],
+                "\(command.verb) declared \(command.invalidates)"
+            )
+            #expect(command.diskAreas.isEmpty == false)
         }
         #expect(ProbeMutation().invalidates == .services)
         #expect(InvalidationScope.services != InvalidationScope.installedInventory)
@@ -120,7 +124,8 @@ struct BrewMutatingTests {
         #expect(erased.verb == "install")
         #expect(erased.packageID == PackageID(kind: .formula, name: "wget"))
         #expect(erased.requiresConfirmation == false)
-        #expect(erased.invalidates == .installedInventory)
+        #expect(erased.invalidates == [.installedInventory, .diskUsage])
+        #expect(erased.diskAreas == [.cellar])
         #expect(erased.displayCommand == "brew install --formula wget")
         let destructive = MutationCommand.uninstall(PackageTarget(PackageID(kind: .cask, name: "iterm2"))!)
         #expect(AnyBrewMutation(destructive).requiresConfirmation)
@@ -154,7 +159,8 @@ struct BrewMutatingTests {
             verb: "upgradeAll",
             packageID: nil,
             requiresConfirmation: false,
-            invalidates: .installedInventory
+            invalidates: [.installedInventory, .diskUsage],
+            diskAreas: package.diskAreas
         )
 
         #expect(AnyBrewMutation(package) == AnyBrewMutation(impostor))

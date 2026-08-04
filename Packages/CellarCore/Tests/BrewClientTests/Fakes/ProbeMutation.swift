@@ -1,6 +1,7 @@
 @testable import BrewClient
 @testable import BrewProcess
 @testable import Catalog
+@testable import DiskUsage
 
 /// A `BrewMutating` conformer belonging to no capability at all.
 ///
@@ -17,4 +18,5 @@ struct ProbeMutation: BrewMutating, Equatable {
     var packageID: PackageID?
     var requiresConfirmation = false
     var invalidates: InvalidationScope = .services
+    var diskAreas: Set<DiskArea> = []
 }

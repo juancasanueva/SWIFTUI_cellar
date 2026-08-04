@@ -11,6 +11,7 @@ final class FakeInstalledChangeObserver: InstalledChangeObserving, Sendable {
     private let stream: AsyncStream<Void>
     private let continuation: AsyncStream<Void>.Continuation
     private let emitted = Mutex(0)
+    private let requested = Mutex(0)
 
     init() {
         (stream, continuation) = AsyncStream<Void>.makeStream()
@@ -18,6 +19,7 @@ final class FakeInstalledChangeObserver: InstalledChangeObserving, Sendable {
 
     /// How many signals this observer has produced.
     var emittedCount: Int { emitted.withLock { $0 } }
+    var changesCallCount: Int { requested.withLock { $0 } }
 
     /// Emits `count` change signals.
     func emit(_ count: Int = 1) {
@@ -31,5 +33,8 @@ final class FakeInstalledChangeObserver: InstalledChangeObserving, Sendable {
         continuation.finish()
     }
 
-    func changes() -> AsyncStream<Void> { stream }
+    func changes() -> AsyncStream<Void> {
+        requested.withLock { $0 += 1 }
+        return stream
+    }
 }

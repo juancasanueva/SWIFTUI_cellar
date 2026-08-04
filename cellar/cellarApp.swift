@@ -9,6 +9,7 @@ import AppKit
 import BrewClient
 import BrewProcess
 import Catalog
+import DiskUsage
 import Persistence
 import SwiftUI
 
@@ -39,6 +40,9 @@ struct cellarApp: App {
     @State private var refresher: InstalledRefreshCoordinator
     @State private var taps: TapStore
     @State private var tapsRefresher: TapRefreshCoordinator
+    @State private var diskUsage: DiskUsageStore
+    @State private var diskMutations: InstalledMutationGate
+    @State private var diskRefresher: DiskUsageRefreshCoordinator
 
     /// The queue of Cellar-initiated mutations, and everything the activity
     /// surfaces read. It is what finally drives `mutations`, the gate M2-1
@@ -110,8 +114,18 @@ struct cellarApp: App {
         let mutations = InstalledMutationGate()
         let serviceMutations = InstalledMutationGate()
         let tapMutations = InstalledMutationGate()
+        let diskMutations = InstalledMutationGate()
         let refreshRegistry = MutationRefreshRegistry()
         let services = ServicesStore()
+        let diskCacheURL = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory)
+            .appendingPathComponent("Cellar/disk-usage-v1.json")
+        let diskUsage = DiskUsageStore(
+            cache: DiskUsageCache(fileURL: diskCacheURL),
+            initialSnapshot: isUITesting && AppTestFixtures.mode != .absent
+                ? AppTestFixtures.diskSnapshot : nil,
+            initiallyStale: isUITesting
+        )
         // One container, opened once, shared by both stores.
         let stores = LocalStores()
         _brewDetection = State(initialValue: BrewDetectionStore(locator: locator))
@@ -119,6 +133,8 @@ struct cellarApp: App {
         _mutations = State(initialValue: mutations)
         _serviceMutations = State(initialValue: serviceMutations)
         _tapMutations = State(initialValue: tapMutations)
+        _diskMutations = State(initialValue: diskMutations)
+        _diskUsage = State(initialValue: diskUsage)
         _taps = State(initialValue: taps)
         self.refreshRegistry = refreshRegistry
         _metadata = State(initialValue: stores.metadata)
@@ -141,6 +157,13 @@ struct cellarApp: App {
                 refreshRegistry: refreshRegistry
             )
         )
+        _diskRefresher = State(
+            initialValue: DiskUsageRefreshCoordinator(
+                store: diskUsage,
+                mutations: diskMutations,
+                refreshRegistry: refreshRegistry
+            )
+        )
         // The recorder is injected once, here, and nowhere else: `finish` is the
         // only caller, so this is the whole of "history is written" as a wiring
         // fact. Removing this argument returns the centre to its M2-2 behaviour
@@ -155,6 +178,7 @@ struct cellarApp: App {
                     (.installedInventory, mutations),
                     (.services, serviceMutations),
                     (.taps, tapMutations)
+                    ,(.diskUsage, diskMutations)
                 ]),
                 history: SwiftDataHistoryRecorder(store: stores.history),
                 refreshRegistry: refreshRegistry,
@@ -177,7 +201,8 @@ struct cellarApp: App {
                 history: history,
                 services: services,
                 servicesRefresher: servicesRefresher,
-                taps: taps
+                taps: taps,
+                diskUsage: diskUsage
             )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
@@ -201,7 +226,14 @@ struct cellarApp: App {
                 // body returns, so a poll started here would never restart after
                 // the first hide. The coordinator owns the poll itself.
                 .task { loops.start("services") { await servicesRefresher.run() } }
-                .task { loops.start("taps") { await tapsRefresher.run() } }
+                .task {
+                    loops.start("taps-and-disk-usage") {
+                        await withTaskGroup(of: Void.self) { group in
+                            group.addTask { await tapsRefresher.run() }
+                            group.addTask { await diskRefresher.run() }
+                        }
+                    }
+                }
         }
     }
 
@@ -246,8 +278,11 @@ struct cellarApp: App {
         guard let installation = brewDetection.state.installation else { return }
 
         let observer = FSEventsInstalledObserver(installation: installation)
-        for await _ in observer.changes() {
-            refresher.changeDetected()
-        }
+        let fanout = HomebrewChangeFanout(
+            observer: observer,
+            installedChanged: { refresher.changeDetected() },
+            diskChanged: { areas in diskRefresher.invalidate(areas) }
+        )
+        await fanout.run()
     }
 }

@@ -1,4 +1,5 @@
 import BrewProcess
+import DiskUsage
 import Foundation
 import Observation
 
@@ -12,6 +13,33 @@ import Observation
 public protocol InstalledChangeObserving: Sendable {
     /// Coalesced change signals. Never parsed.
     func changes() -> AsyncStream<Void>
+}
+
+/// Consumes one root-change stream and fans the signal out without starting a
+/// second FSEvents observer. Path details are intentionally not interpreted;
+/// the production watcher covers Cellar and Caskroom as one explicit boundary.
+@MainActor
+public final class HomebrewChangeFanout {
+    private let observer: any InstalledChangeObserving
+    private let installedChanged: @MainActor @Sendable () async -> Void
+    private let diskChanged: @MainActor @Sendable (Set<DiskArea>) async -> Void
+
+    public init(
+        observer: any InstalledChangeObserving,
+        installedChanged: @escaping @MainActor @Sendable () async -> Void,
+        diskChanged: @escaping @MainActor @Sendable (Set<DiskArea>) async -> Void
+    ) {
+        self.observer = observer
+        self.installedChanged = installedChanged
+        self.diskChanged = diskChanged
+    }
+
+    public func run() async {
+        for await _ in observer.changes() {
+            await installedChanged()
+            await diskChanged([.cellar, .caskroom])
+        }
+    }
 }
 
 /// Whether Cellar itself is currently changing what is installed.
