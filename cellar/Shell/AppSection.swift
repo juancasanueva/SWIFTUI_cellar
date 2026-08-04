@@ -13,6 +13,8 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case home
     case browse
     case installed
+    /// Homebrew source inventory and third-party tap management.
+    case taps
     /// The background services Homebrew manages.
     ///
     /// Its own place rather than a lens on Installed: a service is its own
@@ -33,6 +35,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .home: "Home"
         case .browse: "Browse"
         case .installed: "Installed"
+        case .taps: "Taps"
         case .services: "Services"
         case .history: "History"
         }
@@ -43,6 +46,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .home: "house"
         case .browse: "square.grid.2x2"
         case .installed: "shippingbox"
+        case .taps: "externaldrive.connected.to.line.below"
         case .services: "bolt.horizontal.circle"
         case .history: "clock.arrow.circlepath"
         }

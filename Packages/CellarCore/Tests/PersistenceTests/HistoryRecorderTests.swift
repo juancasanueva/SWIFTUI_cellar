@@ -17,6 +17,32 @@ import Testing
 @MainActor
 @Suite("History recorder")
 struct HistoryRecorderTests {
+
+    @Test("Authorization denials persist distinct outcome names with no exit status")
+    func authorizationDenialsPersistTypedOutcomes() throws {
+        let container = try PersistenceContainer.inMemory()
+        let (recorder, store) = Self.recorder(container)
+        recorder.record(Self.draft(
+            packageID: nil,
+            verb: "tapForceUntap",
+            versions: nil,
+            outcome: .authorizationDenied(.evidenceChanged),
+            argv: ["untap", "--force", "acme/tools"]
+        ))
+        recorder.record(Self.draft(
+            packageID: nil,
+            verb: "tapForceUntap",
+            versions: nil,
+            outcome: .authorizationDenied(.evidenceUnavailable),
+            argv: ["untap", "--force", "acme/tools"]
+        ))
+
+        #expect(Set(store.records.map(\.outcomeRaw)) == [
+            "authorizationDeniedEvidenceChanged",
+            "authorizationDeniedEvidenceUnavailable"
+        ])
+        #expect(store.records.allSatisfy { $0.exitStatus == nil && $0.packageID == nil })
+    }
     private static let wget = PackageID(kind: .formula, name: "wget")
     private static let iterm = PackageID(kind: .cask, name: "iterm2")
 

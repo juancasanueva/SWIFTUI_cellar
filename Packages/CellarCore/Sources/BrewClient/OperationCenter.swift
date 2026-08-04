@@ -38,7 +38,7 @@ public final class OperationCenter {
     ///
     /// `@ObservationIgnored` because the box publishes its own changes;
     /// observing the reference as well would wake every observer twice.
-    @ObservationIgnored private let confirmations = ConfirmationBox()
+    @ObservationIgnored let confirmations = ConfirmationBox()
 
     /// The only writer, and deliberately a method rather than a property setter.
     ///
@@ -48,7 +48,11 @@ public final class OperationCenter {
     /// rest of the module the ability to answer a confirmation on the user's
     /// behalf.
     func setPendingConfirmation(_ request: ConfirmationRequest?) {
-        confirmations.pending = request
+        if let request {
+            confirmations.present(request)
+        } else if let pending = confirmations.pending {
+            confirmations.consume(pending)
+        }
     }
 
     /// The services-scoped duplicate-submit guard.
@@ -75,16 +79,23 @@ public final class OperationCenter {
     @ObservationIgnored private let launcherFactory: (BrewInstallation) -> any ProcessLaunching
     @ObservationIgnored private var runner: BrewRunner?
     @ObservationIgnored private var installation: BrewInstallation?
+    @ObservationIgnored private let refreshRegistry: MutationRefreshRegistry?
+    @ObservationIgnored lazy var forceRecovery: ForceDenialRecoveryCoordinator? = refreshRegistry.map {
+        ForceDenialRecoveryCoordinator(registry: $0, confirmations: confirmations)
+    }
+    @ObservationIgnored var forceRecoveryContexts: [UUID: ForceRecoveryContext] = [:]
 
     public init(
         gates: MutationGates,
         history: any HistoryRecording = NoHistoryRecording(),
+        refreshRegistry: MutationRefreshRegistry? = nil,
         launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
             SystemProcessLauncher()
         }
     ) {
         self.gates = gates
         self.history = history
+        self.refreshRegistry = refreshRegistry
         self.launcherFactory = launcherFactory
     }
 
@@ -98,12 +109,14 @@ public final class OperationCenter {
     public init(
         gate: InstalledMutationGate? = nil,
         history: any HistoryRecording = NoHistoryRecording(),
+        refreshRegistry: MutationRefreshRegistry? = nil,
         launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
             SystemProcessLauncher()
         }
     ) {
         gates = gate.map { MutationGates(installed: $0) }
         self.history = history
+        self.refreshRegistry = refreshRegistry
         self.launcherFactory = launcherFactory
     }
 
@@ -211,7 +224,7 @@ public final class OperationCenter {
         _ command: MutationCommand,
         versions: VersionTransition? = nil
     ) -> ActivityItem {
-        perform(command, versions: versions)
+        perform(command, versions: versions, authorizer: AllowMutationLaunch(), refreshToken: nil)
     }
 
     @discardableResult
@@ -219,7 +232,22 @@ public final class OperationCenter {
         _ command: some BrewMutating,
         versions: VersionTransition? = nil
     ) -> ActivityItem {
-        perform(command, versions: versions)
+        perform(command, versions: versions, authorizer: AllowMutationLaunch(), refreshToken: nil)
+    }
+
+    @discardableResult
+    public func submit(
+        _ command: some BrewMutating,
+        versions: VersionTransition? = nil,
+        authorizer: any MutationLaunchAuthorizing,
+        refreshToken: MutationOperationToken? = nil
+    ) -> ActivityItem {
+        perform(
+            command,
+            versions: versions,
+            authorizer: authorizer,
+            refreshToken: refreshToken
+        )
     }
 
     /// The one submission path. Both overloads above forward here unchanged, so
@@ -228,9 +256,17 @@ public final class OperationCenter {
     @discardableResult
     private func perform(
         _ command: some BrewMutating,
-        versions: VersionTransition?
+        versions: VersionTransition?,
+        authorizer: any MutationLaunchAuthorizing,
+        refreshToken: MutationOperationToken?
     ) -> ActivityItem {
-        let item = ActivityItem(id: UUID(), command: command, versions: versions)
+        let item = ActivityItem(
+            id: UUID(),
+            command: command,
+            versions: versions,
+            refreshToken: refreshToken,
+            installationURL: installation?.executableURL
+        )
         items.append(item)
 
         // The gate opens per submission, not per batch, so `isMutating` stays
@@ -263,7 +299,7 @@ public final class OperationCenter {
         // that is about to exist (design D10).
         item.isStartInFlight = true
         Task { [weak self] in
-            await self?.run(command, for: item, on: runner)
+            await self?.run(command, for: item, on: runner, authorizer: authorizer)
         }
         return item
     }
@@ -277,7 +313,8 @@ public final class OperationCenter {
     private func run(
         _ command: some BrewMutating,
         for item: ActivityItem,
-        on runner: BrewRunner
+        on runner: BrewRunner,
+        authorizer: any MutationLaunchAuthorizing
     ) async {
         // Cancelled between `submit` and here: never spawn it.
         guard !item.isCancelRequested else {
@@ -286,9 +323,12 @@ public final class OperationCenter {
             return
         }
 
-        let operation: BrewOperation
+        let operation: AuthorizedMutationOperation
         do {
-            operation = try await runner.start(command.brewCommand)
+            operation = try await runner.start(
+                BrewMutation(arguments: command.arguments),
+                authorizer: authorizer
+            )
         } catch {
             item.isStartInFlight = false
             finish(item, with: .launchFailed)
@@ -314,13 +354,14 @@ public final class OperationCenter {
             item.append(line)
         }
 
-        let exit = await operation.exit()
-        let fault = await operation.fault()
-        // Through the **command**, not through the static classifier: a family
-        // that overrides `classify` is answered by its own implementation, and
-        // one that does not gets the protocol default, which is today's logic
-        // verbatim.
-        finish(item, with: command.classify(exit: exit, fault: fault, log: item.log))
+        switch await operation.terminal() {
+        case .process(let exit, let fault):
+            // Through the concrete command, preserving family-specific classification.
+            finish(item, with: command.classify(exit: exit, fault: fault, log: item.log))
+        case .authorizationDenied(let denial):
+            item.queuePhase = .authorizationDenied(denial)
+            finish(item, with: .authorizationDenied(denial.code))
+        }
     }
 
     /// Settles an item exactly once, pays the re-snapshot it owes, and records
@@ -334,12 +375,7 @@ public final class OperationCenter {
     private func finish(_ item: ActivityItem, with outcome: MutationOutcome) {
         guard item.outcome == nil else { return }
         item.settle(outcome)
-        // Every terminal outcome owes exactly one refresh of **each domain the
-        // command declared** — success, both typed failures, a plain failure and
-        // a cancellation alike (PM6). The scope is read from the item's own
-        // erased command, so `end` closes exactly what `submit` opened.
-        gates?.end(item.command.invalidates)
-        // Last, and deliberately: recording is a **side effect** of the outcome,
+        // Recording is a side effect of the outcome,
         // never a precondition of it. The protocol is synchronous and
         // non-throwing, so an absent or failing recorder cannot change what this
         // operation reported or delay the re-snapshot it already paid (IH7).
@@ -354,6 +390,14 @@ public final class OperationCenter {
                 argv: item.arguments
             )
         )
+        // Emit refresh work only after the terminal and its durable history draft
+        // are settled. Receipt consumers can therefore never reconfirm early.
+        gates?.end(
+            item.command.invalidates,
+            token: item.refreshToken,
+            installationURL: item.installationURL
+        )
+        settleForceRecovery(for: item, outcome: outcome)
     }
 
     // MARK: - Cancel

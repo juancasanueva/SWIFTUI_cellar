@@ -17,6 +17,35 @@ import Testing
 @MainActor
 @Suite("Operation center history", .timeLimit(.minutes(1)))
 struct OperationCenterHistoryTests {
+
+    @Test("Tap add untap and force untap each write one null-package exact-argv entry")
+    func tapMutationsWriteNamespacedNullPackageHistory() async throws {
+        let harness = CenterHarness()
+        let tap = try #require(TapName("acme/tools"))
+        let commands = [
+            try #require(TapCommand.add(tap.rawValue)),
+            try #require(TapCommand.untap(tap.rawValue)),
+            try #require(TapCommand.forceUntap(evidence: ForceUntapEvidence(
+                tap: tap,
+                affected: [PackageID(kind: .formula, name: "widget")],
+                isComplete: true
+            )))
+        ]
+
+        for (index, command) in commands.enumerated() {
+            harness.center.submit(command)
+            try await harness.finish(call: index)
+        }
+
+        #expect(harness.recorder.drafts.count == 3)
+        #expect(harness.recorder.drafts.map(\.verb) == ["tapAdd", "tapUntap", "tapForceUntap"])
+        #expect(harness.recorder.drafts.map(\.argv) == [
+            ["tap", "acme/tools"],
+            ["untap", "acme/tools"],
+            ["untap", "--force", "acme/tools"]
+        ])
+        #expect(harness.recorder.drafts.allSatisfy { $0.packageID == nil && $0.versions == nil })
+    }
     private static func target(_ id: PackageID) throws -> PackageTarget {
         try #require(PackageTarget(id))
     }

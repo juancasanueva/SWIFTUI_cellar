@@ -18,6 +18,30 @@ import Testing
 @Suite("Operation center submissions", .timeLimit(.minutes(1)))
 struct OperationCenterTests {
 
+    @Test("Force tap confirmation presents every typed affected package without changing argv")
+    func forceTapConfirmationPresentsTypedPackages() throws {
+        let harness = CenterHarness()
+        let tap = try #require(TapName("acme/tools"))
+        let affected: Set<PackageID> = [
+            PackageID(kind: .formula, name: "widget"),
+            PackageID(kind: .cask, name: "widget"),
+            PackageID(kind: .formula, name: "helper")
+        ]
+        let command = try #require(TapCommand.forceUntap(evidence: ForceUntapEvidence(
+            tap: tap,
+            affected: affected,
+            isComplete: true
+        )))
+
+        let request = try #require(harness.center.request(command))
+
+        #expect(request.tapIdentity == tap)
+        #expect(Set(request.affectedPackages) == affected)
+        #expect(request.affectedPackages.count == 3)
+        #expect(request.command.arguments == ["untap", "--force", "acme/tools"])
+        #expect(request.displayCommand == "brew untap --force acme/tools")
+    }
+
     // MARK: - One submission, one item (OA2 sc1–2)
 
     @Test("A submission produces one item whose identity and copy text never change")

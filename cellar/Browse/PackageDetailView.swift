@@ -22,8 +22,16 @@ struct PackageDetailView: View {
     @Binding var selection: PackageID?
 
     var body: some View {
-        if let id, let package = catalog.package(id) {
-            content(for: package)
+        if let id {
+            if let package = catalog.package(id) {
+                content(for: package)
+            } else {
+                ContentUnavailableView(
+                    "Package details unavailable",
+                    systemImage: "shippingbox",
+                    description: Text("This installed package is not in Cellar’s core/cask catalog.")
+                )
+            }
         } else {
             ContentUnavailableView(
                 "No package selected",

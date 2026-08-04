@@ -105,7 +105,7 @@ public actor BrewRunner {
     /// R2 — releases everything a terminal, drained operation no longer needs.
     /// R1 is the guard on the first line: a live record is never touched.
     private func compact(_ id: UUID) {
-        guard var record = operations[id], record.resolvedExit != nil, !record.isCompacted else {
+        guard var record = operations[id], record.terminal != nil, !record.isCompacted else {
             return
         }
         record.process = nil
@@ -160,7 +160,8 @@ public actor BrewRunner {
             command: command,
             ordinal: nextOrdinal,
             lines: lines,
-            continuation: continuation
+            continuation: continuation,
+            authorizer: command.kind == .mutate ? AllowMutationLaunch() : nil
         )
         let id = submission.id
 
@@ -181,6 +182,31 @@ public actor BrewRunner {
         }
 
         return BrewOperation(id: id, lines: lines, runner: self)
+    }
+
+    /// Enqueues an authorized mutation. Reads cannot enter this API.
+    public func start(
+        _ mutation: BrewMutation,
+        authorizer: any MutationLaunchAuthorizing = AllowMutationLaunch()
+    ) async throws(BrewProcessError) -> AuthorizedMutationOperation {
+        let command = BrewCommand.mutate(mutation.arguments)
+        let spec = ProcessSpec(
+            executableURL: installation.executableURL,
+            arguments: mutation.arguments,
+            environment: BrewEnvironment.current()
+        )
+        nextOrdinal += 1
+        let (lines, continuation) = AsyncStream<LogLine>.makeStream()
+        let submission = Submission(
+            id: UUID(),
+            command: command,
+            ordinal: nextOrdinal,
+            lines: lines,
+            continuation: continuation,
+            authorizer: authorizer
+        )
+        enqueueMutation(submission, spec: spec)
+        return AuthorizedMutationOperation(id: submission.id, lines: lines, runner: self)
     }
 
     /// Puts a mutation at the end of the FIFO gate.
@@ -206,20 +232,36 @@ public actor BrewRunner {
 
     /// Runs one gated mutation and holds the gate until it is terminal.
     private func runQueuedMutation(id: UUID, spec: ProcessSpec) async {
-        guard let record = operations[id], record.resolvedExit == nil else {
+        guard let record = operations[id], record.terminal == nil else {
             // Cancelled while queued: never spawn anything.
             return
         }
+
+        let decision = await record.authorizer?.authorizeLaunch() ?? .allow
+        guard operations[id]?.terminal == nil else { return }
+        if case .deny(let denial) = decision {
+            operations[id]?.terminal = .authorizationDenied(denial)
+            record.continuation?.finish()
+            compact(id)
+            publish()
+            return
+        }
+
+        // Cancellation can settle the queued record while authorization awaits.
+        guard operations[id]?.terminal == nil else { return }
 
         let process: any LaunchedProcess
         do {
             process = try launcher.launch(spec)
         } catch {
-            operations[id]?.fault = Self.mapLaunchFailure(
+            let fault = Self.mapLaunchFailure(
                 error,
                 executableURL: installation.executableURL
             )
-            operations[id]?.resolvedExit = BrewExit(status: 127, reason: .exited)
+            operations[id]?.terminal = .process(
+                BrewExit(status: 127, reason: .exited),
+                fault: fault
+            )
             record.continuation?.finish()
             compact(id)
             publish()
@@ -265,13 +307,14 @@ public actor BrewRunner {
         // Awaiting the pump first is what guarantees the ordering contract: the
         // result is never delivered before the output is observable.
         await pump.value
-        guard operations[id]?.resolvedExit == nil else { return }
+        guard operations[id]?.terminal == nil else { return }
 
         let exit = await process.waitForTermination()
         // Computed before the assignment: writing through `operations[id]` while
         // the right-hand side also reads it would overlap exclusive access.
         let result = terminalResult(exit, for: id)
-        operations[id]?.resolvedExit = result
+        let fault = operations[id]?.pendingFault
+        operations[id]?.terminal = .process(result, fault: fault)
         compact(id)
         publish()
     }
@@ -287,16 +330,29 @@ public actor BrewRunner {
         guard let record = operations[id] else {
             return .unknownOperation
         }
-        if let resolved = record.resolvedExit { return resolved }
+        if case .process(let exit, _) = record.terminal { return exit }
 
         await record.completion?.value
-        return operations[id]?.resolvedExit ?? .unknownOperation
+        if case .process(let exit, _) = operations[id]?.terminal { return exit }
+        return .unknownOperation
     }
 
     /// An out-of-band fault, if the operation hit one. `nil` for every normal
     /// run, including a cancelled one.
     func fault(of id: UUID) -> BrewProcessError? {
-        operations[id]?.fault
+        if case .process(_, let fault) = operations[id]?.terminal { return fault }
+        return operations[id]?.pendingFault
+    }
+
+    func authorizedTerminal(of id: UUID) async -> AuthorizedMutationTerminal {
+        guard let record = operations[id] else {
+            return .process(.unknownOperation, fault: nil)
+        }
+        if let terminal = record.terminal { return terminal.authorized }
+
+        await record.completion?.value
+        return operations[id]?.terminal?.authorized
+            ?? .process(.unknownOperation, fault: nil)
     }
 
     /// Reports a run Cellar cancelled as cancelled, whatever the OS said.
@@ -310,7 +366,7 @@ public actor BrewRunner {
     /// Stops `id`, escalating `SIGINT` → `SIGTERM` and never further (D4).
     public func cancel(_ id: BrewOperation.ID) async {
         guard let record = operations[id],
-              record.resolvedExit == nil,
+               record.terminal == nil,
               record.isCancelling == false
         else { return }
         operations[id]?.isCancelling = true
@@ -318,9 +374,9 @@ public actor BrewRunner {
         guard let process = record.process, let pump = record.pump else {
             // Still queued behind another mutation: resolve it here so it never
             // spawns, and let the gate hand over to whoever is next.
-            operations[id]?.resolvedExit = BrewExit(
-                status: 128 + SIGINT,
-                reason: .cancelled(signal: SIGINT)
+            operations[id]?.terminal = .process(
+                BrewExit(status: 128 + SIGINT, reason: .cancelled(signal: SIGINT)),
+                fault: nil
             )
             record.continuation?.finish()
             compact(id)
@@ -338,10 +394,9 @@ public actor BrewRunner {
         // The process ignored both signals. Stop consuming it, report the fault,
         // and leave it alone: SIGKILL is not an option (D4).
         pump.cancel()
-        operations[id]?.fault = .cancelledUnresponsive(after: policy.totalGrace)
-        operations[id]?.resolvedExit = BrewExit(
-            status: 128 + SIGTERM,
-            reason: .cancelled(signal: SIGTERM)
+        operations[id]?.terminal = .process(
+            BrewExit(status: 128 + SIGTERM, reason: .cancelled(signal: SIGTERM)),
+            fault: .cancelledUnresponsive(after: policy.totalGrace)
         )
         // The pump was cancelled rather than drained — the closest to drained
         // that D4's "never SIGKILL" allows — so this record is compactable too.
@@ -361,5 +416,14 @@ public actor BrewRunner {
         operations[id]?.cancellationSignal = signal.posixValue
         try? process.send(signal)
         return await Self.completes(pump, within: grace, on: clock)
+    }
+}
+
+private extension OperationTerminal {
+    var authorized: AuthorizedMutationTerminal {
+        switch self {
+        case .process(let exit, let fault): .process(exit, fault: fault)
+        case .authorizationDenied(let denial): .authorizationDenied(denial)
+        }
     }
 }

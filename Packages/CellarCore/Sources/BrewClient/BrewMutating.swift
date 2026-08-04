@@ -1,5 +1,6 @@
 import BrewProcess
 import Catalog
+import Foundation
 
 // MARK: - Threat response: subprocess argument composition, generalized
 //
@@ -42,6 +43,8 @@ public struct InvalidationScope: OptionSet, Sendable, Hashable {
     public static let installedInventory = InvalidationScope(rawValue: 1 << 0)
     /// What `brew services list --json` answers for.
     public static let services = InvalidationScope(rawValue: 1 << 1)
+    /// What `brew tap-info --installed --json` answers for.
+    public static let taps = InvalidationScope(rawValue: 1 << 2)
 
     // `1 << 2` taps (M3-2) and `1 << 3` disk usage (M3-3) are **reserved by this
     // comment and deliberately not declared**: an undeclared bit cannot be
@@ -200,9 +203,29 @@ public final class MutationGates {
     /// a domain cannot be ended that was never begun, and every domain that was
     /// begun is ended — which is what makes "exactly one refresh per declared
     /// domain, never zero and never two" hold for every terminal outcome (PM6).
-    public func end(_ scope: InvalidationScope) {
+    public func end(
+        _ scope: InvalidationScope,
+        token: MutationOperationToken? = nil,
+        installationURL: URL? = nil
+    ) {
         for entry in entries where entry.scope.isDisjoint(with: scope) == false {
-            entry.gate.end()
+            let event = token.flatMap { token in
+                installationURL.flatMap { url in
+                    Self.domain(for: entry.scope).map {
+                        MutationTerminalEvent(token: token, domain: $0, installationURL: url)
+                    }
+                }
+            }
+            entry.gate.end(event: event)
+        }
+    }
+
+    private static func domain(for scope: InvalidationScope) -> RefreshDomain? {
+        switch scope {
+        case .taps: .taps
+        case .installedInventory: .installedInventory
+        case .services: .services
+        default: nil
         }
     }
 }

@@ -6,14 +6,35 @@
 //
 
 import Testing
+import Catalog
 @testable import cellar
 
 struct cellarTests {
+    @Test("A valid external handoff joins without collapsing a bulk selection")
+    func validInstalledHandoffPreservesBulkSelection() {
+        let first = PackageID(kind: .formula, name: "first")
+        let second = PackageID(kind: .cask, name: "second")
+        let handoff = PackageID(kind: .formula, name: "widget")
+        let current: Set<PackageID> = [first, second]
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-        // Swift Testing Documentation
-        // https://developer.apple.com/documentation/testing
+        let adopted = InstalledSelection.adopting(
+            handoff,
+            into: current,
+            available: current.union([handoff])
+        )
+
+        #expect(adopted == current.union([handoff]))
+    }
+
+    @Test("Nil and unavailable external identities leave bulk selection unchanged")
+    func invalidInstalledHandoffPreservesBulkSelection() {
+        let first = PackageID(kind: .formula, name: "first")
+        let second = PackageID(kind: .cask, name: "second")
+        let missing = PackageID(kind: .formula, name: "missing")
+        let current: Set<PackageID> = [first, second]
+
+        #expect(InstalledSelection.adopting(nil, into: current, available: current) == current)
+        #expect(InstalledSelection.adopting(missing, into: current, available: current) == current)
     }
 
 }

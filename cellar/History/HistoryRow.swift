@@ -40,7 +40,7 @@ struct HistoryRow: View {
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 3) {
-                Text(outcomeLabel).font(.caption)
+                Text(record.outcomeLabel).font(.caption)
                 Text(record.date, format: .dateTime.day().month().hour().minute())
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -68,22 +68,6 @@ struct HistoryRow: View {
     /// (`HistorySubjectTests`); this view owns no rule.
     private var title: String {
         record.subject.label
-    }
-
-    /// The stored outcome, spelled for a human. Read off `outcomeRaw`, which the
-    /// classifier decided — never off anything brew printed.
-    private var outcomeLabel: String {
-        switch record.outcomeRaw {
-        case "succeeded": "Done"
-        case "noChange": "No change"
-        case "failed": record.exitStatus.map { "Failed (\($0))" } ?? "Failed"
-        case "busy": "Homebrew busy"
-        case "needsPrivileges": "Needs Terminal"
-        case "cancelled": "Cancelled"
-        case "abandoned": "Cancelled, still running"
-        case "launchFailed": "Could not start"
-        default: record.outcomeRaw
-        }
     }
 
     private func copy(_ text: String) {

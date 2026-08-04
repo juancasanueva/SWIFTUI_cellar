@@ -46,6 +46,9 @@ struct InstalledRow: View {
             }
         }
         .padding(.vertical, 2)
+        .accessibilityIdentifier(
+            "installed-row-\(entry.id.kind == .formula ? "formula" : "cask")-\(entry.id.name)"
+        )
     }
 
     /// Reads `PackageMetadata.isFavorite` and writes through the store.

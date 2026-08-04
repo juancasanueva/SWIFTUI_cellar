@@ -16,7 +16,7 @@ import SwiftUI
 struct cellarApp: App {
     /// Detection state for the whole app. Owned here so every scene observes
     /// the same evaluation.
-    @State private var brewDetection = BrewDetectionStore()
+    @State private var brewDetection: BrewDetectionStore
 
     /// The catalog, likewise owned once. There is no `ModelContainer` any more:
     /// the catalog is derived data with its own on-disk format, and nothing in
@@ -33,8 +33,12 @@ struct cellarApp: App {
     /// is nothing installed-specific in it — the rename it deserves is recorded
     /// as debt rather than taken here (design D2).
     @State private var serviceMutations: InstalledMutationGate
+    /// The tap inventory has its own invalidation domain and refresh consumer.
+    @State private var tapMutations: InstalledMutationGate
     /// Owns cadence: launch, activation, and debounced external changes.
     @State private var refresher: InstalledRefreshCoordinator
+    @State private var taps: TapStore
+    @State private var tapsRefresher: TapRefreshCoordinator
 
     /// The queue of Cellar-initiated mutations, and everything the activity
     /// surfaces read. It is what finally drives `mutations`, the gate M2-1
@@ -71,6 +75,9 @@ struct cellarApp: App {
     @State private var services: ServicesStore
     @State private var servicesRefresher: ServicesRefreshCoordinator
 
+    /// Correlates a force-untap terminal with both refreshes it must await.
+    private let refreshRegistry: MutationRefreshRegistry
+
     /// The app's long-lived loops.
     ///
     /// App-level state outlives every scene, so closing the window that started
@@ -90,15 +97,30 @@ struct cellarApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        let installed = InstalledStore()
+        let isUITesting = AppTestFixtures.isEnabled
+        let locator: any BrewLocating = isUITesting ? AppTestBrewLocator() : DefaultBrewLocator()
+        let installedSource: any InstalledPayloadSourcing = isUITesting
+            ? AppTestInstalledPayloadSource()
+            : BrewInfoPayloadSource()
+        let tapSource: any TapPayloadSourcing = isUITesting
+            ? AppTestTapPayloadSource()
+            : BrewTapPayloadSource()
+        let installed = InstalledStore(source: installedSource)
+        let taps = TapStore(source: tapSource)
         let mutations = InstalledMutationGate()
         let serviceMutations = InstalledMutationGate()
+        let tapMutations = InstalledMutationGate()
+        let refreshRegistry = MutationRefreshRegistry()
         let services = ServicesStore()
         // One container, opened once, shared by both stores.
         let stores = LocalStores()
+        _brewDetection = State(initialValue: BrewDetectionStore(locator: locator))
         _installed = State(initialValue: installed)
         _mutations = State(initialValue: mutations)
         _serviceMutations = State(initialValue: serviceMutations)
+        _tapMutations = State(initialValue: tapMutations)
+        _taps = State(initialValue: taps)
+        self.refreshRegistry = refreshRegistry
         _metadata = State(initialValue: stores.metadata)
         _history = State(initialValue: stores.history)
         _services = State(initialValue: services)
@@ -106,7 +128,18 @@ struct cellarApp: App {
             initialValue: ServicesRefreshCoordinator(store: services, mutations: serviceMutations)
         )
         _refresher = State(
-            initialValue: InstalledRefreshCoordinator(store: installed, mutations: mutations)
+            initialValue: InstalledRefreshCoordinator(
+                store: installed,
+                mutations: mutations,
+                refreshRegistry: refreshRegistry
+            )
+        )
+        _tapsRefresher = State(
+            initialValue: TapRefreshCoordinator(
+                store: taps,
+                mutations: tapMutations,
+                refreshRegistry: refreshRegistry
+            )
         )
         // The recorder is injected once, here, and nowhere else: `finish` is the
         // only caller, so this is the whole of "history is written" as a wiring
@@ -120,9 +153,15 @@ struct cellarApp: App {
             initialValue: OperationCenter(
                 gates: MutationGates([
                     (.installedInventory, mutations),
-                    (.services, serviceMutations)
+                    (.services, serviceMutations),
+                    (.taps, tapMutations)
                 ]),
-                history: SwiftDataHistoryRecorder(store: stores.history)
+                history: SwiftDataHistoryRecorder(store: stores.history),
+                refreshRegistry: refreshRegistry,
+                launcherFactory: { _ -> any ProcessLaunching in
+                    if isUITesting { return AppTestProcessLauncher() }
+                    return SystemProcessLauncher()
+                }
             )
         )
     }
@@ -137,7 +176,8 @@ struct cellarApp: App {
                 metadata: metadata,
                 history: history,
                 services: services,
-                servicesRefresher: servicesRefresher
+                servicesRefresher: servicesRefresher,
+                taps: taps
             )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
@@ -161,6 +201,7 @@ struct cellarApp: App {
                 // body returns, so a poll started here would never restart after
                 // the first hide. The coordinator owns the poll itself.
                 .task { loops.start("services") { await servicesRefresher.run() } }
+                .task { loops.start("taps") { await tapsRefresher.run() } }
         }
     }
 
@@ -174,6 +215,7 @@ struct cellarApp: App {
         await brewDetection.refresh()
         operations.attach(installation: brewDetection.state.installation)
         await refresher.refresh(for: brewDetection.state)
+        await tapsRefresher.refresh(for: brewDetection.state)
         // Services becomes available the moment brew does, and the poll starts
         // itself if the surface is already showing — which is the ordinary
         // launch order, since detection resolves after the first render.

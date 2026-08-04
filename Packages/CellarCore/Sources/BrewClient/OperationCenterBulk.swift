@@ -137,7 +137,8 @@ extension OperationCenter {
         let request = ConfirmationRequest(
             id: UUID(),
             command: AnyBrewMutation(first),
-            additional: commands.dropFirst().map(AnyBrewMutation.init)
+            additional: commands.dropFirst().map(AnyBrewMutation.init),
+            disclosure: (first as? TapCommand)?.disclosure ?? .packageRemoval
         )
         setPendingConfirmation(request)
         return request
@@ -148,14 +149,14 @@ extension OperationCenter {
     @discardableResult
     public func confirm(_ request: ConfirmationRequest) -> [ActivityItem] {
         guard pendingConfirmation == request else { return [] }
-        setPendingConfirmation(nil)
+        confirmations.consume(request)
         return request.commands.map { submit($0) }
     }
 
     /// Spawns nothing, enqueues nothing, leaves the inventory untouched.
     public func decline(_ request: ConfirmationRequest) {
         guard pendingConfirmation == request else { return }
-        setPendingConfirmation(nil)
+        confirmations.decline(request)
     }
 
     /// The transition for a command that may name no package at all.
@@ -188,6 +189,19 @@ extension OperationCenter {
         public let command: AnyBrewMutation
         /// Everything else the same yes covers, in selection order.
         public let additional: [AnyBrewMutation]
+        public let disclosure: ConfirmationDisclosure
+
+        public init(
+            id: UUID,
+            command: AnyBrewMutation,
+            additional: [AnyBrewMutation],
+            disclosure: ConfirmationDisclosure = .packageRemoval
+        ) {
+            self.id = id
+            self.command = command
+            self.additional = additional
+            self.disclosure = disclosure
+        }
 
         /// Every command this confirmation will submit, in order.
         public var commands: [AnyBrewMutation] { [command] + additional }
@@ -202,6 +216,22 @@ extension OperationCenter {
         /// The same, for a surface that renders one string: one command per
         /// line, so a three-package uninstall discloses all three.
         public var displayCommand: String { displayCommands.joined(separator: "\n") }
+        public var warningText: String { disclosure.warningText }
+
+        public var tapIdentity: TapName? {
+            switch disclosure {
+            case .tapTrust(let tap), .forceUntap(let tap, _): tap
+            case .packageRemoval: nil
+            }
+        }
+
+        public var affectedPackages: [PackageID] {
+            guard case .forceUntap(_, let affected) = disclosure else { return [] }
+            return affected.sorted {
+                if $0.kind != $1.kind { return $0.kind.rawValue < $1.kind.rawValue }
+                return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+            }
+        }
     }
 }
 
@@ -221,5 +251,119 @@ extension OperationCenter {
 final class ConfirmationBox {
     var pending: OperationCenter.ConfirmationRequest?
 
+    struct RecoveryCandidate {
+        let request: OperationCenter.ConfirmationRequest
+        let token: MutationOperationToken
+        let supersessionKey: String
+        let isEligible: @MainActor () -> Bool
+        let onCancel: @MainActor () -> Void
+    }
+
+    private var visibleRecovery: RecoveryCandidate?
+    private var backlog: RecoveryCandidate?
+
+    var visibleRecoveryToken: MutationOperationToken? { visibleRecovery?.token }
+    var backloggedToken: MutationOperationToken? { backlog?.token }
+
     init() {}
+
+    func present(_ request: OperationCenter.ConfirmationRequest) {
+        pending = request
+        visibleRecovery = nil
+    }
+
+    func consume(_ request: OperationCenter.ConfirmationRequest) {
+        guard pending == request else { return }
+        pending = nil
+        visibleRecovery = nil
+        promoteBacklog()
+    }
+
+    func decline(_ request: OperationCenter.ConfirmationRequest) {
+        guard pending == request else { return }
+        let cancelled = visibleRecovery
+        pending = nil
+        visibleRecovery = nil
+        cancelled?.onCancel()
+        promoteBacklog()
+    }
+
+    func enqueueRecovery(
+        request: OperationCenter.ConfirmationRequest,
+        token: MutationOperationToken,
+        supersessionKey: String,
+        isEligible: @escaping @MainActor () -> Bool,
+        onCancel: @escaping @MainActor () -> Void
+    ) {
+        guard visibleRecovery?.token != token, backlog?.token != token else { return }
+        let candidate = RecoveryCandidate(
+            request: request,
+            token: token,
+            supersessionKey: supersessionKey,
+            isEligible: isEligible,
+            onCancel: onCancel
+        )
+
+        guard pending != nil else {
+            present(candidate)
+            return
+        }
+        backlog?.onCancel()
+        backlog = candidate
+    }
+
+    func supersedeRecovery(for key: String) {
+        if visibleRecovery?.supersessionKey == key {
+            let cancelled = visibleRecovery
+            pending = nil
+            visibleRecovery = nil
+            cancelled?.onCancel()
+            promoteBacklog()
+        }
+        if backlog?.supersessionKey == key {
+            let cancelled = backlog
+            backlog = nil
+            cancelled?.onCancel()
+        }
+    }
+
+    func cancelRecovery(token: MutationOperationToken) {
+        if visibleRecovery?.token == token {
+            let cancelled = visibleRecovery
+            pending = nil
+            visibleRecovery = nil
+            cancelled?.onCancel()
+            promoteBacklog()
+        }
+        if backlog?.token == token {
+            let cancelled = backlog
+            backlog = nil
+            cancelled?.onCancel()
+        }
+    }
+
+    func shutdown() {
+        let visible = visibleRecovery
+        let queued = backlog
+        if visible != nil { pending = nil }
+        visibleRecovery = nil
+        backlog = nil
+        visible?.onCancel()
+        queued?.onCancel()
+    }
+
+    private func promoteBacklog() {
+        guard pending == nil, let candidate = backlog else { return }
+        backlog = nil
+        present(candidate)
+    }
+
+    private func present(_ candidate: RecoveryCandidate) {
+        guard candidate.isEligible() else {
+            candidate.onCancel()
+            return
+        }
+        pending = candidate.request
+        visibleRecovery = candidate
+    }
 }

@@ -23,14 +23,135 @@ final class cellarUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
-        app.launch()
+    func testTapsNavigationOfficialSourcesAndAddConfirmation() throws {
+        let app = launchTapFixture()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        app.staticTexts["Taps"].click()
+
+        XCTAssertTrue(app.staticTexts["Homebrew Core"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Homebrew Cask"].exists)
+        XCTAssertTrue(app.staticTexts["official-tap-explanation-homebrew-core"].exists)
+        XCTAssertTrue(app.staticTexts["official-tap-explanation-homebrew-cask"].exists)
+
+        let field = app.textFields["tap-add-field"]
+        XCTAssertTrue(field.exists)
+        field.click()
+        field.typeText("acme/new-tools")
+        app.buttons["tap-add-button"].click()
+
+        let addCommand = app.staticTexts["confirmation-command"]
+        XCTAssertTrue(addCommand.waitForExistence(timeout: 2))
+        XCTAssertEqual(addCommand.value as? String, "brew tap acme/new-tools")
+        XCTAssertTrue(((app.staticTexts["confirmation-warning"].value as? String) ?? "")
+            .localizedCaseInsensitiveContains("third-party formulae and casks"))
+        app.buttons["Cancel"].click()
+    }
+
+    @MainActor
+    func testTapDetailFilteringInstalledHandoffAndForceDisclosure() throws {
+        let app = launchTapFixture()
+        app.staticTexts["Taps"].click()
+        app.outlines["taps-list"].staticTexts["acme/tools"].click()
+
+        let filter = app.textFields["tap-package-filter"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 2))
+        filter.click()
+        filter.typeText("widget")
+        XCTAssertTrue(app.staticTexts["widget"].exists)
+        XCTAssertTrue(app.buttons["Show in Installed"].exists)
+        XCTAssertTrue(app.staticTexts["Not in Cellar’s core/cask catalog."].exists)
+
+        app.buttons["tap-force-untap-button"].click()
+        let forceCommand = app.staticTexts["confirmation-command"]
+        XCTAssertTrue(forceCommand.waitForExistence(timeout: 2))
+        XCTAssertEqual(forceCommand.value as? String, "brew untap --force acme/tools")
+        XCTAssertTrue(app.staticTexts["confirmation-affected-formula-widget"].exists)
+        app.buttons["Cancel"].click()
+    }
+
+    @MainActor
+    func testInvalidTapTargetAndEmptyErrorStatesStayDistinct() throws {
+        let app = launchTapFixture()
+        app.staticTexts["Taps"].click()
+
+        let field = app.textFields["tap-add-field"]
+        field.click()
+        field.typeText("https://example.com/a.git")
+        XCTAssertFalse(app.buttons["tap-add-button"].isEnabled)
+        XCTAssertTrue(app.staticTexts["Enter a tap as user/repo."].exists)
+        XCTAssertTrue(app.staticTexts["Third-party taps"].exists)
+        XCTAssertFalse(app.staticTexts["Could not load taps"].exists)
+    }
+
+    @MainActor
+    func testPlainUntapAndInstalledHandoff() throws {
+        let app = launchTapFixture()
+        app.staticTexts["Taps"].click()
+        app.outlines["taps-list"].staticTexts["acme/tools"].click()
+
+        app.buttons["Show in Installed"].click()
+        let installedList = app.outlines["installed-list"]
+        XCTAssertTrue(installedList.waitForExistence(timeout: 2))
+        let widgetRow = installedList.descendants(matching: .outlineRow)
+            .containing(.staticText, identifier: "installed-row-formula-widget")
+            .firstMatch
+        XCTAssertTrue(widgetRow.waitForExistence(timeout: 2))
+        XCTAssertTrue(widgetRow.isSelected, "Show in Installed must select formula:widget")
+        XCTAssertTrue(app.staticTexts["No package selected"].waitForNonExistence(timeout: 2))
+
+        app.staticTexts["Taps"].click()
+        app.outlines["taps-list"].staticTexts["acme/tools"].click()
+        app.buttons["tap-untap-button"].click()
+        XCTAssertFalse(app.sheets.firstMatch.exists)
+        app.buttons["Show activity"].click()
+        XCTAssertTrue(app.staticTexts["brew untap acme/tools"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testTapEmptyErrorAndAbsentStates() throws {
+        let empty = launchTapFixture("--ui-testing-m3-taps-empty")
+        empty.staticTexts["Taps"].click()
+        XCTAssertTrue(empty.staticTexts["No third-party taps are installed."].waitForExistence(timeout: 2))
+        empty.terminate()
+
+        let error = launchTapFixture("--ui-testing-m3-taps-error")
+        error.staticTexts["Taps"].click()
+        XCTAssertTrue(error.staticTexts["Could not load taps"].waitForExistence(timeout: 2))
+        error.terminate()
+
+        let absent = launchTapFixture("--ui-testing-m3-taps-absent")
+        absent.staticTexts["Taps"].click()
+        XCTAssertTrue(absent.staticTexts["Homebrew is not installed"].waitForExistence(timeout: 2))
+        XCTAssertFalse(absent.buttons["tap-add-button"].isEnabled)
+    }
+
+    @MainActor
+    func testLargeTapFilteringAndKeyboardAdd() throws {
+        let app = launchTapFixture("--ui-testing-m3-taps-large")
+        app.staticTexts["Taps"].click()
+        app.outlines["taps-list"].staticTexts["acme/large"].click()
+        let filter = app.textFields["tap-package-filter"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 2))
+        filter.click()
+        filter.typeText("needle-4999")
+        XCTAssertTrue(app.staticTexts["needle-4999"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.staticTexts["needle-0"].exists)
+
+        app.textFields["tap-add-field"].click()
+        app.textFields["tap-add-field"].typeText("acme/keyboard")
+        app.typeKey(.return, modifierFlags: .command)
+        let command = app.staticTexts["confirmation-command"]
+        XCTAssertTrue(command.waitForExistence(timeout: 2))
+        XCTAssertEqual(command.value as? String, "brew tap acme/keyboard")
+    }
+
+    @MainActor
+    private func launchTapFixture(_ mode: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments.append("--ui-testing-m3-taps")
+        if let mode { app.launchArguments.append(mode) }
+        app.launch()
+        return app
     }
 
     @MainActor
