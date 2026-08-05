@@ -11,7 +11,7 @@ struct CancellationTests {
     /// grace period ever costs wall-clock time.
     private func makeRunner(
         behavior: FakeProcess.SignalBehavior
-    ) -> (BrewRunner, FakeProcess, TestClock) {
+    ) -> (BrewRunner, FakeProcessLauncher, FakeProcess, TestClock) {
         let clock = TestClock()
         let launcher = FakeProcessLauncher(clock: clock)
         let process = FakeProcess(behavior: behavior, clock: clock)
@@ -22,13 +22,14 @@ struct CancellationTests {
             policy: .default,
             clock: clock
         )
-        return (runner, process, clock)
+        return (runner, launcher, process, clock)
     }
 
     @Test("A cooperative process stops at SIGINT and reports cancelled")
     func cooperativeProcessStopsAtInterrupt() async throws {
-        let (runner, process, _) = makeRunner(behavior: .exitOnInterrupt)
+        let (runner, launcher, process, _) = makeRunner(behavior: .exitOnInterrupt)
         let operation = try await runner.start(.mutate(["upgrade", "ripgrep"]))
+        await launcher.waitForLaunches(atLeast: 1)
 
         await operation.cancel()
         let exit = await operation.exit()
@@ -41,8 +42,9 @@ struct CancellationTests {
 
     @Test("A process that ignores SIGINT is escalated to SIGTERM after the grace")
     func unresponsiveProcessIsEscalated() async throws {
-        let (runner, process, clock) = makeRunner(behavior: .exitOnTerminate)
+        let (runner, launcher, process, clock) = makeRunner(behavior: .exitOnTerminate)
         let operation = try await runner.start(.mutate(["upgrade", "ripgrep"]))
+        await launcher.waitForLaunches(atLeast: 1)
 
         let cancellation = Task { await operation.cancel() }
         await clock.waitForSleepers()
@@ -58,8 +60,9 @@ struct CancellationTests {
 
     @Test("SIGTERM is only sent after the interrupt grace has actually elapsed")
     func terminateWaitsForTheInterruptGrace() async throws {
-        let (runner, process, clock) = makeRunner(behavior: .exitOnTerminate)
+        let (runner, launcher, process, clock) = makeRunner(behavior: .exitOnTerminate)
         let operation = try await runner.start(.mutate(["upgrade", "ripgrep"]))
+        await launcher.waitForLaunches(atLeast: 1)
 
         let cancellation = Task { await operation.cancel() }
         await clock.waitForSleepers()
@@ -75,8 +78,9 @@ struct CancellationTests {
 
     @Test("A process ignoring both signals is reported unresponsive, never killed")
     func unresponsiveProcessIsNeverKilled() async throws {
-        let (runner, process, clock) = makeRunner(behavior: .ignoreAll)
+        let (runner, launcher, process, clock) = makeRunner(behavior: .ignoreAll)
         let operation = try await runner.start(.mutate(["upgrade", "ripgrep"]))
+        await launcher.waitForLaunches(atLeast: 1)
 
         let cancellation = Task { await operation.cancel() }
         await clock.waitForSleepers()
@@ -94,8 +98,9 @@ struct CancellationTests {
 
     @Test("Delivered signals are timestamped in escalation order on the injected clock")
     func signalsAreOrderedInTime() async throws {
-        let (runner, process, clock) = makeRunner(behavior: .exitOnTerminate)
+        let (runner, launcher, process, clock) = makeRunner(behavior: .exitOnTerminate)
         let operation = try await runner.start(.mutate(["upgrade", "ripgrep"]))
+        await launcher.waitForLaunches(atLeast: 1)
 
         let cancellation = Task { await operation.cancel() }
         await clock.waitForSleepers()
@@ -110,8 +115,9 @@ struct CancellationTests {
 
     @Test("Cancelling the consuming Swift task escalates the same way")
     func cancellingTheConsumerCancelsTheProcess() async throws {
-        let (runner, process, _) = makeRunner(behavior: .exitOnInterrupt)
+        let (runner, launcher, process, _) = makeRunner(behavior: .exitOnInterrupt)
         let operation = try await runner.start(.mutate(["upgrade", "ripgrep"]))
+        await launcher.waitForLaunches(atLeast: 1)
 
         let consuming = Mutex(false)
         let consumer = Task {
@@ -130,8 +136,9 @@ struct CancellationTests {
 
     @Test("Cancelling an already-finished operation changes nothing")
     func cancellingAfterCompletionIsANoOp() async throws {
-        let (runner, process, _) = makeRunner(behavior: .exitOnInterrupt)
+        let (runner, launcher, process, _) = makeRunner(behavior: .exitOnInterrupt)
         let operation = try await runner.start(.mutate(["list"]))
+        await launcher.waitForLaunches(atLeast: 1)
         process.terminate(with: BrewExit(status: 0, reason: .exited))
         let exit = await operation.exit()
 

@@ -19,6 +19,31 @@ enum AppTestFixtures {
         let arguments = ProcessInfo.processInfo.arguments
         return arguments.contains("--ui-testing-m3-taps")
             || arguments.contains("--ui-testing-m3-disk-usage")
+            || arguments.contains("--ui-testing-m3-cleanup")
+    }
+
+    nonisolated enum CleanupMode: Sendable {
+        case content, empty, unknownTotal, partial, error, cancelled
+        case brewAbsence, confirmation, staleChanged, denialRefresh, postTerminalRefresh
+    }
+
+    nonisolated static var isCleanupEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m3-cleanup")
+    }
+
+    nonisolated static var cleanupMode: CleanupMode {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--ui-testing-m3-cleanup-empty") { return .empty }
+        if arguments.contains("--ui-testing-m3-cleanup-unknown-total") { return .unknownTotal }
+        if arguments.contains("--ui-testing-m3-cleanup-partial") { return .partial }
+        if arguments.contains("--ui-testing-m3-cleanup-error") { return .error }
+        if arguments.contains("--ui-testing-m3-cleanup-cancelled") { return .cancelled }
+        if arguments.contains("--ui-testing-m3-cleanup-brew-absence") { return .brewAbsence }
+        if arguments.contains("--ui-testing-m3-cleanup-confirmation") { return .confirmation }
+        if arguments.contains("--ui-testing-m3-cleanup-stale-changed") { return .staleChanged }
+        if arguments.contains("--ui-testing-m3-cleanup-denial-refresh") { return .denialRefresh }
+        if arguments.contains("--ui-testing-m3-cleanup-post-terminal-refresh") { return .postTerminalRefresh }
+        return .content
     }
 
     nonisolated static let installation = BrewInstallation(
@@ -41,12 +66,10 @@ enum AppTestFixtures {
 
 struct AppTestBrewLocator: BrewLocating {
     func detect(configuredPath: URL?) async -> BrewDetectionState {
-        switch AppTestFixtures.mode {
-        case .absent:
+        if AppTestFixtures.isCleanupEnabled, AppTestFixtures.cleanupMode == .brewAbsence {
             return .absent
-        default:
-            return .detected(AppTestFixtures.installation)
         }
+        return AppTestFixtures.mode == .absent ? .absent : .detected(AppTestFixtures.installation)
     }
 }
 
@@ -135,6 +158,64 @@ struct AppTestInstalledPayloadSource: InstalledPayloadSourcing {
 struct AppTestProcessLauncher: ProcessLaunching {
     func launch(_ spec: ProcessSpec) throws -> any LaunchedProcess {
         AppTestLaunchedProcess()
+    }
+}
+
+actor AppTestCleanupPreviewSource: CleanupPreviewSourcing {
+    private let mode: AppTestFixtures.CleanupMode
+    private var calls: [CleanupScope: Int] = [:]
+
+    init(mode: AppTestFixtures.CleanupMode) {
+        self.mode = mode
+    }
+
+    func preview(
+        _ request: CleanupPreviewRequest,
+        for detection: BrewDetectionState,
+        diskUsage: CleanupDiskUsageContext?
+    ) async throws(CleanupPreviewError) -> CleanupPreviewResult {
+        guard detection.installation != nil else {
+            throw .unavailable(.notInstalled(.standard))
+        }
+        if mode == .cancelled {
+            do {
+                try await Task.sleep(for: .seconds(60))
+            } catch {
+                throw .cancelled(rawStdout: Data(), rawStderr: Data())
+            }
+        }
+        if mode == .error {
+            throw .commandFailed(
+                status: 1,
+                rawStdout: Data(),
+                rawStderr: Data("cleanup locked\n".utf8)
+            )
+        }
+
+        let call = calls[request.scope, default: 0]
+        calls[request.scope] = call + 1
+        let stdout: String
+        if request.scope == .autoremove {
+            stdout = "==> Would autoremove 1 unneeded formula:\nwget\n"
+        } else {
+            stdout = switch mode {
+            case .empty: ""
+            case .unknownTotal: "Would remove: /tmp/archive (22B)\n"
+            case .partial: "future Homebrew cleanup prose\n"
+            case .staleChanged, .denialRefresh where call > 0:
+                "Would remove: /tmp/changed (11B)\n"
+                    + "==> This operation would free approximately 11B of disk space.\n"
+            default:
+                "Would remove: /tmp/archive (22B)\n"
+                    + "==> This operation would free approximately 22B of disk space.\n"
+            }
+        }
+        return CleanupParser.parse(
+            request,
+            rawStdout: Data(stdout.utf8),
+            rawStderr: Data(),
+            diskUsage: diskUsage
+        )
     }
 }
 

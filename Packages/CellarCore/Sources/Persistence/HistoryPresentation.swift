@@ -2,6 +2,27 @@ import BrewClient
 import Foundation
 
 extension HistoryRecord {
+    enum CleanupAction: String {
+        case global = "cleanupGlobal"
+        case package = "cleanupPackage"
+        case full = "cleanupFull"
+        case autoremove = "cleanupAutoremove"
+
+        var label: String {
+            switch self {
+            case .global: "Cleanup"
+            case .package: "Package cleanup"
+            case .full: "Full cleanup"
+            case .autoremove: "Autoremove"
+            }
+        }
+    }
+
+    /// Human-readable action vocabulary shared by every history surface.
+    public var actionLabel: String {
+        CleanupAction(rawValue: verb)?.label ?? verb
+    }
+
     /// Human-readable terminal vocabulary shared by every history surface.
     public var outcomeLabel: String {
         switch outcomeRaw {
@@ -39,6 +60,8 @@ extension HistoryRecord {
         case everyPackage
         /// The operation has no package identity. Nothing is inferred for it.
         case noPackage
+        /// A non-package operation whose stored verb defines its scope.
+        case operationScope(String)
 
         /// The row's headline.
         ///
@@ -50,6 +73,7 @@ extension HistoryRecord {
             case .package(let name): name
             case .everyPackage: "All packages"
             case .noPackage: "No package"
+            case .operationScope(let label): label
             }
         }
     }
@@ -62,6 +86,26 @@ extension HistoryRecord {
     /// touched every package on the machine is not.
     public var subject: Subject {
         guard name.isEmpty else { return .package(name) }
-        return verb == MutationCommand.upgradeAll.verb ? .everyPackage : .noPackage
+        return switch verb {
+        case MutationCommand.upgradeAll.verb: .everyPackage
+        default:
+            CleanupAction(rawValue: verb).map { .operationScope($0.label) } ?? .noPackage
+        }
+    }
+
+    struct CleanupLabelMatches {
+        let global: Bool
+        let package: Bool
+        let full: Bool
+        let autoremove: Bool
+    }
+
+    static func cleanupLabelMatches(_ term: String) -> CleanupLabelMatches {
+        CleanupLabelMatches(
+            global: CleanupAction.global.label.localizedStandardContains(term),
+            package: CleanupAction.package.label.localizedStandardContains(term),
+            full: CleanupAction.full.label.localizedStandardContains(term),
+            autoremove: CleanupAction.autoremove.label.localizedStandardContains(term)
+        )
     }
 }

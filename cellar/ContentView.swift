@@ -30,6 +30,8 @@ struct ContentView: View {
     let servicesRefresher: ServicesRefreshCoordinator
     let taps: TapStore
     let diskUsage: DiskUsageStore
+    let cleanup: CleanupStore
+    let cleanupPreviewSource: any CleanupPreviewSourcing
 
     @State private var section: AppSection = .browse
     @State private var selection: PackageID?
@@ -47,7 +49,11 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 ActivityBar(center: operations, isExpanded: $isActivityExpanded)
             }
-            .mutationConfirmation(operations, currentForceEvidence: forceEvidence)
+            .mutationConfirmation(
+                operations,
+                currentForceEvidence: forceEvidence,
+                confirmCleanup: confirmCleanup
+            )
     }
 
     private var shell: some View {
@@ -95,7 +101,13 @@ struct ContentView: View {
                 )
                 .navigationSplitViewColumnWidth(min: 280, ideal: 340)
             case .cleanup:
-                CleanupView(detection: brewDetection, installed: installed, store: diskUsage)
+                CleanupView(
+                    detection: brewDetection,
+                    installed: installed,
+                    diskUsage: diskUsage,
+                    cleanup: cleanup,
+                    operations: operations
+                )
                     .navigationSplitViewColumnWidth(min: 360, ideal: 520)
             case .history:
                 HistoryView(history: history)
@@ -164,6 +176,21 @@ struct ContentView: View {
         selection = id
         section = .installed
     }
+
+    private func confirmCleanup(_ request: OperationCenter.ConfirmationRequest) {
+        operations.confirmCleanup(
+            request,
+            source: cleanupPreviewSource,
+            detection: brewDetection.state,
+            diskUsage: cleanupDiskUsageContext,
+            publish: cleanup.adopt
+        )
+    }
+
+    private var cleanupDiskUsageContext: CleanupDiskUsageContext? {
+        guard let snapshot = diskUsage.visibleSnapshot else { return nil }
+        return CleanupDiskUsageContext(snapshot: snapshot, expectedRoots: snapshot.roots)
+    }
 }
 
 #Preview {
@@ -180,6 +207,8 @@ struct ContentView: View {
         taps: TapStore(),
         diskUsage: DiskUsageStore(
             cache: DiskUsageCache(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("preview-disk.json"))
-        )
+        ),
+        cleanup: CleanupStore(),
+        cleanupPreviewSource: CleanupPreviewSource()
     )
 }

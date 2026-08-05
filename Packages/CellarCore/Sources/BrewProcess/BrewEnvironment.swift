@@ -9,6 +9,21 @@ import Foundation
 /// drives brew, and nothing else (tokens, mirrors, install-from-API overrides)
 /// leaks into the subprocess.
 public enum BrewEnvironment {
+    /// A command-local Homebrew policy that callers may opt into.
+    ///
+    /// Cases are the complete allow-list. Callers cannot supply arbitrary keys
+    /// or values, so secrets and user shell policy still cannot leak through.
+    public enum CommandOverride: Sendable, Hashable {
+        /// Prevents `brew cleanup` from implicitly running autoremove.
+        case noAutoremove
+
+        fileprivate var entry: (key: String, value: String) {
+            switch self {
+            case .noAutoremove: ("HOMEBREW_NO_AUTOREMOVE", "1")
+            }
+        }
+    }
+
     /// Values pinned on every invocation.
     ///
     /// - `HOMEBREW_NO_AUTO_UPDATE=1` keeps a read from silently mutating state.
@@ -39,16 +54,42 @@ public enum BrewEnvironment {
     public static let inheritedKeys = ["PATH", "HOME"]
 
     /// Composes the environment for a subprocess from `parent`.
+    ///
+    /// Inherited `PATH`/`HOME` are applied first, normalization is pinned next,
+    /// and typed command-local policy is applied last.
     public static func compose(inheriting parent: [String: String]) -> [String: String] {
+        compose(inheriting: parent, commandOverrides: [])
+    }
+
+    /// Composes the environment with an allow-listed command-local policy.
+    public static func compose(
+        inheriting parent: [String: String],
+        commandOverrides: Set<CommandOverride>
+    ) -> [String: String] {
         var environment: [String: String] = [:]
         for key in inheritedKeys {
             environment[key] = parent[key]
         }
-        return environment.merging(pinned) { _, pinned in pinned }
+        environment.merge(pinned) { _, pinned in pinned }
+        for override in commandOverrides {
+            let entry = override.entry
+            environment[entry.key] = entry.value
+        }
+        return environment
     }
 
     /// Composes the environment from the current process's environment.
     public static func current() -> [String: String] {
-        compose(inheriting: ProcessInfo.processInfo.environment)
+        current(commandOverrides: [])
+    }
+
+    /// Composes the current environment with command-local policy.
+    public static func current(
+        commandOverrides: Set<CommandOverride>
+    ) -> [String: String] {
+        compose(
+            inheriting: ProcessInfo.processInfo.environment,
+            commandOverrides: commandOverrides
+        )
     }
 }
