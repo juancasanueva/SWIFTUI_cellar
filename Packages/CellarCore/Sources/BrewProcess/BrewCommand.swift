@@ -20,18 +20,54 @@ public struct BrewCommand: Sendable, Equatable {
     /// The serialization kind.
     public let kind: Kind
 
+    /// Typed environment policy applied only to this invocation.
+    public let environmentOverrides: Set<BrewEnvironment.CommandOverride>
+
     public init(arguments: [String], kind: Kind) {
+        self.init(arguments: arguments, kind: kind, environmentOverrides: [])
+    }
+
+    public init(
+        arguments: [String],
+        kind: Kind,
+        environmentOverrides: Set<BrewEnvironment.CommandOverride>
+    ) {
         self.arguments = arguments
         self.kind = kind
+        self.environmentOverrides = environmentOverrides
     }
 
     /// A read-only query that may run concurrently with an in-flight mutation.
     public static func read(_ arguments: [String]) -> BrewCommand {
-        BrewCommand(arguments: arguments, kind: .read)
+        read(arguments, environmentOverrides: [])
+    }
+
+    /// A read-only query with command-local Homebrew policy.
+    public static func read(
+        _ arguments: [String],
+        environmentOverrides: Set<BrewEnvironment.CommandOverride>
+    ) -> BrewCommand {
+        BrewCommand(
+            arguments: arguments,
+            kind: .read,
+            environmentOverrides: environmentOverrides
+        )
     }
 
     /// A state-changing command that must run alone, in submission order.
     public static func mutate(_ arguments: [String]) -> BrewCommand {
-        BrewCommand(arguments: arguments, kind: .mutate)
+        mutate(arguments, environmentOverrides: [])
+    }
+
+    /// A serialized mutation with command-local Homebrew policy.
+    public static func mutate(
+        _ arguments: [String],
+        environmentOverrides: Set<BrewEnvironment.CommandOverride>
+    ) -> BrewCommand {
+        BrewCommand(
+            arguments: arguments,
+            kind: .mutate,
+            environmentOverrides: environmentOverrides
+        )
     }
 }

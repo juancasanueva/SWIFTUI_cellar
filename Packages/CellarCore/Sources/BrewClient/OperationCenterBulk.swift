@@ -190,17 +190,21 @@ extension OperationCenter {
         /// Everything else the same yes covers, in selection order.
         public let additional: [AnyBrewMutation]
         public let disclosure: ConfirmationDisclosure
+        /// Cleanup-only typed evidence. `nil` for every existing command family.
+        public let cleanupDisclosure: CleanupConfirmationDisclosure?
 
         public init(
             id: UUID,
             command: AnyBrewMutation,
             additional: [AnyBrewMutation],
-            disclosure: ConfirmationDisclosure = .packageRemoval
+            disclosure: ConfirmationDisclosure = .packageRemoval,
+            cleanupDisclosure: CleanupConfirmationDisclosure? = nil
         ) {
             self.id = id
             self.command = command
             self.additional = additional
             self.disclosure = disclosure
+            self.cleanupDisclosure = cleanupDisclosure
         }
 
         /// Every command this confirmation will submit, in order.
@@ -216,7 +220,9 @@ extension OperationCenter {
         /// The same, for a surface that renders one string: one command per
         /// line, so a three-package uninstall discloses all three.
         public var displayCommand: String { displayCommands.joined(separator: "\n") }
-        public var warningText: String { disclosure.warningText }
+        public var warningText: String {
+            cleanupDisclosure?.warningText ?? disclosure.warningText
+        }
 
         public var tapIdentity: TapName? {
             switch disclosure {

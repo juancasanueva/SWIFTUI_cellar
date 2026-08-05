@@ -1,0 +1,5 @@
+held-lock-path=/var/folders/v7/6grrq9ws0r373mpmxjjfx9fh0000gn/T/opencode/m3-cleanup-u0-probe/cellar-m3-cleanup-sentinel-prefix/var/homebrew/locks/cellar-m3-contention.lock
+held-probe-exit=0
+held-lock-exists-after-probe=true
+released-probe-exit=0
+released-lock-exists-after-probe=false

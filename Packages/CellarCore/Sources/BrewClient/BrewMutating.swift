@@ -78,6 +78,8 @@ public protocol BrewMutating: Sendable {
     var invalidates: InvalidationScope { get }
     /// Exact disk roots affected by this mutation. Empty when disk usage is unaffected.
     var diskAreas: Set<DiskArea> { get }
+    /// Typed command-local Homebrew policy applied to this mutation only.
+    var environmentOverrides: Set<BrewEnvironment.CommandOverride> { get }
 
     /// Decides the outcome from the terminal facts and the output.
     ///
@@ -90,6 +92,7 @@ public protocol BrewMutating: Sendable {
 
 extension BrewMutating {
     public var diskAreas: Set<DiskArea> { [] }
+    public var environmentOverrides: Set<BrewEnvironment.CommandOverride> { [] }
     /// The command as a human reads it — and as they can paste it.
     ///
     /// Display only. Nothing parses this back into argv, which is what makes
@@ -103,7 +106,7 @@ extension BrewMutating {
     /// inherits `brew-execution` BE5 (serialized mutations, concurrent reads)
     /// without restating it.
     public var brewCommand: BrewCommand {
-        .mutate(arguments)
+        .mutate(arguments, environmentOverrides: environmentOverrides)
     }
 
     /// Today's classification logic, verbatim and unmoved: a fault, a
@@ -145,6 +148,7 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
     public let requiresConfirmation: Bool
     public let invalidates: InvalidationScope
     public let diskAreas: Set<DiskArea>
+    public let environmentOverrides: Set<BrewEnvironment.CommandOverride>
 
     public init(_ command: some BrewMutating) {
         arguments = command.arguments
@@ -153,6 +157,7 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
         requiresConfirmation = command.requiresConfirmation
         invalidates = command.invalidates
         diskAreas = command.diskAreas
+        environmentOverrides = command.environmentOverrides
     }
 }
 

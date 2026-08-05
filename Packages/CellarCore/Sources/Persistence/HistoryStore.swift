@@ -171,12 +171,21 @@ public final class HistoryStore {
         }
         do {
             let term = search
+            let cleanupLabels = HistoryRecord.cleanupLabelMatches(term)
+            let matchesCleanupGlobal = cleanupLabels.global
+            let matchesCleanupPackage = cleanupLabels.package
+            let matchesCleanupFull = cleanupLabels.full
+            let matchesCleanupAutoremove = cleanupLabels.autoremove
             let descriptor = FetchDescriptor<HistoryEntry>(
                 predicate: #Predicate { entry in
                     term.isEmpty
                         || entry.name.localizedStandardContains(term)
                         || entry.verb.localizedStandardContains(term)
                         || entry.commandText.localizedStandardContains(term)
+                        || (matchesCleanupGlobal && entry.verb == "cleanupGlobal")
+                        || (matchesCleanupPackage && entry.verb == "cleanupPackage")
+                        || (matchesCleanupFull && entry.verb == "cleanupFull")
+                        || (matchesCleanupAutoremove && entry.verb == "cleanupAutoremove")
                 },
                 sortBy: [SortDescriptor(\.date, order: .reverse)]
             )

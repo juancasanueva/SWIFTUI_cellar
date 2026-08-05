@@ -43,6 +43,8 @@ struct cellarApp: App {
     @State private var diskUsage: DiskUsageStore
     @State private var diskMutations: InstalledMutationGate
     @State private var diskRefresher: DiskUsageRefreshCoordinator
+    @State private var cleanup: CleanupStore
+    private let cleanupPreviewSource: any CleanupPreviewSourcing
 
     /// The queue of Cellar-initiated mutations, and everything the activity
     /// surfaces read. It is what finally drives `mutations`, the gate M2-1
@@ -124,8 +126,11 @@ struct cellarApp: App {
             cache: DiskUsageCache(fileURL: diskCacheURL),
             initialSnapshot: isUITesting && AppTestFixtures.mode != .absent
                 ? AppTestFixtures.diskSnapshot : nil,
-            initiallyStale: isUITesting
+            initiallyStale: isUITesting && !AppTestFixtures.isCleanupEnabled
         )
+        let cleanupPreviewSource: any CleanupPreviewSourcing = AppTestFixtures.isCleanupEnabled
+            ? AppTestCleanupPreviewSource(mode: AppTestFixtures.cleanupMode)
+            : CleanupPreviewSource()
         // One container, opened once, shared by both stores.
         let stores = LocalStores()
         _brewDetection = State(initialValue: BrewDetectionStore(locator: locator))
@@ -135,6 +140,8 @@ struct cellarApp: App {
         _tapMutations = State(initialValue: tapMutations)
         _diskMutations = State(initialValue: diskMutations)
         _diskUsage = State(initialValue: diskUsage)
+        _cleanup = State(initialValue: CleanupStore(source: cleanupPreviewSource))
+        self.cleanupPreviewSource = cleanupPreviewSource
         _taps = State(initialValue: taps)
         self.refreshRegistry = refreshRegistry
         _metadata = State(initialValue: stores.metadata)
@@ -202,7 +209,9 @@ struct cellarApp: App {
                 services: services,
                 servicesRefresher: servicesRefresher,
                 taps: taps,
-                diskUsage: diskUsage
+                diskUsage: diskUsage,
+                cleanup: cleanup,
+                cleanupPreviewSource: cleanupPreviewSource
             )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed

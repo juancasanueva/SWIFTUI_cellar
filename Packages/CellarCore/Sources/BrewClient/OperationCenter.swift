@@ -327,7 +327,8 @@ public final class OperationCenter {
         do {
             operation = try await runner.start(
                 BrewMutation(arguments: command.arguments),
-                authorizer: authorizer
+                authorizer: authorizer,
+                environmentOverrides: command.environmentOverrides
             )
         } catch {
             item.isStartInFlight = false

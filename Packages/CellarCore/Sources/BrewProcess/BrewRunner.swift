@@ -150,7 +150,9 @@ public actor BrewRunner {
         let spec = ProcessSpec(
             executableURL: installation.executableURL,
             arguments: command.arguments,
-            environment: BrewEnvironment.current()
+            environment: BrewEnvironment.current(
+                commandOverrides: command.environmentOverrides
+            )
         )
 
         nextOrdinal += 1
@@ -189,11 +191,29 @@ public actor BrewRunner {
         _ mutation: BrewMutation,
         authorizer: any MutationLaunchAuthorizing = AllowMutationLaunch()
     ) async throws(BrewProcessError) -> AuthorizedMutationOperation {
-        let command = BrewCommand.mutate(mutation.arguments)
+        try await start(
+            mutation,
+            authorizer: authorizer,
+            environmentOverrides: []
+        )
+    }
+
+    /// Enqueues an authorized mutation with typed command-local policy.
+    public func start(
+        _ mutation: BrewMutation,
+        authorizer: any MutationLaunchAuthorizing = AllowMutationLaunch(),
+        environmentOverrides: Set<BrewEnvironment.CommandOverride>
+    ) async throws(BrewProcessError) -> AuthorizedMutationOperation {
+        let command = BrewCommand.mutate(
+            mutation.arguments,
+            environmentOverrides: environmentOverrides
+        )
         let spec = ProcessSpec(
             executableURL: installation.executableURL,
             arguments: mutation.arguments,
-            environment: BrewEnvironment.current()
+            environment: BrewEnvironment.current(
+                commandOverrides: environmentOverrides
+            )
         )
         nextOrdinal += 1
         let (lines, continuation) = AsyncStream<LogLine>.makeStream()

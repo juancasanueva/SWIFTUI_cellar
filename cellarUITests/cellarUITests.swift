@@ -10,6 +10,128 @@ import XCTest
 final class cellarUITests: XCTestCase {
 
     @MainActor
+    func testCleanupCO7PreviewFirstScopesAndStorageRows() throws {
+        let app = launchCleanupFixture("--ui-testing-m3-cleanup-content")
+        openCleanup(in: app)
+
+        XCTAssertTrue(app.outlines["disk-usage-list"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["disk-package-formula-wget"].exists)
+        XCTAssertTrue(app.staticTexts["disk-package-cask-ghostty"].exists)
+
+        for scope in ["global", "package-formula-wget", "full", "autoremove"] {
+            let preview = app.buttons["cleanup-preview-\(scope)"]
+            XCTAssertTrue(preview.exists, "Missing preview-first action for \(scope)")
+            XCTAssertFalse(app.buttons["cleanup-action-\(scope)"].exists)
+            preview.click()
+            XCTAssertTrue(app.buttons["cleanup-action-\(scope)"].waitForExistence(timeout: 2))
+        }
+    }
+
+    @MainActor
+    func testCleanupCO7StateMatrixIsDeterministicAndHonest() throws {
+        let empty = launchCleanupFixture("--ui-testing-m3-cleanup-empty")
+        openCleanup(in: empty)
+        empty.buttons["cleanup-preview-global"].click()
+        XCTAssertTrue(empty.staticTexts["cleanup-state-empty"].waitForExistence(timeout: 2))
+        XCTAssertFalse(empty.buttons["cleanup-action-global"].exists)
+        empty.terminate()
+
+        let unknown = launchCleanupFixture("--ui-testing-m3-cleanup-unknown-total")
+        openCleanup(in: unknown)
+        unknown.buttons["cleanup-preview-global"].click()
+        XCTAssertTrue(unknown.staticTexts["cleanup-state-content"].waitForExistence(timeout: 2))
+        XCTAssertTrue(text(of: unknown.staticTexts["cleanup-provenance"]).contains("did not report"))
+        unknown.terminate()
+
+        let partial = launchCleanupFixture("--ui-testing-m3-cleanup-partial")
+        openCleanup(in: partial)
+        partial.buttons["cleanup-preview-global"].click()
+        XCTAssertTrue(partial.staticTexts["cleanup-state-partial"].waitForExistence(timeout: 2))
+        XCTAssertFalse(partial.buttons["cleanup-action-global"].exists)
+        partial.terminate()
+
+        let error = launchCleanupFixture("--ui-testing-m3-cleanup-error")
+        openCleanup(in: error)
+        error.buttons["cleanup-preview-global"].click()
+        XCTAssertTrue(error.staticTexts["cleanup-state-error"].waitForExistence(timeout: 2))
+        XCTAssertTrue(text(of: error.staticTexts["cleanup-diagnostics"]).contains("cleanup locked"))
+        error.terminate()
+
+        let cancelled = launchCleanupFixture("--ui-testing-m3-cleanup-cancelled")
+        openCleanup(in: cancelled)
+        cancelled.buttons["cleanup-preview-global"].click()
+        XCTAssertTrue(cancelled.staticTexts["cleanup-state-loading"].waitForExistence(timeout: 2))
+        cancelled.buttons["cleanup-cancel"].click()
+        XCTAssertTrue(cancelled.staticTexts["cleanup-state-cancelled"].waitForExistence(timeout: 2))
+        cancelled.terminate()
+
+        let absent = launchCleanupFixture("--ui-testing-m3-cleanup-brew-absence")
+        openCleanup(in: absent)
+        XCTAssertTrue(absent.staticTexts["cleanup-state-unavailable"].waitForExistence(timeout: 2))
+        XCTAssertFalse(absent.buttons["cleanup-preview-global"].isEnabled)
+    }
+
+    @MainActor
+    func testCleanupCO7FullConfirmationDisclosesCommandProvenanceAndWarning() throws {
+        let app = launchCleanupFixture("--ui-testing-m3-cleanup-confirmation")
+        openCleanup(in: app)
+        app.buttons["cleanup-preview-full"].click()
+        app.buttons["cleanup-action-full"].click()
+
+        let confirmation = app.descendants(matching: .any)["cleanup-confirmation"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 2))
+        XCTAssertEqual(confirmation.staticTexts["cleanup-command"].value as? String, "brew cleanup --prune=all")
+        XCTAssertTrue(text(of: confirmation.staticTexts["cleanup-provenance"]).contains("Homebrew reported"))
+        XCTAssertTrue(text(of: confirmation.staticTexts["cleanup-full-warning"]).contains("regardless of age"))
+        XCTAssertTrue(text(of: confirmation.staticTexts["cleanup-full-warning"]).contains("installed packages"))
+        XCTAssertTrue(text(of: confirmation.staticTexts["cleanup-full-warning"]).contains("not cache-only"))
+        app.buttons["Cancel"].click()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testCleanupCO7AutoremoveDisclosesExactOrphans() throws {
+        let app = launchCleanupFixture("--ui-testing-m3-cleanup-confirmation")
+        openCleanup(in: app)
+        app.buttons["cleanup-preview-autoremove"].click()
+        app.buttons["cleanup-action-autoremove"].click()
+
+        let confirmation = app.descendants(matching: .any)["cleanup-confirmation"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 2))
+        XCTAssertTrue(text(of: confirmation.staticTexts["cleanup-orphan-count"]).contains("1 orphan"))
+        XCTAssertEqual(text(of: confirmation.staticTexts["cleanup-orphan-wget"]), "wget")
+        XCTAssertTrue(text(of: confirmation.staticTexts["cleanup-orphan-allocation"]).contains("currently on disk"))
+        XCTAssertFalse(text(of: confirmation.staticTexts["cleanup-orphan-allocation"]).contains("reclaimable"))
+    }
+
+    @MainActor
+    func testCleanupCO7DenialRefreshRequiresReconfirmation() throws {
+        let app = launchCleanupFixture("--ui-testing-m3-cleanup-denial-refresh")
+        openCleanup(in: app)
+        app.buttons["cleanup-preview-global"].click()
+        app.buttons["cleanup-action-global"].click()
+        app.buttons["Confirm Cleanup"].click()
+
+        XCTAssertTrue(app.staticTexts["cleanup-state-stale"].waitForExistence(timeout: 2))
+        XCTAssertTrue(text(of: app.staticTexts["cleanup-state-stale"]).contains("changed"))
+        XCTAssertFalse(app.buttons["cleanup-action-global"].exists)
+        XCTAssertTrue(app.buttons["cleanup-preview-global"].exists)
+    }
+
+    @MainActor
+    func testCleanupCO7TerminalOutcomeRefreshesStorage() throws {
+        let app = launchCleanupFixture("--ui-testing-m3-cleanup-post-terminal-refresh")
+        openCleanup(in: app)
+        XCTAssertFalse(app.staticTexts["cleanup-post-terminal-refresh"].exists)
+        app.buttons["cleanup-preview-global"].click()
+        app.buttons["cleanup-action-global"].click()
+        app.buttons["Confirm Cleanup"].click()
+
+        XCTAssertTrue(app.staticTexts["cleanup-post-terminal-refresh"].waitForExistence(timeout: 3))
+        XCTAssertTrue(text(of: app.staticTexts["cleanup-post-terminal-refresh"]).contains("revalidating"))
+    }
+
+    @MainActor
     func testCleanupRouteShowsStablePackageFirstOnDiskRows() throws {
         let app = launchDiskFixture()
         app.staticTexts["Cleanup"].click()
@@ -201,6 +323,25 @@ final class cellarUITests: XCTestCase {
         if let mode { app.launchArguments.append(mode) }
         app.launch()
         return app
+    }
+
+    @MainActor
+    private func launchCleanupFixture(_ mode: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-m3-cleanup", mode]
+        app.launch()
+        return app
+    }
+
+    @MainActor
+    private func openCleanup(in app: XCUIApplication) {
+        app.staticTexts["Cleanup"].click()
+        XCTAssertTrue(app.staticTexts["Cleanup"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    private func text(of element: XCUIElement) -> String {
+        (element.value as? String) ?? element.label
     }
 
     @MainActor
