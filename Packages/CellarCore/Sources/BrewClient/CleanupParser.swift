@@ -28,7 +28,7 @@ public enum CleanupFooterForm: String, Sendable, Hashable {
 public struct CleanupParserProvenance: Sendable, Hashable {
     public let parserVersion: Int
     public let footerForm: CleanupFooterForm?
-    public init(parserVersion: Int = 1, footerForm: CleanupFooterForm?) {
+    public init(parserVersion: Int = 2, footerForm: CleanupFooterForm?) {
         self.parserVersion = parserVersion; self.footerForm = footerForm
     }
 }
@@ -36,7 +36,7 @@ public struct CleanupEvidenceFingerprint: Sendable, Hashable {
     public let version: Int
     public let hexadecimal: String
     init(evidence: CleanupEvidence) {
-        version = 1
+        version = 2
         let digest = SHA256.hash(data: evidence.canonicalData(version: version))
         hexadecimal = digest.map { String(format: "%02x", $0) }.joined()
     }
@@ -44,6 +44,10 @@ public struct CleanupEvidenceFingerprint: Sendable, Hashable {
 public struct CleanupEvidence: Sendable, Hashable {
     public let scope: CleanupScope
     public let rows: [CleanupRow]
+    /// Paths from `Would remove (empty directory): <path>` lines. Brew prints
+    /// them with no size, so they never become rows: a zero-byte row would
+    /// claim a size brew never reported.
+    public let emptyDirectories: [String]
     public let orphans: CleanupOrphans
     public let total: CleanupReportedTotal
     public let unknownLines: [Data]
@@ -51,6 +55,7 @@ public struct CleanupEvidence: Sendable, Hashable {
     public init(
         scope: CleanupScope,
         rows: [CleanupRow],
+        emptyDirectories: [String],
         orphans: CleanupOrphans,
         total: CleanupReportedTotal,
         unknownLines: [Data],
@@ -58,6 +63,7 @@ public struct CleanupEvidence: Sendable, Hashable {
     ) {
         self.scope = scope
         self.rows = rows
+        self.emptyDirectories = emptyDirectories
         self.orphans = orphans
         self.total = total
         self.unknownLines = unknownLines
@@ -67,7 +73,8 @@ public struct CleanupEvidence: Sendable, Hashable {
     public var isEmpty: Bool {
         switch orphans {
         case .known(let names, _, _): names.isEmpty && unknownLines.isEmpty
-        case .notApplicable: rows.isEmpty && total == .unknown && unknownLines.isEmpty
+        case .notApplicable:
+            rows.isEmpty && emptyDirectories.isEmpty && total == .unknown && unknownLines.isEmpty
         case .unknown: false
         }
     }
@@ -92,6 +99,8 @@ public struct CleanupEvidence: Sendable, Hashable {
             encoder.append(row.path)
             encoder.append(row.bytes)
         }
+        encoder.append(emptyDirectories.count)
+        for path in emptyDirectories { encoder.append(path) }
         switch orphans {
         case .notApplicable: encoder.append("orphans.na")
         case .unknown: encoder.append("orphans.unknown")
@@ -158,6 +167,7 @@ public enum CleanupParser {
             evidence: CleanupEvidence(
                 scope: request.scope,
                 rows: parsed.rows,
+                emptyDirectories: parsed.emptyDirectories,
                 orphans: parsed.orphans,
                 total: parsed.total,
                 unknownLines: parsed.unknownLines,
@@ -168,6 +178,7 @@ public enum CleanupParser {
     }
     private struct Parsed {
         var rows: [CleanupRow] = []
+        var emptyDirectories: [String] = []
         var orphans: CleanupOrphans = .notApplicable
         var total: CleanupReportedTotal = .unknown
         var unknownLines: [Data] = []
@@ -180,6 +191,8 @@ public enum CleanupParser {
             guard let text = text(of: rawLine), !text.isEmpty else { continue }
             if let row = cleanupRow(text) {
                 parsed.rows.append(row)
+            } else if let directory = emptyDirectory(text) {
+                parsed.emptyDirectories.append(directory)
             } else if let footer = footer(text) {
                 parsed.total = .reportedFooter(bytes: footer.bytes)
                 parsed.footerForm = footer.form
@@ -240,6 +253,15 @@ public enum CleanupParser {
         let size = String(body[sizeStart..<body.index(before: body.endIndex)])
         guard !path.isEmpty, let bytes = byteCount(size) else { return nil }
         return CleanupRow(path: path, bytes: bytes)
+    }
+    /// Dry-run only: the real run removes empty directories silently
+    /// (`rmdir_if_possible` in Homebrew's cleanup.rb), so there is no
+    /// `Removing (empty directory):` twin to recognize.
+    private static func emptyDirectory(_ text: String) -> String? {
+        let prefix = "Would remove (empty directory): "
+        guard text.hasPrefix(prefix) else { return nil }
+        let path = String(text.dropFirst(prefix.count))
+        return path.isEmpty ? nil : path
     }
     private static func footer(_ text: String) -> (bytes: Int64, form: CleanupFooterForm)? {
         let forms: [(String, CleanupFooterForm)] = [

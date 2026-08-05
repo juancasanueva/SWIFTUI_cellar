@@ -43,7 +43,7 @@ struct CleanupParserTests {
         )
         #expect(result.evidence.rows.map(\.bytes) == [12, 10])
         #expect(result.evidence.total == .reportedFooter(bytes: 22))
-        #expect(result.provenance.parserVersion == 1)
+        #expect(result.provenance.parserVersion == 2)
         #expect(result.provenance.footerForm == .wouldFree)
         #expect(result.evidence.isPartial == false)
     }
@@ -59,11 +59,55 @@ struct CleanupParserTests {
         #expect(result.evidence.total == .unknown)
         #expect(result.evidence.isPartial == false)
     }
+    @Test("Empty-directory lines are typed evidence, not unknown output")
+    func emptyDirectoryLinesAreTyped() {
+        // Homebrew's cleanup.rb prints `Would remove (empty directory): #{d}`
+        // in dry-run mode only; the real run removes the directory silently.
+        let stdout = Data(
+            "Would remove (empty directory): /opt/homebrew/lib/ruby/gems/3.3.0/doc/cocoapods-1.16.2\n"
+                .appending("Would remove: /tmp/a (12B)\n")
+                .utf8
+        )
+        let result = CleanupParser.parse(
+            CleanupPreviewRequest(scope: .global),
+            rawStdout: stdout,
+            rawStderr: Data()
+        )
+        #expect(result.evidence.emptyDirectories == ["/opt/homebrew/lib/ruby/gems/3.3.0/doc/cocoapods-1.16.2"])
+        #expect(result.evidence.rows.map(\.bytes) == [12])
+        #expect(result.evidence.unknownLines.isEmpty)
+        #expect(result.evidence.isPartial == false)
+    }
+    @Test("Empty directories alone are cleanable, never an empty preview or an invented size")
+    func emptyDirectoriesAloneAreNotEmpty() {
+        let stdout = Data("Would remove (empty directory): /tmp/dir\n".utf8)
+        let result = CleanupParser.parse(
+            CleanupPreviewRequest(scope: .full),
+            rawStdout: stdout,
+            rawStderr: Data()
+        )
+        #expect(result.evidence.rows.isEmpty)
+        #expect(result.evidence.emptyDirectories == ["/tmp/dir"])
+        #expect(result.evidence.isEmpty == false)
+        #expect(result.evidence.isPartial == false)
+        #expect(result.evidence.total == .unknown)
+    }
+    @Test("Empty directories carry authorization identity")
+    func emptyDirectoriesCarryIdentity() {
+        let first = cleanup("Would remove (empty directory): /tmp/a\n")
+        let same = cleanup("Would remove (empty directory): /tmp/a\n")
+        let changed = cleanup("Would remove (empty directory): /tmp/b\n")
+        #expect(first.evidence.isEqualForAuthorization(to: same.evidence))
+        #expect(first.evidence.fingerprint == same.evidence.fingerprint)
+        #expect(first.evidence.isEqualForAuthorization(to: changed.evidence) == false)
+        #expect(first.evidence.fingerprint != changed.evidence.fingerprint)
+    }
     @Test("Overflow, malformed size, and unknown nonblank lines are partial")
     func malformedInputIsPartial() {
         let stdout = Data(
             "Would remove: /tmp/huge (9223372036854775808B)\n"
                 .appending("Would remove: /tmp/bad (many bytes)\n")
+                .appending("Would remove (empty directory): \n")
                 .appending("future Homebrew prose\n")
                 .utf8
         )
@@ -73,7 +117,8 @@ struct CleanupParserTests {
             rawStderr: Data()
         )
         #expect(result.evidence.rows.isEmpty)
-        #expect(result.evidence.unknownLines.count == 3)
+        #expect(result.evidence.emptyDirectories.isEmpty)
+        #expect(result.evidence.unknownLines.count == 4)
         #expect(result.evidence.unknownLines[0] == Data("Would remove: /tmp/huge (9223372036854775808B)\n".utf8))
         #expect(result.evidence.issues.contains(.malformedSize))
         #expect(result.evidence.issues.contains(.unknownLine))
@@ -118,7 +163,7 @@ struct CleanupParserTests {
         #expect(first.evidence.fingerprint == sameEvidence.evidence.fingerprint)
         #expect(first.evidence.isEqualForAuthorization(to: changed.evidence) == false)
         #expect(first.evidence.fingerprint != changed.evidence.fingerprint)
-        #expect(first.evidence.fingerprint.version == 1)
+        #expect(first.evidence.fingerprint.version == 2)
         #expect(first.evidence.fingerprint.hexadecimal.count == 64)
     }
     @Test("Only a complete same-root snapshot supplies currently-on-disk orphan allocation")
@@ -135,6 +180,13 @@ struct CleanupParserTests {
         #expect(partial.evidence.orphans.currentlyOnDiskBytes == nil)
         #expect(wrongRoot.evidence.orphans.currentlyOnDiskBytes == nil)
         #expect(allocated.evidence.total == .unknown, "disk allocation became reclaimable provenance")
+    }
+    private func cleanup(_ text: String) -> CleanupPreviewResult {
+        CleanupParser.parse(
+            CleanupPreviewRequest(scope: .global),
+            rawStdout: Data(text.utf8),
+            rawStderr: Data()
+        )
     }
     private func autoremove(_ text: String, id: UUID = UUID()) -> CleanupPreviewResult {
         CleanupParser.parse(
