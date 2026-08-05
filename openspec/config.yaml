@@ -1,23 +1,19 @@
 schema: spec-driven
 
-project: cellar
+project: swiftui_cellar
 artifact_store: hybrid
 execution_mode: interactive
 delivery_strategy: single-pr
 review_budget_lines: 2000
 
 context: |
-  Cellar! — native macOS SwiftUI GUI for Homebrew (see PRD.md). Fresh Xcode template.
-  Stack: Swift 6.3.3 toolchain / Xcode 26.6, SwiftUI + SwiftData, macOS 26.0 deployment target, arm64 only.
-  Layout: app target `cellar` (thin SwiftUI shell) + local SPM package `Packages/CellarCore` (target `BrewProcess`).
-  Targets today: cellar, cellarTests (Swift Testing), cellarUITests (XCUITest). Schemes: cellar, CellarCore.
-  Architecture goal: protocol-first core in CellarCore, GUI-free testable; app shells out to `brew`.
-  Concurrency: Swift 6 language mode (SWIFT_VERSION = 6.0) on every app-project build config, with
-  approachable concurrency + MainActor default isolation on the app target; CellarCore uses SwiftPM's
-  default `nonisolated` isolation and `.swiftLanguageMode(.v6)`.
-  App sandbox is OFF (ENABLE_APP_SANDBOX = NO) — required to stat and spawn `/opt/homebrew/bin/brew`;
-  hardened runtime stays ON.
-  No git remote configured for pushes, no SwiftLint config, no formatter config.
+  Cellar! is a native macOS SwiftUI GUI for Homebrew; product scope and milestones live in PRD.md.
+  Stack: Apple Swift 6.3.3, Xcode 26.6, SwiftUI, SwiftData, macOS 26.0, arm64.
+  Layout: thin `cellar` app target plus local SwiftPM package `Packages/CellarCore`.
+  Core targets: BrewProcess, Catalog, BrewClient, and Persistence; dependencies point inward and external effects use protocols.
+  Concurrency: Swift 6 mode; the app defaults to MainActor while CellarCore uses SwiftPM nonisolated defaults.
+  Runtime: app sandbox off, hardened runtime on, and Homebrew access through `/opt/homebrew/bin/brew`.
+  Delivery: origin is configured; hybrid OpenSpec + Engram uses canonical project `swiftui_cellar`; RDD is globally disabled.
 
 testing:
   strict_tdd: true
@@ -27,19 +23,19 @@ testing:
   core_package_command: "swift test --package-path Packages/CellarCore"
   build_command: "xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'"
   verified: true
-  verified_on: "2026-08-01"
+  verified_on: "2026-08-04"
   layers:
     unit: swift-testing
-    integration: swift-testing (real `brew` binary at /opt/homebrew/bin/brew, Homebrew 6.0.14)
+    integration: swift-testing (real `brew` binary at /opt/homebrew/bin/brew, Homebrew 6.0.15)
     e2e: XCUITest (cellarUITests)
   coverage:
     available: true
     command: "xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -enableCodeCoverage YES"
     threshold: 0
   quality:
-    linter: "swiftlint (binary installed at /opt/homebrew/bin/swiftlint; no .swiftlint.yml in repo yet)"
+    linter: "swiftlint 0.65.0 (binary installed; no .swiftlint.yml in repo)"
     type_checker: "swiftc (compiler-enforced; no separate tool)"
-    formatter: "none configured (swift-format not installed; xcbeautify available for log formatting)"
+    formatter: "none configured (swift-format unavailable; xcbeautify 3.2.1 only formats build logs)"
 
 rules:
   proposal:

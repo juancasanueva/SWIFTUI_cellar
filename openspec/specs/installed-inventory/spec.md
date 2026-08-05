@@ -47,7 +47,11 @@ records, and a cask's installed data is a plain version string. A formula with m
 installed keg MUST be represented with all of its kegs, never truncated to one and never dropped. A
 cask's `auto_updates` field is tri-state (`true`, `null`, absent, never `false` in observed
 payloads) and MUST be preserved as "declared" versus "not declared" at decode time rather than
-folded into a plain boolean.
+folded into a plain boolean. A formula's optional linked-keg value MUST be preserved exactly: a
+present value identifies the linked version, while absence means unlinked and MUST NOT be replaced
+with the newest installed keg. This observable state MUST remain available for disk attribution.
+(Previously: decoding preserved every installed keg but collapsed an absent linked-keg value to the
+newest keg, losing the distinction between linked and unlinked formulae.)
 
 #### Scenario: A single-keg formula decodes
 
@@ -74,6 +78,13 @@ folded into a plain boolean.
 - WHEN both are decoded
 - THEN the first is classified as self-updating and the second is not
 - AND the null value is recorded as "not declared", not as an explicit false
+
+#### Scenario: Linked-keg absence remains unlinked
+
+- GIVEN a multi-keg formula with no linked-keg value, and another naming its older keg
+- WHEN both are decoded for disk attribution
+- THEN the first is unlinked and the second names that older keg as linked
+- AND neither is inferred from the newest installed keg
 
 ### Requirement: On-request and dependency-only are derived, and the default view is on-request
 
@@ -749,3 +760,10 @@ be impossible for the control to announce one number and submit a different set.
     carries a guard scenario asserting the installed list's bulk vocabulary is still exactly upgrade
     and uninstall, so a future services multi-select must be its own type over its own entity rather
     than a third case here.
+- **Amended by change `m3-disk-usage` (archived `2026-08-05`, PRD milestone **M3**, slice M3-3 —
+  Disk Usage)**: **1 MODIFIED** requirement replaced as a whole block — "Asymmetric formula and cask
+  installation shapes both decode" — adding **1 scenario**. 14 requirements / 57 scenarios → **14
+  requirements / 58 scenarios**. Nothing was added, removed, or renamed; all other requirements and
+  scenarios were preserved. The replacement keeps every existing decoding guarantee and additionally
+  requires an absent linked-keg value to remain unlinked rather than being inferred from the newest
+  installed keg, so disk attribution can consume the exact payload state.

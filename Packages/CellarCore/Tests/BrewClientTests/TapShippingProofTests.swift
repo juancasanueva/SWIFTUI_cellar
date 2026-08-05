@@ -34,6 +34,7 @@ struct TapShippingProofTests {
         #expect(requestedData.taps.isEmpty)
         #expect(store.inventory.taps.isEmpty)
         #expect(store.absence == scenario.absence)
+        #expect(center.isAvailable == false)
         #expect(
             TapProjection.state(loadState: store.state, inventory: store.inventory)
                 == .unavailable(scenario.absence)
@@ -41,6 +42,7 @@ struct TapShippingProofTests {
         #expect(addItems.count == 1)
         #expect((addItems + [untapItem]).allSatisfy { $0.outcome == .launchFailed })
         #expect(launcher.launchCount == 0, "\(scenario) spawned a tap process")
+        #expect(launcher.specs.isEmpty, "\(scenario) constructed a process launch")
     }
 
     @Test("Absent taps recover and mutate in the same process lifetime")
@@ -55,6 +57,7 @@ struct TapShippingProofTests {
         #expect(store.state == .brewAbsent(.notInstalled(.standard)))
         #expect(center.isAvailable == false)
         #expect(launcher.launchCount == 0)
+        #expect(launcher.specs.isEmpty)
 
         let detected = BrewDetectionState.detected(TestInstallation.appleSilicon)
         center.attach(installation: detected.installation)
@@ -192,6 +195,16 @@ struct TapShippingProofTests {
             "Add Tap", "Untap", "Force Untap", "Show in Installed"
         ])
         #expect(tapUI.contains("Button {") == false, "an unenumerated dynamic tap button exists")
+
+        for excludedCapability in [
+            "Brewfile", "Install package", "Search catalog", "Clone official source",
+            "Security scan", "Git management", "Cleanup", "Disk usage", "Service behavior"
+        ] {
+            #expect(
+                tapUI.localizedCaseInsensitiveContains(excludedCapability) == false,
+                "excluded capability appeared in tap UI: \(excludedCapability)"
+            )
+        }
     }
 
     private func staticButtonLabels(in source: String) throws -> Set<String> {
