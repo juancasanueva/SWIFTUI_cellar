@@ -6,6 +6,7 @@
 import BrewClient
 import Catalog
 import Persistence
+import ReleaseNotes
 import SwiftUI
 
 /// One installed package.
@@ -36,6 +37,7 @@ struct InstalledRow: View {
                     badge.view
                 }
                 Spacer(minLength: 0)
+                releaseNotes
                 MutationMenu(center: operations, entry: entry)
             }
             if let desc = entry.desc {
@@ -48,6 +50,57 @@ struct InstalledRow: View {
         .padding(.vertical, 2)
         .accessibilityIdentifier(
             "installed-row-\(entry.id.kind == .formula ? "formula" : "cask")-\(entry.id.name)"
+        )
+    }
+
+    /// "What's new?", beside `MutationMenu` and deliberately **not inside it**.
+    ///
+    /// `MutationMenu` is the shared *mutation* surface, driven by
+    /// `OperationCenter` and reused by every call site that can change this
+    /// machine. A read-only, network-touching item in it would hand an egress
+    /// affordance to all of them at once, including ones nobody has written yet.
+    /// So it lives here, on the row, where it can be gated on this row being
+    /// outdated (D4 primary).
+    ///
+    /// Both halves of the gate are cheap and neither costs a request:
+    /// `isOutdated` is already computed for the badge, and resolvability is a
+    /// pure function over four catalog URLs.
+    @ViewBuilder
+    private var releaseNotes: some View {
+        if let installed = entry.installed,
+           ReleaseNotesAffordance(
+               isOutdated: installed.isOutdated,
+               candidates: candidates
+           ).isOffered {
+            ReleaseNotesButton(
+                id: entry.id,
+                displayName: entry.displayName,
+                version: installed.catalogVersion,
+                candidates: candidates,
+                label: "What's new?",
+                showsSlug: true
+            )
+            .font(.caption)
+        }
+    }
+
+    /// The catalog record's four URLs when there is one, and the snapshot's own
+    /// `homepage` when there is not.
+    ///
+    /// The fallback is the same discipline the description already follows on
+    /// this row: the snapshot is the source that exists even with a cold, empty
+    /// or third-party-tap catalog (installed-inventory II7). `brew info` publishes
+    /// the same `homepage` field the catalog dump does, so this widens *coverage*
+    /// and not the rule — resolution still runs over published URLs only, and
+    /// still resolves nothing for a package whose homepage is not a GitHub
+    /// repository.
+    private var candidates: RepositoryCandidates {
+        if let package = entry.catalog { return RepositoryCandidates(package) }
+        return RepositoryCandidates(
+            homepage: entry.installed?.homepage?.absoluteString,
+            headURL: nil,
+            stableURL: nil,
+            caskDownloadURL: nil
         )
     }
 

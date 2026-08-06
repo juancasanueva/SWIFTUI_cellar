@@ -1,0 +1,11 @@
+[
+  {
+    "tag_name": "v1.19.0",
+    "name": "v1.19.0",
+    "body": "### Broken on purpose\n\n*unterminated emphasis and **nested bold that never closes\n\n```swift\nlet fence = \"this code fence is never closed\"\n\n[a link with no target](\n![an image with no closing paren](https://example.com/a.png\n\n| a table | that stops\n| ---\n\n<div><span>raw html that never closes\n\n> a quote\n>> that jumps depth\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2024-06-16T21:09:35Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.19.0"
+  }
+]

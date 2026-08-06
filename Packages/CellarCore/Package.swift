@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "DiskUsage", targets: ["DiskUsage"]),
         .library(name: "BrewClient", targets: ["BrewClient"]),
         .library(name: "SecurityKit", targets: ["SecurityKit"]),
+        .library(name: "ReleaseNotes", targets: ["ReleaseNotes"]),
         .library(name: "Persistence", targets: ["Persistence"])
     ],
     targets: [
@@ -85,6 +86,34 @@ let package = Package(
         .testTarget(
             name: "SecurityKitTests",
             dependencies: ["SecurityKit", "CellarTestSupport"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // Release notes for an outdated package. Deliberately depends on
+        // **`Catalog` alone** — not on `SecurityKit`, not on `BrewProcess`, not on
+        // `BrewClient`. Two consequences, both load-bearing:
+        //
+        // * It cannot see `BrewProcess`, so "release notes spawn no `brew`
+        //   process" is a fact of the build graph rather than a discipline
+        //   (`release-notes` RN-R9).
+        // * It cannot see `OperationCenterBulk` in `BrewClient`, so a bulk upgrade
+        //   structurally cannot reach this target's egress (RN-R3). The
+        //   composition guard for that lives in the app test target, the only
+        //   place that sees both.
+        //
+        // It re-declares the consent and credential seams `SecurityKit` already
+        // ships rather than importing them (design D2): one mechanism applied
+        // twice under a distinct Keychain service name, never a second set of
+        // rules. **Nothing depends back on it**, which is what makes the whole
+        // capability one `git revert` away.
+        .target(
+            name: "ReleaseNotes",
+            dependencies: ["Catalog"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "ReleaseNotesTests",
+            dependencies: ["ReleaseNotes", "CellarTestSupport"],
             resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

@@ -1,0 +1,128 @@
+[
+  {
+    "tag_name": "v0.11.1",
+    "name": "v0.11.1",
+    "body": "## What's Changed\r\n* Fix that the release was reporting the wrong version id by @rpdelaney in https://github.com/sharkdp/vivid/pull/195\r\n\r\n\r\n**Full Changelog**: https://github.com/sharkdp/vivid/compare/v0.11.0...v0.11.1",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-04-09T20:12:00Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.11.1"
+  },
+  {
+    "tag_name": "v0.11.1-pre",
+    "name": "Fix that the release was reporting the wrong version id",
+    "body": "## What's Changed\r\n* Bump version to 0.11.1 by @rpdelaney in https://github.com/sharkdp/vivid/pull/195\r\n\r\n\r\n**Full Changelog**: https://github.com/sharkdp/vivid/compare/v0.11.0...v0.11.1-pre",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-04-09T19:26:04Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.11.1-pre"
+  },
+  {
+    "tag_name": "v0.11.0",
+    "name": "v0.11.0",
+    "body": "## What's Changed\r\n* Update Nord theme to match reference implementation by @jpcirrus in https://github.com/sharkdp/vivid/pull/138\r\n* Added tokyonight-day theme by @haasal in https://github.com/sharkdp/vivid/pull/141\r\n* dracula: Update `unimportant` to match Dracula colors by @RobLoach in https://github.com/sharkdp/vivid/pull/144\r\n* style(theme): Init cyberdream theme by @byt3m4st3r in https://github.com/sharkdp/vivid/pull/142\r\n* added modus-vivendi theme by @sorend in https://github.com/sharkdp/vivid/pull/148\r\n* Add Aseprite file extensions by @RobLoach in https://github.com/sharkdp/vivid/pull/145\r\n* Vim: add .swo and .swn for swap files by @yochem in https://github.com/sharkdp/vivid/pull/152\r\n* Add file types .zpaq, .paq8o, .paq8n, .tsv by @EyeCon in https://github.com/sharkdp/vivid/pull/150\r\n* Readme: add instructions for fish by @simono in https://github.com/sharkdp/vivid/pull/155\r\n* Update CI runners to -latest versions by @rpdelaney in https://github.com/sharkdp/vivid/pull/165\r\n* Fix wrong file extension xvf -> xcf by @rpdelaney in https://github.com/sharkdp/vivid/pull/164\r\n* Update Debian package download instructions to v0.10.1 by @mattbalvin in https://github.com/sharkdp/vivid/pull/167\r\n* .csv and .tsv are spreadsheet formats, not markup by @Monty in https://github.com/sharkdp/vivid/pull/175\r\n* Fix Keynote presentation ext by @rpdelaney in https://github.com/sharkdp/vivid/pull/177\r\n* Upgrade amd64 macos runner to version 15 by @rpdelaney in https://github.com/sharkdp/vivid/pull/182\r\n* Add .mjs, .cjs javascript extensions by @Monty in https://github.com/sharkdp/vivid/pull/180\r\n* docs(readme): simplify fish usage instructions by @tranzystorekk in https://github.com/sharkdp/vivid/pull/170\r\n* Reword NoThemeProvided error by @rpdelaney in https://github.com/sharkdp/vivid/pull/185\r\n* Add `.odin` for Odin Lang by @sumit-sahrawat in https://github.com/sharkdp/vivid/pull/188\r\n* Import many file types from LS_COLORS by @rpdelaney in https://github.com/sharkdp/vivid/pull/189\r\n* Import additional categories from LS_COLORS by @rpdelaney in https://github.com/sharkdp/vivid/pull/191\r\n* Add an ANSI color theme using terminal's 16-color palette by @martenlienen in https://github.com/sharkdp/vivid/pull/190\r\n\r\n## New Contributors\r\n* @jpcirrus made their first contribution in https://github.com/sharkdp/vivid/pull/138\r\n* @haasal made their first contribution in https://github.com/sharkdp/vivid/pull/141\r\n* @RobLoach made their first contribution in https://github.com/sharkdp/vivid/pull/144\r\n* @byt3m4st3r made their first contribution in https://github.com/sharkdp/vivid/pull/142\r\n* @sorend made their first contribution in https://github.com/sharkdp/vivid/pull/148\r\n* @EyeCon made their first contribution in https://github.com/sharkdp/vivid/pull/150\r\n* @simono made their first contribution in https://github.com/sharkdp/vivid/pull/155\r\n* @Monty made their first contribution in https://github.com/sharkdp/vivid/pull/175\r\n* @tranzystorekk made their first contribution in https://github.com/sharkdp/vivid/pull/170\r\n* @sumit-sahrawat made their first contribution in https://github.com/sharkdp/vivid/pull/188\r\n* @martenlienen made their first contribution in https://github.com/sharkdp/vivid/pull/190\r\n\r\n**Full Changelog**: https://github.com/sharkdp/vivid/compare/v0.10.1...v0.11.0",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-04-08T01:46:04Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.11.0"
+  },
+  {
+    "tag_name": "v0.10.1",
+    "name": "v0.10.1",
+    "body": "## What's Changed\r\n\r\n* Bugfix: Some themes fail to find media.3d categories, see #136, #137\r\n\r\n\r\n**Full Changelog**: https://github.com/sharkdp/vivid/compare/v0.10.0...v0.10.1",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2024-06-22T20:09:56Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.10.1"
+  },
+  {
+    "tag_name": "v0.10.0",
+    "name": "v0.10.0",
+    "body": "## What's Changed\r\n\r\n* Replace `dirs` crate with `etcetera` crate by @utkarshgupta137 in https://github.com/sharkdp/vivid/pull/103\r\n* Add Dockerfile by @rpdelaney in https://github.com/sharkdp/vivid/pull/104\r\n* zenburn theme by @colinta in https://github.com/sharkdp/vivid/pull/107\r\n* Add jsx filtype by @yusuphgammut in https://github.com/sharkdp/vivid/pull/106\r\n* Add Rosé Pine theme by @ryanccn in https://github.com/sharkdp/vivid/pull/108\r\n* Add new filetypes by @yochem in https://github.com/sharkdp/vivid/pull/110\r\n* bump rust-embed by @nim65s in https://github.com/sharkdp/vivid/pull/111\r\n* .bashrc and .bash_profile are shell files by @yochem in https://github.com/sharkdp/vivid/pull/114\r\n* Bump rustix from 0.36.9 to 0.36.16 by @dependabot in https://github.com/sharkdp/vivid/pull/115\r\n* Add `.avif` to image filetype by @kidonng in https://github.com/sharkdp/vivid/pull/118\r\n* Add bunch of file extensions by @vanillajonathan in https://github.com/sharkdp/vivid/pull/117\r\n* Update filetypes.yml by @vanillajonathan in https://github.com/sharkdp/vivid/pull/119\r\n* Media filetype additions by @jakeanq in https://github.com/sharkdp/vivid/pull/123\r\n* Added multiple filetypes, explained in depth in the pull request by @sandalbanditten in https://github.com/sharkdp/vivid/pull/105\r\n* Update filetypes.yml by @pedemonte in https://github.com/sharkdp/vivid/pull/128\r\n* Add Tokyo Night theme by @adrian5 in https://github.com/sharkdp/vivid/pull/126\r\n* Added Ansi 3-bit Colors by @John-Toohey in https://github.com/sharkdp/vivid/pull/125\r\n* Allowed font_style to be an array by @John-Toohey in https://github.com/sharkdp/vivid/pull/124\r\n* Add hints via JSON schemas for themes/*.yml and config/filetypes.yml by @EmilyGraceSeville7cf in https://github.com/sharkdp/vivid/pull/130\r\n* Add `.ha` to filetypes.yml by @ormai in https://github.com/sharkdp/vivid/pull/132\r\n* Sync GA scripts with bat by @sharkdp in https://github.com/sharkdp/vivid/pull/102\r\n\r\n## New Contributors\r\n* @utkarshgupta137 made their first contribution in https://github.com/sharkdp/vivid/pull/103\r\n* @rpdelaney made their first contribution in https://github.com/sharkdp/vivid/pull/104\r\n* @colinta made their first contribution in https://github.com/sharkdp/vivid/pull/107\r\n* @yusuphgammut made their first contribution in https://github.com/sharkdp/vivid/pull/106\r\n* @ryanccn made their first contribution in https://github.com/sharkdp/vivid/pull/108\r\n* @yochem made their first contribution in https://github.com/sharkdp/vivid/pull/110\r\n* @nim65s made their first contribution in https://github.com/sharkdp/vivid/pull/111\r\n* @dependabot made their first contribution in https://github.com/sharkdp/vivid/pull/115\r\n* @kidonng made their first contribution in https://github.com/sharkdp/vivid/pull/118\r\n* @vanillajonathan made their first contribution in https://github.com/sharkdp/vivid/pull/117\r\n* @jakeanq made their first contribution in https://github.com/sharkdp/vivid/pull/123\r\n* @sandalbanditten made their first contribution in https://github.com/sharkdp/vivid/pull/105\r\n* @pedemonte made their first contribution in https://github.com/sharkdp/vivid/pull/128\r\n* @adrian5 made their first contribution in https://github.com/sharkdp/vivid/pull/126\r\n* @John-Toohey made their first contribution in https://github.com/sharkdp/vivid/pull/125\r\n* @EmilyGraceSeville7cf made their first contribution in https://github.com/sharkdp/vivid/pull/130\r\n* @ormai made their first contribution in https://github.com/sharkdp/vivid/pull/132\r\n\r\n**Full Changelog**: https://github.com/sharkdp/vivid/compare/v0.9.0...v0.10.0",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2024-06-22T19:16:03Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.10.0"
+  },
+  {
+    "tag_name": "v0.9.0",
+    "name": "v0.9.0",
+    "body": "## Changes\r\n\r\n- Make the output order deterministic, see #63 and #87 (@tavianator)\r\n- Added more filetypes, see #95 (@Babkock)\r\n- Make it possible to build vivid with LTO, see #90 (@ixti)\r\n\r\n## Themes\r\n\r\n- Added alabaster_dark, see #91 (@p00f)\r\n- Added catppuccin-*, see #94 (@etenzy)\r\n- Added modus-operandi, see #96 (@apraga)\r\n- Updates in the lava theme, see #88 (@fredericrous)\r\n- Updates in the dracula theme, see #85 (@yavko)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2023-03-14T20:05:58Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.9.0"
+  },
+  {
+    "tag_name": "v0.8.0",
+    "name": "v0.8.0",
+    "body": "## Changes\r\n\r\n- Added new core filetypes (reset_to_normal, multi_hard_link, door, setuid, setgid), see #78 (@ixti)\r\n- Added instructions on how to preview themes in a user-defined directory, see #75 (@WoLpH)\r\n\r\n## New filetypes\r\n\r\n- Opus and WavPack audio extensions, see #71 (@desbma)\r\n- `.webm`, see #72 (@desbma)\r\n- `.pyd`, `.pyo`, see #73 (@bl-ue)\r\n\r\n## New themes\r\n\r\n- Nord, see #66 (@Utagai)\r\n- Lava, see #66 (@fredericrous)\r\n- Iceberg, see #70 (@p00f)\r\n- Gruvbox, see #79 (@ixti)\r\n- Dracula, see #80 (@yavko)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2022-01-29T12:29:10Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.8.0"
+  },
+  {
+    "tag_name": "v0.7.0",
+    "name": "v0.7.0",
+    "body": "- List available themes via `vivid themes`, see #48 (@gillespiecd)\r\n- Added \"One\" theme, see #51 (@mortezadadgar)\r\n- Fix panic if stdout is closed, see #56\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2021-06-14T18:30:59Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.7.0"
+  },
+  {
+    "tag_name": "v0.6.0",
+    "name": "v0.6.0",
+    "body": "- The default themes and config files are now embedded into the `vivid` binary.\r\n  See #43 (@LordFlashmeow)\r\n- Added `XDG_CONFIG_HOME` as a possible source for theme files, see #40 (@LordFlashmeow)\r\n- Better error handling, see #43 (@LordFlashmeow)\r\n- Added macOS category to unimportant files, see #33 (@gseidler)\r\n- Added more media file types, see #38 (@gseidler)\r\n- Add new core filetypes for `sticky`/`other_writable`/`sticky_other_writable`, see #34 (@mattbalvin)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2020-09-20T16:29:55Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.6.0"
+  },
+  {
+    "tag_name": "v0.5.0",
+    "name": "v0.5.0",
+    "body": "- Added `jellybeans` theme, see #26 (@chandlerc)\r\n- Added `solarized-dark` and `solarized-light` theme, see #30 (@menelaos)\r\n- Theme arguments can be a path to a YAML theme file, see #23\r\n- Added LLVM file types, see #27 (@chandlerc)\r\n- Added support for block and character devices\r\n- Added `preview` subcommand, see #13\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2019-12-04T21:35:39Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.5.0"
+  },
+  {
+    "tag_name": "v0.4.0",
+    "name": "v0.4.0",
+    "body": "",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-12-03T22:02:18Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.4.0"
+  },
+  {
+    "tag_name": "v0.3.0",
+    "name": "v0.3.0",
+    "body": "",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-12-01T14:39:58Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.3.0"
+  },
+  {
+    "tag_name": "v0.2.0",
+    "name": null,
+    "body": null,
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-11-29T22:18:34Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.2.0"
+  },
+  {
+    "tag_name": "v0.1.0",
+    "name": "v0.1.0",
+    "body": "",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-11-27T22:25:30Z",
+    "html_url": "https://github.com/sharkdp/vivid/releases/tag/v0.1.0"
+  }
+]

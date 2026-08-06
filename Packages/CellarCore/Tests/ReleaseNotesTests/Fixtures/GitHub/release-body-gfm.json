@@ -1,0 +1,11 @@
+[
+  {
+    "tag_name": "v1.20.0",
+    "name": "v1.20.0",
+    "body": "## What's Changed\n\nA GFM table the platform renderer does not interpret:\n\n| Platform | Artifact | Notes |\n| -------- | -------- | ----- |\n| macOS    | hyperfine-v1.20.0-x86_64-apple-darwin.tar.gz | universal build |\n| Linux    | hyperfine-v1.20.0-x86_64-unknown-linux-gnu.tar.gz | glibc 2.17 |\n\nA task list:\n\n- [x] Ship the release\n- [ ] Update the docs\n- [ ] Announce it\n\nSome inline constructs: ~~this was removed~~, thanks to @sharkdp and @cellar-app\nfor the report, and see https://github.com/sharkdp/hyperfine/issues/1 for the\noriginal thread.\n\n![release banner](https://raw.githubusercontent.com/sharkdp/hyperfine/master/doc/banner.png)\n\n**Full Changelog**: https://github.com/sharkdp/hyperfine/compare/v1.19.0...v1.20.0\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2024-11-16T09:32:35Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.20.0"
+  }
+]

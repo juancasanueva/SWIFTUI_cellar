@@ -3,6 +3,7 @@ import BrewProcess
 import Catalog
 import DiskUsage
 import Foundation
+import ReleaseNotes
 import SecurityKit
 
 /// Deterministic, process-free app dependencies used only by the XCUITest launch mode.
@@ -22,6 +23,37 @@ enum AppTestFixtures {
             || arguments.contains("--ui-testing-m3-disk-usage")
             || arguments.contains("--ui-testing-m3-cleanup")
             || arguments.contains("--ui-testing-m4-security")
+            || arguments.contains("--ui-testing-m5-release-notes")
+    }
+
+    // MARK: - M5 release notes
+
+    nonisolated static var isReleaseNotesEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-release-notes")
+    }
+
+    /// Whether the launch pretends a grant is already recorded.
+    ///
+    /// A launch argument rather than a written default, so a UI test never has to
+    /// mutate the developer's real preferences to reach the granted path — and so
+    /// the ungranted path is genuinely ungranted rather than "whatever was left
+    /// over from the last run".
+    nonisolated static var isReleaseNotesGranted: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-release-notes-granted")
+    }
+
+    /// What the stubbed GitHub transport answers with.
+    nonisolated enum ReleaseNotesMode: Sendable {
+        /// A page carrying a release tagged for the outdated version.
+        case matched
+        /// `403` with an exhausted budget and a reset time.
+        case rateLimited
+    }
+
+    nonisolated static var releaseNotesMode: ReleaseNotesMode {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-release-notes-rate-limited")
+            ? .rateLimited
+            : .matched
     }
 
     // MARK: - M5 discover
@@ -228,9 +260,105 @@ extension AppTestFixtures {
 
 struct AppTestInstalledPayloadSource: InstalledPayloadSourcing {
     func payload(using installation: BrewInstallation) async throws(InstalledInventoryError) -> Data {
-        Data(
-            #"{"formulae":[{"name":"widget","tap":"acme/tools","versions":{"stable":"1.0"},"installed":[{"version":"1.0","time":0,"installed_on_request":true}]}],"casks":[]}"#.utf8
+        guard AppTestFixtures.isReleaseNotesEnabled else {
+            return Data(
+                #"{"formulae":[{"name":"widget","tap":"acme/tools","versions":{"stable":"1.0"},"installed":[{"version":"1.0","time":0,"installed_on_request":true}]}],"casks":[]}"#.utf8
+            )
+        }
+        // One outdated formula whose published homepage is a real GitHub
+        // repository, so the row's affordance resolves without a catalog record.
+        // The second is outdated too and resolves to nothing, which is what makes
+        // "the button appears only where it can work" observable rather than
+        // vacuous.
+        return Data(
+            #"""
+            {"formulae":[
+              {"name":"hyperfine","tap":"homebrew/core","desc":"Command-line benchmarking tool",
+               "homepage":"https://github.com/sharkdp/hyperfine",
+               "versions":{"stable":"1.20.0"},"outdated":true,
+               "installed":[{"version":"1.18.0","time":0,"installed_on_request":true}]},
+              {"name":"widget","tap":"acme/tools","desc":"No repository anywhere",
+               "homepage":"https://gnu.org/software/widget",
+               "versions":{"stable":"2.0"},"outdated":true,
+               "installed":[{"version":"1.0","time":0,"installed_on_request":true}]}
+            ],"casks":[]}
+            """#.utf8
         )
+    }
+}
+
+/// The stubbed GitHub transport for `--ui-testing-m5-release-notes`.
+///
+/// Registered on this launch's release-notes session only — never globally — so
+/// nothing else in the app changes and no real request is ever issued from a UI
+/// test. It exists so the E2E cases are deterministic: the rate-limited case in
+/// particular cannot be reached by asking GitHub nicely.
+nonisolated final class AppTestReleaseNotesProtocol: URLProtocol {
+    // swiftlint:disable static_over_final_class
+    override class func canInit(with request: URLRequest) -> Bool { true }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    // swiftlint:enable static_over_final_class
+
+    override func startLoading() {
+        guard let url = request.url else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+
+        let status: Int
+        let headers: [String: String]
+        let body: Data
+
+        switch AppTestFixtures.releaseNotesMode {
+        case .matched:
+            status = 200
+            headers = [
+                "Content-Type": "application/json",
+                "x-ratelimit-limit": "60",
+                "x-ratelimit-remaining": "57",
+                "x-ratelimit-reset": "1786055400"
+            ]
+            body = Data(Self.matchedPage.utf8)
+        case .rateLimited:
+            status = 403
+            headers = [
+                "Content-Type": "application/json",
+                "x-ratelimit-limit": "60",
+                "x-ratelimit-remaining": "0",
+                "x-ratelimit-reset": "1786055400"
+            ]
+            body = Data(#"{"message":"API rate limit exceeded"}"#.utf8)
+        }
+
+        guard let response = HTTPURLResponse(
+            url: url, statusCode: status, httpVersion: "HTTP/2", headerFields: headers
+        ) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+
+    /// Tagged `v1.20.0`, which is the `catalogVersion` the payload above offers,
+    /// so the matcher's `v`-prefix rule is what makes this land.
+    private static let matchedPage = """
+        [{"tag_name":"v1.20.0","name":"v1.20.0",
+          "body":"## What's Changed\\n\\nFaster warmup runs and a new `--sort` option.",
+          "draft":false,"prerelease":false,
+          "published_at":"2024-11-16T09:32:35Z",
+          "html_url":"https://github.com/sharkdp/hyperfine/releases/tag/v1.20.0"}]
+        """
+
+    /// A session that answers only from this stub.
+    static func session() -> URLSession {
+        let configuration = ReleaseNotesSession.configuration()
+        configuration.protocolClasses = [AppTestReleaseNotesProtocol.self]
+        return URLSession(configuration: configuration)
     }
 }
 
