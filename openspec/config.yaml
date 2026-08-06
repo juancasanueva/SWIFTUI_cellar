@@ -4,7 +4,8 @@ project: swiftui_cellar
 artifact_store: hybrid
 execution_mode: interactive
 delivery_strategy: single-pr
-review_budget_lines: 2000
+# Raised from 2000 (M3) to 5000 per the M5 session decision every M5 slice already ran under.
+review_budget_lines: 5000
 
 context: |
   Cellar! is a native macOS SwiftUI GUI for Homebrew; product scope and milestones live in PRD.md.
@@ -52,7 +53,7 @@ rules:
   tasks:
     - Group by phase with hierarchical numbering; each task completable in one session.
     - Sequence RED (failing test) before GREEN (implementation) for every behavioral task.
-    - Forecast the 2,000-line review budget explicitly.
+    - Forecast the 5,000-line review budget explicitly.
   apply:
     guidelines:
       - Strict TDD — write the failing test first, never implement ahead of a test.
