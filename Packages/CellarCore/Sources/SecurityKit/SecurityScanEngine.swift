@@ -23,18 +23,21 @@ public actor SecurityScanEngine {
     /// lives in `BrewClient` — a target this one deliberately cannot see. The app
     /// composes the two; this engine only asks.
     public typealias QueryProvider = @Sendable () async -> [AdvisoryQuery]
+    /// The whole of what one scan must account for: the packages to ask about,
+    /// **and** the ones already decided without asking.
+    public typealias RequestProvider = @Sendable () async -> AdvisoryScanRequest
 
-    private let discovery: any AdvisoryDiscovering
-    private let enrichment: any AdvisoryEnriching
-    private let cache: any AdvisoryCaching
-    private let consent: any ScanConsentProviding
-    private let queries: QueryProvider
-    private let matcher: CVEMatcher
-    private let clock: any Clock<Duration>
-    private let timeSource: any SecurityTimeSource
-    private let policy: SecurityRefreshPolicy
+    let discovery: any AdvisoryDiscovering
+    let enrichment: any AdvisoryEnriching
+    let cache: any AdvisoryCaching
+    let consent: any ScanConsentProviding
+    let request: RequestProvider
+    let matcher: CVEMatcher
+    let clock: any Clock<Duration>
+    let timeSource: any SecurityTimeSource
+    let policy: SecurityRefreshPolicy
 
-    public private(set) var status: SecurityScanStatus = .idle
+    public internal(set) var status: SecurityScanStatus = .idle
 
     /// The one scan that may be joined, together with the token that owns it.
     ///
@@ -51,8 +54,41 @@ public actor SecurityScanEngine {
     private var nextScanToken = 0
 
     public nonisolated let events: AsyncStream<SecurityScanEvent>
-    private nonisolated let continuation: AsyncStream<SecurityScanEvent>.Continuation
+    nonisolated let continuation: AsyncStream<SecurityScanEvent>.Continuation
 
+    public init(
+        discovery: any AdvisoryDiscovering,
+        enrichment: any AdvisoryEnriching,
+        cache: any AdvisoryCaching,
+        consent: any ScanConsentProviding,
+        request: @escaping RequestProvider,
+        matcher: CVEMatcher = CVEMatcher(),
+        clock: any Clock<Duration> = ContinuousClock(),
+        timeSource: any SecurityTimeSource = SystemSecurityTimeSource(),
+        policy: SecurityRefreshPolicy = SecurityRefreshPolicy()
+    ) {
+        self.discovery = discovery
+        self.enrichment = enrichment
+        self.cache = cache
+        self.consent = consent
+        self.request = request
+        self.matcher = matcher
+        self.clock = clock
+        self.timeSource = timeSource
+        self.policy = policy
+
+        (events, continuation) = AsyncStream.makeStream(
+            of: SecurityScanEvent.self,
+            bufferingPolicy: .unbounded
+        )
+    }
+
+    /// For callers with nothing pre-decided.
+    ///
+    /// Every real composition root has something pre-decided — most of an
+    /// inventory is unmapped — so this exists for the tests that are asking about
+    /// the *acquisition* half and would otherwise have to say "and nothing else"
+    /// at every call site.
     public init(
         discovery: any AdvisoryDiscovering,
         enrichment: any AdvisoryEnriching,
@@ -64,19 +100,16 @@ public actor SecurityScanEngine {
         timeSource: any SecurityTimeSource = SystemSecurityTimeSource(),
         policy: SecurityRefreshPolicy = SecurityRefreshPolicy()
     ) {
-        self.discovery = discovery
-        self.enrichment = enrichment
-        self.cache = cache
-        self.consent = consent
-        self.queries = queries
-        self.matcher = matcher
-        self.clock = clock
-        self.timeSource = timeSource
-        self.policy = policy
-
-        (events, continuation) = AsyncStream.makeStream(
-            of: SecurityScanEvent.self,
-            bufferingPolicy: .unbounded
+        self.init(
+            discovery: discovery,
+            enrichment: enrichment,
+            cache: cache,
+            consent: consent,
+            request: { AdvisoryScanRequest(queries: await queries()) },
+            matcher: matcher,
+            clock: clock,
+            timeSource: timeSource,
+            policy: policy
         )
     }
 
@@ -174,7 +207,8 @@ public actor SecurityScanEngine {
             return .failed(.blockedPendingConsent)
         }
 
-        let queries = await queries()
+        let scanRequest = await request()
+        let queries = scanRequest.queries
         guard Task.isCancelled == false else { return .cancelled }
 
         publish(.discovering)
@@ -198,164 +232,10 @@ public actor SecurityScanEngine {
         let enriched = await enrichIfNeeded(discovered)
         guard Task.isCancelled == false else { return .cancelled }
 
-        return await settle(queries: queries, discovered: discovered, enriched: enriched)
-    }
-
-    /// Composes the answers into outcomes, mints the next revision, persists,
-    /// and publishes — in that order, so nothing is published that was not first
-    /// written down.
-    private func settle(
-        queries: [AdvisoryQuery],
-        discovered: AdvisoryDiscovery,
-        enriched: EnrichmentStep
-    ) async -> SecurityScanOutcome {
-        let now = timeSource.now
-        let entries = entries(
-            for: queries,
-            answers: discovered.answers,
-            severities: enriched.severities,
-            at: now
+        return await settle(
+            request: scanRequest,
+            discovered: discovered,
+            enriched: enriched
         )
-
-        let revision = (await loadCache()?.revision ?? SecurityScanRevision(ordinal: 0)).next()
-        let result = SecurityScanResult(
-            revision: revision,
-            entries: entries,
-            provenance: ScanProvenance(
-                scannedAt: now,
-                matcherVersion: CVEMatcher.version,
-                mappingRevision: EcosystemMapping.revision,
-                skippedRecordCounts: [
-                    .osv: discovered.skippedRecordCount,
-                    .nvd: enriched.skippedRecordCount
-                ],
-                enrichmentAttempted: enriched.attempted,
-                enrichmentSucceeded: enriched.succeeded
-            ),
-            isPartial: (enriched.attempted && enriched.succeeded == false)
-                || discovered.skippedRecordCount > 0
-        )
-
-        // Provenance and partiality are persisted with the entries, so a
-        // relaunch reads back the scan that happened rather than a scan-shaped
-        // guess assembled from what survived.
-        try? await cache.save(
-            AdvisoryCacheFile(
-                revisionOrdinal: revision.ordinal,
-                entries: entries,
-                provenance: result.provenance,
-                isPartial: result.isPartial
-            )
-        )
-
-        status = .settled(revision)
-        continuation.yield(.status(status))
-        continuation.yield(.settled(result))
-        return .completed(result)
-    }
-
-    /// What enrichment produced, and whether it was even asked.
-    ///
-    /// Two flags rather than one, because "we never asked NVD" and "we asked and
-    /// were refused" both leave findings unrated and are different facts.
-    private struct EnrichmentStep {
-        var severities: [String: SeverityTier] = [:]
-        var attempted = false
-        var succeeded = false
-        var skippedRecordCount = 0
-    }
-
-    private func enrichIfNeeded(_ discovered: AdvisoryDiscovery) async -> EnrichmentStep {
-        let identifiers = Self.identifiers(in: discovered)
-        // No findings, no enrichment. A clean inventory costs one request.
-        guard identifiers.isEmpty == false else { return EnrichmentStep() }
-
-        var step = EnrichmentStep(attempted: true)
-        publish(.enriching)
-        do {
-            let enriched = try await enrichment.enrich(identifiers)
-            step.severities = enriched.severities
-            step.skippedRecordCount = enriched.skippedRecordCount
-            step.succeeded = true
-        } catch {
-            // Recorded, never fatal: discovery's answers stand and the findings
-            // simply arrive unrated.
-            step.succeeded = false
-        }
-        return step
-    }
-
-    private func entries(
-        for queries: [AdvisoryQuery],
-        answers: [DiscoveredAnswer],
-        severities: [String: SeverityTier],
-        at now: Date
-    ) -> [AdvisoryCacheEntry] {
-        zip(queries, answers).map { query, discoveredAnswer in
-            AdvisoryCacheEntry(
-                key: AdvisoryCacheKey(
-                    sourceID: .osv,
-                    packageID: query.packageID,
-                    version: query.installedVersion
-                ),
-                outcome: matcher.match(
-                    query: query,
-                    answer: discoveredAnswer.answer,
-                    severities: severities
-                ),
-                fetchedAt: now,
-                advisoryModified: discoveredAnswer.newestModified,
-                mappingRevision: EcosystemMapping.revision,
-                matcherVersion: CVEMatcher.version
-            )
-        }
-    }
-
-    /// Retries only the failures another attempt could plausibly fix.
-    private func discoverWithRetries(
-        _ queries: [AdvisoryQuery]
-    ) async -> Result<AdvisoryDiscovery, AdvisoryError> {
-        var lastError = AdvisoryError.transportFailed
-
-        for attempt in 1...max(1, policy.maximumAttempts) {
-            if attempt > 1 {
-                do {
-                    try await clock.sleep(for: policy.backoff(beforeAttempt: attempt))
-                } catch {
-                    return .failure(lastError)
-                }
-            }
-            do {
-                return .success(try await discovery.discover(queries))
-            } catch {
-                lastError = error
-                guard policy.isWorthRetrying(error) else { return .failure(error) }
-            }
-        }
-        return .failure(lastError)
-    }
-
-    /// The CVE identifiers discovery found, deduplicated and ordered.
-    ///
-    /// Ordered so a request is reproducible, deduplicated because one advisory
-    /// routinely applies to several installed packages and enrichment must not
-    /// scale with inventory.
-    private static func identifiers(in discovery: AdvisoryDiscovery) -> [String] {
-        var seen: Set<String> = []
-        var ordered: [String] = []
-
-        for discoveredAnswer in discovery.answers {
-            guard case .answered(let advisories) = discoveredAnswer.answer else { continue }
-            for advisory in advisories {
-                guard let cveID = advisory.cveID, seen.insert(cveID).inserted else { continue }
-                ordered.append(cveID)
-            }
-        }
-        return ordered
-    }
-
-    private func publish(_ status: SecurityScanStatus) {
-        self.status = status
-        continuation.yield(.status(status))
     }
 }

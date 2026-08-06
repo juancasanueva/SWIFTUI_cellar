@@ -46,6 +46,43 @@ public enum AdvisoryQueryPlan: Sendable, Hashable {
     }
 }
 
+/// One package whose outcome was decided **before any request was considered**.
+///
+/// Unmapped, a cask, or a version its ecosystem cannot interpret. These are the
+/// overwhelming majority of a real inventory — U1 measured curated coverage at
+/// 3-5% — and they must reach the surface with their typed reason, or the
+/// Not-covered section is permanently empty and every count describes the handful
+/// that happened to be answerable rather than the inventory.
+public struct PredecidedOutcome: Sendable, Hashable {
+    public let packageID: PackageID
+    /// The installed string, verbatim, so the entry keys the same way a queried
+    /// one does and the cache cannot hold two shapes.
+    public let installedVersion: String
+    public let outcome: CVEScanOutcome
+
+    public init(packageID: PackageID, installedVersion: String, outcome: CVEScanOutcome) {
+        self.packageID = packageID
+        self.installedVersion = installedVersion
+        self.outcome = outcome
+    }
+}
+
+/// Everything one scan is asked to account for.
+///
+/// Both halves travel together because a scan's job is to describe the **whole
+/// inventory**, not the part of it that could be asked about. A provider that
+/// returned only queries would leave the caller to infer that everything else is
+/// fine — the exact collapse this capability exists to prevent.
+public struct AdvisoryScanRequest: Sendable, Hashable {
+    public let queries: [AdvisoryQuery]
+    public let predecided: [PredecidedOutcome]
+
+    public init(queries: [AdvisoryQuery], predecided: [PredecidedOutcome] = []) {
+        self.queries = queries
+        self.predecided = predecided
+    }
+}
+
 /// How an ecosystem writes versions.
 ///
 /// One rule per ecosystem, not one rule for everything, and the difference is

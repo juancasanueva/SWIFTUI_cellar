@@ -65,6 +65,10 @@ struct cellarApp: App {
     private let advisoryCredentials: any AdvisoryCredentialStoring
     /// Dismissed findings, on the same container as metadata and history.
     @State private var dismissals: DismissalStore
+    /// The artifact-integrity half. Its results are not cached — a signature
+    /// verdict describes the artifact as it is now — so this holds them for the
+    /// life of the scene and no longer.
+    @State private var integrity = ArtifactIntegrityStore()
 
     /// The queue of Cellar-initiated mutations, and everything the activity
     /// surfaces read. It is what finally drives `mutations`, the gate M2-1
@@ -186,7 +190,26 @@ struct cellarApp: App {
                     enrichment: NVDSource(credentials: advisoryCredentials),
                     cache: AdvisoryCache(fileURL: advisoryCacheURL),
                     consent: securityConsent,
-                    queries: { [] }
+                    // Both halves of what the scan must account for. The
+                    // pre-decided majority — unmapped formulae, casks,
+                    // uninterpretable versions — reaches the surface with its
+                    // typed reason instead of being silently absent, which is
+                    // what keeps the Not-covered count over the whole inventory
+                    // rather than over the handful that could be asked about.
+                    request: { @MainActor in
+                        let plan = SecurityQueryBuilder.plan(for: installed.inventory.packages)
+                        return AdvisoryScanRequest(
+                            queries: plan.queries,
+                            predecided: plan.outcomes.map { packageID, outcome in
+                                PredecidedOutcome(
+                                    packageID: packageID,
+                                    installedVersion: installed.inventory.package(packageID)?
+                                        .primaryKeg.version ?? "",
+                                    outcome: outcome
+                                )
+                            }
+                        )
+                    }
                 )
             )
         )
@@ -259,7 +282,9 @@ struct cellarApp: App {
                 security: security,
                 securityConsent: securityConsent,
                 advisoryCredentials: advisoryCredentials,
-                dismissals: dismissals
+                dismissals: dismissals,
+                integrity: integrity,
+                artifactLocations: artifactLocations
             )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
@@ -304,6 +329,24 @@ struct cellarApp: App {
     /// The operation centre is attached from the same place, so mutations become
     /// available the moment brew does and go unavailable the moment it stops
     /// being — with no restart either way (package-mutation PM7).
+    /// The brew-managed artifacts worth assessing.
+    ///
+    /// Built from Homebrew's **own roots** and from the inventory brew reported.
+    /// `/Applications` is never enumerated: cask bundles are reached through the
+    /// path Homebrew recorded, which the U3 probe confirmed is a symlink the
+    /// locator resolves rather than a directory it walks.
+    @MainActor
+    private var artifactLocations: [ArtifactLocation] {
+        guard let installation = brewDetection.state.installation else { return [] }
+        let roots = HomebrewRoots(
+            installation: installation,
+            userCacheDirectory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+        )
+        return ArtifactLocator(cellar: roots.cellar, caskroom: roots.caskroom)
+            .locations(for: installed.inventory.packages, caskArtifacts: [:])
+    }
+
     @MainActor
     private func refreshEverything() async {
         await brewDetection.refresh()

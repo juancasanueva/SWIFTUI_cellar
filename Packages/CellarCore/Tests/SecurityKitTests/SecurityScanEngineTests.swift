@@ -271,3 +271,104 @@ struct SecurityScanEngineTests {
         #expect(cache.stored?.revisionOrdinal == 13)
     }
 }
+
+// MARK: - Packages that were never queried still reach the surface
+
+/// The gap this suite exists to close, found while wiring the composition root.
+///
+/// The engine built entries only for the packages it *queried*. On this machine
+/// U1 measured real coverage at 3-5%, so roughly 150 of 159 formulae produce no
+/// query at all — and every one of them would have been absent from the settled
+/// result, leaving the Not-covered section permanently empty and the summary
+/// reading over nine packages instead of the whole inventory. That is precisely
+/// the collapse the spec forbids, arriving through the back door.
+@Suite("Pre-decided outcomes")
+struct PredecidedOutcomeTests {
+    private static func query(_ name: String) -> AdvisoryQuery {
+        AdvisoryQuery(
+            packageID: PackageID(kind: .formula, name: name),
+            installedVersion: "1.0.0",
+            queryVersion: "1.0.0",
+            ecosystem: "crates.io",
+            ecosystemPackageName: name
+        )
+    }
+
+    private static func predecided(
+        _ name: String,
+        kind: PackageKind = .formula,
+        reason: NotCoveredReason
+    ) -> PredecidedOutcome {
+        PredecidedOutcome(
+            packageID: PackageID(kind: kind, name: name),
+            installedVersion: "1.0.0",
+            outcome: .notCovered(reason)
+        )
+    }
+
+    @Test("Packages decided before any request appear in the settled result with their reason")
+    func predecidedPackagesAppearInTheSettledResult() async throws {
+        let request = AdvisoryScanRequest(
+            queries: [Self.query("bat")],
+            predecided: [
+                Self.predecided("curl", reason: .unmapped),
+                Self.predecided("ghostty", kind: .cask, reason: .kindUnsupported),
+                Self.predecided("ca-certificates", reason: .unsupportedVersionScheme)
+            ]
+        )
+        let engine = SecurityScanEngine(
+            discovery: RecordingAdvisorySource(),
+            enrichment: RecordingAdvisorySource(),
+            cache: InMemoryAdvisoryCache(),
+            consent: FixedScanConsent(.granted(at: Date(timeIntervalSince1970: 0))),
+            request: { request }
+        )
+
+        guard case .completed(let result) = await engine.scan() else {
+            Issue.record("the scan did not complete")
+            return
+        }
+
+        #expect(result.entries.count == 4, "the un-queried packages fell out of the result")
+        let byName = Dictionary(
+            uniqueKeysWithValues: result.entries.map { ($0.key.packageID.name, $0.outcome) }
+        )
+        #expect(byName["curl"] == .notCovered(.unmapped))
+        #expect(byName["ghostty"] == .notCovered(.kindUnsupported))
+        #expect(byName["ca-certificates"] == .notCovered(.unsupportedVersionScheme))
+        #expect(byName["bat"] != nil, "the queried package was lost")
+
+        // The counts the surface reads are over the whole inventory, not over the
+        // handful that happened to be answerable.
+        let totals = CoverageTotals(of: result.entries.map(\.outcome))
+        #expect(totals.total == 4)
+        #expect(totals.notCovered == 3)
+    }
+
+    /// The realistic shape: nothing is mapped, so nothing is queried — and the
+    /// result must still describe the whole inventory rather than being empty.
+    @Test("An inventory with nothing mapped still produces a full result")
+    func anInventoryWithNothingMappedStillProducesAFullResult() async throws {
+        let predecided = (0..<159).map { Self.predecided("pkg\($0)", reason: .unmapped) }
+        let engine = SecurityScanEngine(
+            discovery: RecordingAdvisorySource(),
+            enrichment: RecordingAdvisorySource(),
+            cache: InMemoryAdvisoryCache(),
+            consent: FixedScanConsent(.granted(at: Date(timeIntervalSince1970: 0))),
+            request: { AdvisoryScanRequest(queries: [], predecided: predecided) }
+        )
+
+        guard case .completed(let result) = await engine.scan() else {
+            Issue.record("the scan did not complete")
+            return
+        }
+
+        #expect(result.entries.count == 159)
+        #expect(CoverageTotals(of: result.entries.map(\.outcome)).notCovered == 159)
+        #expect(
+            SecurityPresentation.headline(
+                for: CoverageTotals(of: result.entries.map(\.outcome))
+            ).claimsNoVulnerabilities == false
+        )
+    }
+}

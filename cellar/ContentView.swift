@@ -37,6 +37,10 @@ struct ContentView: View {
     let securityConsent: SecurityConsentPreference
     let advisoryCredentials: any AdvisoryCredentialStoring
     let dismissals: DismissalStore
+    let integrity: ArtifactIntegrityStore
+    /// The brew-managed artifacts worth assessing, built by `ArtifactLocator`
+    /// from Homebrew's own roots. Empty until detection resolves.
+    let artifactLocations: [ArtifactLocation]
 
     @State private var section: AppSection = .browse
     @State private var selection: PackageID?
@@ -152,13 +156,20 @@ struct ContentView: View {
                     description: Text("Expand a package to inspect its installed versions.")
                 )
             case .security:
-                SecurityFindingDetail(
-                    selection: findingSelection,
-                    security: security,
-                    dismissals: dismissals,
-                    operations: operations,
-                    catalog: catalog
-                )
+                if findingSelection == nil, artifactLocations.isEmpty == false {
+                    // The integrity half occupies the detail column whenever no
+                    // finding is selected: it is a second view of the same
+                    // inventory rather than a separate destination.
+                    ArtifactIntegrityPanel(store: integrity, locations: artifactLocations)
+                } else {
+                        SecurityFindingDetail(
+                        selection: findingSelection,
+                        security: security,
+                        dismissals: dismissals,
+                        operations: operations,
+                        catalog: catalog
+                    )
+                }
             case .history:
                 // The list column already carries the whole record; a second
                 // pane would only repeat it.
@@ -249,6 +260,8 @@ struct ContentView: View {
         ),
         securityConsent: SecurityConsentPreference(),
         advisoryCredentials: KeychainAdvisoryCredentialStore(),
-        dismissals: DismissalStore(container: nil)
+        dismissals: DismissalStore(container: nil),
+        integrity: ArtifactIntegrityStore(),
+        artifactLocations: []
     )
 }

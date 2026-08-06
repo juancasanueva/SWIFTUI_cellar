@@ -813,7 +813,7 @@ If the split is taken, exactly four things move with it — nothing else:
 - [x] 16.8 Create `cellar/Security/SecurityConsentSheet.swift` — the disclosure names the two hosts and
       exactly what leaves the machine (mapped package names and versions only), and offers revocation.
       Verified by `xcodebuild build` plus manual steps **MV-1, MV-2, MV-3**.
-- [ ] 16.9 *(PR 3)* Create `cellar/Security/ArtifactIntegrityPanel.swift` — see Phase 15.
+- [x] 16.9 *(PR 3)* Create `cellar/Security/ArtifactIntegrityPanel.swift` — see Phase 15.
       **Commit 16. → PR 2 ends here.**
 
 ---
@@ -926,29 +926,37 @@ If the split is taken, exactly four things move with it — nothing else:
 > `xcodebuild test`, not `swift test`. Where a rule can be hoisted into a pure CellarCore projection,
 > hoist it — the app target is the one target M3-1's Phase 18 proved is where defects hide.
 
-- [ ] 15.1 **RED** `cellarTests/SecurityCompositionTests.swift` (new) —
+- [x] 15.1 **RED** `cellarTests/SecurityCompositionTests.swift` (new) —
       `theQueryBuilderEmitsOneQueryPerMappedFormulaAndNothingElse`: unmapped formulae, casks and
       uninterpretable versions produce **no** query and instead their corresponding `notCovered`
       outcome, with **zero** egress; `thePrimaryKegIsReadFromInstalledPackageAndNotRederived` (linked
       wins, else newest — `InstalledDecoder.primaryKeg` stays the single owner);
       `theQueryVersionIsTheHomebrewRevisionSplitOfTheInstalledVersion`.
-- [ ] 15.2 **GREEN** create `cellar/Security/SecurityQueryBuilder.swift`.
-- [ ] 15.3 **RED** same test file — `onlyBrewManagedLocationsAreEnumerated`: a recording filesystem
+- [x] 15.2 **GREEN** create `cellar/Security/SecurityQueryBuilder.swift`.
+      **Amendment forced by wiring the composition root.** `SecurityScanEngine` built entries only
+      for the packages it *queried*, so the ~150 of 159 formulae that produce no query would have
+      been absent from every settled result — leaving the Not-covered section permanently empty and
+      every count describing the nine answerable packages rather than the inventory. That is the
+      exact collapse the spec forbids, arriving through the back door. The engine's provider is
+      widened to `AdvisoryScanRequest { queries, predecided }`, with `PredecidedOutcome` carrying
+      each un-queried package's typed reason; the query-only initialiser survives for the
+      acquisition tests. Covered by `PredecidedOutcomeTests` (RED first).
+- [x] 15.3 **RED** same test file — `onlyBrewManagedLocationsAreEnumerated`: a recording filesystem
       enumerator proves `/Applications` and every non-brew location were **never** enumerated;
       `formulaScopeIsThePrimaryKegsBinAndSbinOnly` (no whole-keg walk, no `include/`, no `share/man/`);
       `caskArtifactsResolveThroughBrewRecordedPathsAndNotALiteralCaskroomWalk` — the obs 7454(1)
       carry-forward, driven by the task 14.0 fixture. — `artifact-integrity` sc *"Non-brew applications
       are out of scope"*.
-- [ ] 15.4 **RED** same test file — `everyCandidateIsFilteredThroughArtifactAssessability`: a location
+- [x] 15.4 **RED** same test file — `everyCandidateIsFilteredThroughArtifactAssessability`: a location
       the predicate rejects never reaches the engine.
-- [ ] 15.5 **GREEN** create `cellar/Security/ArtifactLocator.swift`.
-- [ ] 15.6 **RED** same test file — `aDailyScheduleAndAPostMutationTriggerEachCauseExactlyOneScan` on a
+- [x] 15.5 **GREEN** create `cellar/Security/ArtifactLocator.swift`.
+- [x] 15.6 **RED** same test file — `aDailyScheduleAndAPostMutationTriggerEachCauseExactlyOneScan` on a
       `TestClock`, and `neitherFiresWhileConsentIsOff`. — `vulnerability-scanning` req *"Scanning is
       opt-in, disclosed, reversible…"* (the cadence clause).
-- [ ] 15.7 **GREEN** create `cellar/Security/SecurityRefreshCoordinator.swift` — the
+- [x] 15.7 **GREEN** create `cellar/Security/SecurityRefreshCoordinator.swift` — the
       `DiskUsageRefreshCoordinator` *pattern*, deliberately in the app target rather than beside it in
       `Sources/BrewClient/` (design "Note on placement").
-- [ ] 15.8 **GREEN** `cellar/Security/ArtifactIntegrityPanel.swift` (task 16.9) — quarantined artifacts
+- [x] 15.8 **GREEN** `cellar/Security/ArtifactIntegrityPanel.swift` (task 16.9) — quarantined artifacts
       shown **together with** their signing and notarization verdict, decoded components plus the raw
       value, `.couldNotAssess` rendered as itself. Identifier `security-integrity-{package}`.
       **No clearing, removing or re-signing affordance exists** — task 14.11 is the capability-surface
