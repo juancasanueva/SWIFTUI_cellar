@@ -1567,3 +1567,116 @@ authored findings.
     panel formatted its own signing line, and that is precisely where the gap
     was. The pattern held everywhere it was applied and failed in the one place
     it was not.
+
+---
+
+## Batch 5 fourth corrective — the disclosure was not interactive
+
+The user's third live finding, on the build carrying the identity fix. Two of
+MV-7's three fields — identifier and team — were confirmed literally against
+`codesign`. The third was on screen behind a control that did nothing.
+
+### What was observed
+
+No disclosure triangle beside "Signing identity", and clicking the label or its
+row did nothing. The authority chain was unreachable, so MV-7 still could not
+close.
+
+### Cause, verified rather than assumed
+
+The app already contains **one working `DisclosureGroup`**: `CleanupRow`. Reading
+it against mine is the whole diagnosis.
+
+| | `CleanupRow` (works) | Integrity panel (shipped broken) |
+|---|---|---|
+| Position | the row's **top-level** view | nested inside the row's `VStack` |
+| Label | `HStack` with a `Spacer` — full width | bare `String` — intrinsic width |
+
+Confirmed against the live accessibility tree: the control existed as an element
+but rendered no indicator, and only its glyphs were hit-testable.
+
+**The tree also showed a second defect the eye could not catch.** The row's
+`.accessibilityIdentifier` was applied to the outer `VStack`, and in SwiftUI a
+container's identifier **overrides every descendant's**. The identity button
+reported `security-integrity-ghostty`, not `…-identity`, and every field inside
+the disclosure would have collapsed onto that same string — the authority chain
+would have been unaddressable from any UI test even once it rendered. The row
+anchor moved to the header line so children keep their own identifiers.
+
+### The fix
+
+An explicit control rather than a platform one whose indicator depends on
+nesting: a `Button` whose label spans the row via `Spacer(minLength: 0)`, a
+chevron this file draws and rotates, `.contentShape(Rectangle())` so the whole
+line is hit-testable rather than the words, and expansion state the panel owns in
+a `Set<URL>`.
+
+macOS users click text, not 10pt triangles — the click target is now 745pt wide,
+measured in the tree. Accessibility exposes `.isButton` with
+`value: Collapsed`/`Expanded` and a per-row label.
+
+### Testing honesty — the part that matters
+
+**A projection test proves a value exists and says nothing about whether a human
+can reach it.** That is precisely how this shipped: `ArtifactIdentityPresentationTests`
+was green throughout, because the fields *were* projected correctly. The gap was
+one layer further out, and no test in this change could see it.
+
+So this corrective adds the project's first security **XCUITests** —
+`cellarUITests/SecurityIdentityUITests.swift`, two tests:
+
+- the chain is **absent before** the control is used, present after, and absent
+  again after a second click. Asserting the "before" state is what stops a
+  control that was already open from passing the test by accident;
+- an ad-hoc artifact discloses its identifier and **does not** invent a team or a
+  chain.
+
+**Deterministic by construction, not by luck.** A real sweep depends on what is
+installed, so a UI test over one would be flaky and was not acceptable. The
+existing launch-argument fixture pattern is used instead: `--ui-testing-m4-security`
+injects two fixed reports through `ArtifactIntegrityStore(initialReports:)`, on
+the shipped `DiskUsageStore(initialSnapshot:)` precedent. The signed fixture
+carries **the real values this machine reports for Ghostty**, so the test fails if
+the projection ever stops matching what MV-7 compares against.
+
+**Proven by mutation**: a `Button` whose action body is empty fails the test with
+*"tapping the signing-identity control revealed nothing — it is not interactive"*.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1090 / 152 pass**, 1 known issue |
+| `xcodebuild test -only-testing:cellarTests` | **TEST SUCCEEDED**, 32 cases |
+| `xcodebuild test -only-testing:cellarUITests/SecurityIdentityUITests` | **TEST SUCCEEDED**, 2 cases |
+| `xcodebuild build` | **BUILD SUCCEEDED**, zero concurrency warnings |
+| `swiftlint --quiet` | **117**, zero authored findings |
+
+### Deviations
+
+68. **The disclosure is hand-built, not `DisclosureGroup`.** Keeping the platform
+    control would mean depending on which nestings it happens to draw an
+    indicator for — a property no test in this project can assert and which
+    already cost two rounds. A `Button` with an owned chevron and owned state
+    behaves identically on every nesting, and the click target is explicit.
+
+69. **A container's `accessibilityIdentifier` overrides its descendants'.**
+    Measured from the live tree, not read in documentation. Any row that wants a
+    findable anchor *and* addressable children must put the anchor on a leaf line
+    rather than on the row. The house pattern elsewhere in this app (three
+    `security-package-…` elements sharing one identifier) is that same behaviour,
+    previously unnoticed because those rows have nothing inside them worth
+    addressing separately.
+
+70. **`--ui-testing-m4-security` and `ArtifactIntegrityStore(initialReports:)`.**
+    Not in the file table. The alternative was no UI test at all, since a real
+    sweep is machine-dependent; the alternative to *that* was a flaky test, which
+    is worse than none. The fixture carries real measured values rather than
+    invented ones so it cannot drift into agreeing with a wrong projection.
+
+71. **Three live findings, three layers, one pattern.** The cask defect was a
+    missing *supplier*; the identity gap was a missing *consumer*; this was a
+    missing *interaction*. Each layer was individually tested and each boundary
+    past it was not. The suite reached 1090 green tests without any of them being
+    catchable — recorded because the lesson is about where this change put its
+    tests, not about any one bug.
