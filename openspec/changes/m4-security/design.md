@@ -330,10 +330,58 @@ reference and group membership only.
 
 ## Open Questions
 
-- [ ] **U2**: whether a CVE published with only an OSV CVSS **vector string** and no `baseScore`
-      yields a tier or stays `.unrated`. Design default until then: `.unrated`.
-- [ ] **U3**: whether `SecAssessmentTicketLookup` succeeds unprivileged on macOS 26 for a Caskroom
-      bundle. If it does not, non-stapled notarization is `.couldNotAssess(.assessmentUnavailable)`
-      and the panel says so — a weaker feature, not a different architecture.
-- [ ] Delivery slicing versus `size:exception` is **not** resolved here — the review workload guard
-      resolves it after `sdd-tasks`.
+*Reconciled at apply, task 18.4. Each answer carries the measurement that produced it.*
+
+- [x] **U2**: whether a CVE published with only an OSV CVSS **vector string** and no `baseScore`
+      yields a tier or stays `.unrated`. **Answered at the Phase 2 gate (task 2.2): the premise does
+      not occur.** Across the live NVD capture, wherever a `cvssMetricV2/V31/V40` entry exists its
+      `cvssData.baseScore` is present — vector and score always travel together. The design default
+      `.unrated` stands, reached by two *different* real shapes instead: `metrics: {}` entirely (a
+      record at `vulnStatus: "Received"`), and a **non-CVSS** `metrics` entry — `ssvcV203` carries no
+      `cvssData` and sits beside genuine v3.1 scores on `CVE-2022-1941` and `CVE-2026-0994`. The
+      second is a live decode hazard: iterating `metrics` and assuming every entry is a CVSS score
+      mis-tiers a properly scored record. Task 3.5 was amended in the open rather than quietly
+      followed; both replacement assertions are green. Fixtures: `NVD/cveids-response.json`,
+      `NVD/cveids-unrated-response.json`.
+
+- [x] **U3**: whether `SecAssessmentTicketLookup` succeeds unprivileged on macOS 26 for a Caskroom
+      bundle. **Answered at the task 14.0 gate, and the answer is stronger than the question: it is
+      not callable at all.** The symbol is present in the shipped `Security` binary and **absent from
+      the public macOS 26.5 SDK** — there is no `SecAssessment.h` under the framework's `Headers/`,
+      and `SecAssessment` appears nowhere in its module map — so `import Security` does not declare
+      it and a build that calls it fails to compile. Reached through `dlsym` **for the probe only**,
+      it returned `false` in under 0.2 ms for all four notarized casks, with and without the
+      force-online flag, which is not a usable answer either.
+      **Consequence, exactly as this document predicted:** the inspector never calls it, and
+      non-stapled notarization is `.couldNotAssess(.assessmentUnavailable)` — a weaker feature, not a
+      different architecture. Tasks 14.4 and 14.5 were amended in the open.
+      The **supported** path was measured working and **local**: `SecStaticCodeCheckValidity` against
+      `"notarized"` passed on four real casks at **euid 501 with no prompt**, in 22.6–452.7 ms, flat
+      across five consecutive calls, scaling with bundle size rather than distance, and failing in
+      **20.2 ms** for an ad-hoc binary rather than after a timeout. Transcript:
+      `Fixtures/MachO/signature-probe-record.txt`. Verified live at MV-7 (obs 7465): all three
+      identity fields match `codesign -dv --verbose=4` literally.
+
+- [x] Delivery slicing versus `size:exception`. **Resolved before apply**: the user read the
+      three-way split recommendation and chose a single PR, recording `size:exception` (obs 7456).
+      The measured outcome is recorded honestly in task 18.3 — **22,887 changed lines, 1.57× the top
+      of the forecast band**. The recommendation against granting the exception at this size stands
+      as written; it was overruled deliberately, not by omission.
+
+### Still open, carried forward with reasons
+
+- [ ] **Coverage is ~4% and that is the feature's real limit.** The curated table maps seven
+      formulae; MV-3 measured **Clean 7 / Not covered 163** over a 170-package inventory. The
+      declared fix is the **v1.1 local advisory index** — shipping a compiled index so coverage stops
+      being bounded by a hand-written table. Registered rather than deleted because "not covered" is
+      the honest state this release ships, and the next release is where it shrinks.
+- [ ] **The mapping table's growth path.** Seven entries were curated by hand with per-entry
+      provenance. There is no process yet for adding an eighth safely — U1 proved name matching is
+      dominated by identity collisions (`curl` → RubyGems, `coreutils` → uutils), so growth cannot be
+      automated from names alone. Open until the v1.1 index either replaces the table or gives it a
+      verification procedure.
+- [ ] **`the-unarchiver`-shaped casks yield no artifact.** One of ten installed casks leaves a stale
+      Caskroom directory that `SecStaticCodeCreateWithPath` rejects with `-67028`. The panel shows
+      nothing for it rather than an unassessable row saying why. Pinned by
+      `aStaleCaskroomDirectoryShellYieldsNothing`; a visible "not assessable" row is the fix, and it
+      is not in this change.

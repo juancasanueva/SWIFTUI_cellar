@@ -976,7 +976,7 @@ If the split is taken, exactly four things move with it — nothing else:
 > checks are therefore **FIXTURE-DRIVEN**, and each is labelled **LIVE**, **FIXTURE-DRIVEN** or
 > **HEADLESS-ONLY**.
 
-- [ ] 17.1 Build with
+- [x] 17.1 Build with
       `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       and run the ten checks below in order. Record the **actual** observation for each, not just PASS.
 
@@ -1042,9 +1042,43 @@ If the split is taken, exactly four things move with it — nothing else:
       evidence. Then **revert the patch**, rebuild, confirm `git status` is clean. This check exists
       because this machine's real inventory cannot produce these states.
 
+### 17.1 RESULT — **ten for ten, run live by the user on 2026-08-06**
+
+Observations, not bare PASSes. Engram obs 7458–7466 carry the full records.
+
+| Check | Result | Observation |
+|---|---|---|
+| MV-0 | PASS | U2/U5 at Phase 2, U3 at 14.0, all captured to the fixture standard; `probe-manifest.txt` digests match on re-run (38 files). |
+| MV-1 | PASS | Security section renders with no consent recorded; **Not covered** present with its count; no summary, badge or empty state claims the inventory has no vulnerabilities. (obs 7458) |
+| MV-2 | PASS | **Zero** pre-consent connections. The sheet names both hosts and states that mapped package names and versions are what leave the machine. (obs 7458) |
+| MV-3 | PASS | **Four counts verbatim: Vulnerable 0 (rendered as an explicit "0"), Not covered 163, Clean 7, Unavailable 0.** Clean 7 is exactly the seven curated entries — bat, eza, ripgrep, sd, uv, protobuf, llhttp — all answering clean. 163 not-covered over a ~170-package inventory. **This is the feature's honest self-description and belongs in the verify report.** (obs 7458) |
+| MV-4 | PASS | First real `SchemaV1 → V2` migration on the user's live store: every pre-migration history row survived (5 Aug entries 18:18–21:23, `tapUntap` + `cleanupGlobal`, statuses and timestamps intact). The user had **zero snoozes and zero notes** pre-migration, so history survival is the complete real-store proof and the snooze half is vacuously satisfied — recorded as such rather than claimed as more. (obs 7459) |
+| MV-5 | PASS | Offline relaunch shows cached results labelled with their age, nothing presented as fresh, and **no error alert** — an unreachable network is an ordinary state here. (obs 7460) |
+| MV-6 | PASS | **`nettop` shows exactly ONE TCP connection from the process: `192.168.1.125:55556 ←→ wa-in-f121.1e100.net:443`** (Google-hosted `api.osv.dev`). **ZERO NVD connections** — the Cloudflare `172.65.90.24-27` range is absent. ~6.7 KB in / 4.8 KB out, consistent with a single `querybatch` POST and its response, zero hydrations (zero findings to hydrate), zero enrichment. **One request against a ~170-package inventory: volume follows findings, not inventory, verified live.** (obs 7461) |
+| MV-7 | PASS | Ghostty's disclosure: `com.mitchellh.ghostty` / `24VZTF6M5V` / `Developer ID Application: Mitchell Hashimoto (24VZTF6M5V)` → `Developer ID Certification Authority` → `Apple Root CA`. **All three literal matches against `codesign -dv --verbose=4`**, obtained without Cellar spawning anything. Screenshot evidence. (obs 7465) |
+| MV-8 | PASS | `xattr -l` and `stat` identical before and after a full sweep on three artifacts; **no admin prompt at any moment**; no `codesign`/`spctl`/`xattr` process in Activity Monitor during the sweep. (obs 7463) |
+| MV-9 | PASS | A distinctive non-brew `.app` in `/Applications` **never appeared**, while all **9** brew casks did — the positive anchor, without which the absence proves nothing. (obs 7464) |
+| MV-10 | PASS | Fixture patch rendered all four sections (**Vulnerable 1 / Not covered 163 / Clean 5 / Unavailable 1**), HIGH above UNRATED in distinct buckets, and the finding wording exactly *"A fix published at 1.2.4, comparison not possible for this version scheme (a Homebrew packaging revision)"* with **no ordering verdict**. The upgrade button distinguished Homebrew's `0.26.1` from the advisory's `1.2.4`; the PYSEC record explained its missing NVD link. Patch reverted, advisory cache deleted, `git status` clean, rebuild shows the real 0/163/7/0. (obs 7466) |
+
+**Four defects were found by these checks and fixed — none was catchable by the suite**, because each
+sat at a boundary *between* tested layers while every layer passed:
+
+| Defect | Layer | Fix |
+|---|---|---|
+| Cask locator had no supplier (`caskArtifacts: [:]`) — 468 artifacts, **zero casks** | wiring | `b92f071` |
+| Identifier + authority chain reached the report and the view never read them | consumer | `3410e45` |
+| The identity disclosure rendered no indicator and answered no click | interaction | `e4de71d` |
+| A container's `accessibilityIdentifier` overrode every descendant's | accessibility | `e4de71d` |
+
+That is the single most useful result of this milestone and it is recorded in
+`apply-progress.md` as Deviation 71. The suite reached 1,090 green tests without any of the four
+being visible to it.
+
+---
+
 ## Phase 18: Full gate, scope guard, and reconciliation
 
-- [ ] 18.1 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ the 0.1
+- [x] 18.1 **Full gate.** (i) `swift test --package-path Packages/CellarCore` — green, count ≥ the 0.1
       baseline plus the new tests; (ii)
       `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       — BUILD SUCCEEDED, **zero** concurrency warnings; (iii) `xcodebuild test` — `cellarTests` and
@@ -1053,26 +1087,105 @@ If the split is taken, exactly four things move with it — nothing else:
       `file_length` warning. `SecurityStore.swift`, `SecurityScanEngine.swift`, `CVEMatcher.swift` and
       `SecurityView.swift` are the likeliest to breach — **split rather than suppress** (M3-1 split
       four files this way).
-- [ ] 18.2 **Scope guard.** `rg '@unchecked Sendable|nonisolated\(unsafe\)'` over `Sources/SecurityKit/`
+- [x] 18.2 **Scope guard.** `rg '@unchecked Sendable|nonisolated\(unsafe\)'` over `Sources/SecurityKit/`
       and `cellar/Security/` must return **zero** (design "Concurrency"). `rg 'import BrewClient|import BrewProcess|import DiskUsage'`
       over `Sources/SecurityKit/` must return **zero**. `rg 'import SecurityKit' Packages/CellarCore/Sources/Persistence/`
       must return exactly **one** file (task 13.4). `git diff main...HEAD --name-only` must contain no
       taps, services or cleanup source file.
-- [ ] 18.3 **Candidate size.** Record `git diff main...HEAD --shortstat` per slice and compare against
+- [x] 18.3 **Candidate size.** Record `git diff main...HEAD --shortstat` per slice and compare against
       the forecast band. If it lands outside 11,600–14,600 (or outside the per-slice bands), say so and
       say **why** — a forecast never checked against the outcome is how this project under-priced three
       slices in a row. Break the measurement into the same four buckets as the arithmetic table so the
       next forecast can use the deltas.
-- [ ] 18.4 **Reconcile the open questions.** Write the U2 answer (vector-only ⇒ tier or `.unrated`) and
+- [x] 18.4 **Reconcile the open questions.** Write the U2 answer (vector-only ⇒ tier or `.unrated`) and
       the U3 answer (unprivileged `SecAssessmentTicketLookup`) into `design.md`'s Open Questions,
       checked, with the measured evidence. Register anything still open — notably the **v1.1 local
       advisory index** as the declared coverage fix, and the mapping table's growth path — with its
       reason, rather than deleting the question.
-- [ ] 18.5 **Engram.** Save the apply outcome under `sdd/m4-security/apply` with the measured
+- [x] 18.5 **Engram.** Save the apply outcome under `sdd/m4-security/apply` with the measured
       candidate size, the four MV-3 coverage counts, and the U2/U3 answers. **Commit 17.**
+
+### Phase 18 RESULTS — measured 2026-08-06 at `a9919b1`
+
+**18.1 Full gate**
+
+| Part | Expected | Measured |
+|---|---|---|
+| (i) `swift test --package-path Packages/CellarCore` | green, ≥ baseline + new | **1090 tests / 152 suites pass**, 1 known issue (pre-existing) — baseline was 811/120 |
+| (ii) `xcodebuild build` | BUILD SUCCEEDED, zero concurrency warnings | **BUILD SUCCEEDED, zero** |
+| (iii) `xcodebuild test` | `cellarTests` and `cellarUITests` green | **both TEST SUCCEEDED** — `cellarTests` 32 cases in 5 suites, and the *whole* `cellarUITests` target including the 2 new `SecurityIdentityUITests` |
+| (iv) `swiftlint --quiet` | equal to the 0.1 baseline (zero new) | **117** — see the note below |
+| (v) file length | every new file under 400 | **zero new files over 400 lines** |
+
+> **On (iv): 117 is one *below* the 118 baseline, and that is not drift.** Moving the shell preview
+> out of `ContentView.swift` during the batch-5 corrective took a pre-existing 126-character line
+> with it, and it was re-wrapped on the way. **Authored findings in this change: zero**, at every
+> batch boundary. The comparable series from the repository root is 116 (pre-change) → 118 → 118 →
+> 118 → 118 → 118 → **117**.
+
+**18.2 Scope guard** — all four clean:
+
+| Assertion | Result |
+|---|---|
+| `rg '@unchecked Sendable\|nonisolated\(unsafe\)'` over `Sources/SecurityKit/` and `cellar/Security/` | **0** |
+| `rg 'import BrewClient\|import BrewProcess\|import DiskUsage'` over `Sources/SecurityKit/` | **0** |
+| `rg 'import SecurityKit' Sources/Persistence/` | **exactly one** — `DismissalStore.swift` |
+| `git diff main...HEAD --name-only` contains a taps/services/cleanup **source** file | **none** |
+
+**18.3 Candidate size — the forecast was wrong again, by more than last time**
+
+`git diff main...HEAD --shortstat` → **147 files changed, 22,703 insertions(+), 184 deletions(-)**
+= **22,887 changed lines**.
+
+| Bucket | Forecast | Measured | Variance |
+|---|---:|---:|---|
+| `Sources/SecurityKit/` | 3,000–3,400 | **5,379** | +58% over top |
+| `Sources/Persistence/` | 300–400 | **399** | in band |
+| `cellar/` app target | 1,100–1,400 | **1,723** | +23% over top |
+| Tests (CellarCore) | 6,400–8,500 | **10,244** | +20% over top |
+| — of which fixtures | 600–1,200 | 1,098 | in band |
+| `cellarTests` + `cellarUITests` | (not forecast) | **1,181** | unforecast |
+| `tasks.md` + verify report | 800–900 | **3,929** (all `openspec/`) | 4.4× |
+| `Package.swift` + project | (not forecast) | 32 | — |
+| **Total** | **11,600–14,600** | **22,887** | **1.57× the top of the band; 4.6× the 5,000 session budget** |
+
+Said plainly, as this task requires. **The forecast under-priced for the fourth slice in a row, and
+by the widest margin yet.** Three causes, each measurable:
+
+1. **`openspec/` is 3,929 lines against a forecast of 800–900.** The single largest miss in
+   proportion. `apply-progress.md` alone is now ~1,900 lines because six batches and four
+   correctives each recorded their evidence — which was the right call and was never priced.
+2. **`Sources/SecurityKit/` ran 58% over** because prohibitions cost real code: the
+   assessability predicate, both inspectors and the streamed sweep are the *response* to threat-matrix
+   rows, and a row answered "by prohibition" still needs the thing it prohibits alternatives to.
+3. **Four live defects arrived after the forecast closed.** The cask locator, identity projection,
+   interactive disclosure, and their tests are ~600 lines nobody could have forecast, because
+   they exist only because MV-7 and MV-9 failed.
+
+**Note for the next forecast**: price documentation at ~4× whatever seems reasonable when the change
+has more than three work-unit batches, and add a contingency for defects found at manual
+verification. Both are now measured rather than guessed.
+
+The `size:exception` was granted knowingly (obs 7456) after the three-way split was recommended and
+declined. The recommendation against granting it at this size stands as written; the outcome is
+1.57× the band it was measured against.
+
+**18.4 Open questions reconciled** in `design.md`: **U2 and U3 both closed with their measured
+evidence**, delivery slicing closed as resolved-and-overruled. Three questions are **registered as
+still open with reasons** rather than deleted — the ~4% coverage limit and its declared v1.1 local
+advisory index fix, the mapping table's growth path, and the `the-unarchiver`-shaped cask that yields
+no artifact.
+
+**18.5 Engram** — saved under `sdd/m4-security/apply`.
+
 
 ---
 
-**Counts.** 108 tasks across 19 phases; **63 RED tasks**; 11 pre-written manual checks; 17 work-unit
-commits; 3 probe gates (U1 re-capture + U2 + U5 at Phase 2, U3 at 14.0). Split boundaries after
-Phase 8 / commit 8 and after Phase 16 / commit 16.
+**Counts.** ~~108~~ **113 tasks** across 19 phases; **63 RED tasks**; 11 pre-written manual checks;
+17 work-unit commits; 3 probe gates (U1 re-capture + U2 + U5 at Phase 2, U3 at 14.0). Split
+boundaries after Phase 8 / commit 8 and after Phase 16 / commit 16.
+
+> **Corrected at 18.1.** This line said 108 from `sdd-tasks` onward, while the file has always
+> contained **113** checkbox lines — the plan's own arithmetic was five short, and every batch
+> reported progress against the wrong denominator ("78 / 108", "107 / 108"). The work is unchanged;
+> only the count was wrong. **Final state: 113 / 113, zero unchecked.**

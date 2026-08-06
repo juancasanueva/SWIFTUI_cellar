@@ -11,13 +11,13 @@ never overwrite. Batches 1–4 are preserved below **verbatim**; batch 5 is appe
 
 | Field | Value |
 |---|---|
-| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6), 3 (Phases 7–10), 4 (Phases 11–13), 5 (Phases 16, 14, 15) |
+| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6), 3 (Phases 7–10), 4 (Phases 11–13), 5 (Phases 16, 14, 15), 6 (Phases 17–18) |
 | Mode | **Strict TDD** (no fallback taken in any batch) |
 | Branch | `feature/m4-security` |
 | Branch point | `5863f61` (**not** the planned `0bd1f72` — see Deviation 1) |
 | Delivery | `single-pr` + user-recorded `size:exception` (Engram obs 7456) |
-| Status | **107 / 108 tasks complete**, suite green, no blockers |
-| Resumes at | **Phase 17** (manual verification), then **Phase 18** (full gate) |
+| Status | **APPLY COMPLETE — 113 / 113 tasks, zero unchecked** (the plan's "108" was five short; see the Counts note in `tasks.md`) |
+| Resumes at | Nothing. Next is the RDD review lifecycle, then `sdd-verify`. |
 
 ---
 
@@ -1680,3 +1680,111 @@ the projection ever stops matching what MV-7 compares against.
     past it was not. The suite reached 1090 green tests without any of them being
     catchable — recorded because the lesson is about where this change put its
     tests, not about any one bug.
+
+---
+
+# Batch 6 — Phases 17 and 18 (final)
+
+| Field | Value |
+|---|---|
+| Batch | 6 — Phase 17 (record the live checks) and Phase 18 (final gates) |
+| Mode | Records and gates; no production code changed |
+| Attempt authority | acquired with the continuation token, `proceed` |
+| Status | **APPLY COMPLETE — 113 / 113, zero unchecked** |
+
+## Phase 17 — ten for ten, run live by the user
+
+All ten MV checks passed on a real build, on this machine, executed by the user rather than by me.
+The per-check observations are recorded in `tasks.md` under **17.1 RESULT**, each citing its Engram
+observation (7458–7466). The three that belong in the verify report verbatim:
+
+- **MV-3 — the feature's honest self-description**: Vulnerable **0** (rendered as an explicit "0"),
+  Not covered **163**, Clean **7**, Unavailable **0**. Clean 7 is exactly the seven curated mapping
+  entries. U1 predicted 3–5% real coverage; the measured figure is **7 of ~170 ≈ 4.1%**, inside the
+  band it was sized against.
+- **MV-6 — volume follows findings**: exactly **one** TCP connection from the process
+  (`wa-in-f121.1e100.net:443`, Google-hosted `api.osv.dev`), **zero** NVD connections, ~6.7 KB in /
+  4.8 KB out. **One request against a ~170-package inventory.**
+- **MV-7 — identity parity**: all three fields literal matches against `codesign -dv --verbose=4`,
+  obtained without Cellar spawning anything.
+
+**Four defects were found by these checks**, and this is the milestone's most useful result. Each sat
+at a boundary *between* tested layers, and the suite reached 1,090 green tests without any of them
+being visible to it:
+
+| Defect | Missing | Fix |
+|---|---|---|
+| `caskArtifacts: [:]` — 468 artifacts, zero casks | **supplier** | `b92f071` |
+| identifier + chain reached the report, view never read them | **consumer** | `3410e45` |
+| the identity disclosure drew no indicator and took no click | **interaction** | `e4de71d` |
+| a container's `accessibilityIdentifier` overrode its descendants' | **addressability** | `e4de71d` |
+
+MV-4 is recorded with its limit stated rather than overclaimed: the user had **zero snoozes and zero
+notes** before migrating, so history survival is the complete real-store proof and the
+snooze-suppression half is vacuously satisfied.
+
+## Phase 18 — measured, not asserted
+
+Full results are tabulated in `tasks.md` under **Phase 18 RESULTS**. Summary:
+
+| Gate | Result |
+|---|---|
+| 18.1 (i) CellarCore | **1090 / 152 pass**, 1 pre-existing known issue (baseline 811 / 120) |
+| 18.1 (ii) build | **BUILD SUCCEEDED**, zero concurrency warnings |
+| 18.1 (iii) app + UI targets | **both TEST SUCCEEDED** — `cellarTests` 32, whole `cellarUITests` incl. 2 new |
+| 18.1 (iv) swiftlint | **117**, one *below* baseline, **zero authored findings** |
+| 18.1 (v) file length | **zero** new files over 400 lines |
+| 18.2 scope guard | all four assertions clean |
+| 18.3 candidate size | **22,887 changed lines — 1.57× the top of the forecast band** |
+| 18.4 open questions | U2 and U3 closed with evidence; three registered as still open |
+| 18.5 Engram | saved under `sdd/m4-security/apply` |
+
+### The number that matters, said plainly
+
+**22,887 changed lines against a forecast of 11,600–14,600, and a session budget of 5,000.** The
+fourth consecutive under-price and the widest yet. The three measured causes, so the next forecast
+can use them rather than repeat this:
+
+1. **`openspec/` ran 3,929 against 800–900 — 4.4×.** The largest miss in proportion.
+   `apply-progress.md` alone is ~1,900 lines, because six batches and four correctives each recorded
+   their evidence. That was the right call and it was never priced.
+2. **`Sources/SecurityKit/` ran 58% over.** A threat-matrix row answered "by prohibition" still needs
+   the capability that replaces what it prohibits — the assessability predicate, both inspectors and
+   the streamed sweep are all *responses* to prohibitions, not additions beside them.
+3. **~600 lines did not exist when the forecast closed.** They are the four MV-discovered defects and
+   their tests, and they exist only because two manual checks failed.
+
+**Rule for the next forecast**: price documentation at ~4× the intuitive figure once a change exceeds
+three work-unit batches, and carry an explicit contingency for defects found at manual verification.
+Both are now measured.
+
+### A count that was wrong from the start
+
+`tasks.md` declared **108 tasks** from `sdd-tasks` onward; the file has always held **113** checkbox
+lines. Every batch therefore reported against the wrong denominator — "78 / 108", "107 / 108". The
+work is unchanged and nothing was skipped; the arithmetic was five short. Corrected in the Counts
+line rather than quietly left, because a progress fraction nobody can reproduce is the same class of
+problem as batch 5's false receipt.
+
+## Deviations — batch 6
+
+72. **The declared task count was five short and is corrected in place.** Not a work change. Recorded
+    because five batches reported progress against a denominator that never matched the file, and the
+    only reason it went unnoticed is that nobody recounted.
+
+73. **Three open questions are registered rather than closed.** Task 18.4 says to register what is
+    still open "with its reason, rather than deleting the question". The ~4% coverage ceiling is the
+    honest limit this release ships with and its declared fix is the v1.1 local advisory index; the
+    mapping table has no safe growth procedure yet; and one cask shape yields no artifact where a
+    visible "not assessable" row would be better. None is a defect in what shipped, and none should
+    disappear because the milestone ended.
+
+## What comes next
+
+1. **The RDD review lifecycle**, which the orchestrator owns. The `size:exception` at 22,887 lines
+   will want reconfirming against the number rather than the forecast.
+2. `sdd-verify`, whose report should carry MV-3's four counts and MV-6's request count verbatim —
+   they are the feature's own description of what it can and cannot do.
+3. `sdd-archive`.
+
+Nothing in this change is pushed and no PR is open.
