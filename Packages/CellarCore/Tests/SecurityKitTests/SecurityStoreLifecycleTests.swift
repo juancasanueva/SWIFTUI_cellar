@@ -8,7 +8,7 @@ import Testing
 /// What `SecurityStore` shows when a scan degrades, what it reads back from the
 /// cache, and how a settled engine event reaches it.
 ///
-/// Split from `SecurityStoreGuardTests` so neither file outgrows the project's
+/// Split from `SecurityStoreTests` so neither file outgrows the project's
 /// limits; both arrange through `SecurityStoreArrangement`, so they are talking
 /// about the same store.
 ///

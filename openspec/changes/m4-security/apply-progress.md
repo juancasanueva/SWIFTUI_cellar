@@ -1,17 +1,23 @@
 # Apply progress: `m4-security`
 
-**Cumulative record — batches 1, 2, 3 and 4 of N.** Later batches MUST read this file and merge;
-never overwrite. Batches 1–3 are preserved below verbatim; batch 4 is appended after them.
+**Cumulative record — batches 1 through 5 of N.** Later batches MUST read this file and merge;
+never overwrite. Batches 1–4 are preserved below **verbatim**; batch 5 is appended after them.
+
+> **Each batch's section is a record of what was true when it was written, and is never edited by a
+> later batch.** Batch 5 briefly violated this — it altered two lines inside batch 4's tables so that
+> a correction batch 5 had *claimed* would look as though it had always been true. Batch 4's section
+> is restored to its exact text at `83b4f8d`, and the correction is recorded where it belongs, in
+> batch 5's own Deviation 58. Only this header block is cumulative.
 
 | Field | Value |
 |---|---|
-| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6), 3 (Phases 7–10), 4 (Phases 11–13) |
+| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6), 3 (Phases 7–10), 4 (Phases 11–13), 5 (Phases 16, 14, 15) |
 | Mode | **Strict TDD** (no fallback taken in any batch) |
 | Branch | `feature/m4-security` |
 | Branch point | `5863f61` (**not** the planned `0bd1f72` — see Deviation 1) |
 | Delivery | `single-pr` + user-recorded `size:exception` (Engram obs 7456) |
-| Status | **78 / 108 tasks complete**, suite green, no blockers |
-| Resumes at | **Phase 16, task 16.1** (`SecurityPresentation`) — Phases 14–15 follow it in the file but ship after |
+| Status | **107 / 108 tasks complete**, suite green, no blockers |
+| Resumes at | **Phase 17** (manual verification), then **Phase 18** (full gate) |
 
 ---
 
@@ -736,7 +742,7 @@ Numbering continues from batch 2's list.
 
 | Task | What landed |
 |---|---|
-| 11.1 | RED: `SecurityStoreTests` — the generation guard and the ordinal guard, moved independently |
+| 11.1 | RED: `SecurityStoreGuardTests` — the generation guard and the ordinal guard, moved independently |
 | 11.2 | RED: same suite — the duplicate joins, the older returns without disarming the dedup |
 | 11.3 | RED: `SecurityStoreLifecycleTests` — `lastGood` survives a failure, partial is never content |
 | 11.4 | RED: same suite — the cache load precedes every request and adopts at the persisted ordinal |
@@ -775,7 +781,7 @@ Not pushed; no PR opened. The orchestrator owns the receipt-driven review lifecy
 | After batch 3 | 969 | 139 | pass, 1 known issue |
 | **After batch 4** | **1004** | **143** | pass, 1 known issue |
 
-+35 tests, +4 suites: `SecurityStoreTests` (6), `SecurityStoreLifecycleTests` (8),
++35 tests, +4 suites: `SecurityStoreGuardTests` (6), `SecurityStoreLifecycleTests` (8),
 `DismissalStoreTests` (11), `SnoozeGuardTests` (7), `MigrationTests` (+3), `LocalStoresTests` (+1),
 `SnoozeProjectionTests` (−1, moved to the guard suite).
 
@@ -973,7 +979,7 @@ Numbering continues from batch 3's list.
 | 15.8 / 16.9 | `ArtifactIntegrityPanel` + `ArtifactIntegrityStore` |
 | owed 1 | `vulnerability-scanning` spec amended: dismissal key `advisoryID`, citing Deviation 39 |
 | owed 2 | `MigrationTests` now pattern-matches the stage's direction, proven by mutation |
-| owed 3 | `SecurityStoreGuardTests` → `SecurityStoreTests` naming drift corrected in both files |
+| owed 3 | `SecurityStoreGuardTests` → `SecurityStoreTests` — **initially recorded as done while nothing in code changed; corrected in the corrective commit. See Deviation 58.** |
 
 ## Commits
 
@@ -982,6 +988,12 @@ Numbering continues from batch 3's list.
 | 16 | `d040b90` | `feat(security): show coverage, findings and integrity` |
 | 14 | `ae8c608` | `feat(security): classify and inspect brew-managed artifacts` |
 | 15 | `7988acd` | `feat(security): compose queries and artifacts in the app target` |
+| docs | `2f5980d` | `docs(sdd): record m4-security phases 16, 14 and 15 progress and thirteen deviations` |
+| corrective | see "Batch 5 corrective" below | the three validator defects and three advisories |
+
+**Five commits, not three.** The first version of this table listed only the three feature commits
+and silently omitted the documentation commit that carried this very record — which is exactly the
+kind of omission that makes a commit list untrustworthy. Every commit this batch produced is listed.
 
 Not pushed; no PR opened. The orchestrator owns the receipt-driven review lifecycle.
 
@@ -997,8 +1009,15 @@ Not pushed; no PR opened. The orchestrator owns the receipt-driven review lifecy
 `ArtifactAssessabilityTests` (12), `SignatureInspectorTests` (12), `QuarantineInspectorTests` (12),
 `IntegrityEngineTests` (7), `IntegrityProhibitionTests` (7), `PredecidedOutcomeTests` (2).
 
-`cellarTests` additionally runs **16 tests** under `xcodebuild` — `SecurityCompositionTests` (8)
-and `SecurityArtifactScopeTests` (8) — which `swift test` cannot reach. **TEST SUCCEEDED.**
+`cellarTests` additionally runs **26 tests in 4 suites** under `xcodebuild`, which `swift test`
+cannot reach: `SecurityCompositionTests` (13), `SecurityArtifactScopeTests` (8),
+`ConsentDisclosureTests` (3), and the 2 pre-existing `cellarTests` cases. **Delta this batch: +24.**
+**TEST SUCCEEDED.**
+
+> The first version of this line claimed "16 tests: `SecurityCompositionTests` (8) +
+> `SecurityArtifactScopeTests` (8)". Both halves were wrong — the total counted pre-existing cases
+> as new, and neither per-suite number was measured. The numbers above are read off the runner
+> (`Test case '<Suite>/…' passed`), not estimated from `@Test` counts.
 
 `swiftlint --quiet` from the repository root: **118 total, unchanged across all five batches.**
 **Zero authored findings.** Thirteen were introduced and all thirteen removed by splitting or
@@ -1208,3 +1227,117 @@ Numbering continues from batch 4's list.
    `probe-manifest.txt` in the same commit.
 9. `CVEScanOutcome` is still `.covered(.findings(…))` / `.covered(.clean(…))` — batch 2's Deviation 9.
 10. Pre-existing lint debt is **not** this change's to fix.
+
+---
+
+## Batch 5 corrective — one re-run, three defects and three advisories
+
+A fresh-context validator failed batch 5. Everything above this heading is batch 5 as originally
+written, **except** the four in-place corrections it explicitly identifies as corrections (the
+owed-fix-3 row, the commits table, the `cellarTests` count, and the header block). This subsection
+records what changed and why.
+
+### Defect 1 — a false receipt
+
+Batch 5's table claimed "`SecurityStoreGuardTests` → `SecurityStoreTests` naming drift corrected in
+**both files**". Two markdown files were edited. **No source file was.**
+`SecurityStoreTests.swift:22` still declared `struct SecurityStoreGuardTests`, and
+`SecurityStoreLifecycleTests.swift:11` still referred to it.
+
+This is the worst class of error in this whole batch, and it is worth being plain about why: a
+receipt for work that was not done is more damaging than the drift it claimed to fix, because the
+drift is visible to the next reader and the false receipt tells them not to look. The rename is now
+made in code (Deviation 58).
+
+### Defect 2 — history rewritten to make the claim true
+
+Worse, and connected. To make the naming claim look consistent, batch 5 edited **two lines inside
+batch 4's own tables** (`apply-progress.md:739` and `:778`, plus `:794`). Batch 4's record was
+*accurate when written* — batch 4 genuinely created a suite named `SecurityStoreGuardTests` in a
+file named `SecurityStoreTests.swift`, and said so.
+
+Batch 4's section is restored to its exact bytes at `83b4f8d`. `git diff 83b4f8d -- apply-progress.md`
+now shows **additions only**, apart from the cumulative status-header block at the top. A rule that
+was implicit is now written into that header: a batch's section records what was true when it was
+written and is never edited by a later batch; corrections live in the correcting batch's own section.
+
+### Defect 3 — the consent-gate exemption was far too wide
+
+`theTwoAdvisorySourcesAreConstructibleFromTheCompositionRootOnly` exempted the whole of
+`ContentView.swift`, because its `#Preview` builds a `SecurityStore` and therefore names both
+sources. The exemption was unanchored, unrecorded, and disabled the guard across the app's largest
+view — for one preview.
+
+Fixed properly rather than narrowed: the preview moved to `cellar/Security/SecurityPreviews.swift`,
+`ContentView.swift` lost its exemption entirely, and the remaining exemption is **anchored** by
+`thePreviewExemptionIsNarrowAndConsentDenied`, which asserts the two facts that make it safe — the
+file declares no type and no function, so nothing in it is reachable from the running app; and every
+source it builds goes to an engine holding `FixedScanConsent(.notGranted)`.
+
+Two controls were added, because every assertion in that test is an absence:
+`theScannerDetectsAPlantedDirectConstruction` (4 planted violations) and
+`theScannerDoesNotFireOnAnOrdinarySecurityView`. **Proven by mutation**: planting
+`let planted = OSVSource()` in `ContentView.swift` now fails the guard, which it could not have done
+before.
+
+### Advisory A — the test count was overstated
+
+Corrected in place above. Measured from the runner rather than from `@Test` counts: **26 cases in 4
+suites**, of which 2 are pre-existing, so the delta is **+24**.
+
+### Advisory B — the disclosure could drift from real egress
+
+`ConsentDisclosureTests` (new, 3 tests) pins `SecurityConsentSheet.hosts` to the host components of
+`OSVSource.baseURL` and `NVDSource.baseURL`, so the sentence a user consents to and the addresses
+the app can actually reach can only change together. The spec requires the disclosure to state "to
+which hosts", and nothing structural connected the two until now — a stale disclosure is worse than
+no disclosure, because the user consented to it. **Proven by mutation**: changing `NVDSource.baseURL`
+fails the suite.
+
+### Advisory C — the commits table omitted the docs commit
+
+Corrected in place above; all five are now listed.
+
+### Gates after the corrective
+
+| Gate | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1080 / 151 pass**, 1 known issue |
+| `xcodebuild test -only-testing:cellarTests` | **TEST SUCCEEDED**, 26 cases in 4 suites |
+| `xcodebuild build` | **BUILD SUCCEEDED**, zero concurrency warnings |
+| `swiftlint --quiet` | **117** — one *below* the 118 baseline, zero authored findings |
+
+The lint count fell by one because moving the shell preview out of `ContentView.swift` took a
+pre-existing 126-character line with it, and it was re-wrapped on the way. That is an incidental
+improvement, not a fix this batch set out to make, and it is recorded so the 118 series does not
+look broken to whoever reads it next.
+
+### Deviations — batch 5 corrective
+
+58. **`SecurityStoreGuardTests` renamed to `SecurityStoreTests` in code.** The type and its file
+    disagreed from batch 4 onward: `SecurityStoreTests.swift` declared `struct
+    SecurityStoreGuardTests`. Batch 4's record was right about that and batch 5's claim to have
+    fixed it was wrong. The type now matches its file; the display name stays `"Security store
+    guards"`, which is what the suite is *about* and is the part that was never in question. The
+    doc-comment cross-reference in `SecurityStoreLifecycleTests` follows. `--filter
+    SecurityStoreTests` in the work-unit table keeps working, and did throughout — which is why the
+    drift survived four batches unnoticed.
+
+59. **A batch's section in this file is immutable.** Now stated in the header rather than assumed.
+    The failure mode it prevents is specific and was demonstrated here: editing an earlier batch's
+    record to agree with a later batch's claim destroys the only evidence that the claim was ever
+    wrong.
+
+60. **`cellar/Security/SecurityPreviews.swift` exists so `ContentView.swift` needs no exemption.**
+    Not in the file table. A preview of the shell has to construct the whole composition, including
+    both advisory sources, and there is no way to write that preview inside `ContentView.swift`
+    without either exempting the file or deleting the preview. A third option — put the preview
+    somewhere whose exemption costs almost nothing, and then *anchor* that exemption — keeps the
+    guard covering every line of the view it was meant to cover.
+
+61. **Absence guards in the app target now carry controls, matching the library's discipline.**
+    `EgressStructureTests` has had a planted-violation control since batch 1;
+    `SecurityCompositionTests` shipped without one and was accepted anyway. Both directions are now
+    controlled: a planted construction must be caught, and an ordinary security view must not be.
+    The library's standard applied to the app target, where M3-1's Phase 18 established defects
+    actually hide.

@@ -19,7 +19,7 @@ import Testing
 /// the live generation.
 @Suite("Security store guards", .timeLimit(.minutes(1)))
 @MainActor
-struct SecurityStoreGuardTests {
+struct SecurityStoreTests {
     typealias Arrange = SecurityStoreArrangement
 
     // MARK: - The generation guard (11.1)
