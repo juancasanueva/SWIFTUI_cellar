@@ -17,6 +17,10 @@ import Testing
 /// Equality's failure mode is a badge that is honest: a package republished at
 /// an older version shows one again. The tests below assert the accepted false
 /// positive on purpose, so nobody "fixes" it into a comparator.
+///
+/// The structural guards behind the rule live in `SnoozeGuardTests`: the guard
+/// grew in M4 and the behaviour did not, and keeping them in one file would
+/// have made that impossible to see in a diff.
 @Suite("Snooze projection")
 struct SnoozeProjectionTests {
     private static let wget = PackageID(kind: .formula, name: "wget")
@@ -42,24 +46,6 @@ struct SnoozeProjectionTests {
     )
     func anyDifferentOfferedVersionRevivesTheBadge(offered: String) {
         #expect(PackageMetadata.isSnoozed(offering: offered, snoozedVersion: "1.2.3") == false)
-    }
-
-    /// The structural half: no ordering comparison of version strings was
-    /// performed to reach those results, because no comparator exists in this
-    /// capability at all.
-    @Test("No version comparator exists anywhere in the snooze rule")
-    func noVersionComparatorExists() throws {
-        let source = Self.code(in: try Self.source(of: "PackageMetadata.swift"))
-            + Self.code(in: try Self.source(of: "InstalledFilterMode.swift"))
-
-        for comparator in [
-            "compare(", ".numeric", "NumericSearch", "versionCompare", "isNewer",
-            "isOlder", "precedes", "<=", ">="
-        ] {
-            #expect(source.contains(comparator) == false, "a version comparator (\(comparator)) leaked in")
-        }
-        // The rule really is one equality.
-        #expect(source.contains("snoozedVersion == candidate"))
     }
 
     @Test("A package with no snooze is never suppressed")
@@ -180,28 +166,5 @@ struct SnoozeProjectionTests {
                     .map(\.id)
             )
         }
-    }
-
-    // MARK: -
-
-    private static func code(in source: String) -> String {
-        source
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { line -> Substring in
-                guard let marker = line.range(of: "//") else { return line }
-                return line[line.startIndex..<marker.lowerBound]
-            }
-            .joined(separator: "\n")
-    }
-
-    private static func source(of file: String) throws -> String {
-        let packageRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(
-            contentsOf: packageRoot.appendingPathComponent("Sources/BrewClient/\(file)"),
-            encoding: .utf8
-        )
     }
 }

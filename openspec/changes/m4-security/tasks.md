@@ -728,17 +728,17 @@ If the split is taken, exactly four things move with it — nothing else:
 > `Sources/BrewClient/`. Extending the guard to six files across two targets requires generalizing it
 > **first**, or the new assertions read the wrong files and pass vacuously.
 
-- [ ] 13.1 **REFACTOR** `Tests/BrewClientTests/SnoozeProjectionTests.swift` — generalize
+- [x] 13.1 **REFACTOR** `Tests/BrewClientTests/SnoozeProjectionTests.swift` — generalize
       `source(of:)` to take a package-root-relative path (`"Sources/BrewClient/PackageMetadata.swift"`),
       and re-point the two existing call sites. The existing `noVersionComparatorExists` assertions
       stay **byte-identical in meaning**; only the path plumbing changes. Run the suite before adding
       anything: it must still be green.
-- [ ] 13.2 **RED** same file — extend `noVersionComparatorExists` to assert, over the **two
+- [x] 13.2 **RED** same file — extend `noVersionComparatorExists` to assert, over the **two
       `BrewClient` files** (`PackageMetadata.swift`, `InstalledFilterMode.swift`): the same forbidden
       comparator tokens absent, and the positive anchor `snoozedVersion == candidate` present.
       Unchanged in substance — restated here so the diff shows the guard was not weakened while being
       moved.
-- [ ] 13.3 **RED** same file — new `noSecurityComparatorIsReachableFromSnooze`: over **all six**
+- [x] 13.3 **RED** same file — new `noSecurityComparatorIsReachableFromSnooze`: over **all six**
       enumerated files (`Sources/BrewClient/PackageMetadata.swift`,
       `Sources/BrewClient/InstalledFilterMode.swift`, `Sources/Persistence/MetadataStore.swift`,
       `Sources/Persistence/LocalStores.swift`, `Sources/Persistence/SchemaV1.swift`,
@@ -746,18 +746,36 @@ If the split is taken, exactly four things move with it — nothing else:
       textual reference to `SecurityKit`, `StrictSemVer`, `FixVersionComparison` or
       `HomebrewRevision`. — `local-package-metadata` sc *"The security comparator is structurally
       unreachable from snooze"*.
-- [ ] 13.4 **RED** same file — new `dismissalStoreIsTheOnlyPersistenceFileImportingSecurityKit`: scan
+- [x] 13.4 **RED** same file — new `dismissalStoreIsTheOnlyPersistenceFileImportingSecurityKit`: scan
       the **whole** `Sources/Persistence/` directory and assert `DismissalStore.swift` is the sole file
       containing `import SecurityKit`. This is what stops task 13.3's six-file list from being an
       allow-list escape, which the delta forbids: a second import anywhere in `Persistence` fails the
       suite and forces a design conversation.
-- [ ] 13.5 **RED** same file — `snoozeBehaviourIsByteIdenticalToItsPreComparatorForm`: the five
+- [x] 13.5 **RED** same file — `snoozeBehaviourIsByteIdenticalToItsPreComparatorForm`: the five
       existing behavioural tests (suppression, revival, the accepted false positive, unsnooze,
       still-listed) run unchanged and green. The delta requires behaviour identical and the *guard*
       grown — this task is the "identical" half, stated so a reviewer can see it was checked.
-- [ ] 13.6 **No production change is expected in this phase.** If any task 13.2–13.5 goes red against
+- [x] 13.6 **No production change is expected in this phase.** If any task 13.2–13.5 goes red against
       shipped code, **stop and record why** — it means an earlier phase leaked, and the fix is in that
       phase, not here. **Commit 13.**
+      **Nothing went red against shipped code**, so no earlier phase leaked: all six files were
+      already clean of every forbidden token, and `DismissalStore.swift` was already the sole
+      `SecurityKit` importer in `Persistence`. No production file was changed in this phase.
+      **Two recorded deviations.** (a) **The guards moved to `Tests/BrewClientTests/SnoozeGuardTests.swift`.**
+      The combined file broke the 400-line and 250-line rules, and the split is the point rather than
+      housekeeping: in this delta the guard grew and the behaviour did not, and one file made that
+      impossible to see in a diff. `SnoozeProjectionTests` keeps the five behavioural tests verbatim;
+      `SnoozeGuardTests` holds the scans. Task 13.5 reads the behavioural file **by path** and asserts
+      the five test names are still present, which is a stronger statement from outside than from
+      within. (b) **A mention inside a comment is deliberately not a violation** — every scan strips
+      comments first, following the shipped `code(in:)` discipline, so a doc comment may explain the
+      prohibition without breaking it. `theImportScannerDetectsASecondImport` pins all three cases:
+      an import, a prose mention, and an absence.
+      **Order was honoured and verified:** 13.1's `source(at:)` generalization landed and the suite was
+      re-run green at 11/11 *before* a single new assertion was written, or the six-file and
+      whole-directory scans would have read the wrong paths and passed vacuously. Proven by mutation:
+      a second `import SecurityKit` in `MetadataStore.swift` fails both 13.3 and 13.4, and renaming one
+      behavioural test fails 13.5.
 
 ## Phase 16 (shipped in PR 2 for the CVE half): App shell and the security surface
 
