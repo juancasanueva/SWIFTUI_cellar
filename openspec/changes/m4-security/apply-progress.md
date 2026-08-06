@@ -989,7 +989,8 @@ Numbering continues from batch 3's list.
 | 14 | `ae8c608` | `feat(security): classify and inspect brew-managed artifacts` |
 | 15 | `7988acd` | `feat(security): compose queries and artifacts in the app target` |
 | docs | `2f5980d` | `docs(sdd): record m4-security phases 16, 14 and 15 progress and thirteen deviations` |
-| corrective | see "Batch 5 corrective" below | the three validator defects and three advisories |
+| corrective | `59965d8` | `fix(security): rename the store suite, narrow the consent-gate exemption` |
+| corrective docs | *(this commit)* | `docs(sdd): record the batch 5 corrective` — a commit cannot record its own hash, so it is named by subject |
 
 **Five commits, not three.** The first version of this table listed only the three feature commits
 and silently omitted the documentation commit that carried this very record — which is exactly the
@@ -1065,7 +1066,7 @@ Pure functions created: `SecurityCoverageState.of`, `SecurityPresentation.sectio
 |---|---|---|---|---|
 | 16 | `swift test --filter "SecurityPresentationTests\|SecurityFindingPresentationTests"` | 24 tests pass | `xcodebuild build` — BUILD SUCCEEDED, zero concurrency warnings | `SecurityPresentation.swift` + `SecurityFindingPresentation.swift` + `cellar/Security/` (4 files) + `AppSection`/`ContentView`/`cellarApp` hunks |
 | 14 | `swift test --filter "ArtifactAssessabilityTests\|SignatureInspectorTests\|QuarantineInspectorTests\|IntegrityEngineTests\|IntegrityProhibitionTests"` | 50 tests pass | **MV-0 run live** — real Security.framework against four real casks, transcript in the fixture tree | the five `Sources/SecurityKit/Artifact*`/`*Inspecting*` files + `Fixtures/{Quarantine,MachO}/` |
-| 15 | `xcodebuild test -only-testing:cellarTests` | **TEST SUCCEEDED**, 16 tests | real filesystem trees, recording enumerator, request spy | `cellar/Security/{SecurityQueryBuilder,ArtifactLocator,SecurityRefreshCoordinator,ArtifactIntegrityPanel}.swift` + the engine widening |
+| 15 | `xcodebuild test -only-testing:cellarTests` | **TEST SUCCEEDED**, 26 cases in 4 suites (+24 this batch) | real filesystem trees, recording enumerator, request spy | `cellar/Security/{SecurityQueryBuilder,ArtifactLocator,SecurityRefreshCoordinator,ArtifactIntegrityPanel}.swift` + the engine widening |
 | all | `swift test --package-path Packages/CellarCore` | **1080 / 151 pass**, 1 known issue | `xcodebuild build` + `xcodebuild test` both green | the three commits above, revertible in order |
 
 **The runtime boundary was genuinely exercised this batch, for the first time.** Task 14.0 is not a
