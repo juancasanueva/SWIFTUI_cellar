@@ -1342,3 +1342,117 @@ look broken to whoever reads it next.
     controlled: a planted construction must be caught, and an ordinary security view must not be.
     The library's standard applied to the app target, where M3-1's Phase 18 established defects
     actually hide.
+
+---
+
+## Batch 5 second corrective — the MV-7 / MV-9 defect
+
+The user ran task 17.1's manual checks against a real build. **MV-9's positive
+anchor failed and MV-7 could not run at all.** This is the first defect in this
+change found by a human using the app rather than by a test or a validator, and
+it is the most instructive one in the whole milestone.
+
+### What was observed
+
+> `468 of 468 artifacts checked. 0 notarized, 466 not notarized, 2 could not be assessed.`
+
+Zero cask rows. No Ghostty, no Applite, no Etcher, no CodexBar. All 468 were
+formula keg binaries.
+
+### Root cause
+
+`cellarApp.swift:347` called `.locations(for:caskArtifacts: [:])`. The
+`caskArtifacts:` parameter existed so the locator would not have to run `brew
+info` — and **nothing ever supplied it**. `caskLocations` received an empty list
+for every cask and correctly returned nothing.
+
+### Why the tests missed it, which is the part worth keeping
+
+Every cask test in `SecurityArtifactScopeTests` handed the locator a path and then
+proved it resolved that path. Not one of them asked the only question that
+mattered: *where does the path come from?* The suite tested the seam and never
+tested that anything was plugged into it.
+
+**A seam whose only supplier is a test is not a seam, it is a hole.** The
+parameter is therefore **removed** rather than filled in, so the failure mode
+cannot recur by omission: the locator discovers what it needs from the roots it
+was given, and there is no argument a future caller can forget.
+
+### The comment that caused it
+
+`ArtifactLocator`'s doc comment read *"a Caskroom walk finds nothing usable"*.
+That misread the U3 probe. The probe found that nine of ten Caskroom `.app`
+entries are **symlinks**, and a symlink is not nothing — it is precisely the
+record Homebrew wrote when it installed the cask, and resolving it is one line
+that was already in the file. A wrong sentence in a doc comment became a wrong
+empty dictionary in the composition root. Corrected in the source, in the test's
+doc comment, and in the test's name.
+
+### The fix
+
+One directory listing per cask, at `Caskroom/<token>/<installed version>`, through
+the existing `ArtifactFileSystem` seam. `.app` entries only, symlinks resolved,
+every candidate still filtered through `ArtifactAssessability`. No subprocess. The
+version comes from `primaryKeg.version`, which for a cask is brew's own `installed`
+field — verified against this machine to match the Caskroom directory name
+exactly, including `the-unarchiver 4.3.9,147,1742287964`.
+
+**`/Applications` is still never enumerated, and the distinction is exact**: the
+only directory listed is the cask's own version directory; the bundle is reached
+by *resolving a link found there*. A non-brew app has no Caskroom entry pointing
+at it and is therefore unreachable — MV-9's decoy guarantee, which now has its own
+test rather than being left to follow from the mechanism.
+
+### Verified on the real machine
+
+The fixed algorithm run against the real `/opt/homebrew/Caskroom`:
+
+| Result | Count | Detail |
+|---|---:|---|
+| Cask artifacts located | **9** | incl. Ghostty, Applite, balenaEtcher, CodexBar, VLC, Spotify |
+| Correctly yielding nothing | 2 | `font-iosevka-term-nerd-font` (no `.app`), `the-unarchiver` (stale shell) |
+
+`the-unarchiver` is the U3 probe's tenth cask: its Caskroom entry is a real
+directory holding a nested `.app` with no `Contents/MacOS`, which
+`SecStaticCodeCreateWithPath` rejects with `-67028`. A documented gap, now pinned
+by `aStaleCaskroomDirectoryShellYieldsNothing`, not a regression.
+
+MV-7 can now run against Ghostty; MV-9's positive anchor passes.
+
+### Tests
+
+RED first, and a **behavioural** RED rather than a compile error: the four new
+tests were run against the unfixed locator (with the parameter defaulted) and all
+four failed with zero cask locations — the live symptom, reproduced.
+
+| Suite | Before | After |
+|---|---:|---:|
+| `SecurityArtifactScopeTests` (formulae) | 8 | 6 |
+| `SecurityCaskScopeTests` (new) | — | 8 |
+| `cellarTests` total | 26 | **32** |
+
+CellarCore is unchanged at 1080 / 151. `xcodebuild build` SUCCEEDED, zero
+concurrency warnings. `swiftlint` **117**, zero authored findings.
+
+### Deviations
+
+62. **`ArtifactLocator.locations(for:caskArtifacts:)` loses its second parameter.**
+    The alternative — keep it and pass real values from `cellarApp` — leaves the
+    same hole open for the next caller. Removing it makes "the locator is supplied
+    with cask artifacts" true by construction instead of by discipline. The tests
+    that handed in paths were rewritten to arrange a filesystem instead, which is
+    what the app actually faces.
+
+63. **`SecurityCaskScopeTests` split from `SecurityArtifactScopeTests`.** Forced by
+    the 400-line rule, but the seam is real and worth naming: the cask half grew
+    from two tests to eight because two live manual checks found it broken, and
+    the formula half did not move at all. One file made that invisible in a diff.
+    `SecurityScopeArrangement` holds the shared tree builder so the two suites
+    cannot drift into testing differently-shaped filesystems.
+
+64. **A doc comment is a defect surface.** Recorded because the causal chain here
+    is unusually clean: a wrong sentence about what the U3 probe measured became a
+    wrong empty dictionary in the composition root, and survived review, a
+    validator pass and a full green suite. The corrected comment now states what
+    the walk *does* find and why resolving it is safe, rather than concluding that
+    the walk is useless.
