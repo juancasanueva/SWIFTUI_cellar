@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "Catalog", targets: ["Catalog"]),
         .library(name: "DiskUsage", targets: ["DiskUsage"]),
         .library(name: "BrewClient", targets: ["BrewClient"]),
+        .library(name: "SecurityKit", targets: ["SecurityKit"]),
         .library(name: "Persistence", targets: ["Persistence"])
     ],
     targets: [
@@ -66,13 +67,36 @@ let package = Package(
             resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // Advisory scanning and artifact integrity. Deliberately no dependency on
+        // `BrewProcess`, `BrewClient` or `DiskUsage`: the capability reads
+        // advisories over HTTP and matches them against values, so it never needs
+        // a `brew` binary, a subprocess or a disk walk. That absence is also what
+        // keeps the strict-SemVer comparator it owns **structurally unreachable**
+        // from the snooze rule in `BrewClient` (local-package-metadata LPM5) —
+        // the edge is missing in this direction *and* in the reverse one. Every
+        // composition point between the two lives in the app target, because no
+        // target here may see both.
+        .target(
+            name: "SecurityKit",
+            dependencies: ["Catalog"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "SecurityKitTests",
+            dependencies: ["SecurityKit", "CellarTestSupport"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         // The outermost node of the graph (design D1): it sees `BrewClient` so the
-        // history draft -> row mapping stays testable in CellarCore, and **nothing
-        // depends back on it**, which is what keeps `Catalog` brew-free (CS1) and
-        // keeps SwiftData out of every other target.
+        // history draft -> row mapping stays testable in CellarCore, and it sees
+        // `SecurityKit` for the `DismissedCVE` model alone. **Nothing depends back
+        // on it**, which is what keeps `Catalog` brew-free (CS1) and keeps
+        // SwiftData out of every other target. It is the only target with both
+        // inward edges, and `DismissalStore.swift` is the only file in it that
+        // imports `SecurityKit` — asserted exhaustively, not by convention.
         .target(
             name: "Persistence",
-            dependencies: ["BrewClient"],
+            dependencies: ["BrewClient", "SecurityKit"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
