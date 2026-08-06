@@ -1,0 +1,36 @@
+{
+  "categories": [
+    {
+      "id": "first",
+      "title": "Declared First",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "ripgrep",
+          "blurb": "Declared here first, so this is the one that survives."
+        },
+        {
+          "kind": "formula",
+          "token": "fd",
+          "blurb": "Find files without remembering find's syntax."
+        }
+      ]
+    },
+    {
+      "id": "second",
+      "title": "Declared Second",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "ripgrep",
+          "blurb": "Declared here second, and must never be exposed."
+        },
+        {
+          "kind": "cask",
+          "token": "iterm2",
+          "blurb": "A terminal you can actually configure."
+        }
+      ]
+    }
+  ]
+}

@@ -238,6 +238,79 @@ struct CatalogAdoptionTests {
         )
     }
 
+    // MARK: - Discover lands with the index (PD-R6)
+
+    @Test("Discover content is installed in the same assignment as the index")
+    func discoverIsInstalledAlongsideTheIndex() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+
+        // Before any adoption: awaiting the catalog, and explicitly not a
+        // failure or a pending spinner.
+        #expect(store.discover == .empty)
+        #expect(store.discover.topFormulae.isAwaitingCatalog)
+
+        let watcher = Task { @MainActor in
+            // Every observed moment must agree: an index of N records beside a
+            // Discover projection built from a *different* snapshot is the state
+            // this assertion exists to exclude.
+            var straddled = false
+            for _ in 0..<400 {
+                let count = store.packageCount
+                let ranked = store.discover.topFormulae.count
+                if count > 0, ranked == 0 { straddled = true }
+                await Task.yield()
+            }
+            return straddled
+        }
+        await Task.yield()
+
+        await store.adopt(Self.rankedSnapshot(of: 60))
+        let straddled = await watcher.value
+
+        #expect(store.packageCount == 60)
+        // Fifty rungs from sixty eligible records: the projection really ran.
+        #expect(store.discover.topFormulae.count == 50)
+        #expect(
+            straddled == false,
+            "an observer saw a fresh index beside a stale Discover projection"
+        )
+    }
+
+    @Test("A duplicate or older revision costs no second Discover projection")
+    func duplicateRevisionDoesNotReproject() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+        let snapshot = Self.rankedSnapshot(of: 10)
+
+        await store.adopt(snapshot)
+        let afterFirst = store.discover
+        let buildsAfterFirst = store.indexBuildCount
+
+        // The same materialization, delivered twice — a manual refresh and the
+        // event stream both claim it. One materialization, one projection.
+        await store.adopt(snapshot)
+
+        #expect(store.indexBuildCount == buildsAfterFirst)
+        #expect(store.discover == afterFirst)
+        #expect(store.discover.topFormulae.count == 10)
+    }
+
+    /// A snapshot whose records are all eligible for the formula ladder.
+    static func rankedSnapshot(of count: Int) -> CatalogSnapshot {
+        CatalogSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 0),
+            skippedRecordCount: 0,
+            packages: (0..<count).map {
+                CatalogPackage.stub(
+                    kind: .formula,
+                    name: String(format: "pkg%03d", $0),
+                    installCount365d: $0 * 10
+                )
+            }
+        )
+    }
+
     /// Bounded polling that stays on the main actor, so the condition can read
     /// main-isolated state.
     func poll(_ condition: () -> Bool) async {

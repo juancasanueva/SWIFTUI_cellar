@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 99,
+  "formulae": ["git", "ripgrep", "wget"],
+  "casks": ["firefox", "iterm2"]
+}

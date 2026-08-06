@@ -1,0 +1,43 @@
+{
+  "categories": [
+    {
+      "id": "tolerant-a",
+      "title": "Tolerant A",
+      "editorialNote": "a category key the decoder does not model",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "ripgrep",
+          "blurb": "Search a whole project in a blink.",
+          "priority": 3,
+          "editorial": { "reviewedBy": "nobody", "nested": true }
+        },
+        { "kind": "formula", "token": "noblurb" },
+        { "kind": "formula", "token": "blankblurb", "blurb": "" },
+        { "kind": "cask", "blurb": "This entry never names a package." },
+        { "token": "nokind", "blurb": "This entry never says which namespace." },
+        {
+          "kind": "snap",
+          "token": "unknownkind",
+          "blurb": "A namespace Homebrew does not have."
+        },
+        {
+          "kind": "cask",
+          "token": "iterm2",
+          "blurb": "A terminal you can actually configure."
+        }
+      ]
+    },
+    {
+      "id": "tolerant-b",
+      "title": "Tolerant B",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "jq",
+          "blurb": "Slice JSON on the command line without writing a script."
+        }
+      ]
+    }
+  ]
+}

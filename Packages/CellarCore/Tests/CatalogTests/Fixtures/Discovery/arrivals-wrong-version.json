@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 99,
+  "arrivals": [
+    { "kind": "formula", "name": "newpkg", "firstSeenAt": 1800000000 },
+    { "kind": "cask", "name": "newcask", "firstSeenAt": 1800086400 }
+  ]
+}

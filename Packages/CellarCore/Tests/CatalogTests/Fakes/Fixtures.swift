@@ -49,4 +49,36 @@ enum Fixture {
         "cask-no-check",
         "formula-headless"
     ]
+
+    /// The discovery fixtures live one directory deeper, so the curated-list and
+    /// sidecar shapes stay visibly separate from the payload excerpts they have
+    /// nothing to do with.
+    static func discovery(_ name: String) throws -> Data {
+        let url = try #require(
+            Bundle.module.url(
+                forResource: name,
+                withExtension: "json",
+                subdirectory: "Fixtures/Discovery"
+            ),
+            "missing discovery fixture \(name).json"
+        )
+        return try Data(contentsOf: url)
+    }
+
+    /// Registered for the same reason `inspectionFixtures` is: a file added to
+    /// `Fixtures/Discovery/` but never copied into the bundle fails here, once,
+    /// rather than as a mystery `#require` failure inside whichever suite
+    /// happened to load it first.
+    ///
+    /// See `Fixtures/README.md` for what each one exercises.
+    static let discoveryFixtures = [
+        "curated-tolerant",
+        "curated-duplicate",
+        "curated-unsorted",
+        "roster-corrupt",
+        "roster-wrong-version",
+        "arrivals-corrupt",
+        "arrivals-wrong-version",
+        "arrivals-undatable"
+    ]
 }

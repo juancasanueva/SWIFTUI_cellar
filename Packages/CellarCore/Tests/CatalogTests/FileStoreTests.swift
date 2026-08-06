@@ -211,6 +211,87 @@ struct FileStoreTests {
         #expect(try revertedBuild.loadSnapshot()?.packages.map(\CatalogPackage.name) == ["wget"])
     }
 
+    // MARK: - The newness sidecars gate independently (CS-M1)
+
+    @Test("A snapshot schema bump does not invalidate an independently versioned sidecar")
+    func snapshotSchemaBumpDoesNotDiscardTheNewnessSidecars() throws {
+        let fileSystem = FakeCatalogFileSystem()
+        // The build's expectation for the *snapshot* has moved on; the two
+        // newness sidecars were written at the version their own schema
+        // declares and have not moved at all.
+        let store = CatalogFileStore(
+            directory: Self.root,
+            fileSystem: fileSystem,
+            expectedSchemaVersion: CatalogSnapshot.currentSchemaVersion + 1
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        fileSystem.seed(
+            try encoder.encode(Self.snapshot(names: ["wget"])),
+            at: store.snapshotURL
+        )
+        fileSystem.seed(try encoder.encode(Self.state(recordCount: 1)), at: store.stateURL)
+        fileSystem.seed(
+            try encoder.encode(KnownPackageRoster(formulae: ["wget"], casks: [])),
+            at: store.rosterURL
+        )
+        fileSystem.seed(
+            try encoder.encode(
+                PackageArrivalsLog(arrivals: [
+                    PackageArrival(
+                        kind: .formula,
+                        name: "wget",
+                        firstSeenAt: Date(timeIntervalSince1970: 1_800_000_000)
+                    )
+                ])
+            ),
+            at: store.arrivalsURL
+        )
+
+        // The snapshot and its state sidecar are a cold start...
+        #expect(try store.loadSnapshot() == nil)
+        #expect(try store.loadState() == nil)
+        // ...and the user's 30-day history survives it untouched. Sharing the
+        // snapshot's constant would have erased it here, for a change that has
+        // nothing to do with newness.
+        let roster = try #require(store.loadRoster())
+        #expect(roster.contains(PackageID(kind: .formula, name: "wget")))
+        #expect(store.loadArrivals()?.arrivals.map(\.name) == ["wget"])
+    }
+
+    @Test("A sidecar whose own version differs, either way, is absent without costing the snapshot")
+    func sidecarVersionMismatchDoesNotRejectTheSnapshot() throws {
+        let fileSystem = FakeCatalogFileSystem()
+        let store = CatalogFileStore(directory: Self.root, fileSystem: fileSystem)
+        try store.persist(Self.snapshot(names: ["wget"]), state: Self.state(recordCount: 1))
+
+        // Both directions, because "exact in both directions" is the rule: a
+        // version older than this build's and one newer are the same answer.
+        for version in [DiscoverySchema.currentVersion - 1, DiscoverySchema.currentVersion + 1] {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .secondsSince1970
+            fileSystem.seed(
+                try encoder.encode(
+                    KnownPackageRoster(schemaVersion: version, formulae: ["wget"], casks: [])
+                ),
+                at: store.rosterURL
+            )
+            fileSystem.seed(
+                try encoder.encode(PackageArrivalsLog(schemaVersion: version, arrivals: [])),
+                at: store.arrivalsURL
+            )
+            let operationsBeforeTheRead = fileSystem.operations
+
+            #expect(store.loadRoster() == nil, "version \(version) roster was adopted")
+            #expect(store.loadArrivals() == nil, "version \(version) arrivals log was adopted")
+            // The snapshot is unaffected: no file is rejected on the strength of
+            // another's version.
+            #expect(try store.loadSnapshot()?.packages.map(\CatalogPackage.name) == ["wget"])
+            // Nothing thrown, and neither file rewritten or deleted by the read.
+            #expect(fileSystem.operations == operationsBeforeTheRead)
+        }
+    }
+
     // MARK: - Full replace (CS3)
 
     @Test("A package absent from the new payload disappears entirely")

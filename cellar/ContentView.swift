@@ -74,6 +74,10 @@ struct ContentView: View {
             List(AppSection.allCases, selection: $section) { item in
                 Label(item.title, systemImage: item.systemImage)
                     .tag(item)
+                    // The sidebar label and the navigation title carry the same
+                    // words, so a UI test querying by text matches two elements
+                    // and can assert on neither. An identifier names the row.
+                    .accessibilityIdentifier("sidebar-\(item.rawValue)")
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 240)
         } content: {
@@ -81,6 +85,9 @@ struct ContentView: View {
             case .home:
                 HomeView(brewDetection: brewDetection, catalog: catalog)
                     .navigationSplitViewColumnWidth(min: 320, ideal: 480)
+            case .discover:
+                DiscoverView(catalog: catalog, selection: $selection)
+                    .navigationSplitViewColumnWidth(min: 320, ideal: 420)
             case .browse:
                 BrowseView(
                     catalog: catalog,
@@ -178,9 +185,12 @@ struct ContentView: View {
                     systemImage: AppSection.history.systemImage,
                     description: Text("Every package change Cellar made, newest first.")
                 )
-            case .browse, .installed:
-                // The same detail view for both: a package is a package, and
-                // the catalog record is the thing worth reading about it.
+            case .discover, .browse, .installed:
+                // The same detail view for all three: a package is a package,
+                // and the catalog record is the thing worth reading about it.
+                // Discover joins here rather than growing a detail view of its
+                // own — selecting a recommendation should land exactly where
+                // selecting a search result lands.
                 PackageDetailView(
                     catalog: catalog,
                     installed: installed,

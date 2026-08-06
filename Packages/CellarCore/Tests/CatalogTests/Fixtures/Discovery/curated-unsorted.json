@@ -1,0 +1,29 @@
+{
+  "categories": [
+    {
+      "id": "zeta",
+      "title": "Zeta",
+      "entries": [
+        { "kind": "formula", "token": "wget", "blurb": "Pull a file down over HTTP." },
+        { "kind": "formula", "token": "jq", "blurb": "Slice JSON without writing a script." },
+        { "kind": "formula", "token": "curl", "blurb": "Talk to an HTTP endpoint by hand." }
+      ]
+    },
+    {
+      "id": "alpha",
+      "title": "Alpha",
+      "entries": [
+        { "kind": "cask", "token": "iterm2", "blurb": "A terminal you can configure." },
+        { "kind": "cask", "token": "firefox", "blurb": "A browser that is not Safari." }
+      ]
+    },
+    {
+      "id": "mu",
+      "title": "Mu",
+      "entries": [
+        { "kind": "formula", "token": "ripgrep", "blurb": "Search a project in a blink." },
+        { "kind": "formula", "token": "fd", "blurb": "Find files the friendly way." }
+      ]
+    }
+  ]
+}

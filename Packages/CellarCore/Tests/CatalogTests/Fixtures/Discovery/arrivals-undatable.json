@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "arrivals": [
+    { "kind": "formula", "name": "first-good", "firstSeenAt": 1800000000 },
+    { "kind": "formula", "name": "undatable", "firstSeenAt": "whenever it was" },
+    { "kind": "cask", "name": "second-good", "firstSeenAt": 1800086400 }
+  ]
+}

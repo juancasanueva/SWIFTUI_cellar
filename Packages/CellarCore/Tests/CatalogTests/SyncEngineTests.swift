@@ -289,6 +289,210 @@ struct SyncEngineTests {
         #expect(await harness.engine.status == .failed(.offline))
         #expect(try harness.store.loadSnapshot() == nil)
     }
+
+    // MARK: - The newness sidecars (CS-A1, CS-A2)
+
+    @Test("A sync that publishes a new snapshot writes arrivals before the roster")
+    func newSnapshotWritesArrivalsBeforeTheRoster() async throws {
+        let harness = try SyncHarness(recording: true)
+        let recorder = try #require(harness.recorder)
+        harness.source.script(.payload(Payload.formulae(["wget", "git"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+
+        let result = await harness.engine.sync()
+
+        #expect(result.value != nil)
+        // The crash-order choice, stated as an ordering: a crash between the two
+        // costs a repeated arrival that earliest-`firstSeenAt` deduplicates,
+        // while the reverse order marks a package seen with no arrival ever
+        // written and loses it permanently.
+        #expect(
+            recorder.publishedPaths == [
+                "catalog.json",
+                "catalog-state.json",
+                "catalog-arrivals.json",
+                "catalog-roster.json"
+            ]
+        )
+        // The first sync is the seeding pass, so the roster is full and the
+        // arrivals log is empty (D5).
+        let roster = try #require(harness.store.loadRoster())
+        #expect(roster.formulae == ["git", "wget"])
+        #expect(roster.casks == ["iterm2"])
+        #expect(harness.store.loadArrivals()?.arrivals.isEmpty == true)
+    }
+
+    @Test("A second sync records only the package the roster had not seen")
+    func secondSyncRecordsOnlyTheUnseenPackage() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        _ = await harness.engine.sync()
+
+        // A genuinely changed payload, so this is the new-snapshot path.
+        harness.source.script(.payload(Payload.formulae(["wget", "newpkg"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.time.advance(by: 3_600)
+        _ = await harness.engine.sync()
+
+        let arrivals = try #require(harness.store.loadArrivals())
+        #expect(arrivals.arrivals.map(\.name) == ["newpkg"])
+        #expect(arrivals.arrivals.first?.firstSeenAt == harness.time.now)
+        #expect(harness.store.loadRoster()?.formulae == ["newpkg", "wget"])
+    }
+
+    @Test("A fully revalidated sync writes neither sidecar and records no arrival")
+    func revalidatedSyncLeavesBothSidecarsUntouched() async throws {
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        _ = await harness.engine.sync()
+
+        let rosterBefore = try Data(contentsOf: harness.store.rosterURL)
+        let arrivalsBefore = try Data(contentsOf: harness.store.arrivalsURL)
+
+        // Everything revalidates: the packages are identical, so diffing would
+        // be a guaranteed no-op costing a roster read and a 16k set compare.
+        harness.source.script(.notModified, for: .formulae)
+        harness.source.script(.notModified, for: .casks)
+        harness.time.advance(by: 90_000)
+        let result = await harness.engine.sync()
+
+        #expect(result.value != nil)
+        #expect(try Data(contentsOf: harness.store.rosterURL) == rosterBefore)
+        #expect(try Data(contentsOf: harness.store.arrivalsURL) == arrivalsBefore)
+        #expect(harness.store.loadArrivals()?.arrivals.isEmpty == true)
+    }
+
+    @Test("A roster write failure leaves the sync successful and the snapshot served")
+    func rosterWriteFailureDoesNotFailTheSync() async throws {
+        let harness = try SyncHarness(recording: true)
+        let recorder = try #require(harness.recorder)
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        recorder.failReplacements(of: harness.store.rosterURL)
+
+        let result = await harness.engine.sync()
+
+        // Newness is decoration. A roster that cannot be written costs newness
+        // for one sync; it must never cost the catalog that already arrived.
+        #expect(result.value != nil)
+        #expect(await harness.engine.status.isBusy == false)
+        #expect(try harness.store.loadSnapshot()?.packages.isEmpty == false)
+        #expect(try harness.store.loadState() != nil)
+        #expect(harness.store.loadRoster() == nil)
+    }
+
+    @Test("An arrivals write failure leaves the sync successful and the snapshot served")
+    func arrivalsWriteFailureDoesNotFailTheSync() async throws {
+        let harness = try SyncHarness(recording: true)
+        let recorder = try #require(harness.recorder)
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        recorder.failReplacements(of: harness.store.arrivalsURL)
+
+        let result = await harness.engine.sync()
+
+        #expect(result.value != nil)
+        #expect(try harness.store.loadSnapshot()?.packages.isEmpty == false)
+        #expect(try harness.store.loadState() != nil)
+        // Arrivals is written first, so its failure costs the roster too — and
+        // still not the sync.
+        #expect(harness.store.loadArrivals() == nil)
+    }
+
+    @Test("The engine serves the arrivals log already pruned to the window")
+    func engineServesPrunedArrivals() async throws {
+        let harness = try SyncHarness()
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        try FileManager.default.createDirectory(
+            at: harness.directory, withIntermediateDirectories: true
+        )
+        try encoder.encode(
+            PackageArrivalsLog(arrivals: [
+                PackageArrival(
+                    kind: .formula,
+                    name: "stale",
+                    firstSeenAt: harness.time.now.addingTimeInterval(-31 * 24 * 3_600)
+                ),
+                PackageArrival(
+                    kind: .formula,
+                    name: "fresh",
+                    firstSeenAt: harness.time.now.addingTimeInterval(-2 * 24 * 3_600)
+                )
+            ])
+        )
+        .write(to: harness.store.arrivalsURL)
+
+        // Read-time pruning, with no sync having run: the 30-day rule holds
+        // regardless of sync cadence.
+        let served = await harness.engine.arrivals()
+
+        #expect(served?.arrivals.map(\.name) == ["fresh"])
+    }
+
+    @Test("An expired arrival is removed from the file by the next write")
+    func expiredArrivalIsGoneFromTheFileAfterTheNextWrite() async throws {
+        // The **write** half of CS-A2 sc3. Read-time pruning above makes the
+        // 30-day answer true; it does nothing to bound the file, because it
+        // never touches the bytes. Only a write can do that, so this is the
+        // half that has to be observed against the file on disk rather than
+        // against the projection — a log that grew forever would satisfy every
+        // read-side assertion in this suite.
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        // A first sync seeds the roster, so the sync below takes the diffing
+        // path rather than the seeding one.
+        _ = await harness.engine.sync()
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        try encoder.encode(
+            PackageArrivalsLog(arrivals: [
+                PackageArrival(
+                    kind: .formula,
+                    name: "stalepkg",
+                    firstSeenAt: harness.time.now.addingTimeInterval(-31 * 24 * 3_600)
+                ),
+                PackageArrival(
+                    kind: .formula,
+                    name: "freshpkg",
+                    firstSeenAt: harness.time.now.addingTimeInterval(-2 * 24 * 3_600)
+                )
+            ])
+        )
+        .write(to: harness.store.arrivalsURL)
+
+        // The expired entry really is in the persisted bytes beforehand, so the
+        // assertion below is about a removal rather than about an absence that
+        // was always there.
+        let before = try #require(
+            String(data: try Data(contentsOf: harness.store.arrivalsURL), encoding: .utf8)
+        )
+        #expect(before.contains("stalepkg"))
+
+        // A genuinely changed payload, so this sync materializes a new snapshot
+        // and therefore writes the sidecars.
+        harness.source.script(.payload(Payload.formulae(["wget", "newpkg"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.time.advance(by: 3_600)
+        #expect(await harness.engine.sync().value != nil)
+
+        // Re-read the file, not the projection.
+        let persisted = try Data(contentsOf: harness.store.arrivalsURL)
+        let after = try #require(String(data: persisted, encoding: .utf8))
+        #expect(after.contains("stalepkg") == false, "the expired arrival survived the write")
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let reloaded = try decoder.decode(PackageArrivalsLog.self, from: persisted)
+        // The entry inside the window survives, and the genuinely new package
+        // was recorded — so the write pruned rather than simply truncating.
+        #expect(reloaded.arrivals.map(\.name).sorted() == ["freshpkg", "newpkg"])
+        #expect(reloaded.arrivals.contains { $0.name == "stalepkg" } == false)
+    }
 }
 
 // MARK: - Harness
