@@ -15,17 +15,8 @@ import Testing
 struct NVDSourceTests {
     // MARK: - Fakes
 
-    /// The credential seam, in memory. **No test here touches the Keychain.**
-    struct FakeCredentialStore: AdvisoryCredentialStoring {
-        let key: String?
-
-        func apiKey() async throws -> String? { key }
-        func store(apiKey: String) async throws {}
-        func removeAPIKey() async throws {}
-    }
-
     static func source(on network: RecordingNetwork, key: String? = nil) -> NVDSource {
-        NVDSource(session: network.session, credentials: FakeCredentialStore(key: key))
+        NVDSource(session: network.session, credentials: InMemoryCredentialStore(key: key))
     }
 
     /// The `cveIds` values of one recorded request, as the server would read

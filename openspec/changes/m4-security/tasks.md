@@ -606,15 +606,15 @@ If the split is taken, exactly four things move with it — nothing else:
       revocation, advance the `TestClock` past several poll granularities and past `staleAfter`;
       **zero** requests, **zero** scheduled runs; and `theCacheStaysReadableWithItsAgeAfterRevocation`.
       — sc *"Off means fully off"*.
-- [ ] 9.3 **RED** same file — `aBlockedEgressEmitsBlockedPendingConsentRatherThanParkingSilently`.
-- [ ] 9.4 **GREEN** create `Sources/SecurityKit/ScanConsent.swift` — a preference value
+- [x] 9.3 **RED** same file — `aBlockedEgressEmitsBlockedPendingConsentRatherThanParkingSilently`.
+- [x] 9.4 **GREEN** create `Sources/SecurityKit/ScanConsent.swift` — a preference value
       (boolean + date), read before every egress path.
-- [ ] 9.5 **RED** `Tests/SecurityKitTests/CredentialStoreTests.swift` (new), over an in-memory fake —
+- [x] 9.5 **RED** `Tests/SecurityKitTests/CredentialStoreTests.swift` (new), over an in-memory fake —
       `theKeyRoundTripsThroughTheSeamAndNeverThroughUserDefaults`; and a structural scan asserting
       `Sources/SecurityKit/` contains no `UserDefaults`, no `@AppStorage`, and no `print`/`os_log`
       call site that takes the key value. **No test touches the real Keychain.** —
       `vulnerability-scanning` req *"Scanning is opt-in, disclosed, reversible and Keychain-backed"*.
-- [ ] 9.6 **GREEN** create `Sources/SecurityKit/AdvisoryCredentialStoring.swift` — the protocol plus
+- [x] 9.6 **GREEN** create `Sources/SecurityKit/AdvisoryCredentialStoring.swift` — the protocol plus
       the `kSecClassGenericPassword` implementation (service `…cellar.nvd-api-key`,
       `kSecAttrAccessibleAfterFirstUnlock`). **Commit 9.**
 

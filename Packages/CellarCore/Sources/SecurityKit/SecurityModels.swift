@@ -102,6 +102,13 @@ public enum AdvisoryError: Error, Sendable, Hashable, Codable {
     /// byte, so a hostile or broken origin cannot make the process allocate its
     /// way out of memory on the way to finding out the payload was nonsense.
     case payloadTooLarge
+    /// Consent for network access has not been recorded, so nothing was sent.
+    ///
+    /// A typed refusal rather than silence. "You have not opted in" and "we
+    /// tried and could not reach anyone" are different sentences, and a surface
+    /// that showed the second for the first would be lying about what the app
+    /// did.
+    case blockedPendingConsent
 }
 
 /// One advisory that applies to one installed package.
