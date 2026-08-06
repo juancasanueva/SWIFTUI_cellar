@@ -1456,3 +1456,114 @@ concurrency warnings. `swiftlint` **117**, zero authored findings.
     validator pass and a full green suite. The corrected comment now states what
     the walk *does* find and why resolving it is safe, rather than concluding that
     the walk is useless.
+
+---
+
+## Batch 5 third corrective — the MV-7 identity gap
+
+The user's second finding from task 17.1, on a build that already carried the
+cask fix. Smaller than the last, and a different kind of miss.
+
+### What was observed
+
+The panel now shows `477/477` with **9 notarized casks** — the previous corrective
+verified live. But MV-7 requires a literal comparison of **three** fields against
+`codesign -dv --verbose=4`, and the Ghostty row rendered only
+`Signed by 24VZTF6M5V`. Clicking it did nothing. The identifier and the
+three-entry authority chain were nowhere on screen.
+
+### Root cause
+
+Not a data problem. `SecurityFrameworkSignatureInspector` captured all three —
+`kSecCodeInfoIdentifier`, `kSecCodeInfoTeamIdentifier`, `kSecCodeInfoCertificates`
+— and they reached `ArtifactIntegrityReport.signature` intact. **The view rendered
+`ArtifactSigningState.label` and nothing else.** A team identifier is not an
+identity, and `artifact-integrity` requires identity visibility.
+
+### Why the tests missed it, again worth naming
+
+`SignatureInspectorTests.aSignedArtifactReportsItsIdentifierTeamIdentifierAndAuthorityChain`
+asserts all three survive the *inspector*. Nothing asserted they survive to the
+*surface*. The same shape as the cask defect one corrective earlier: the layer was
+tested, the wiring past it was not — there the supplier was missing, here the
+consumer was.
+
+The projection therefore moved into `SecurityKit`, where `swift test` reaches it,
+rather than living in a `body` where nothing can assert it. That is the standing
+rule this change has followed since Phase 16 for exactly this reason, and the
+integrity panel was the one surface that had not.
+
+### The fix
+
+`SecurityPresentation.identityFields(for:)` projects `[ArtifactIdentityField]`:
+
+- **signed** → identifier, team (omitted when absent), then every authority in the
+  platform's own **leaf-first** order;
+- **ad-hoc** → identifier only. Every brew bottle is here, with a real
+  `rg-<hash>` identifier and genuinely no team and no chain, as the U3 probe
+  measured. Inventing an empty team would be worse than omitting it;
+- **unsigned / invalid / could-not-assess** → nothing at all, not blank rows: an
+  empty labelled field reads as a fact, and there is no fact there.
+
+Labels are `codesign`'s own words — `Identifier`, `Team identifier`, `Authority`
+— so MV-7 is two copies of the same vocabulary side by side rather than a
+translation exercise. Each field carries a distinct key, so three `Authority`
+rows do not collapse onto one accessibility identifier.
+
+### Presentation, and why
+
+The identifier joins the summary line **inline** — short, most identifying, and
+its absence is what was reported. All three fields sit in a per-row
+**`DisclosureGroup`**, labelled and selectable.
+
+A real sweep on this machine is 477 artifacts. Five more always-visible lines per
+row turns a scannable list into a wall, so collapsed rows stay exactly as dense as
+before and MV-7 expands the one row it is checking. Artifacts with no identity get
+no disclosure rather than an empty one.
+
+The three-way notarization verdict and the quarantine decode are untouched.
+
+### Verified against codesign
+
+| Field | `codesign -dv --verbose=4` | Panel |
+|---|---|---|
+| Identifier | `com.mitchellh.ghostty` | same |
+| TeamIdentifier | `24VZTF6M5V` | same |
+| Authority (leaf) | `Developer ID Application: Mitchell Hashimoto (24VZTF6M5V)` | same |
+| Authority | `Developer ID Certification Authority` | same |
+| Authority (root) | `Apple Root CA` | same |
+
+The test fixture uses these exact real values, so the suite is pinned to what the
+machine actually reports rather than to invented strings.
+
+### Tests
+
+RED first: `type 'SecurityPresentation' has no member 'identityFields'`.
+
+| Suite | Before | After |
+|---|---:|---:|
+| CellarCore | 1080 / 151 | **1090 / 152** |
+| `ArtifactIdentityPresentationTests` (new) | — | 10 |
+| `cellarTests` | 32 | 32 |
+
+`xcodebuild build` SUCCEEDED, zero concurrency warnings. `swiftlint` **117**, zero
+authored findings.
+
+### Deviations
+
+65. **`ArtifactIdentityField` is a value, not a formatted string.** A single
+    rendered sentence cannot be compared field by field, and cannot carry one
+    accessibility identifier per field either — and the authority chain is the
+    part most worth checking, so its three entries must not collapse onto one.
+
+66. **Identity is disclosed, not always expanded.** The only alternative that
+    keeps all three fields visible at once costs five lines on every one of 477
+    rows. Recorded as a deliberate density trade rather than left as a silent
+    layout choice: the collapsed row is unchanged, and the fields are one click
+    away.
+
+67. **The integrity panel was the last surface with a rule in its `body`.** Every
+    other surface in this change projects through `SecurityPresentation`; the
+    panel formatted its own signing line, and that is precisely where the gap
+    was. The pattern held everywhere it was applied and failed in the one place
+    it was not.
