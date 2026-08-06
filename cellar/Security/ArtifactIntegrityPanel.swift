@@ -140,9 +140,27 @@ struct ArtifactIntegrityPanel: View {
                 Text(report.signature.notarization.label)
                     .font(.caption)
             }
-            Text(report.signature.signing.label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(report.signature.signing.label)
+                // The identifier inline as well as in the disclosure below. It is
+                // the single most identifying value, it is short, and "signed by
+                // <team>" on its own is what shipped and was rightly called out:
+                // a team identifier is not an identity.
+                if let identifier = report.signature.signing.identity?.identifier {
+                    Text(identifier)
+                        .monospaced()
+                        .textSelection(.enabled)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .accessibilityIdentifier(
+                            "security-integrity-\(report.location.packageID.name)-identifier-inline"
+                        )
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            signingIdentity(report)
             // `couldNotAssess` renders as itself, with its reason — never as a
             // blank, and never as one of the two verdicts it is not.
             if let reason = report.signature.notarization.reason {
@@ -161,6 +179,50 @@ struct ArtifactIntegrityPanel: View {
             }
         }
         .accessibilityIdentifier("security-integrity-\(report.location.packageID.name)")
+    }
+
+    /// Identifier, team and the full authority chain, behind one disclosure.
+    ///
+    /// **Why a disclosure rather than five more lines per row.** A real sweep on
+    /// this machine is 477 artifacts; adding the whole chain to every row would
+    /// turn a scannable list into a wall. Collapsed, the row is exactly as dense
+    /// as it was. Expanded, MV-7 gets all three fields labelled in `codesign`'s
+    /// own vocabulary, in the platform's own order, selectable — so comparing
+    /// against `codesign -dv --verbose=4` is reading two copies of the same words
+    /// rather than translating between two.
+    ///
+    /// Absent entirely for unsigned, invalid and could-not-assess artifacts:
+    /// there is no identity to disclose, and an empty disclosure would suggest
+    /// there is something behind it.
+    @ViewBuilder
+    private func signingIdentity(_ report: ArtifactIntegrityReport) -> some View {
+        let fields = SecurityPresentation.identityFields(for: report.signature.signing)
+        if fields.isEmpty == false {
+            DisclosureGroup("Signing identity") {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(fields) { field in
+                        LabeledContent(field.label) {
+                            Text(field.value)
+                                .monospaced()
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .accessibilityIdentifier(
+                            SecurityPresentation.identityFieldIdentifier(
+                                field,
+                                package: report.location.packageID.name
+                            )
+                        )
+                    }
+                }
+                .font(.caption)
+                .padding(.top, 2)
+            }
+            .font(.caption)
+            .accessibilityIdentifier(
+                "security-integrity-\(report.location.packageID.name)-identity"
+            )
+        }
     }
 
     /// The decoded components **and** the raw value, together.
