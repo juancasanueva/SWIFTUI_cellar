@@ -68,7 +68,7 @@ struct cellarApp: App {
     /// The artifact-integrity half. Its results are not cached — a signature
     /// verdict describes the artifact as it is now — so this holds them for the
     /// life of the scene and no longer.
-    @State private var integrity = ArtifactIntegrityStore()
+    @State private var integrity: ArtifactIntegrityStore
 
     /// The queue of Cellar-initiated mutations, and everything the activity
     /// surfaces read. It is what finally drives `mutations`, the gate M2-1
@@ -174,6 +174,11 @@ struct cellarApp: App {
         _metadata = State(initialValue: stores.metadata)
         _history = State(initialValue: stores.history)
         _dismissals = State(initialValue: stores.dismissals)
+        _integrity = State(
+            initialValue: ArtifactIntegrityStore(
+                initialReports: AppTestFixtures.isSecurityEnabled ? AppTestFixtures.integrityReports : []
+            )
+        )
         let securityConsent = SecurityConsentPreference()
         let advisoryCredentials = KeychainAdvisoryCredentialStore()
         _securityConsent = State(initialValue: securityConsent)

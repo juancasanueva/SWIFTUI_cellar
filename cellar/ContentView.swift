@@ -156,7 +156,7 @@ struct ContentView: View {
                     description: Text("Expand a package to inspect its installed versions.")
                 )
             case .security:
-                if findingSelection == nil, artifactLocations.isEmpty == false {
+                if findingSelection == nil, artifactLocations.isEmpty == false || integrity.reports.isEmpty == false {
                     // The integrity half occupies the detail column whenever no
                     // finding is selected: it is a second view of the same
                     // inventory rather than a separate destination.

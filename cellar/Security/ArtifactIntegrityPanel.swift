@@ -30,8 +30,17 @@ final class ArtifactIntegrityStore {
     @ObservationIgnored private let engine: ArtifactIntegrityEngine
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(engine: ArtifactIntegrityEngine = ArtifactIntegrityEngine()) {
+    init(
+        engine: ArtifactIntegrityEngine = ArtifactIntegrityEngine(),
+        initialReports: [ArtifactIntegrityReport] = []
+    ) {
         self.engine = engine
+        // The `DiskUsageStore(initialSnapshot:)` precedent: a UI test needs a
+        // deterministic surface, and a real sweep depends on what happens to be
+        // installed. Empty in every ordinary launch.
+        reports = initialReports
+        expected = initialReports.count
+        isComplete = initialReports.isEmpty == false
     }
 
     func run(over locations: [ArtifactLocation]) {
@@ -79,6 +88,14 @@ final class ArtifactIntegrityStore {
 struct ArtifactIntegrityPanel: View {
     let store: ArtifactIntegrityStore
     let locations: [ArtifactLocation]
+
+    /// Which rows have their signing identity open, keyed by artifact URL.
+    ///
+    /// Held here rather than left to `DisclosureGroup`'s implicit state, because
+    /// the implicit version is what shipped broken: nested inside a row's
+    /// `VStack` with a bare `String` label it rendered **no indicator at all**
+    /// and had no usable click target. See `signingIdentity`.
+    @State private var expandedIdentities: Set<URL> = []
 
     var body: some View {
         List {
@@ -140,6 +157,13 @@ struct ArtifactIntegrityPanel: View {
                 Text(report.signature.notarization.label)
                     .font(.caption)
             }
+            // The row anchor sits on the header line rather than on the whole
+            // row. An identifier on the outer container **overrides every
+            // descendant's** — measured: the identity button reported
+            // `security-integrity-ghostty`, and every field inside the
+            // disclosure would have collapsed onto the same string, leaving the
+            // authority chain unaddressable from a UI test.
+            .accessibilityIdentifier("security-integrity-\(report.location.packageID.name)")
             HStack(spacing: 6) {
                 Text(report.signature.signing.label)
                 // The identifier inline as well as in the disclosure below. It is
@@ -178,10 +202,20 @@ struct ArtifactIntegrityPanel: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .accessibilityIdentifier("security-integrity-\(report.location.packageID.name)")
     }
 
     /// Identifier, team and the full authority chain, behind one disclosure.
+    ///
+    /// **Why a hand-built disclosure rather than `DisclosureGroup`.** The first
+    /// version used `DisclosureGroup("Signing identity")` nested inside the row's
+    /// `VStack`, and it shipped **non-interactive**: no indicator rendered and
+    /// clicking did nothing, so the authority chain was unreachable and MV-7
+    /// could not close. The app's one working `DisclosureGroup` (`CleanupRow`) is
+    /// the row's *top-level* view with a full-width `HStack` label — a materially
+    /// different arrangement. Rather than depend on which nestings the platform
+    /// happens to render an indicator for, the control is explicit: a `Button`
+    /// whose label spans the row, a chevron this file draws and rotates, and
+    /// expansion state the panel owns.
     ///
     /// **Why a disclosure rather than five more lines per row.** A real sweep on
     /// this machine is 477 artifacts; adding the whole chain to every row would
@@ -198,30 +232,56 @@ struct ArtifactIntegrityPanel: View {
     private func signingIdentity(_ report: ArtifactIntegrityReport) -> some View {
         let fields = SecurityPresentation.identityFields(for: report.signature.signing)
         if fields.isEmpty == false {
-            DisclosureGroup("Signing identity") {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(fields) { field in
-                        LabeledContent(field.label) {
-                            Text(field.value)
-                                .monospaced()
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .accessibilityIdentifier(
-                            SecurityPresentation.identityFieldIdentifier(
-                                field,
-                                package: report.location.packageID.name
-                            )
-                        )
+            let package = report.location.packageID.name
+            let isExpanded = expandedIdentities.contains(report.id)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Button {
+                    if isExpanded {
+                        expandedIdentities.remove(report.id)
+                    } else {
+                        expandedIdentities.insert(report.id)
                     }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        Text("Signing identity")
+                        // Stretches the label to the full row width, so the
+                        // click target is the whole line rather than the words.
+                        Spacer(minLength: 0)
+                    }
+                    // Without this the transparent part of the HStack is not
+                    // hit-testable and only the glyphs respond.
+                    .contentShape(Rectangle())
                 }
-                .font(.caption)
-                .padding(.top, 2)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("security-integrity-\(package)-identity")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel("Signing identity for \(package)")
+                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+                .accessibilityHint(isExpanded ? "Hides the signing fields" : "Shows the signing fields")
+
+                if isExpanded {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(fields) { field in
+                            LabeledContent(field.label) {
+                                Text(field.value)
+                                    .monospaced()
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .accessibilityIdentifier(
+                                SecurityPresentation.identityFieldIdentifier(field, package: package)
+                            )
+                        }
+                    }
+                    .padding(.leading, 14)
+                    .padding(.top, 2)
+                }
             }
             .font(.caption)
-            .accessibilityIdentifier(
-                "security-integrity-\(report.location.packageID.name)-identity"
-            )
         }
     }
 
