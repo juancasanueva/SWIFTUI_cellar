@@ -1,0 +1,34 @@
+# ReleaseNotes fixture manifest -- SHA-256 of every captured file.
+#
+# Recomputed on every run by ReleaseNotesFixtureManifestTests, which also
+# asserts this manifest names every file in the tree and every named file
+# exists. A fixture cannot be edited to make a test pass without failing here
+# first.
+#
+# Captured 2026-08-06 from api.github.com, unauthenticated, with curl 8.7.1 on
+# macOS 26.5.2 arm64. Exact requests, statuses, per_page, verbatim response
+# headers and the provenance of every stream: see GitHub/README.md.
+#
+# Every body has a sibling *.headers.txt. The rate-limit headers are parsed
+# from every response, not only from a refusal, so the headers are data here
+# and not decoration.
+#
+# Format: <sha256>  <path relative to Fixtures/>
+#
+d00ab803b13a00a6adf4fa0ed9fc549963f36fa8bae32d1d44b9a938362fa884  GitHub/README.md
+65a1e67b2d85c0ca7f091107f46babd88666be21a4c68f8c403412bedfbc76f6  GitHub/error-401-unauthorized.headers.txt
+a142a0d84ca300f11e730f4f8e6259310ac3d5a709649e529bcc91f7a76cc10e  GitHub/error-401-unauthorized.json
+b178cf00a09b9306b7c5f59b4caf54a3facb08726d170d842232285d9488c8b5  GitHub/error-403-ratelimit.headers.txt
+af5ae5209a3bf1a60d22f5fa6aa61de8e69b271ec196ad1dc10a3b0ce5e8f322  GitHub/error-403-ratelimit.json
+732eef67d8f73cf04e427d1bc64a461a77d3945fef59c1e513c2d823a418294c  GitHub/error-404-repo.headers.txt
+066bf4addaca2e8fb002dd0f51a6affb85d99f76994bb394a81edad4dac6ce1e  GitHub/error-404-repo.json
+12e43761d0c7b68c0312c8b6288505d7d3f5d4c8f2058fea262ca71a9ef25c3f  GitHub/release-body-gfm.json
+c7a0cec5d79decf8edc4f550503724e066a6c2f4e4d25ac2d041e2f8afcaf35b  GitHub/release-body-malformed.json
+9530692d9dcdcdae812805c51f62423350c8e26ca3e246b387df73f68f1a11a5  GitHub/releases-empty.headers.txt
+2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d  GitHub/releases-empty.json
+e0590d71c32d8819366f9ac9438be2c17a3c621d1bf79322c908166f2b2993a4  GitHub/releases-git-populated.headers.txt
+f1690811134e115c890dd30124e681e6286967e323659b7f9e855b3327d9cdfd  GitHub/releases-git-populated.json
+e34d7053fcc9900092326e6f2e5922efff936937a11714e700d510fcae4b9c4f  GitHub/releases-no-matching-tag.headers.txt
+2fc391c2ca20782583144590a132f52527f7b948f457cf40520db27e6c1c7067  GitHub/releases-no-matching-tag.json
+0f91252f651fbbc8f061bc52bd16f23b01789f2437f54ec84ff09e031eaa02a4  GitHub/releases-page-full.headers.txt
+d855148499f987893e2338495d9bdcad8776a3a58c70716d0b8f6adfde4b7358  GitHub/releases-page-full.json

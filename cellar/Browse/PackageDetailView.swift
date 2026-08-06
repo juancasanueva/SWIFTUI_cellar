@@ -53,6 +53,13 @@ struct PackageDetailView: View {
                 // Renders nothing for a formula, and nothing for a cask that
                 // published none of the inspection keys.
                 PackageInspectionSection(package: package)
+                // The secondary entry point (D4). One explicit button, rendered
+                // only when a repository resolves — never on hover, on appear or
+                // on selection, and with no `.task` anywhere near it.
+                ReleaseNotesSection(
+                    package: package,
+                    installedVersion: installed.inventory.package(package.id)?.installedVersion
+                )
                 analytics(for: package)
                 dependencies(for: package)
                 dependents(for: package)

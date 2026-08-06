@@ -1,0 +1,236 @@
+[
+  {
+    "tag_name": "v1.20.0",
+    "name": "v1.20.0",
+    "body": "# v1.20.0\r\n\r\n## Features\r\n\r\n- Add `--reference-name` option to give a meaningful name to the reference command, see #808 (@niklasdewally)\r\n- The `--ignore-failure` option now supports a comma-separated list of exit codes to ignore (e.g., `--ignore-failure=1,2`), see #836 (@sharkdp)\r\n- Python scripts: Add `--time-unit` option to `advanced_statistics.py` (@sharkdp)\r\n- Python scripts: Add new `plot_benchmarks.py` script for plotting collections of benchmarks, see #806 (@marxin)\r\n\r\n## Bugfixes\r\n\r\n- Fix bug where naming individual commands with parameter scan was not working correctly, see #794 (@teofr)\r\n\r\n## Other\r\n\r\n- Restrict `cat` tests to Unix environments, see #776 and #777 (@ritvikos)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2025-11-18T08:38:43Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.20.0"
+  },
+  {
+    "tag_name": "v1.19.0",
+    "name": "v1.19.0",
+    "body": "## Features\r\n\r\n- Add a new `--reference <cmd>` option to specify a reference command for the relative speed comparison, see #579, #577 and #744 (@JanEricNitschke)\r\n- Add `--conclude` argument (analog to `--prepare`), see #565 and #719 as well as the [docs here](https://github.com/sharkdp/hyperfine?tab=readme-ov-file#detailed-benchmark-flowchart) (@jackoconnordev)\r\n- Allow `--output=…` to appear once for each command, enabling use cases like `hyperfine --output=null my-cmd --output=./file.log my-cmd`, see #529 and #775 (@sharkdp)\r\n- The environment variable `$HYPERFINE_ITERATION` will now contain the current iteration number for each benchmarked command, see #775 (@sharkdp)\r\n- Add iteration information to failure error message, see #771 and #772 (@sharkdp)\r\n- Python scripts: \r\n  - legend modification parameters and output DPI, see #758 (@Spreadcat)\r\n  - Nicer whiskers plot, see #727 (@serpent7776)\r\n\r\n## Bugfixes\r\n\r\n- ETA not clearly visible on terminals with a block cursor, see #698 and #699 (@overclockworked64)\r\n- Fix zsh completions, see #717 (@xzfc)\r\n\r\n## Other\r\n\r\n- Build binaries for aarch64-apple-darwin, see #728 (@Phault)\r\n- Various cleanups (@hamirmahal, @one230six)",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2024-11-11T21:43:25Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.19.0"
+  },
+  {
+    "tag_name": "v1.18.0",
+    "name": "v1.18.0",
+    "body": "## Features\r\n\r\n- Add support for microseconds via `--time-unit microsecond`, see #684 (@sharkdp)\r\n\r\n## Bugfixes\r\n\r\n- Proper argument quoting on Windows CMD, see #296 and #678 (@PedroWitzel)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2023-10-05T08:07:11Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.18.0"
+  },
+  {
+    "tag_name": "v1.17.0",
+    "name": "v1.17.0",
+    "body": "## Features\r\n\r\n- Add new `--sort` option to control the order in the rel. speed comparison and in markup export formats, see #601, #614, #655 (@sharkdp)\r\n- Parameters which are unused in the command line are now displayed in parentheses, see #600 and #644 (@sharkdp).\r\n- Added `--log-count` option for histogram plots, see `scripts/plot_histogram.py` (@sharkdp)\r\n\r\n## Changes\r\n\r\n- Updated hyperfine to use `windows-sys` instead of the unmaintained `winapi`, see #624, #639, #636, #641 (@clemenswasser)\r\n- Silenced deprecation warning in Python scripts, see #633 (@nicovank)\r\n- Major update of the man page, see 0ce6578, #647 (@sharkdp)\r\n\r\n## Bugfixes\r\n\r\n- Do not export intermediate results to stdout when using `-` as a file name, see #640 and #643 (@sharkdp)\r\n- Markup exporting does not fail if benchmark results are zero, see #642 (@sharkdp)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2023-06-04T06:22:26Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.17.0"
+  },
+  {
+    "tag_name": "v1.16.1",
+    "name": "v1.16.1",
+    "body": "## Bugfixes\r\n\r\n- Fix line-wrapping of `--help` text (@sharkdp)\r\n- Fix `--input=null` (@sharkdp)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2023-03-21T20:06:42Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.16.1"
+  },
+  {
+    "tag_name": "v1.16.0",
+    "name": "v1.16.0",
+    "body": "## Features\r\n\r\n- Added new `--input` option, see #541 and #563 (@snease)\r\n- Added possibility to specify `-` as the filename in the `--export-*` options, see #615 and #623 (@humblepenguinn)\r\n\r\n## Changes\r\n\r\n- Improve hints for outlier warnings if `--warmup` or `--prepare` are in use already, see #570 (@sharkdp)\r\n\r\n## Bugfixes\r\n\r\n- Fix uncolored output on Windows if `TERM` is not set, see #583 (@nabijaczleweli)\r\n- On Windows, only run `cmd.exe` with the `/C` option. Use `-c` for all other shells, see #568 and #582 (@FilipAndersson245)\r\n\r\n## Other\r\n\r\n- Thanks to @berombau for working on dependency upgrades, see #584\r\n- Fixed installationm on Windows, see #595 and #596 (@AntoniosBarotsis)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2023-03-15T09:14:51Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.16.0"
+  },
+  {
+    "tag_name": "v1.15.0",
+    "name": "v1.15.0",
+    "body": "## Features\r\n\r\n- Disable colorized output in case of `TERM=dumb` or `NO_COLOR=1`, see #542 and #555 (@nabijaczleweli)\r\n- Add new (experimental) `--min-benchmarking-time <secs>` option, see #527 (@sharkdp)\r\n\r\n## Bugfixes\r\n\r\n- Fix user and kernel times on Windows, see #368 and #538 (@clemenswasser)\r\n\r\n## Other\r\n\r\n- Improve `--help` texts of `--export-*` options, see #506 and #522 (@Engineer-of-Efficiency)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2022-09-07T07:30:16Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.15.0"
+  },
+  {
+    "tag_name": "v1.14.0",
+    "name": "v1.14.0",
+    "body": "- Add a new `--output={null,pipe,inherit,<FILE>}` option to control\r\n  where the output of the benchmarked program is redirected (if at all),\r\n  see #377 and #509 (@tavianator, originally suggested by @BurntSushi)\r\n- Add Emacs org-mode as a new export format, see #491 (@ppaulweber)\r\n- Relax glibc requirements, see #508 and #512 (@sharkdp)",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2022-05-17T20:58:22Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.14.0"
+  },
+  {
+    "tag_name": "v1.13.0",
+    "name": "v1.13.0",
+    "body": "## Features\r\n\r\n- Added a new `--shell=none`/`-N` option to disable the intermediate\r\n  shell for executing the benchmarked commands. Hyperfine normally\r\n  measures and subtracts the shell spawning time, but the intermediate\r\n  shell always introduces a certain level of measurement noise. Using\r\n  `--shell=none`/`-N` allows users to benchmark very fast commands\r\n  (with a runtime on the order of a few milliseconds). See #336, #429,\r\n  and #487 (@cipriancraciun and @sharkdp)\r\n- Added `--setup`/`-s` option that can be used to run `make all` or\r\n  similar. It runs once per set of tests, like `--cleanup`/`-c` (@avar)\r\n- Added new `plot_progression.py` script to debug background\r\n  interference effects.\r\n\r\n## Changes\r\n\r\n- Breaking change: the `-s` short option for `--style` is now used for\r\n  the new `--setup` option.\r\n- The environment offset randomization is now also available on Windows,\r\n  see #484\r\n\r\n## Other\r\n\r\n- Improved documentation and test coverage, cleaned up code base for\r\n  future improvements.\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2022-03-05T11:59:28Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.13.0"
+  },
+  {
+    "tag_name": "v1.12.0",
+    "name": "v1.12.0",
+    "body": "## Features\r\n\r\n- `--command-name` can now take parameter names from `--parameter-*` options, see #351 and #391 (@silathdiir)\r\n- Exit codes (or signals) are now printed in cases of command failures, see #342 (@KaindlJulian)\r\n- Exit codes are now part of the JSON output, see #371 (@JordiChauzi)\r\n- Colorized output should now be enabled on Windows by default, see #427\r\n\r\n## Changes\r\n\r\n- When `--export-*` commands are used, result files are created before benchmark execution\r\n  to fail early in case of, e.g., wrong permissions. See #306 (@s1ck).\r\n- When `--export-*` options are used, result files are written after each individual\r\n  benchmark command instead of writing after all benchmarks have finished. See #306 (@s1ck).\r\n- Reduce number of shell startup time measurements from 200 to 50, generally speeding up benchmarks. See #378\r\n- User and system time are now in consistent time units, see #408 and #409 (@film42)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2021-10-17T17:47:28Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.12.0"
+  },
+  {
+    "tag_name": "v1.11.0",
+    "name": "v1.11.0",
+    "body": "## Features\r\n\r\n- The `-L`/`--parameter-list` option can now be specified multiple times to\r\n  evaluate all possible combinations of the listed parameters:\r\n\r\n  ``` bash\r\n  hyperfine -L number 1,2 -L letter a,b,c \\\r\n      \"echo {number}{letter}\" \\\r\n      \"printf '%s\\n' {number}{letter}\"\r\n  # runs 12 benchmarks: 2 commands (echo and printf) times 6 combinations of\r\n  # the \"letter\" and \"number\" parameters\r\n  ```\r\n\r\n  See: #253, #318 (@wchargin)\r\n\r\n- Add CLI option to identify a command with a custom name, see #326 (@scampi)\r\n\r\n## Changes\r\n\r\n- When parameters are used with `--parameter-list` or `--parameter-scan`, the JSON export format\r\n  now contains a dictionary `parameters` instead of a single key `parameter`. See #253, #318.\r\n- The `plot_parametrized.py` script now infers the parameter name, and its `--parameter-name`\r\n  argument has been deprecated. See #253, #318.\r\n\r\n## Bugfixes\r\n\r\n- Fix a bug in the outlier detection which would only detect \"slow outliers\" but not the fast\r\n  ones (runs that are much faster than the rest of the benchmarking runs), see #329\r\n- Better error messages for very fast commands that would lead to inf/nan results in the relative\r\n  speed comparison, see #319\r\n- Show error message if `--warmup` or `--*runs` arguments can not be parsed, see #337\r\n- Keep output colorized when the output is not interactive and `--style=full` or `--style=color` is used.\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2020-10-16T22:13:20Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.11.0"
+  },
+  {
+    "tag_name": "v1.10.0",
+    "name": "v1.10.0",
+    "body": "## Features\r\n\r\n- Hyperfine now comes with shell completion files for Bash, Zsh, Fish and PowerShell, see #290 (@four0000four).\r\n- Hyperfine now comes with a basic man page, see #257 (@cadeef)\r\n- During execution of benchmarks, hyperfine will now set a `HYPERFINE_RANDOMIZED_ENVIRONMENT_OFFSET` environment variable in order to randomize the memory layout. See #235 and #241 for references and details.\r\n- A few enhancements for the histogram plotting scripts and the\r\n  advanced statistics script\r\n- Updates for the `plot_whisker.py` script, see #275 (@ghaiklor)\r\n\r\n## Bugfixes\r\n\r\n- Fix Spin Icon on Windows, see #229\r\n- A few typos have been fixed, see #292 (@McMartin)\r\n\r\n## Packaging\r\n\r\n- `hyperfine` is now available on MacPorts for macOS, see #281 (@herbygillot)\r\n- `hyperfine` is now available on OpenBSD, see #289 (@minusf)\r\n\r\nPackage authors: note that Hyperfine now comes with a set of shell completion files and a man page (see above)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2020-05-25T14:21:50Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.10.0"
+  },
+  {
+    "tag_name": "v1.9.0",
+    "name": "v1.9.0",
+    "body": "## Features\r\n\r\n- The new `--parameter-list <VAR> <VALUES>` option can be used to run\r\n  a parametrized benchmark on a user-specified list of values.\r\n  This is similar to `--parameter-scan <VAR> <MIN> <MAX>`, but doesn't\r\n  necessarily required numeric arguments.\r\n\r\n  ``` bash\r\n  hyperfine --parameter-list compiler \"gcc,clang\" \\\r\n      \"{compiler} -O2 main.cpp\"\r\n  ```\r\n\r\n  See: #227, #234 (@JuanPotato)\r\n\r\n- Added `none` as a possible choice for the `--style` option to\r\n  run `hyperfine` without any output, see #193 (@knidarkness)\r\n\r\n- Added a few new scripts for plotting various types of benchmark\r\n  results (https://github.com/sharkdp/hyperfine/tree/master/scripts)\r\n\r\n## Changes\r\n\r\n- The `--prepare` command is now also run during the warmup\r\n  phase, see #182 (@sseemayer)\r\n\r\n- Better estimation of the remaining benchmark time due to an update\r\n  of the `indicatif` crate.\r\n\r\n## Other\r\n\r\n- `hyperfine` is now available on NixOS, see #240 (@tuxinaut)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2019-11-25T19:10:20Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.9.0"
+  },
+  {
+    "tag_name": "v1.8.0",
+    "name": "v1.8.0",
+    "body": "## Features\r\n\r\n- The `--prepare <CMD>` option can now be specified multiple times to\r\n  run specific preparation commands for each of the benchmarked programs:\r\n\r\n  ``` bash\r\n  hyperfine --prepare \"make clean; git checkout master\"  \"make\" \\\r\n            --prepare \"make clean; git checkout feature\" \"make\"\r\n  ```\r\n\r\n  See: #216, #218 (@iamsauravsharma)\r\n\r\n- Added a new [`welch_ttest.py`](https://github.com/sharkdp/hyperfine/blob/master/scripts/welch_ttest.py) script to test whether or not the two benchmark\r\n  results are the same, see #222 (@uetchy)\r\n\r\n- The Markdown export has been improved. The relative speed is now exported\r\n  with a higher precision (see #208) and includes the standard deviation\r\n  (see #225).\r\n\r\n## Other\r\n\r\n- Improved documentation for [`scripts`](https://github.com/sharkdp/hyperfine/tree/master/scripts) folder (@matthieusb)",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2019-10-13T14:34:49Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.8.0"
+  },
+  {
+    "tag_name": "v1.7.0",
+    "name": "v1.7.0",
+    "body": "## Features\r\n\r\n- Added a new `-D`,`--parameter-step-size` option that can be used to control\r\n  the step size for `--parameter-scan` benchmarks. In addition, decimal numbers\r\n  are now allowed for parameter scans. For example, the following command runs\r\n  `sleep 0.3`, `sleep 0.5` and `sleep 0.7`:\r\n  ``` bash\r\n  hyperfine --parameter-scan delay 0.3 0.7 -D 0.2 'sleep {delay}'\r\n  ```\r\n  For more details, see #184 (@piyushrungta25)\r\n\r\n## Other\r\n\r\n- hyperfine is now in the official Alpine repositories, see #177 (@maxice8, @5paceToast)\r\n- hyperfine is now in the official Fedora repositories, see #196 (@ignatenkobrain)\r\n- hyperfine is now in the official Arch Linux repositories\r\n- hyperfine can be installed on FreeBSD, see #204 (@0mp)\r\n- Enabled LTO for slightly smaller binary sizes, see #179 (@Calinou)\r\n- Various small improvements all over the code base, see #194 (@phimuemue)\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2019-09-01T13:15:02Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.7.0"
+  },
+  {
+    "tag_name": "v1.6.0",
+    "name": "v1.6.0",
+    "body": "## Features\r\n\r\n- Added a `-c, --cleanup <CMD>` option to execute `CMD` after the completion of all benchmarking runs for a given command. This is useful if the commands to be benchmarked produce artifacts that need to be cleaned up. See #91 (@RalfJung and @colinwahl)\r\n- Add parameter values (for `--parameter-scan` benchmarks) to exported CSV and JSON files. See #131 (@bbannier)\r\n- Added AsciiDoc export option, see #137 (@5paceToast)\r\n- The relative speed is now part of the Markdown export, see #127 (@mathiasrw and @sharkdp).\r\n- The *median* run time is now exported via CSV and JSON, see #171 (@hosewiejacke and @sharkdp).\r\n\r\n## Other\r\n\r\n- Hyperfine has been updated to Rust 2018 (@AnderEnder). The minimum supported Rust version is now 1.31.",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2019-06-08T12:51:38Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.6.0"
+  },
+  {
+    "tag_name": "v1.5.0",
+    "name": "v1.5.0",
+    "body": "## Features\r\n\r\n- Show the number of runs in `hyperfine`s output (@tcmal)\r\n- Added two Python scripts to post-process exported benchmark results (see [`scripts/`](https://github.com/sharkdp/hyperfine/tree/master/scripts) folder)\r\n\r\n## Other\r\n\r\n- Refined `--help` text for the `--export-*` flags (@psteinb)\r\n- Added Snapcraft file (@popey)\r\n- Small improvements in the progress bar \"experience\".",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-12-12T22:35:40Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.5.0"
+  },
+  {
+    "tag_name": "v1.4.0",
+    "name": "v1.4.0",
+    "body": "## Features\r\n\r\n- Added `-S`/`--shell` option to override the default shell, see #61 (@mqudsi and @jasonpeacock)\r\n- Added `-u`/`--time-unit` option to change the unit of time (`second` or `millisecond`), see #80 (@jasonpeacock)\r\n- Markdown export auto-selects time unit, see #71 (@jasonpeacock)",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-11-21T19:10:02Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.4.0"
+  },
+  {
+    "tag_name": "v1.3.0",
+    "name": "v1.3.0",
+    "body": "## Feature\r\n\r\n- Compute and print standard deviation of the speed ratio, see #83 (@Shnatsel)\r\n- More compact output format, see #70  (@jasonpeacock)\r\n- Added `--style=color`, see #70 (@jasonpeacock)\r\n- Added options to specify the max/exact numbers of runs, see #77 (@orium)\r\n\r\n## Bugfixes\r\n\r\n- Change Windows `cmd` interpreter to `cmd.exe` to prevent accidentally calling other programs, see #74 (@tathanhdinh)\r\n\r\n## Other\r\n\r\n- Binary releases for Windows are now available, see #87 \r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-09-28T20:40:25Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.3.0"
+  },
+  {
+    "tag_name": "v1.2.0",
+    "name": "v1.2.0",
+    "body": "- Support parameters in preparation commands, see #68 (@siiptuo)\r\n- Updated dependencies, see #69. The minimum required Rust version is now 1.24.",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-07-18T16:31:27Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.2.0"
+  },
+  {
+    "tag_name": "v1.1.0",
+    "name": "v1.1.0",
+    "body": "* Added `--show-output` option (@chrisduerr and @sevagh)\r\n* Refactoring work (@stevepentland)",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-06-11T19:03:32Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.1.0"
+  },
+  {
+    "tag_name": "v1.0.0",
+    "name": "v1.0.0",
+    "body": "## Features\r\n\r\n* Support for various export-formats like CSV, JSON and Markdown - see #38, #44, #49, #42 (@stevepentland)\r\n* Summary output that compares the different benchmarks, see #6 (@stevepentland)\r\n* Parameterized benchmarks via `-P`, `--parameter-scan <VAR> <MIN> <MAX>`, see #19\r\n\r\n## Thanks\r\n\r\nI'd like to say a big THANK YOU to @stevepentland for implementing new features,\r\nfor reviewing pull requests and for giving very valuable feedback.\r\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-03-24T20:46:15Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v1.0.0"
+  },
+  {
+    "tag_name": "v0.5.0",
+    "name": "v0.5.0",
+    "body": "* Proper Windows support (@stevepentland)\r\n* Added `--style auto/basic/nocolor/full` option (@stevepentland)\r\n* Correctly estimate the full execution time, see #27 (@rleungx)\r\n* Added Void Linux install instructions (@wpbirney)",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-03-03T15:52:24Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v0.5.0"
+  },
+  {
+    "tag_name": "v0.4.0",
+    "name": "v0.4.0",
+    "body": "- New `--style` option to disable output coloring and interactive CLI features, see #24 (@stevepentland)\r\n- Statistical outlier detection, see #23 #18 ",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-01-28T17:50:51Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v0.4.0"
+  },
+  {
+    "tag_name": "v0.3.0",
+    "name": "v0.3.0",
+    "body": "## Features\r\n\r\n- In addition to 'real' (wall clock) time, Hyperfine can now also measure 'user' and 'system' time (see #5).\r\n- Added `--prepare` option that can be used to clear up disk caches before timing runs, for example (see #8).\r\n\r\n## Other\r\n\r\n- [Arch Linux package](https://aur.archlinux.org/packages/hyperfine) for Hyperfine (@jD91mZM2).\r\n- Ubuntu/Debian packages are now are available.",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-01-20T13:06:48Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v0.3.0"
+  },
+  {
+    "tag_name": "v0.2.0",
+    "name": "v0.2.0",
+    "body": "Initial public release",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2018-01-14T21:15:37Z",
+    "html_url": "https://github.com/sharkdp/hyperfine/releases/tag/v0.2.0"
+  }
+]

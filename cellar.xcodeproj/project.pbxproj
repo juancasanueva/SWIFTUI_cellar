@@ -12,6 +12,7 @@
 		BC0000010000000000000006 /* BrewClient in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000007 /* BrewClient */; };
 		BC0000010000000000000008 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000009 /* Persistence */; };
 		BC0000010000000000000010 /* DiskUsage in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000011 /* DiskUsage */; };
+		BC0000010000000000000012 /* ReleaseNotes in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000013 /* ReleaseNotes */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +66,7 @@
 				BC0000010000000000000006 /* BrewClient in Frameworks */,
 				BC0000010000000000000008 /* Persistence in Frameworks */,
 				BC0000010000000000000010 /* DiskUsage in Frameworks */,
+				BC0000010000000000000012 /* ReleaseNotes in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,6 +132,7 @@
 				BC0000010000000000000007 /* BrewClient */,
 				BC0000010000000000000009 /* Persistence */,
 				BC0000010000000000000011 /* DiskUsage */,
+				BC0000010000000000000013 /* ReleaseNotes */,
 			);
 			productName = cellar;
 			productReference = BCDBE97B301E2D410013A38D /* cellar.app */;
@@ -622,6 +625,10 @@
 		BC0000010000000000000011 /* DiskUsage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DiskUsage;
+		};
+		BC0000010000000000000013 /* ReleaseNotes */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReleaseNotes;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

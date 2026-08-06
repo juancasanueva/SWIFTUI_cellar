@@ -11,6 +11,7 @@ import BrewProcess
 import Catalog
 import DiskUsage
 import Persistence
+import ReleaseNotes
 import SecurityKit
 import SwiftUI
 
@@ -68,6 +69,23 @@ struct cellarApp: App {
     /// The Keychain seam, held rather than rebuilt per sheet so the consent sheet
     /// and the enrichment source read the same store.
     private let advisoryCredentials: any AdvisoryCredentialStoring
+    /// What changed in the release a package is about to be upgraded to.
+    ///
+    /// Owned here like every other store, and injected through the environment
+    /// rather than threaded down four view signatures — but note what it is
+    /// **not** wired to: no `.task`, no refresh coordinator, no loop. This store
+    /// has no cadence at all. Its only caller is a button, which is what makes
+    /// "one opened request costs one request" a property of the composition and
+    /// not only of the store.
+    @State private var releaseNotes: ReleaseNotesStore
+    /// The recorded answer to "may a repository name leave this Mac". A separate
+    /// question from the security-scan grant, under its own two defaults keys.
+    @State private var releaseNotesConsent: ReleaseNotesConsentPreference
+    /// The GitHub token's Keychain seam, under a service name distinct from the
+    /// NVD key's. Held rather than rebuilt per sheet so the consent surface and
+    /// the source read the same store.
+    private let releaseNotesCredentials: any ReleaseNotesCredentialStoring
+
     /// Dismissed findings, on the same container as metadata and history.
     @State private var dismissals: DismissalStore
     /// The artifact-integrity half. Its results are not cached — a signature
@@ -223,6 +241,38 @@ struct cellarApp: App {
                 )
             )
         )
+        // Beside `disk-usage-v1.json` and `security-advisories-v1.json`, and
+        // carrying its own schema version — so a catalog field change can never
+        // wipe it and reverting this slice leaves it orphaned but intact.
+        let releaseNotesCacheURL = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory)
+            .appendingPathComponent("Cellar/\(ReleaseNotes.cacheFileName)")
+        // Under `--ui-testing-m5-release-notes` the grant is a launch argument,
+        // so a UI test never has to write the developer's real preferences and
+        // the ungranted path is genuinely ungranted rather than left over from a
+        // previous run.
+        let releaseNotesConsent = ReleaseNotesConsentPreference(
+            defaults: AppTestFixtures.isReleaseNotesEnabled
+                ? UserDefaults(suiteName: "cellar-ui-release-notes-\(UUID().uuidString)") ?? .standard
+                : .standard
+        )
+        if AppTestFixtures.isReleaseNotesGranted { releaseNotesConsent.grant() }
+        let releaseNotesCredentials = KeychainReleaseNotesCredentialStore()
+        _releaseNotesConsent = State(initialValue: releaseNotesConsent)
+        self.releaseNotesCredentials = releaseNotesCredentials
+        _releaseNotes = State(
+            initialValue: ReleaseNotesStore(
+                source: AppTestFixtures.isReleaseNotesEnabled
+                    ? GitHubReleaseNotesSource(session: AppTestReleaseNotesProtocol.session())
+                    : GitHubReleaseNotesSource(),
+                cache: ReleaseNotesCache(fileURL: releaseNotesCacheURL),
+                // The consent preference is injected rather than read once here,
+                // so revoking takes effect on the next click instead of at the
+                // next launch.
+                consent: releaseNotesConsent,
+                credentials: releaseNotesCredentials
+            )
+        )
         _services = State(initialValue: services)
         _servicesRefresher = State(
             initialValue: ServicesRefreshCoordinator(store: services, mutations: serviceMutations)
@@ -296,6 +346,13 @@ struct cellarApp: App {
                 integrity: integrity,
                 artifactLocations: artifactLocations
             )
+                // Injected rather than threaded through four view signatures.
+                // Deliberately **not** accompanied by a `.task`: nothing here
+                // starts release-notes work, and the only thing that can is a
+                // button.
+                .environment(releaseNotes)
+                .environment(releaseNotesConsent)
+                .environment(\.releaseNotesCredentials, releaseNotesCredentials)
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
                 // from a terminal while Cellar was in the background.
