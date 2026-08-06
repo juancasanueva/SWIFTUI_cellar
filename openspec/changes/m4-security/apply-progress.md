@@ -939,3 +939,272 @@ Numbering continues from batch 3's list.
     MV-4 needs a store written by a shipped build; MV-6 needs the app shell and a consent grant.
 13. Pre-existing lint debt is **not** this change's to fix; the comparable series is the raw total
     from the repository root (116 → 118 → 118 → 118 → 118).
+
+---
+
+# Batch 5 — Phases 16, 14, 15
+
+| Field | Value |
+|---|---|
+| Batch | 5 — Phases 16, 14, 15 (work units 16, 14, 15) in `tasks.md` file order |
+| Mode | **Strict TDD** (no fallback taken) |
+| Attempt authority | acquired with the continuation token, `proceed` |
+| Safety net | 1004 tests / 143 suites green at `83b4f8d` before any edit |
+| Status | **107 / 108 tasks complete** cumulatively, suite green, no blockers |
+
+## Tasks completed
+
+| Task | What landed |
+|---|---|
+| 16.1–16.2 | RED: `SecurityPresentationTests` — section order, the zero-count section, the honesty matrix |
+| 16.3 | GREEN: `SecurityPresentation.swift` + `SecurityFindingPresentation.swift` |
+| 16.4 | `.security` in `AppSection`, between `.cleanup` and `.history` |
+| 16.5 | `ContentView` + `cellarApp` composition (query provider completed in commit 15) |
+| 16.6–16.8 | `SecurityView`, `SecurityFindingDetail`, `SecurityConsentSheet`, `SecurityConsentPreference` |
+| 14.0 | **U3 gate closed** — real Security.framework probe on four real casks, 13 fixtures |
+| 14.1–14.2 | RED/GREEN: `ArtifactAssessability` — magic matched as on-disk bytes |
+| 14.3–14.5 | RED/GREEN: `CodeSignatureInspecting` + the real Security.framework inspector |
+| 14.6–14.7 | RED/GREEN: `QuarantineInspecting` over `listxattr`/`getxattr` |
+| 14.8–14.9 | RED/GREEN: `ArtifactIntegrityEngine` — streamed, per-item, cancellable |
+| 14.10–14.11 | RED: `IntegrityProhibitionTests` — read-only, no launch, no elevation, no write surface |
+| 15.1–15.2 | RED/GREEN: `SecurityQueryBuilder` **+ the engine widening below** |
+| 15.3–15.5 | RED/GREEN: `ArtifactLocator` — brew-recorded paths, never `/Applications` |
+| 15.6–15.7 | RED/GREEN: `SecurityRefreshCoordinator` — consent read per trigger |
+| 15.8 / 16.9 | `ArtifactIntegrityPanel` + `ArtifactIntegrityStore` |
+| owed 1 | `vulnerability-scanning` spec amended: dismissal key `advisoryID`, citing Deviation 39 |
+| owed 2 | `MigrationTests` now pattern-matches the stage's direction, proven by mutation |
+| owed 3 | `SecurityStoreGuardTests` → `SecurityStoreTests` naming drift corrected in both files |
+
+## Commits
+
+| # | Hash | Subject |
+|---|---|---|
+| 16 | `d040b90` | `feat(security): show coverage, findings and integrity` |
+| 14 | `ae8c608` | `feat(security): classify and inspect brew-managed artifacts` |
+| 15 | `7988acd` | `feat(security): compose queries and artifacts in the app target` |
+
+Not pushed; no PR opened. The orchestrator owns the receipt-driven review lifecycle.
+
+## Suite state
+
+| Point | Tests | Suites | Result |
+|---|---:|---:|---|
+| Baseline (`5863f61`) | 811 | 120 | pass, 1 known issue |
+| After batch 4 | 1004 | 143 | pass, 1 known issue |
+| **After batch 5** | **1080** | **151** | pass, 1 known issue |
+
++76 tests, +8 suites: `SecurityPresentationTests` (13), `SecurityFindingPresentationTests` (11),
+`ArtifactAssessabilityTests` (12), `SignatureInspectorTests` (12), `QuarantineInspectorTests` (12),
+`IntegrityEngineTests` (7), `IntegrityProhibitionTests` (7), `PredecidedOutcomeTests` (2).
+
+`cellarTests` additionally runs **16 tests** under `xcodebuild` — `SecurityCompositionTests` (8)
+and `SecurityArtifactScopeTests` (8) — which `swift test` cannot reach. **TEST SUCCEEDED.**
+
+`swiftlint --quiet` from the repository root: **118 total, unchanged across all five batches.**
+**Zero authored findings.** Thirteen were introduced and all thirteen removed by splitting or
+correcting rather than silencing: `SecurityPresentationTests` split three ways (arrangement +
+inventory + finding), a four-member tuple replaced by a named `CountRow`,
+`CodeSignatureInspecting` split into `ArtifactSignatureModels`, `SecurityScanEngine` split into
+`SecurityScanPipeline`, `SecurityCompositionTests` split into `SecurityArtifactScopeTests`, the
+app-side comment stripper extracted into a `ScanState` machine, four `String(decoding:)` sites
+changed to the failable initialiser, one unneeded memberwise init removed, one `ok` renamed.
+
+## TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| 16.1–16.2 | `SecurityPresentationTests.swift` | Unit (projection) | 1004/1004 green | ✅ `cannot find 'SecurityPresentation'` | ✅ 13 tests | ✅ 8-row exhaustive count matrix + positive anchor; reversed entry order; zero-count section | ✅ split three ways |
+| 16.3 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ **honesty guard proven by mutation** (13 issues) | ➖ |
+| 16.7 | `SecurityFindingPresentationTests.swift` | Unit | ✅ | ✅ `no member 'reportedFor'` | ✅ 11 tests | ✅ 4 upgrade-offer arrangements; 6 fix verdicts pairwise-distinct; CVE-less fallback | ✅ record links de-schemed (Deviation 46) |
+| 14.0 | — | **Live probe** | — | ➖ gate, not a test | ✅ 13 fixtures, manifest regenerated | ✅ 4 casks + 1 formula + 1 malformed bundle; 5-sample latency | ➖ |
+| 14.1–14.2 | `ArtifactAssessabilityTests.swift` | Unit (real filesystem) | ✅ | ✅ `cannot find 'ArtifactAssessability'` | ✅ 12 tests | ✅ 4 bundle extensions; 6 on-disk magics; symlink both shapes; 5 out-of-scope files; real captured header | ➖ |
+| 14.3–14.5 | `SignatureInspectorTests.swift` | Unit (fake matrix + real framework) | ✅ | ✅ `cannot find 'ArtifactSigningIdentity'` | ✅ 12 tests | ✅ 5 unavailable reasons exhaustive; 4 signing states pairwise-distinct; 4 notarization arrangements | ✅ values split out |
+| 14.6–14.7 | `QuarantineInspectorTests.swift` | Unit (real xattr) | ✅ | ✅ `cannot find 'QuarantineAttribute'` | ✅ 12 tests | ✅ 3 real captures; 5 malformed shapes; absent vs unknown; real setxattr round trip | ➖ |
+| 14.8–14.9 | `IntegrityEngineTests.swift` | Unit (streaming) | ✅ | ✅ `cannot find type 'ArtifactIntegrityEngine'` | ✅ 7 tests | ✅ isolation with positive controls either side; two cancellation shapes; empty list | ✅ cancellation test made deterministic (Deviation 49) |
+| 14.10–14.11 | `IntegrityProhibitionTests.swift` | Unit (structural + real filesystem) | ✅ | ✅ (absence guards — controls instead) | ✅ 7 tests | ✅ fingerprint control fires on all three change kinds; scanner control fires on 2 of 4 declarations | ✅ fingerprint widened to attribute values |
+| 15.1–15.2 | `cellarTests/SecurityCompositionTests.swift` | Unit (app target) | 16/16 `cellarTests` green | ✅ `cannot find 'SecurityQueryBuilder'` | ✅ 8 tests | ✅ all three not-covered reasons in one inventory; 3-keg linked selection; request spy | ✅ split into two suites |
+| 15.3–15.5 | `cellarTests/SecurityArtifactScopeTests.swift` | Unit (real filesystem) | ✅ | ✅ `cannot find 'ArtifactLocator'` | ✅ 8 tests | ✅ recorded enumeration list; symlinked cask vs unrecorded cask; 4 unassessable candidates | ➖ |
+| 15.6–15.7 | ↑ | Unit | ✅ | ✅ `cannot find 'SecurityRefreshCoordinator'` | ✅ 3 tests | ✅ both triggers; consent off; **revocation between triggers** | ➖ |
+| owed 2 | `MigrationTests.swift` | Unit (approval → strengthened) | 8/8 green first | ➖ strengthening | ✅ | ✅ **proven by mutation**: reversing the stage fails 7 | ➖ |
+
+Tests written this batch: **76** in CellarCore + **16** in `cellarTests` = **92**. Passing: 92.
+Approval tests: **owed fix 2** — the eight migration tests were run green before the strengthening,
+which is what makes the mutation result meaningful.
+
+Pure functions created: `SecurityCoverageState.of`, `SecurityPresentation.sections`,
+`SecurityPresentation.headline`, `SecurityPresentation.freshnessLabel`,
+`SecurityPresentation.findingIdentifier`, `SecurityPresentation.dismissIdentifier`,
+`SecurityPresentation.reportedFor`, `SecurityPresentation.upgradeOffer`,
+`SecurityPresentation.fixDescription`, `SecurityPresentation.advisoryRecordLocation`,
+`SecurityPresentation.cveRecordLocation`, `ArtifactAssessability.classify`,
+`SecurityFrameworkSignatureInspector.notarization`, `QuarantineAttribute.init(rawValue:)`,
+`SecurityQueryBuilder.plan` — 15.
+
+## Work Unit Evidence
+
+| Unit | Focused command | Result | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| 16 | `swift test --filter "SecurityPresentationTests\|SecurityFindingPresentationTests"` | 24 tests pass | `xcodebuild build` — BUILD SUCCEEDED, zero concurrency warnings | `SecurityPresentation.swift` + `SecurityFindingPresentation.swift` + `cellar/Security/` (4 files) + `AppSection`/`ContentView`/`cellarApp` hunks |
+| 14 | `swift test --filter "ArtifactAssessabilityTests\|SignatureInspectorTests\|QuarantineInspectorTests\|IntegrityEngineTests\|IntegrityProhibitionTests"` | 50 tests pass | **MV-0 run live** — real Security.framework against four real casks, transcript in the fixture tree | the five `Sources/SecurityKit/Artifact*`/`*Inspecting*` files + `Fixtures/{Quarantine,MachO}/` |
+| 15 | `xcodebuild test -only-testing:cellarTests` | **TEST SUCCEEDED**, 16 tests | real filesystem trees, recording enumerator, request spy | `cellar/Security/{SecurityQueryBuilder,ArtifactLocator,SecurityRefreshCoordinator,ArtifactIntegrityPanel}.swift` + the engine widening |
+| all | `swift test --package-path Packages/CellarCore` | **1080 / 151 pass**, 1 known issue | `xcodebuild build` + `xcodebuild test` both green | the three commits above, revertible in order |
+
+**The runtime boundary was genuinely exercised this batch, for the first time.** Task 14.0 is not a
+fixture read: `SecStaticCodeCreateWithPath`, `SecCodeCopySigningInformation` and
+`SecStaticCodeCheckValidity` were called against `/Applications/{Ghostty,VLC,CodexBar,Applite}.app`
+on this machine, at euid 501, and the transcript is committed. `SignatureInspectorTests` and
+`QuarantineInspectorTests` each keep one test that runs the **real** implementation against a real
+artifact, so the fake matrix is not the only thing standing behind the types.
+
+## Candidate size
+
+| Measurement | Value |
+|---|---|
+| `git diff main...HEAD --shortstat` | **140 files, 20,950 insertions, 165 deletions** |
+| This batch alone (`83b4f8d...HEAD`) | 54 files, 6,257 insertions, 229 deletions |
+| Forecast band (task 18.3) | 11,600–14,600 |
+
+**The candidate is ~21,100 changed lines, 1.4× the top of its own forecast band and 4.2× the
+session's 5,000-line budget.** Task 18.3 asks for this to be said plainly rather than noticed later,
+so: the forecast under-priced again, for the fourth slice in a row. The largest single miss is the
+test bucket — forecast 6,400–8,500, and `Tests/SecurityKitTests/` alone is now well past that
+before `cellarTests` is counted. The second is the fixture tree, which the arithmetic did not price
+at all beyond "600–1,200" and which now carries 38 files including a 4,000-line captured corpus.
+Phase 18 owns the full reconciliation; this is the measurement it will need.
+
+## MV-6 — deliberately **not** run, and why
+
+The orchestrator's brief allows MV-6 (one real consented request) to be run live once. **It was not
+run, and the reason is the feature itself.**
+
+MV-6 requires a consent grant. The grant lives behind `SecurityConsentSheet`, which a person has to
+read and accept — that is the entire point of the disclosure, and `ScanConsent.granted(at:)` is the
+only constructor that produces a consenting value. Issuing the request headlessly would mean
+constructing a consent this user never gave, in order to transmit their installed package names to
+two third parties, in order to test the mechanism that exists to stop exactly that from happening.
+The check would have falsified its own subject.
+
+MV-6 therefore stays with Phase 17, where a human grants consent through the shipped sheet and the
+request volume is counted against a real inventory. What *is* proven headlessly, and was before this
+batch, is task 7.1's byte-comparison of the request the client would send and task 9.1's zero-egress
+guard. What remains unproven is that a real endpoint answers those bytes — and that is a claim only
+a live, consented run can make.
+
+## Deviations from plan — batch 5
+
+Numbering continues from batch 4's list.
+
+45. **`SecurityPresentation` is two files, and the finding half is a separate suite.** The plan names
+    one file. The 400-line rule and the 250-line type-body rule both bit once the upgrade offer,
+    the fix vocabulary and the record locations landed. The split is along a real seam — one file is
+    about the whole inventory, the other about a single finding — and the two suites drift apart
+    naturally, which is why they were split rather than suppressed.
+
+46. **Record links are schemeless *locations*, not `URL`s, and the existing egress guard is what
+    forced it.** The first attempt returned `URL`s built from `https://osv.dev/vulnerability/` and
+    `https://nvd.nist.gov/vuln/detail/`, and `EgressStructureTests.onlyTwoConstantHostsAppearInTheTarget`
+    failed immediately: it asserts by **exact set equality**, not as an allow-list, that the only
+    `https://` literals in `SecurityKit` are the two hosts it may *request*. Weakening it to
+    distinguish "requested" from "merely linked" would have turned the equality into precisely the
+    allow-list the design forbids. So the projection returns `osv.dev/vulnerability/GHSA-…`, the app
+    target adds the scheme, and batch 2's Deviation 16 precedent holds: a string that is not a URL
+    cannot become a request by accident. The guard did its job on its first real test.
+
+47. **`security-finding-{cveID}` would have collapsed, and does not.** Taken literally the design's
+    identifier gives every CVE-less advisory the identifier `security-finding-` — and `GHSA-`,
+    `RUSTSEC-` and `PYSEC-` records routinely publish no CVE alias. The identifier falls back to the
+    advisory's own ID, matching the identity `DismissedCVE` is keyed on (Deviation 39). The same
+    correction is applied to `security-dismiss-{cveID}`.
+
+48. **U3's answer is stronger than U3's question, and two tasks were amended in the open.**
+    `SecAssessmentTicketLookup` is not "unavailable unprivileged" — it is **absent from the public
+    macOS 26.5 SDK entirely**: no `SecAssessment.h`, not in the module map, so `import Security` does
+    not declare it and a build that calls it does not compile. It *is* present in the shipped binary,
+    and the probe reached it through `dlsym` purely to measure what it would have said (`false`, in
+    under 0.2 ms, with and without the online flag — not a usable answer either). Task 14.4's
+    consent-gated-online-lookup test is struck, because there is no online lookup to gate and a test
+    over a door that does not exist can never fail; task 14.5 forbids the call site outright. The
+    consequence is the one the design predicted: non-stapled notarization is
+    `.couldNotAssess(.assessmentUnavailable)`, a weaker feature rather than a different architecture.
+
+49. **The cancellation test was timing-based and lost its race; it is now deterministic.** Five
+    hundred instant fakes finished inside the 20 ms sleep the test was using to cancel mid-flight,
+    so the run reported itself complete and the assertion failed for the right reason. The fake now
+    blocks on the third artifact until cancellation reaches it, so the sweep is *guaranteed* to be
+    in flight. Recorded because the first version would have passed on a slower machine and failed
+    on nobody's, which is worse than failing.
+
+50. **The read-only fingerprint was blind to a rewritten attribute, and its own control caught it.**
+    Comparing content digest, mtime and the attribute **name** set is not enough: rewriting a file's
+    bytes leaves its extended attributes in place, so an attribute whose *value* changed produced an
+    identical fingerprint. Clearing a quarantine and rewriting one are both things this capability
+    must be shown not to do, and only one of them changes the name set. The fingerprint now hashes
+    attribute values too. Found by the control test, not by review.
+
+51. **macOS 26 attaches `com.apple.provenance` to files this process writes.** The first version of
+    the real-reader test asserted `hasProvenance == false` for a file it had just created, and the
+    system disagreed. This matters beyond the test: provenance presence is **not** evidence that
+    something was downloaded, and a panel presenting it that way would be wrong about every file on
+    the disk. Pinned by its own test.
+
+52. **`SecurityScanEngine` built entries only for packages it queried — the feature's central claim
+    was quietly unsatisfiable.** Found while wiring the composition root, not by review. On this
+    machine roughly 150 of 159 formulae produce no query, and every one of them was absent from the
+    settled result: the Not-covered section would have been permanently empty, and `CoverageTotals`
+    would have described the nine answerable packages rather than the inventory. That is exactly the
+    collapse `vulnerability-scanning` forbids, reached from the other side. The provider is widened
+    to `AdvisoryScanRequest { queries, predecided }`; `PredecidedOutcome` carries each un-queried
+    package's typed reason into the entries; the query-only initialiser survives for the acquisition
+    tests that genuinely have nothing pre-decided. RED first (`PredecidedOutcomeTests`), including
+    the 159-package all-unmapped case U1 says is realistic.
+
+53. **`ArtifactLocator` takes two URLs rather than `HomebrewRoots`.** `HomebrewRoots` publishes no
+    memberwise initialiser — only `init(installation:userCacheDirectory:)` — so a test cannot build
+    one over a temporary tree. Taking `cellar:` and `caskroom:` is also the honest narrower seam: the
+    locator is *given* the two roots it may enumerate and cannot reach for a third.
+
+54. **`ArtifactSignatureAssessment` is not `Codable`, unlike every advisory value.** Advisory
+    outcomes are cached because re-fetching costs a network request. A signature assessment costs
+    tens of milliseconds of local work and describes the artifact **as it is now**; persisting it
+    would mean showing a verdict about bytes that may have changed since.
+
+55. **The app-target composition types are `nonisolated`.** The app target infers `@MainActor` by
+    default, which would have made three pure value transformations main-actor-bound and their tests
+    main-actor-hopping for no reason. Only `SecurityRefreshCoordinator.run(observing:)` is
+    `@MainActor`, and only because `InstalledMutationGate` is.
+
+56. **`ArtifactIntegrityStore` is not in the file table.** The panel needs somewhere to hold reports
+    as they stream, and `SecurityStore`'s machinery — ordinal, last-good, adoption guard — is all
+    about a *cached* result with a persisted floor. Integrity reports are cached nowhere
+    (Deviation 54), so reproducing that machinery would have been ceremony around a value with no
+    continuity to protect.
+
+57. **`SecurityScanEngine.swift` split into `SecurityScanPipeline.swift`.** Mechanical, forced by
+    the 400-line rule after Deviation 52. The seam is real: nothing in the pipeline file touches the
+    single-flight slot, the event stream or the consent gate — those are lifecycle, and this is the
+    work the lifecycle schedules. Several members widened from `private` to internal to allow it,
+    which is a genuine loosening and is recorded as such.
+
+---
+
+## What the next batch must know
+
+1. **Read this whole file first and merge.** Batches 1–5 are above; do not overwrite any of them.
+2. **Resume at Phase 17** (manual verification) and **Phase 18** (full gate). Phases 0–16 are
+   complete and committed; **107 / 108 tasks** are done and the only unchecked boxes are 17.1 and
+   18.1–18.5.
+3. **MV-6 must be run by a human**, through the shipped consent sheet. See the section above for why
+   it was not run headlessly. MV-4 (migration on a real store) is likewise still owed.
+4. **Task 18.1's baselines**: 811 tests / 120 suites and 116 lint findings at `5863f61`. The
+   comparable lint series from the repository root is 116 → 118 → 118 → 118 → 118 → **118**.
+   Authored findings are zero at every batch boundary.
+5. **Task 18.3 has its measurement already** — see "Candidate size" above. The candidate is ~1.4×
+   the top of its forecast band; the miss is dominated by the test bucket and the fixture tree.
+6. **Task 18.4 must record the U3 answer as Deviation 48 states it** — *absent from the public SDK*,
+   not *fails unprivileged*. The design's Open Question wording predates the measurement.
+7. **`cellarTests` now carries 16 security tests** in two suites and only runs under `xcodebuild`.
+   Task 18.1(iii) covers them.
+8. **The fixture tree is 38 files.** Adding or editing any of them still requires regenerating
+   `probe-manifest.txt` in the same commit.
+9. `CVEScanOutcome` is still `.covered(.findings(…))` / `.covered(.clean(…))` — batch 2's Deviation 9.
+10. Pre-existing lint debt is **not** this change's to fix.
