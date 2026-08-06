@@ -72,6 +72,36 @@ else `.unrated`. Each branch has a real record:
 — a present-but-irrelevant member, which is exactly why "no advertised severity"
 must be decided by looking for the `severity` key rather than for an empty object.
 
+### Derived malformed payloads (phase 3, **not** captures)
+
+Three files under `OSV/` are **derived**, not captured. They are recorded here
+rather than hidden because a fixture whose provenance is "someone typed it" is
+worth less than one whose provenance is "the real bytes, damaged in one named
+way" — and because the manifest digests them identically to the captures, so a
+reader must be able to tell which is which.
+
+Every one is produced from `querybatch-affected-response.json`, the real 19-
+advisory capture, by exactly one documented edit:
+
+| File | Derivation | Proves |
+|---|---|---|
+| `querybatch-truncated-response.json` | the real bytes, cut at 180 bytes | An unreadable **envelope** fails the whole request |
+| `querybatch-badrecord-response.json` | real result #2 (3 advisories), middle entry's `id` key deleted | An unreadable **record** costs that record and is counted |
+| `querybatch-badresult-response.json` | real results #2 and #3, preceded by a string where an object belongs | An unreadable **result keeps its slot** |
+
+The third one is the important one. OSV's `results` array is **positional** —
+entry *i* answers query *i*, and nothing inside the entry names the package it
+belongs to. Dropping a bad entry the way a lossy array drops a bad formula would
+re-attribute every later answer to the wrong package: in this very fixture, three
+real `llhttp` CVEs would be filed against whatever package was query 0, with
+nothing in the payload left to catch it. So the slot survives, holding an
+explicit "no answer", and `.unreadable` is deliberately not equal to
+`.answered([])`.
+
+The 17-byte `NVD/ratelimited-response.body` doubles as an OSV envelope fixture:
+it is the real shape of a body that is not JSON at all, as opposed to JSON that
+stops early.
+
 ---
 
 ## `NVD/` — enrichment by CVE identifier (probe **gate U2**)
@@ -83,10 +113,21 @@ Endpoint: `https://services.nvd.nist.gov/rest/json/cves/2.0` (GET).
 | `cveids-request.txt` / `cveids-response.json` | 200 | 7 identifiers in **one** request; `totalResults: 7` |
 | `cveids-unrated-request.txt` / `cveids-unrated-response.json` | 200 | 2 records with `metrics: {}` |
 | `ratelimited-response.headers` / `.body` | **429** | Reproduced by 40 requests at concurrency 20 |
+| `cveids-badrecord-response.json` | *(derived)* | The real 7-record capture with the **fourth** record's `id` deleted |
 
 The exact query strings are in the `*-request.txt` files. The rate-limited pair
 is stored as separate header and body files because **the body is not JSON**;
 see below.
+
+`cveids-badrecord-response.json` is **derived**, not captured — the same
+discipline as the three derived `OSV/` payloads above, and derived by exactly one
+documented edit. It exists to pin the difference between the two decoders: NVD's
+`vulnerabilities` array is **not positional**, because every record names its own
+CVE, so the unreadable record is dropped and the six survivors keep their
+identities. OSV's `results` array carries no such name, which is why a bad entry
+there keeps its slot instead. `totalResults` stays at the server's `7`, and the
+gap between it and the six decoded records is the evidence that something was
+lost.
 
 ### U2 — the two answers this gate was opened to get
 

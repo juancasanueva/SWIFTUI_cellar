@@ -170,6 +170,9 @@ If the split is taken, exactly four things move with it — nothing else:
       reachability half is what "structurally unreachable" means; the declared half alone would miss a
       transitive edge. — `local-package-metadata` sc *"The security comparator is structurally
       unreachable from snooze"*.
+      **Non-RED deviation, recorded in `apply-progress.md` (Deviation 2):** this assertion is a
+      prohibition guard over an *absence* that already held before `SecurityKit` existed, so it
+      passed on first run and could not be made RED in the ordinary sense.
 - [x] 1.3 **RED** same file — `persistenceOwnsBothInwardEdges`:
       `#expect(graph["Persistence"] == ["BrewClient", "SecurityKit"])`, so the second inward edge is an
       asserted fact rather than a side effect of a later commit.
@@ -289,23 +292,34 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 3: Value vocabulary and tolerant wire decode
 
-- [ ] 3.1 **RED** `Tests/SecurityKitTests/OSVWireTests.swift` (new) —
+- [x] 3.1 **RED** `Tests/SecurityKitTests/OSVWireTests.swift` (new) —
       `aMalformedEnvelopeFailsTheRequest` (truncated or invalid top-level JSON ⇒ throws) and
       `aMalformedRecordIsSkippedAndCounted` (three records in, two out, `skippedRecordCount == 1`).
       This is the `InstalledDecoder` rule stated for a new payload. — `vulnerability-scanning` req
       *"Every result carries provenance, age and cache discipline"*.
-- [ ] 3.2 **GREEN** create `Sources/SecurityKit/SecurityModels.swift` — `CVEScanOutcome` with the four
+      **A third rule was needed and is not in the plan: OSV's `results` array is positional.**
+      Entry *i* answers query *i* and nothing inside it names the package it belongs to, so
+      dropping a bad entry the way a lossy array drops a bad formula re-attributes every later
+      answer to the wrong package. A bad result therefore **keeps its slot** as
+      `OSVQueryResult.unreadable`, and `.unreadable != .answered([])` is asserted so the two can
+      never be spelled the same way. Three derived fixtures back this
+      (`querybatch-truncated-`, `-badrecord-`, `-badresult-response.json`), each one edit away
+      from the real capture and documented in the Fixtures README.
+- [x] 3.2 **GREEN** create `Sources/SecurityKit/SecurityModels.swift` — `CVEScanOutcome` with the four
       cases `.covered(findings:)`, `.covered(clean:)`, `.notCovered(NotCoveredReason)`,
       `.unavailable(AdvisoryError)`; `NotCoveredReason { unmapped, kindUnsupported, unsupportedVersionScheme }`
       **and nothing else**; `SeverityTier { critical, high, medium, low, none, unrated }`;
       `ResultFreshness { live, cached(fetchedAt: Date) }`; `VulnerabilityFinding`; `AdvisoryError`.
       **No `isClean` accessor exists** — `case .covered(clean:)` is the only way to ask.
-- [ ] 3.3 **GREEN** create `Sources/SecurityKit/ScanProvenance.swift` — `scannedAt`,
+      `.covered(clean:)` carries a `CleanCoverage` (`answeredBy`, `queriedVersion`): Swift permits
+      the two same-named cases only when both payloads are `Hashable`, and a clean result is a
+      positive claim that should not be constructible without naming who was asked about what.
+- [x] 3.3 **GREEN** create `Sources/SecurityKit/ScanProvenance.swift` — `scannedAt`,
       `matcherVersion: Int`, `mappingRevision: Int`, per-source `skippedRecordCount`,
       `enrichmentAttempted/Succeeded`, mirroring `CleanupParserProvenance`.
-- [ ] 3.4 **GREEN** create `Sources/SecurityKit/OSVWire.swift` — `querybatch` (`{id, modified}`) and
+- [x] 3.4 **GREEN** create `Sources/SecurityKit/OSVWire.swift` — `querybatch` (`{id, modified}`) and
       `vulns/{id}` decoders over the Phase 2 fixtures.
-- [ ] 3.5 **RED** `Tests/SecurityKitTests/NVDWireTests.swift` and `SeverityTierTests.swift` (new) —
+- [x] 3.5 **RED** `Tests/SecurityKitTests/NVDWireTests.swift` and `SeverityTierTests.swift` (new) —
       `theTierPrefersCVSSv4ThenV31ThenV30ThenV2` parameterized over the U2 fixtures;
       `anAdvertisedSeverityIsUsedWhenNoScoreExists`;
       `anUnscoredAdvisoryStaysUnratedAndSortsInItsOwnBucket` — never defaulted to medium;
@@ -320,8 +334,21 @@ If the split is taken, exactly four things move with it — nothing else:
       the route to it is. `CVE-2026-0994` is the real precedence case: it carries **both** v4.0 (8.2)
       and v3.1 (7.5), so the tier must come from 8.2. — `vulnerability-scanning` sc *"An unscored
       advisory stays unrated"*.
-- [ ] 3.6 **GREEN** create `Sources/SecurityKit/NVDWire.swift` — the same envelope/record rule plus the
+      **Both replacement assertions written and green.** Two further shapes the capture forced:
+      (a) `publishedSeverity` lives **inside** `cvssData` for v3.1/v4.0 and **beside** it for v2,
+      both on the same record; (b) 8.2 and 7.5 both land in `high`, so a tier-only preference
+      assertion would pass against a decoder that picked either — the *selected score* is asserted
+      too, via `SeverityTier.preferredScore(among:)`. CVSS v3.0 has no capture in the corpus
+      (NVD had re-scored every one under v3.1), so its rung is asserted directly on the ordering
+      function and the gap is recorded rather than left silent.
+- [x] 3.6 **GREEN** create `Sources/SecurityKit/NVDWire.swift` — the same envelope/record rule plus the
       tiering function. **Commit 3.**
+      Two notes. The record rule is deliberately *not* the same as OSV's: NVD's `vulnerabilities`
+      array is not positional, so an unreadable record is dropped rather than kept as a slot, and
+      `totalResults` stays at the server's count so the gap is the evidence. Tiering computes the
+      band from the numeric score under **its own version's** specification — v2 defines no
+      `critical` and no `none` — and `theComputedBandAgreesWithNvdsOwnWord` checks all 15 scored
+      entries in the capture against NVD's own published word rather than against memory.
 
 ## Phase 4: The curated ecosystem mapping
 
