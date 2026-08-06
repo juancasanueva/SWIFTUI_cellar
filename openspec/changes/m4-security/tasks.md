@@ -822,7 +822,7 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 14: Inspectors, assessability, and the streamed sweep
 
-- [ ] 14.0 **U3 gate — probe before any RED test below.** On a real brew-installed cask: run
+- [x] 14.0 **U3 gate — probe before any RED test below.** On a real brew-installed cask: run
       `SecStaticCodeCreateWithPath` + `SecCodeCopySigningInformation` + `SecStaticCodeCheckValidity`
       against `"notarized"` and `anchor apple generic`, and `SecAssessmentTicketLookup`. Record
       **latency, network dependence, and whether the ticket lookup succeeds unprivileged on macOS 26**
@@ -832,52 +832,89 @@ If the split is taken, exactly four things move with it — nothing else:
       artifacts and record whether the `.app` bundle lives in the Caskroom or is a symlink to
       `/Applications`. Capture to `Fixtures/{Quarantine,MachO}/` with a README addendum and extend
       `probe-manifest.txt`.
-- [ ] 14.1 **RED** `Tests/SecurityKitTests/ArtifactAssessabilityTests.swift` (new), over fixture files —
+      **U3 GATE CLOSED — 2026-08-06, macOS 26.5.2 (25F84), arm64, euid 501, no elevation.**
+      Transcript `Fixtures/MachO/signature-probe-record.txt`; layout survey
+      `Fixtures/Quarantine/cask-artifact-layout.txt`; full answer in the `Fixtures/README.md`
+      addendum. Three results, all binding:
+      (a) **`SecAssessmentTicketLookup` is not callable from a shipping app at all** — present in
+      the shipped `Security` binary, **absent from the public SDK** (no `SecAssessment.h`, not in
+      the module map), so `import Security` does not declare it. Stronger than the design's
+      question, and it triggers exactly the amendment this task anticipated: **tasks 14.4 and 14.5
+      are amended below**.
+      (b) The **supported** path works unprivileged and is **local**:
+      `SecStaticCodeCheckValidity(… "notarized")` passed on all four notarized casks at euid 501 in
+      22.6–452.7 ms, flat across five consecutive calls, scaling with bundle size rather than
+      distance, and the negative case (an ad-hoc formula binary) fails in **20.2 ms** rather than
+      after a timeout.
+      (c) Formula keg binaries are **ad-hoc signed** (`flags: 2`, no team, no authority chain), so
+      *ad-hoc* is the common formula outcome and must be its own verdict rather than a failure.
+      **Fixture check obs 7454(1) — confirmed in the strongest form.** Of the ten installed casks
+      with an `.app` artifact, **9 are symlinks** in the Caskroom pointing into `/Applications`, and
+      the tenth (`the-unarchiver`) is a stale Caskroom directory that
+      `SecStaticCodeCreateWithPath` rejects with `-67028`. Every cask records its real destination
+      in the `app` artifact's own `target`. **Binding on task 15.3.**
+      13 fixtures added under `Fixtures/{Quarantine,MachO}/`; `probe-manifest.txt` regenerated in
+      the same commit.
+- [x] 14.1 **RED** `Tests/SecurityKitTests/ArtifactAssessabilityTests.swift` (new), over fixture files —
       `aBundleWithAContentsMacOSExecutableIsAssessable` for `.app`, `.framework`, `.xpc`, `.bundle`;
       `aRegularFileWhoseFirstFourBytesAreMachOMagicIsAssessable` parameterized over `0xfeedface`,
       `0xfeedfacf`, `0xcafebabe`, `0xbebafeca`;
       `aSymlinkIsNeverAssessable`; `aShellScriptAManPageAndAHeaderAreAllOutOfScope` (return `nil`,
       silently). — `artifact-integrity` req *"Scope is brew-managed artifacts only"*; threat matrix,
       *Executable-file classification*.
-- [ ] 14.2 **GREEN** create `Sources/SecurityKit/ArtifactAssessability.swift` —
+- [x] 14.2 **GREEN** create `Sources/SecurityKit/ArtifactAssessability.swift` —
       `classify(_ url: URL) -> AssessableArtifactKind?`, a pure filesystem predicate, plus
       `ArtifactLocation(packageID:url:kind:)`.
-- [ ] 14.3 **RED** `Tests/SecurityKitTests/SignatureInspectorTests.swift` (new), over a fake inspector
+- [x] 14.3 **RED** `Tests/SecurityKitTests/SignatureInspectorTests.swift` (new), over a fake inspector
       matrix — `eachSigningStateIsTypedAndDistinct` (signed / ad-hoc / unsigned / invalid);
       `aSignedArtifactReportsItsIdentifierTeamIdentifierAndAuthorityChain`;
       `anInconclusiveAssessmentIsCouldNotAssessWithAReasonAndIsCountedAsNeither`. —
       `artifact-integrity` sc *"An inconclusive assessment is not a verdict"*, *"A signed artifact
       reports its identity"*.
-- [ ] 14.4 **RED** same file — `noOutcomeEverDegradesToSignedOrNotarized`: exhaustive over every
+- [x] 14.4 **RED** same file — `noOutcomeEverDegradesToSignedOrNotarized`: exhaustive over every
       failure, cancellation and unreachable path from the U3 capture; each is `.couldNotAssess(reason)`.
-      Plus `onlineTicketLookupWithoutConsentIsStapledOrCouldNotAssessOnlineLookupRequiresConsent` —
-      the integrity half sits behind the same consent gate because ticket lookup can reach the network.
-- [ ] 14.5 **GREEN** create `Sources/SecurityKit/CodeSignatureInspecting.swift` — the protocol plus
-      `SecurityFrameworkSignatureInspector`, honouring the U3 answer from task 14.0.
-- [ ] 14.6 **RED** `Tests/SecurityKitTests/QuarantineInspectorTests.swift` (new), over the U3 fixtures —
+      ~~`onlineTicketLookupWithoutConsentIsStapledOrCouldNotAssessOnlineLookupRequiresConsent`~~
+      **(amended by the U3 gate, task 14.0 — there is no online ticket lookup to gate. The only API
+      for one is absent from the public SDK, so the inspector never reaches the network, and a
+      consent gate on a door that does not exist would be a test that can never fail.)** Replaced by
+      the two facts the probe established:
+      `theVerdictIsIdenticalWithAndWithoutConsentBecauseNoOnlineLookupExists` — the same artifact
+      assessed under granted and revoked consent yields identical verdicts, and the recording
+      network sees **zero** requests either way — and
+      `nonStapledNotarizationIsCouldNotAssessRatherThanNotNotarized`, the design's own stated
+      fallback. The consent gate over advisory egress is unchanged and still proven by task 9.1;
+      what is struck is the claim that *this half* has an egress path at all.
+- [x] 14.5 **GREEN** create `Sources/SecurityKit/CodeSignatureInspecting.swift` — the protocol plus
+      `SecurityFrameworkSignatureInspector`, honouring the U3 answer from task 14.0:
+      `SecStaticCodeCreateWithPath` + `SecCodeCopySigningInformation` +
+      `SecStaticCodeCheckValidity` against `"notarized"` and `anchor apple generic`, and
+      **no `SecAssessmentTicketLookup` call site anywhere** — it is not in the public SDK, and
+      reaching it by `dlsym` to work around that is not a thing this app does. Anything the stapled
+      check cannot resolve is `.couldNotAssess(.assessmentUnavailable)`.
+- [x] 14.6 **RED** `Tests/SecurityKitTests/QuarantineInspectorTests.swift` (new), over the U3 fixtures —
       `theAttributeDecodesIntoFlagsTimestampAgentAndUuid` from the `flags;hexTimestamp;agentName;UUID`
       shape; `theRawValueIsPreservedVerbatimAlongsideTheTypedComponents`;
       `anUnrecognisedComponentReportsUnknownAndIsNeverGuessed`;
       `provenancePresenceIsReportedWhenPresent`. — `artifact-integrity` sc *"A quarantined artifact
       explains itself"*, *"An unrecognised attribute component stays unknown"*.
-- [ ] 14.7 **GREEN** create `Sources/SecurityKit/QuarantineInspecting.swift` — the protocol plus
+- [x] 14.7 **GREEN** create `Sources/SecurityKit/QuarantineInspecting.swift` — the protocol plus
       `ExtendedAttributeQuarantineInspector` over `listxattr`/`getxattr`. **Read-only: no `getxattr`
       sibling write call exists in the file** (task 1.6 already forbids it target-wide).
-- [ ] 14.8 **RED** `Tests/SecurityKitTests/IntegrityEngineTests.swift` (new) —
+- [x] 14.8 **RED** `Tests/SecurityKitTests/IntegrityEngineTests.swift` (new) —
       `resultsArriveIncrementallyPerArtifactRatherThanAsOneTerminalBatch`;
       `aPerArtifactFailureBecomesACouldNotAssessEventAndNeverTerminatesTheStream`;
       `cancellationStopsTheRunWithoutPresentingItAsComplete` and completed items remain shown. —
       `artifact-integrity` sc *"A slow lookup does not freeze or poison the run"*.
-- [ ] 14.9 **GREEN** create `Sources/SecurityKit/ArtifactIntegrityEngine.swift` — `@concurrent`
+- [x] 14.9 **GREEN** create `Sources/SecurityKit/ArtifactIntegrityEngine.swift` — `@concurrent`
       `inspect` streaming `AsyncThrowingStream<ArtifactIntegrityEvent>` with
       `Task.checkCancellation()` per artifact, exactly as `DiskUsageEngine.scan`.
-- [ ] 14.10 **RED** `Tests/SecurityKitTests/IntegrityProhibitionTests.swift` (new) —
+- [x] 14.10 **RED** `Tests/SecurityKitTests/IntegrityProhibitionTests.swift` (new) —
       `noByteOfAnInspectedArtifactChanges`: a filesystem observer over a temporary fixture tree
       compares content hashes, mtimes and xattr sets before and after a full sweep;
       `noProcessIsLaunchedDuringAFullSweep` through a recording process launcher (**zero** launches);
       `noElevationIsRequested`. — threat matrix, *Subprocess / process integration*, *Filesystem write
       during classification*; `artifact-integrity` sc *"Inspection spawns nothing and writes nothing"*.
-- [ ] 14.11 **RED** same file — `noPublicSurfaceOfTheCapabilityAcceptsAWrite`: enumerate every public
+- [x] 14.11 **RED** same file — `noPublicSurfaceOfTheCapabilityAcceptsAWrite`: enumerate every public
       symbol of the integrity half and assert none takes a mutating verb (clear, remove, strip,
       re-sign, staple, assess-change). — `artifact-integrity` req *"Visibility does not become
       remediation"*. **Commit 14.**

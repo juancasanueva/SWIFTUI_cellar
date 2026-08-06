@@ -248,3 +248,118 @@ Two real rows carry more weight than the rest:
   separate answers is the whole point of the version boundary.
 - `1.0_0` and `2.1.4_0` (Homebrew) — revision **zero**, written explicitly.
   `split` must report `0`, not `nil`; `1.0_0` and `1.0` are different strings.
+
+---
+
+## Addendum — the U3 probe (task 14.0), captured 2026-08-06
+
+macOS 26.5.2 (25F84), arm64, **euid 501 — no elevation at any point**. SDK
+`MacOSX26.5.sdk`. Homebrew 6.0.15-83-gd0b51c6. Full transcript:
+`MachO/signature-probe-record.txt`. Cask layout survey: `Quarantine/cask-artifact-layout.txt`.
+
+### U3 answer (a): `SecAssessmentTicketLookup` is **not callable at all** from a shipping app
+
+Stronger than the design's question, and it changes what task 14.5 may do. The
+symbol is **present in the shipped `Security` binary** and **absent from the
+public SDK**: there is no `SecAssessment.h` under
+`MacOSX26.5.sdk/…/Security.framework/Headers/`, and `SecAssessment` appears
+nowhere in the framework's module map. `import Security` therefore does not
+declare it, and a build that calls it fails with *cannot find
+'SecAssessmentTicketLookup' in scope*.
+
+Reached through `dlsym` **for the probe only**, it returned `false` in under
+0.2 ms for every one of the four notarized casks — including with the
+force-online flag — which is not a meaningful answer either. Whatever its real
+contract is, it is not one this app can rely on through supported API.
+
+**Consequence, and it is the amendment task 14.0 anticipated:** the inspector
+does not call it. Non-stapled notarization is `.couldNotAssess(.assessmentUnavailable)`.
+A weaker feature, not a different architecture — exactly as the design predicted.
+
+### U3 answer (b): the supported path works unprivileged, and is **local**
+
+`SecStaticCodeCreateWithPath` → `SecCodeCopySigningInformation` →
+`SecStaticCodeCheckValidity(… "notarized")` succeeded at euid 501 on all four
+notarized casks, with no prompt of any kind.
+
+| Artifact | identifier | team | `notarized` | latency (5 consecutive calls) |
+|---|---|---|---|---|
+| Ghostty.app | `com.mitchellh.ghostty` | `24VZTF6M5V` | pass | 50.1, 46.6, 47.1, 46.4, 47.6 ms |
+| VLC.app | `org.videolan.vlc` | `75GAHG3SZQ` | pass | 437.1, 429.7, 444.4, 452.7, 436.2 ms |
+| CodexBar.app | `com.steipete.codexbar` | `Y5PE65HELJ` | pass | 61.5, 60.6, 60.7, 59.2, 59.3 ms |
+| Applite.app | `dev.aerolite.Applite` | `9CLTNBW4Z3` | pass | 24.5, 22.6, 23.8, 22.9, 22.8 ms |
+
+**Network dependence: none observed.** Three independent pieces of evidence.
+(1) Latency is flat across five consecutive calls — a first call that reached
+the network would be slower than the four after it, and none is. (2) The spread
+tracks **bundle size**, not distance: VLC is ~9× Applite's time and ~9× its
+content. (3) The negative case answers *immediately*: an ad-hoc-signed formula
+binary fails `notarized` in **20.2 ms** with `-67050`, not after a network
+timeout. The requirement is evaluated against the stapled ticket and the code
+hashes, on this machine.
+
+`anchor apple generic` passes for all four (Developer ID chains to the Apple
+root). `anchor apple` fails for all four with `-67050` — it means *Apple's own
+system binary*, which none of these is. Both are recorded because the design
+names the first and it would be easy to reach for the second.
+
+### U3 answer (c): formula keg binaries are **ad-hoc signed**, never notarized
+
+`/opt/homebrew/Cellar/ripgrep/15.2.0/bin/rg`: identifier
+`rg-555549448f89ec4d458733e9aff65b2c3b7acce2`, **no team identifier, no
+authority chain**, `flags: 2` (`kSecCodeSignatureAdhoc`). All three requirements
+fail with `-67050`.
+
+This is the ordinary, correct state of a bottle, and it is why "unsigned",
+"ad-hoc" and "could not assess" must be three distinct verdicts rather than
+three ways of writing "not signed": the overwhelmingly common formula outcome is
+*ad-hoc*, and rendering that as a failure would make the panel useless.
+
+### Fixture check obs 7454(1): the Caskroom holds **symlinks**, not bundles
+
+Surveyed across all 11 installed casks. Of the ten with an `.app` artifact:
+
+- **9 are symbolic links** in the Caskroom pointing into `/Applications`, where
+  the real bundle lives. `SecStaticCodeCreateWithPath` works on either path
+  because it resolves them, but the bundle itself is not in the Caskroom.
+- **1 is not** — `the-unarchiver` leaves a Caskroom *directory* containing a
+  second nested `The Unarchiver.app`, and `SecStaticCodeCreateWithPath` rejects
+  it with `-67028 bundle format unrecognized`. The real bundle is the
+  root-owned `/Applications/The Unarchiver.app`.
+- Every cask records its real destination itself, in the `app` artifact's
+  `target` field.
+
+**Binding on task 15.3.** A blind Caskroom walk finds nine symlinks and one
+broken shell. `ArtifactLocator` resolves the **brew-recorded** artifact target,
+and this is not an `/Applications` sweep: only paths Homebrew itself recorded
+are ever visited.
+
+### Quarantine captures
+
+`Quarantine/*.txt` are the raw `com.apple.quarantine` values as `getxattr`
+returned them, byte for byte. The `flags;hexTimestamp;agentName;UUID` shape the
+design names is confirmed on real data, and two edges came with it:
+
+| File | Raw value | Note |
+|---|---|---|
+| `vlc-com.apple.quarantine.txt` | `01c3;6a65eb27;Safari;3E44AF78-…` | all four components present |
+| `codexbar-com.apple.quarantine.txt` | `03c1;6a719a00;;67F02780-…` | **agent name empty** — a real, common shape |
+| `applite-com.apple.quarantine.txt` | `03c1;6a7198fa;;27BAE636-…` | second empty-agent case, different flags path |
+
+`ghostty-com.apple.provenance.hex` is the 11 raw bytes of `com.apple.provenance`
+in hex. It is **binary and undocumented**, which is exactly why the spec requires
+presence to be *reported* and the contents never guessed.
+
+Also present on these bundles and deliberately out of scope: `com.apple.macl`,
+`com.apple.FinderInfo`, `com.apple.fileprovider.fpfs#P`. Recorded so that
+"we enumerate the attributes we understand" is a stated boundary rather than an
+oversight.
+
+### Mach-O fixtures
+
+`MachO/*.bin` are the four magics **as the bytes appear on disk**, which is not
+the same as the four constants the design lists — `ripgrep-header-64.bin`, a real
+brew-installed executable, starts `cf fa ed fe`, and that is `0xfeedfacf` read as
+a little-endian `UInt32`. A predicate that compares the first four bytes to
+`0xfeedfacf` in the wrong byte order matches nothing on this machine.
+`manpage-header-64.txt` and `shell-script.sh` are the out-of-scope shapes.
