@@ -454,37 +454,95 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 6: The matcher, the version boundary matrix, and aggregation
 
-- [ ] 6.1 **RED** `Tests/SecurityKitTests/VersionBoundaryTests.swift` (new) — the three-column matrix
+> **Design deviation, load-bearing and measured — `CVEScanOutcome` is nested one level.** The design
+> writes `.covered(findings:)` and `.covered(clean:)` as two same-named cases. Swift **declares** them
+> without complaint and then **refuses to pattern-match them**: every `case .covered(…)` resolves to
+> whichever was declared last, and the other becomes
+> `error: tuple pattern element label 'findings' must be 'clean'`. Verified against the toolchain, not
+> assumed. The pair is therefore nested — `case covered(Coverage)` with
+> `Coverage { findings([…]), clean(CleanCoverage) }` — so the four states, their names and the absence
+> of any boolean shortcut are all unchanged, and a `switch` stays exhaustive over exactly four
+> possibilities. `.covered(clean:)` also needed a `Hashable` payload to be declarable at all, which is
+> why `CleanCoverage` exists (task 3.2).
+
+- [x] 6.1 **RED** `Tests/SecurityKitTests/VersionBoundaryTests.swift` (new) — the three-column matrix
       the design names, one test per row:
       (a) `theQueryVersionIsTheLexicalUpstreamNotTheInstalledString` — `1.2.3_1` is queried as `1.2.3`;
       (b) `coverageIsOSVsAnswerNotALocalRangeEvaluation` — the matcher performs no range arithmetic;
       (c) `anUninterpretableVersionIsNotQueriedAndReportsUnsupportedVersionScheme` — `2024-01-05`
       mapped to a SemVer ecosystem produces `.notCovered(.unsupportedVersionScheme)` and **zero**
       queries.
-- [ ] 6.2 **RED** same file — `aRevisionSuffixedInstallIsCoveredAndReportsAnUncomparableFix`: installed
+      (b) is proven behaviourally *and* structurally: the real `GHSA-p24j-h477-76q3` (fixes `bat` at
+      `0.18.2`) against an installed `9.9.9` still produces a finding — a local range evaluation
+      would have dropped it — and `theMatcherEvaluatesNoRange` scans `CVEMatcher.swift` for the
+      tokens such an evaluation would need.
+      **Interpretability is the mapped ecosystem's rule, not one rule for all.** `protobuf 35.1` has
+      two components: not strict SemVer, ordinary PEP 440, and present in the phase-2 capture. Gating
+      every ecosystem on SemVer would have silently dropped a package real advisory data covers, so
+      `EcosystemVersionScheme` carries a conservative PEP 440 subset for PyPI and SemVer for
+      crates.io / npm. `everyCapturedQueryIsStillProduced` holds all seven captured queries against
+      the planner so task 7.1's byte-comparison has a table that can produce its request.
+- [x] 6.2 **RED** same file — `aRevisionSuffixedInstallIsCoveredAndReportsAnUncomparableFix`: installed
       `1.2.3_1`, OSV fix `1.2.4` ⇒ `covered(findings)` whose finding states *"fix published,
       comparison not possible for this version scheme"* and asserts **no ordering verdict**. This is
       the spec's own scenario and the single most misreadable interaction in the design. —
       `vulnerability-scanning` sc *"A non-SemVer version is not compared"*.
-- [ ] 6.3 **RED** `Tests/SecurityKitTests/CVEMatcherTests.swift` (new) —
+      Run against **real advisory data** rather than the abstract pair: installed `bat 0.18.1_1`
+      against the real `GHSA-p24j-h477-76q3`, which declares a fix at `0.18.2`. Covered (queried as
+      `0.18.1`), `declaredFixVersion == "0.18.2"`, `fix == .notComparable(scheme: .homebrewRevision)`,
+      and both ordering verdicts asserted absent. `theSameAdvisoryAgainstAStrictInstallDoesOrder` is
+      the control, or `notComparable` could be the answer to everything.
+- [x] 6.3 **RED** `Tests/SecurityKitTests/CVEMatcherTests.swift` (new) —
       `everyOutcomeIsExactlyOneOfTheFourStates` exhaustive over the four cases;
       `aCaskIsNotCoveredKindUnsupported`; `onlyThePrimaryKegIsEverMatched` (a formula with a linked keg
       and two unlinked kegs yields exactly one queried version and no finding naming an unlinked keg).
       — `vulnerability-scanning` sc *"Only the primary keg is in scope"*.
-- [ ] 6.4 **RED** same file — `theMatcherPerformsNoNameSimilarityOrKeywordMatching`: feed an advisory
+      "Only the primary keg" is enforced **by the shape of the API**: the planner takes one version
+      string and there is no overload taking a list of kegs, so a second query is not something a
+      caller can produce by accident. Backed structurally — `kegs`, `InstalledKeg`, `linkedKeg` and
+      `primaryKeg` appear nowhere in `Sources/SecurityKit/`, so this target cannot enumerate a keg
+      even if it wanted to. Choosing the primary keg keeps its existing owner in `BrewClient`.
+- [x] 6.4 **RED** same file — `theMatcherPerformsNoNameSimilarityOrKeywordMatching`: feed an advisory
       whose summary text contains the installed formula's name while the package is unmapped; the
       outcome stays `.notCovered(.unmapped)`. — threat matrix, *inference is not discovery*.
-- [ ] 6.5 **RED** `Tests/SecurityKitTests/CoverageAggregationTests.swift` (new) —
+      Both halves: `curl` short-circuits to `.notCovered(.unmapped)` with no query at all, and a
+      decoy advisory whose prose says "bat" five times while its `affected` entry names
+      `some-unrelated-crate` produces `covered(.clean)`. `anAdvisoryInAnotherEcosystemIsNotAFinding`
+      adds the ecosystem half — RubyGems `bat` is different software from crates.io `bat`.
+- [x] 6.5 **RED** `Tests/SecurityKitTests/CoverageAggregationTests.swift` (new) —
       `fourDistinctCountsSurviveAggregation` over a mixed set, and
       `theCleanCountIncludesOnlyCoveredClean` — `notCovered` and `unavailable` never fold into it. —
       `vulnerability-scanning` sc *"The four states survive aggregation"*, *"Unanswered packages never
       read as clean"*.
-- [ ] 6.6 **GREEN** create `Sources/SecurityKit/CVEMatcher.swift` — a pure `Sendable` struct over
+      `anAllUnmappedInventoryIsNotClean` runs the realistic 159-package all-unmapped case U1 predicts
+      and asserts `hasUnansweredPackages` — the question a badge or empty state must ask before
+      claiming anything — with `aFullyAnsweredCleanInventorySaysSo` as the triangulating control.
+- [x] 6.6 **GREEN** create `Sources/SecurityKit/CVEMatcher.swift` — a pure `Sendable` struct over
       values, composing OSV advisories, the mapping entry and the dismissal lookup.
-- [ ] 6.7 **RED** same test file — `aDismissalSuppressesExactlyOneFindingAndChangesNoCoverageState`:
+      **One extra file, recorded:** `Sources/SecurityKit/AdvisoryQuery.swift` holds `AdvisoryQuery`,
+      `AdvisoryQueryPlan`, `EcosystemVersionScheme` and `AdvisoryQueryPlanner`. The version boundary
+      needs nothing from `BrewClient` — only a package identity and one version string — so it lives
+      where `swift test` can reach it, and the app-side `SecurityQueryBuilder` (task 15) becomes a
+      projection with no rules of its own. That is the thin composition point the design's placement
+      decision was after.
+      **One rule the plan did not specify: choosing among several declared fixes.** A real advisory
+      declares one `fixed` event per maintained branch (`PYSEC-2026-899` declares four). The relevant
+      one is the earliest at or above the install; past every branch, the latest. It is a selection
+      among values the advisory declared, ordered with the comparator this target already owns — no
+      bound is interpreted and no membership computed. Written after the implementation rather than
+      before it, and therefore **proven non-vacuous by mutation**: replacing it with the naive
+      last-declared-fix rule fails six of the seven cases, reporting an up-to-date `3.20.2` install
+      as still affected.
+- [x] 6.7 **RED** same test file — `aDismissalSuppressesExactlyOneFindingAndChangesNoCoverageState`:
       the package stays `covered(findings)` with the remaining findings; a second finding for the same
       package is untouched; the coverage state is unchanged. — `vulnerability-scanning` req
       *"Dismissal is scoped to the exact finding and installed version"*. **Commit 6.**
+      **Dismissal is a flag, never a removal, and that is what makes the rule enforceable.** Deleting
+      dismissed findings would let a package whose every finding was dismissed collapse into
+      `covered(.clean)` — a coverage state the user never consented to and the spec forbids dismissal
+      from changing. `VulnerabilityFinding.isDismissed` keeps the coverage state fixed and leaves
+      suppression to the presentation. `DismissalKey` is keyed on `advisoryID` as well as `cveID`
+      because many OSV records carry no CVE alias and would otherwise share a `nil` identity.
 
 ## Phase 7: Advisory acquisition
 

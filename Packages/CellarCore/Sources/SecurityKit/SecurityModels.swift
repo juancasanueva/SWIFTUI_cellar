@@ -107,7 +107,23 @@ public struct VulnerabilityFinding: Sendable, Hashable, Identifiable {
     /// rather than as a claim about the Homebrew formula.
     public let ecosystem: String
     public let ecosystemPackageName: String
+    /// The fixed version the advisory declared, verbatim, or `nil` when it
+    /// declared none. Reported even when it cannot be compared — "a fix exists
+    /// at 0.18.2" is useful on its own.
+    public let declaredFixVersion: String?
+    /// What can honestly be said about the installed version against that fix.
+    public let fix: FixVersionComparison
     public let answeredBy: AdvisorySourceID
+    /// Whether the user already answered this exact finding at this exact
+    /// installed version.
+    ///
+    /// A flag rather than a removal, and that is deliberate. Deleting dismissed
+    /// findings would let a package whose every finding was dismissed collapse
+    /// into `covered(clean:)`, which is a coverage state the user never
+    /// consented to and the spec forbids dismissal from changing. Carrying the
+    /// flag keeps the coverage state fixed and leaves suppression to the
+    /// presentation, where it belongs.
+    public let isDismissed: Bool
 
     public var id: String { advisoryID }
 
@@ -119,7 +135,10 @@ public struct VulnerabilityFinding: Sendable, Hashable, Identifiable {
         severity: SeverityTier,
         ecosystem: String,
         ecosystemPackageName: String,
-        answeredBy: AdvisorySourceID
+        declaredFixVersion: String?,
+        fix: FixVersionComparison,
+        answeredBy: AdvisorySourceID,
+        isDismissed: Bool
     ) {
         self.advisoryID = advisoryID
         self.cveID = cveID
@@ -128,7 +147,10 @@ public struct VulnerabilityFinding: Sendable, Hashable, Identifiable {
         self.severity = severity
         self.ecosystem = ecosystem
         self.ecosystemPackageName = ecosystemPackageName
+        self.declaredFixVersion = declaredFixVersion
+        self.fix = fix
         self.answeredBy = answeredBy
+        self.isDismissed = isDismissed
     }
 }
 
@@ -156,15 +178,34 @@ public struct CleanCoverage: Sendable, Hashable {
 /// `isEmpty` would make "no vulnerabilities found" and "nobody could tell us"
 /// the same value, and that collapse is the single failure this feature exists
 /// to prevent. There is **no `isClean` accessor**: the only way to ask is to
-/// match `case .covered(clean:)`, which forces the other three states into view
+/// match `case .covered(.clean)`, which forces the other three states into view
 /// at every call site.
+///
+/// ## Why `Coverage` is nested rather than two `covered` cases
+///
+/// The design writes these as `.covered(findings:)` and `.covered(clean:)`.
+/// Swift *declares* two same-named cases with different labels without
+/// complaint — and then refuses to pattern-match them: every `case .covered(…)`
+/// resolves to whichever was declared last, and the other becomes
+/// `error: tuple pattern element label 'findings' must be 'clean'`. Measured,
+/// not assumed.
+///
+/// So the pair is nested one level. The four states, their names and the absence
+/// of any boolean shortcut are all unchanged; `.covered(.findings)` and
+/// `.covered(.clean)` still read as the spec's own vocabulary, and a `switch`
+/// over `CVEScanOutcome` is still exhaustive over exactly four possibilities.
 public enum CVEScanOutcome: Sendable, Hashable {
-    /// The package was queried and advisories came back.
-    case covered(findings: [VulnerabilityFinding])
-    /// The package was queried and nothing came back.
-    case covered(clean: CleanCoverage)
+    /// The package was queried and an answer came back.
+    case covered(Coverage)
     /// The package was never queried, for a typed reason.
     case notCovered(NotCoveredReason)
     /// The package should have been queried and the answer never arrived.
     case unavailable(AdvisoryError)
+
+    /// The two shapes an answer can take. Distinct cases, never an array that
+    /// might be empty.
+    public enum Coverage: Sendable, Hashable {
+        case findings([VulnerabilityFinding])
+        case clean(CleanCoverage)
+    }
 }

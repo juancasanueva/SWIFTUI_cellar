@@ -8,10 +8,16 @@ import Foundation
 /// a v4.0 8.2 outranks a v3.1 9.8 because v4.0 is the newer analysis of the same
 /// vulnerability, not because 8.2 is larger.
 public enum CVSSVersion: String, Sendable, Hashable, Codable, CaseIterable {
+    // swiftlint:disable identifier_name
+    // `v2` is two characters and is the name CVSS itself uses. The alternative
+    // is `v20`, which reads as "version twenty" beside `v40`, or `version2`,
+    // which breaks the shape of the other three. The raw values carry the
+    // unambiguous form.
     case v40 = "4.0"
     case v31 = "3.1"
     case v30 = "3.0"
     case v2 = "2.0"
+    // swiftlint:enable identifier_name
 
     /// Lower is preferred.
     var preference: Int {
