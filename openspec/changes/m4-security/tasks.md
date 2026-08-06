@@ -671,33 +671,56 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 12: `SchemaV2`, `DismissedCVE`, and the first migration
 
-- [ ] 12.1 **RED** `Tests/PersistenceTests/MigrationTests.swift` —
+- [x] 12.1 **RED** `Tests/PersistenceTests/MigrationTests.swift` —
       `aStoreWrittenUnderV1OpensUnderV2WithEveryRowIntact`: write `PackageMeta`, `Snooze` and
       `HistoryEntry` rows through a V1 container, reopen under the V2 plan, assert all three survive
       byte-identically; and `theThreeV1ModelsAreUnchangedInV2` (a field-level comparison, not a
       count).
-- [ ] 12.2 **GREEN** create `Sources/Persistence/SchemaV2.swift` — `[PackageMeta, Snooze, HistoryEntry, DismissedCVE]`
+- [x] 12.2 **GREEN** create `Sources/Persistence/SchemaV2.swift` — `[PackageMeta, Snooze, HistoryEntry, DismissedCVE]`
       with the three V1 models byte-identical; `DismissedCVE` holds `cveID`, `kindRaw`, `name`,
       `version`, `dismissedAt`, `note: String = ""` — **primitives only**, no `@Relationship`, no
       `@Transient`, `#Unique<DismissedCVE>([\.cveID, \.kindRaw, \.name, \.version])`.
-- [ ] 12.3 **GREEN** `Sources/Persistence/MetadataMigrationPlan.swift` —
+- [x] 12.3 **GREEN** `Sources/Persistence/MetadataMigrationPlan.swift` —
       `schemas: [SchemaV1.self, SchemaV2.self]`, `stages: [.lightweight(from: SchemaV1.self, to: SchemaV2.self)]`;
       `Sources/Persistence/PersistenceContainer.swift` — open `Schema(versionedSchema: SchemaV2.self)`.
       The plan was wired from the first commit precisely so this is a two-line change (design D2).
-- [ ] 12.4 **RED** `Tests/PersistenceTests/DismissalStoreTests.swift` (new) —
+- [x] 12.4 **RED** `Tests/PersistenceTests/DismissalStoreTests.swift` (new) —
       `aDismissalIsKeyedByTheExactCveKindNameAndVersion`;
       `aVersionChangeReSurfacesTheFindingWithNoUserAction` (dismiss at `1.0.0`, read at `1.1.0` ⇒ not
       suppressed, and the row is **not** deleted); `dismissalsAreEnumerableAndReversible`;
       `aDismissalSuppressesNoOtherFindingForTheSamePackage`. — `vulnerability-scanning` sc *"An upgrade
       re-surfaces a dismissed finding"*.
-- [ ] 12.5 **RED** same file — `persistencePublishesAValueSnapshotAndNeverAModelInstance`:
+- [x] 12.5 **RED** same file — `persistencePublishesAValueSnapshotAndNeverAModelInstance`:
       `DismissalSnapshot`/`DismissalLookup` are `Sendable` values, mirroring `MetadataLookup`; no
       `@Model` type crosses the boundary.
-- [ ] 12.6 **GREEN** create `Sources/Persistence/DismissalStore.swift` — **the only file in
+- [x] 12.6 **GREEN** create `Sources/Persistence/DismissalStore.swift` — **the only file in
       `Sources/Persistence/` that imports `SecurityKit`** (task 13.3 asserts this exhaustively).
-- [ ] 12.7 **RED** `Tests/PersistenceTests/LocalStoresTests.swift` —
+- [x] 12.7 **RED** `Tests/PersistenceTests/LocalStoresTests.swift` —
       `oneContainerStillServesEveryStore`: the shipped W3 invariant must survive the schema bump.
       **Commit 12.**
+      **Four recorded deviations.** (a) **`DismissedCVE` is keyed on `advisoryID`, not on `cveID`.**
+      The plan's four-part key `(cveID, kind, name, version)` is unsafe against the data this app
+      actually receives: `GHSA-`, `RUSTSEC-` and `PYSEC-` records routinely carry **no CVE alias**,
+      so every unaliased finding for one package at one version would share the empty string and
+      dismissing one would silence the rest. `cveID` is still stored as an attribute — it is what the
+      user sees and what NVD enrichment is keyed by — but it is not the identity. Still four-part,
+      still primitives only. Proven by `twoAdvisoriesWithoutCveAliasesAreDismissedIndependently`, and
+      by mutation: keying on the CVE fails 9 of 11 tests.
+      (b) **`DismissalIdentity` ignores `cveID` on lookup**, and `DismissalSnapshot` is keyed by it.
+      OSV adds aliases to existing advisories over time; a `DismissalKey`-keyed dictionary would
+      silently revoke a dismissal the day an alias appeared, which is indistinguishable from the
+      re-surfacing an upgrade is supposed to cause. `anAliasAppearingOnTheAdvisoryDoesNotUndoADismissal`.
+      (c) **The pre-existing throwaway V2 was retargeted to V3.** Its `versionIdentifier` was 2.0.0
+      and collided with the real `SchemaV2` the moment one existed — the store failed to load with
+      "Cannot use staged migration with an unknown model version". Its claim was always "the version
+      *after* the one we ship costs a stage, not a rewrite", so it now sits above the shipped V2.
+      (d) **The `.lightweight` stage is asserted by the plan test, not by the data test.** SwiftData
+      performs implicit lightweight migration even with `stages: []`, so removing the stage does not
+      fail `aStoreWrittenUnderV1OpensUnderV2WithEveryRowIntact`; it fails
+      `theShippedPlanDeclaresTheV1ToV2Stage`. Recorded so nobody later reads the data test as proof
+      that the stage exists.
+      Two files were split to stay under the 400-line rule: `Tests/PersistenceTests/MigrationFixtures.swift`
+      (the request spy, the V1-only plan and the throwaway schema).
 
 ## Phase 13: The `local-package-metadata` guard evolution
 
