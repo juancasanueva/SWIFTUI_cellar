@@ -1,17 +1,17 @@
 # Apply progress: `m4-security`
 
-**Cumulative record — batches 1, 2 and 3 of N.** Later batches MUST read this file and merge; never
-overwrite. Batches 1 and 2 are preserved below verbatim; batch 3 is appended after them.
+**Cumulative record — batches 1, 2, 3 and 4 of N.** Later batches MUST read this file and merge;
+never overwrite. Batches 1–3 are preserved below verbatim; batch 4 is appended after them.
 
 | Field | Value |
 |---|---|
-| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6), 3 (Phases 7–10) |
+| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6), 3 (Phases 7–10), 4 (Phases 11–13) |
 | Mode | **Strict TDD** (no fallback taken in any batch) |
 | Branch | `feature/m4-security` |
 | Branch point | `5863f61` (**not** the planned `0bd1f72` — see Deviation 1) |
 | Delivery | `single-pr` + user-recorded `size:exception` (Engram obs 7456) |
-| Status | **60 / 108 tasks complete**, suite green, no blockers |
-| Resumes at | **Phase 11, task 11.1** (`SecurityStore`) |
+| Status | **78 / 108 tasks complete**, suite green, no blockers |
+| Resumes at | **Phase 16, task 16.1** (`SecurityPresentation`) — Phases 14–15 follow it in the file but ship after |
 
 ---
 
@@ -718,3 +718,224 @@ Numbering continues from batch 2's list.
     a consent grant, so it belongs to phase 16.
 12. Pre-existing lint debt is **not** this change's to fix; the comparable series is the raw total from
     the repository root (116 → 118 → 118 → 118).
+
+
+---
+
+# Batch 4 — Phases 11, 12, 13
+
+| Field | Value |
+|---|---|
+| Batch | 4 — Phases 11, 12, 13 (work units 11–13) |
+| Mode | **Strict TDD** (no fallback taken) |
+| Attempt authority | acquired with the continuation token, `proceed` |
+| Safety net | 969 tests / 139 suites green at `7c11a00` before any edit |
+| Status | **78 / 108 tasks complete** cumulatively, suite green, no blockers |
+
+## Tasks completed
+
+| Task | What landed |
+|---|---|
+| 11.1 | RED: `SecurityStoreGuardTests` — the generation guard and the ordinal guard, moved independently |
+| 11.2 | RED: same suite — the duplicate joins, the older returns without disarming the dedup |
+| 11.3 | RED: `SecurityStoreLifecycleTests` — `lastGood` survives a failure, partial is never content |
+| 11.4 | RED: same suite — the cache load precedes every request and adopts at the persisted ordinal |
+| 11.5 | GREEN: `SecurityStore.swift`, plus persisted provenance/partiality in `AdvisoryCache` |
+| 12.1 | RED: `MigrationTests` — the first real V1→V2 store, field by field, plus the entity comparison |
+| 12.2 | GREEN: `SchemaV2.swift` — `DismissedCVE`, primitives only |
+| 12.3 | GREEN: the `.lightweight` stage and the container opened at V2 |
+| 12.4 | RED: `DismissalStoreTests` — exact scope, upgrade re-surfacing, enumerable, reversible |
+| 12.5 | RED: same file — the value boundary, behaviourally and structurally |
+| 12.6 | GREEN: `DismissalStore.swift` — the only `Persistence` file importing `SecurityKit` |
+| 12.7 | RED: `LocalStoresTests.oneContainerStillServesEveryStore` + the shared-reason half |
+| 13.1 | REFACTOR: `source(at:)` generalized to package-root-relative paths, suite re-run green first |
+| 13.2 | RED: the comparator scan restated over the two `BrewClient` files, with its control |
+| 13.3 | RED: `noSecurityComparatorIsReachableFromSnooze` over all six files, anchored per file |
+| 13.4 | RED: `dismissalStoreIsTheOnlyPersistenceFileImportingSecurityKit` — whole-directory |
+| 13.5 | RED: `snoozeBehaviourIsByteIdenticalToItsPreComparatorForm` |
+| 13.6 | Nothing went red against shipped code — no earlier phase leaked, no production file changed |
+
+## Commits
+
+| # | Hash | Subject |
+|---|---|---|
+| 11 | `cf9ac04` | `feat(security): hold scan state behind generation and ordinal guards` |
+| 12 | `f79bbe1` | `feat(persistence): add SchemaV2 and dismissals` |
+| 13 | `67cda37` | `test(metadata): scope the no-comparator guard to reachability` |
+
+Not pushed; no PR opened. The orchestrator owns the receipt-driven review lifecycle.
+
+## Suite state
+
+| Point | Tests | Suites | Result |
+|---|---:|---:|---|
+| Baseline (`5863f61`) | 811 | 120 | pass, 1 known issue |
+| After batch 1 | 823 | 122 | pass, 1 known issue |
+| After batch 2 | 912 | 132 | pass, 1 known issue |
+| After batch 3 | 969 | 139 | pass, 1 known issue |
+| **After batch 4** | **1004** | **143** | pass, 1 known issue |
+
++35 tests, +4 suites: `SecurityStoreGuardTests` (6), `SecurityStoreLifecycleTests` (8),
+`DismissalStoreTests` (11), `SnoozeGuardTests` (7), `MigrationTests` (+3), `LocalStoresTests` (+1),
+`SnoozeProjectionTests` (−1, moved to the guard suite).
+
+`swiftlint --quiet` from the repository root: **118 total, unchanged across batches 1, 2, 3 and 4**.
+**Zero authored findings.** Four were introduced and all four removed by splitting rather than
+silencing: `SecurityStoreTests` (file + type body) split into `SecurityStoreTests` /
+`SecurityStoreLifecycleTests` / `SecurityStoreArrangement`; `MigrationTests` (function body,
+`identifier_name` on `v1`/`v2`, then file length) split into `MigrationTests` /
+`MigrationFixtures`; `SnoozeProjectionTests` (file + type body) split into `SnoozeProjectionTests` /
+`SnoozeGuardTests`.
+
+## TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| 11.1 | `SecurityStoreTests.swift` | Unit (main-actor concurrency) | 969/969 green | ✅ `cannot find type 'SecurityStore' in scope` | ✅ 6 tests | ✅ same ordinal, live vs superseded generation; ordinal 7 then 3 | ✅ suite split three ways |
+| 11.2 | ↑ | Unit | ✅ | ✅ (same) | ✅ | ✅ concurrent duplicate, settled re-delivery, older-then-newer | ✅ join assertion rewritten (Deviation 37) |
+| 11.3 | `SecurityStoreLifecycleTests.swift` | Unit | ✅ | ✅ (same) | ✅ 8 tests | ✅ partial vs complete control; failure with and without a last good | ➖ |
+| 11.4 | ↑ | Unit (+ round trip) | ✅ | ✅ (same) | ✅ | ✅ absent cache vs populated; ordinal 11 refused after 12; live round trip | ➖ |
+| 11.5 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ | ✅ `project` extracted off-main |
+| 12.1 | `MigrationTests.swift` | Unit (real SQLite) | 983/983 green | ✅ `cannot find type 'DismissedCVE'` | ✅ 8 tests | ✅ three models field by field; entity sets; the unique key | ✅ fixture write extracted; throwaway moved out |
+| 12.2–12.3 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ | ➖ |
+| 12.4 | `DismissalStoreTests.swift` | Unit (real SQLite) | ✅ | ✅ `cannot find type 'DismissalStore'` | ✅ 11 tests | ✅ four key components moved one at a time; two unaliased advisories; alias appearing later | ➖ |
+| 12.5 | ↑ | Unit (+ structural) | ✅ | ✅ | ✅ | ✅ values outlive their store; no public declaration names the model; `Sendable` at compile time | ➖ |
+| 12.6 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ | ➖ |
+| 12.7 | `LocalStoresTests.swift` | Unit | ✅ | ✅ `no member 'dismissals'` | ✅ 1 test | ✅ available path and the shared-reason failure path | ➖ |
+| 13.1 | `SnoozeProjectionTests.swift` | Unit (approval) | **11/11 green before and after** | ➖ refactor — approval, not RED | ✅ | ➖ | ✅ reader generalized |
+| 13.2–13.5 | `SnoozeGuardTests.swift` | Unit (structural) | ✅ | ✅ `cannot find 'capabilitySources'` | ✅ 7 tests | ✅ 4-case comparator control, 4-case security control, import vs mention vs absence | ✅ split from the behavioural suite |
+
+Tests written this batch: **35**. Passing: 35. Layers: Unit 35 (main-actor concurrency, real
+SQLite through SwiftData, and structural).
+Approval tests: **task 13.1** — the eleven existing snooze tests were run before the refactor,
+unchanged during it, and green after, which is the whole of what that task asks for.
+Pure functions created: `SecurityStore.project`, `AdvisoryCacheFile.scanResult`,
+`DismissalIdentity.init(_:)`, `DismissalRecord.identity`, `SnoozeGuardTests.importsSecurityKit` — 5.
+
+## Work Unit Evidence
+
+| Unit | Focused command | Result | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| 11 | `swift test --filter SecurityStore` | 14 tests pass | N/A — `TestClock` and an injected wall clock | `SecurityStore.swift` + the `AdvisoryCacheFile` provenance hunk + 3 test files |
+| 12 | `swift test --filter "MigrationTests\|DismissalStoreTests\|LocalStoresTests"` | 22 tests pass | **MV-4 not run** — see Risks; the migration is exercised against a real on-disk SQLite store | `SchemaV2.swift` + `DismissalStore.swift` + the plan/container/`LocalStores` hunks |
+| 13 | `swift test --filter Snooze` | 20 tests pass | N/A — structural | `SnoozeGuardTests.swift` + the `SnoozeProjectionTests` deletion hunk |
+| all | `swift test --package-path Packages/CellarCore` | **1004 / 143 pass**, 1 known issue | — | the three commits above, revertible in order |
+
+**Every guard in this batch was proven by mutation**, because all six are absence claims and an
+absence passes for free when the code under it is missing:
+
+| Mutation | Result |
+|---|---|
+| generation check dropped | 3 tests fail |
+| ordinal check dropped | 9 tests fail |
+| partial adopted as content | 4 tests fail |
+| duplicate returns instead of joining | 2 tests fail (**after** the assertion was rewritten — it passed before) |
+| dismissal identity keyed on the CVE | 9 of 11 fail |
+| version dropped from the dismissal identity | 9 of 11 fail |
+| the `.lightweight` stage removed | 1 test fails (the plan test — **not** the data test) |
+| a second `import SecurityKit` in `Persistence` | 2 tests fail (13.3 and 13.4) |
+| a behavioural snooze test renamed | 1 test fails (13.5) |
+
+## Deviations from plan — batch 4
+
+Numbering continues from batch 3's list.
+
+35. **The advisory cache now persists `provenance` and `isPartial`; `schemaVersion` 1 → 2.** Task
+    11.4 requires `loadCache` to publish a `SecurityScanResult`, and the only two fields a reader
+    could not recover from the entries were exactly the two that say whether enrichment succeeded.
+    Reconstructing them means telling an offline user that a scan whose severities never arrived was
+    complete — the fabrication this whole capability exists to prevent. Both are non-optional and
+    undefaulted, because there is no honest value to invent for them; the five existing test call
+    sites go through `AdvisoryCacheFile.arranged(…)`, a factory whose name says the provenance is
+    scenery rather than subject. Old files are discarded by the existing foreign-schema rule.
+
+36. **Adoption's joinable work is the coverage projection.** `CatalogStore`'s duplicate-joins
+    contract needs an adoption in flight to join, and `SecurityStore` needed one too. Counting the
+    four coverage states over the inventory, off the main actor, is the honest analogue of building
+    the search index: it scales with the inventory, it belongs off-main, and it is what makes "one
+    materialization, one projection" a countable fact. Stated plainly in the doc comment that the
+    work is small today.
+
+37. **The duplicate-join test did not bite on its first writing, and this is recorded rather than
+    quietly fixed.** It asserted the coverage *after* awaiting both adoptions, by which time the
+    first has finished regardless — so the mutation "return instead of joining" passed. It now reads
+    the coverage at the instant the duplicate's own call returns, which is the only moment the two
+    behaviours differ, and the mutation fails. Found by running the mutation, not by review.
+
+38. **Three test files where the plan implies one**, all under the 400-line rule and all mechanical:
+    `SecurityStoreTests` (the two guards), `SecurityStoreLifecycleTests` (degradation, cache, event
+    stream) and `SecurityStoreArrangement` (shared arrangement, so the two suites cannot drift into
+    testing different stores). Likewise `Tests/PersistenceTests/MigrationFixtures.swift`.
+
+39. **`DismissedCVE` is keyed on `advisoryID`, not on `cveID`.** The plan's four-part key
+    `(cveID, kind, name, version)` is unsafe against the data this app receives: `GHSA-`, `RUSTSEC-`
+    and `PYSEC-` records routinely publish **no CVE alias**, so every unaliased finding for one
+    package at one version would be stored under the empty string and dismissing one would silence
+    the rest — findings the user never answered, disappearing. `cveID` is still stored as an
+    attribute because it is what the user sees and what enrichment is keyed by; it is simply not the
+    identity. Still four-part, still primitives only, still `#Unique`.
+
+40. **`DismissalIdentity` ignores `cveID` on lookup.** OSV adds CVE aliases to existing advisories
+    over time. A snapshot keyed on `DismissalKey` — whose `Hashable` includes `cveID` — would
+    silently revoke a dismissal the day an alias appeared upstream, and the user could not tell that
+    apart from the re-surfacing an upgrade is *supposed* to cause.
+
+41. **The pre-existing throwaway `SchemaV2` was retargeted to V3.** Its `versionIdentifier` was
+    `2.0.0` and collided with the real `SchemaV2` the moment one existed: the store failed to load
+    with *"Cannot use staged migration with an unknown model version"*. Its claim was always "the
+    version *after* the one we ship costs a stage, not a rewrite", so it now sits above the shipped
+    V2 and reuses the real `DismissedCVE` rather than adding a fourth redeclaration.
+
+42. **The `.lightweight` stage is asserted by the plan test, not by the data test.** SwiftData
+    performs implicit lightweight migration even with `stages: []`, so removing the stage does *not*
+    fail `aStoreWrittenUnderV1OpensUnderV2WithEveryRowIntact` — it fails
+    `theShippedPlanDeclaresTheV1ToV2Stage`. Recorded so nobody later reads the data test as proof
+    that the stage exists.
+
+43. **The snooze guards moved to `Tests/BrewClientTests/SnoozeGuardTests.swift`.** The combined file
+    broke both the 400-line and the 250-line rules, and the split is the point rather than
+    housekeeping: in this delta the guard grew and the behaviour did not, and one file made that
+    impossible to see in a diff. Task 13.5 now reads the behavioural file **by path**, which is a
+    stronger statement from outside than from within.
+
+44. **A mention inside a comment is deliberately not a violation.** Every scan strips comments first,
+    following the shipped `code(in:)` discipline, so a doc comment may explain the prohibition
+    without breaking it. `theImportScannerDetectsASecondImport` pins all three cases — an import, a
+    prose mention, and an absence — so the exclusion is a stated rule rather than an accident.
+
+---
+
+## What the next batch must know
+
+1. **Read this whole file first and merge.** Batches 1–4 are above; do not overwrite any of them.
+2. **Resume at Phase 16, task 16.1** (`SecurityPresentation`). Phases 11–13 are complete and
+   committed. Phases 14–15 sit *above* 16 in `tasks.md` but ship after it.
+3. **`SecurityStore` is `@MainActor @Observable`** in `Sources/SecurityKit/SecurityStore.swift`, with
+   `state(for:)`, `coverage(for:)`, `scanStatus`, `isReady`, `start()`, `loadCache()`,
+   `startScan(_:)`, `scanNow(_:)` and `cancelScan(_:)`. Task 16.5's composition wires it to the
+   engine exactly as `CatalogStore` is wired: `Task { await store.start() }`, cancelled with the
+   scene, never awaited.
+4. **`AdvisoryCacheFile` now takes `provenance:` and `isPartial:`** and has no defaults for them
+   (Deviation 35). In a test that is asserting something else, use `AdvisoryCacheFile.arranged(…)`.
+   `AdvisoryCacheFile.scanResult` is the projection `loadCache` adopts.
+5. **`SecurityScanState` is the five-case state** (`idle`, `loading(stale:)`, `content`, `partial`,
+   `failed(_, stale:)`, `cancelled(stale:)`) with `result` / `staleResult` / `failure` accessors.
+   Task 16.1's section projection reads `result`; the freshness label reads each entry's
+   `freshness`, which is always `.cached(fetchedAt:)` for anything off the disk.
+6. **Dismissal is `DismissalStore` in `Persistence`**, published as `DismissalSnapshot` keyed by
+   `DismissalIdentity`, with `lookup: DismissalLookup` for the matcher, `records` for enumeration,
+   `dismiss(_:note:at:)` and `restore(_:)`. Task 16.7's dismissal button calls `dismiss`; the
+   undo calls `restore`. **The identity ignores `cveID`** (Deviation 40).
+7. **`LocalStores` now has three stores on one container** — `metadata`, `history`, `dismissals`.
+   The app composition root gets dismissals for free; it must not open a fourth container.
+8. **`DismissalStore.swift` must remain the only `Sources/Persistence/` file importing `SecurityKit`**
+   (task 13.4 scans the whole directory). A second importer fails the suite by design.
+9. **The six-file security scan is anchored per file on its own name.** Renaming any of the six
+   without updating `SnoozeGuardTests.capabilitySources` fails rather than passing vacuously.
+10. **U3 is still open** and gates every Phase 14 inspector RED test (task 14.0).
+11. **Adding or editing any fixture still requires regenerating `probe-manifest.txt`** in the same
+    commit. No fixture was added or edited in this batch, so every recorded digest is byte-unchanged.
+12. **Manual steps MV-4 (migration on a real store) and MV-6 (a real request) have not been run.**
+    MV-4 needs a store written by a shipped build; MV-6 needs the app shell and a consent grant.
+13. Pre-existing lint debt is **not** this change's to fix; the comparable series is the raw total
+    from the repository root (116 → 118 → 118 → 118 → 118).
