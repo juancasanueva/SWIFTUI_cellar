@@ -1,0 +1,50 @@
+# SecurityKit fixture manifest -- SHA-256 of every captured file.
+#
+# Recomputed on every run by FixtureManifestTests, which also asserts this
+# manifest names every file in the tree and every named file exists. A
+# fixture cannot be edited to make a test pass without failing here first.
+#
+# Captured 2026-08-06 -- macOS 26.5.2 (25F84) arm64, Homebrew 6.0.15-83-gd0b51c6,
+# curl 8.7.1. Endpoints, exact requests and exit status: see README.md.
+#
+# Format: <sha256>  <path relative to Fixtures/>
+#
+
+00a7a4ea40924a110461073f8d40d8fad7b0bed7cf6b8f079af3d461baaf4965  OSV/querybatch-response.json
+05cc35b131aa5cd15507b236194902a0d85c994aa5a66041678c7b0d5b1e6a14  NVD/ratelimited-response.headers
+0a8b9e80fd3ac51f3b8f3e934d499eb3c7f2007a99ce6892ae5a0c5c127efcfa  Quarantine/codexbar-com.apple.quarantine.txt
+10bf49ee10feb08a36a64bb56564fe6cbae401af87969fa1970761b983af456f  NVD/cveids-response.json
+1c67b14f68145a0e93cb09fdf8c79365f0e33b28ce0c1a58f19b6ac99659a399  MachO/thin-32-little-endian.bin
+249b3c75a2a64d4a226527022be630d945e9144d520931f09eb59180a373501b  MachO/fat-little-endian.bin
+2b125b9e52129e44d71a210c3ac8fb5ec11acba70f2a307aa74251e4828736eb  Quarantine/applite-com.apple.quarantine.txt
+2e4f7e94d8dac785661f28d9041066c7520394634bf951179510326d4dfc1c48  OSV/querybatch-affected-request.json
+2edb7ce74c808ff05bd028c5a259e615ba3e7e88e44c76be94edbddf472e26a7  OSV/vulns-GHSA-7gcm-g887-7qv7.json
+3950c6aa41f63b1d88763bda11cafe4d4799c6f795c14011e515f7e83845d8a2  OSV/querybatch-request.json
+4bb42795d679496f768d8240de02a0caa353c6753e5ce202ea9b36d1c16d2801  OSV/querybatch-truncated-response.json
+5204bf4eaaa11bffb400b589ce767b694c26a2606458110b7fd512c4db0a7da1  MachO/signature-probe-record.txt
+5ad3d9634255a7c12fdd50db9e0ce91419b3a0ec034a35024dcc343d2c02471d  Versions/homebrew-pkg-version-spec-corpus.txt
+5bb9a8ff177d1c68c2aecca5366973288535d52ac2947ca0fdc66beac5222c11  Versions/installed-versions.txt
+5e4c5d7b08ff25f59219fa1efd3c61afae2b0850d88243eeea028cfdc3815f52  Quarantine/vlc-com.apple.quarantine.txt
+65ab12a8ff3263fbc257e5ddf0aa563c64573d0bab1f1115b9b107834cfa6971  MachO/fat-big-endian.bin
+666e8b06438dd30395a4741136e63266f221da371191d0ecf2fe1ca924c38691  NVD/cveids-request.txt
+7ed460164cafd236975a2b891211fbff9096a99e9b794a8fa3ea565a10e163d4  MachO/ripgrep-header-64.bin
+862f822817bc1930f0ac65415286ccfd6afffa36b23a0a513f0df2115cbbce0a  OSV/vulns-GHSA-p24j-h477-76q3.json
+96a176045629a13da4f0e1b6861e53f0b35fe410d127982d14619d54efeb8ddb  NVD/cveids-badrecord-response.json
+a433b649a6d60108ece067bedb7144c3a7d678ac7dba60fa571600312e0efbce  OSV/vulns-PYSEC-2026-899.json
+a4d1ebd09f41a98b852e843edbe3c5f17b2bf463a16c4cfbcd676dde1596b1b5  OSV/querybatch-badresult-response.json
+a6989091c2f4bbe94fcd7ebbd30ccd5c9d22aa20ceed77b5f0e6f2091ec7a196  Quarantine/ghostty-com.apple.provenance.hex
+a89ee0164784861e97940c6d5d9cd000b1d05b2978a407875c48546a22fc5f96  NVD/cveids-unrated-request.txt
+b032f23d43e2ab5f3d25714aa54eaa2ad1eb5c45466a30d7ec0508630b0f38c3  README.md
+bafd3b3c2daff92b902e2feba88bcff8fcbb6e5cbbdd0e84c17ee976f7960d3a  OSV/querybatch-affected-response.json
+c52117fea845d2400f2804968c863d632980afd4b76ad53757c72a7c4eda1833  OSV/vulns-RUSTSEC-2020-0163.json
+c571b5f7c7790dc10f9d5dfeb008b428e63e68cf105c49ddcbd9a123d4e26bd2  OSV/vulns-PYSEC-2026-1805.json
+d2238b6d7c34ad608a5f6caddf95928d741307fea41f0336302e390109311d72  MachO/thin-64-little-endian.bin
+d26d985b42a00ab7dc102b9ba3cb34781be32a7b1c8b8da403506b3ab46d00fe  OSV/vulns-RUSTSEC-2021-0139.json
+d48114dd4482533893da5a98c87ba84dff2c9193db17145793e2331da19b99e2  Versions/homebrew-version-spec-corpus.txt
+d78486551c30b5f7c9c55d244b9926638280abde1de5de415fc469b1a2c4c2f3  OSV/vulns-GHSA-4gg8-gxpx-9rph.json
+e395ad55dd18b1bf23944d00b156714accfae4ec834df208053575542dfae602  NVD/ratelimited-response.body
+e6ab74bcc9beb10ecdb61fb8589190a2ef245498ca82e5b4cda32f1ea9fef15c  MachO/manpage-header-64.txt
+f2d5f4a39a55cb05f1a9834689891541de2af769c6253b98d21a85cacc430c98  NVD/cveids-unrated-response.json
+f46f685bb071fa4d6b0b6fc1da1618214440c6651341da2df7d6e7a3c830e407  Quarantine/cask-artifact-layout.txt
+fc3bea4e7cc2c7cf21c8edf52e14e40a329bc0f3060b79a030d2f9d55e40c00b  OSV/querybatch-badrecord-response.json
+feef0210e97b7ede1ec32e8efb46825ecb452fdbc2b58774946e1cc83acfaf7f  MachO/shell-script.sh

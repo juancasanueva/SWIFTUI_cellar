@@ -48,7 +48,7 @@ public enum PersistenceContainer {
 
     private static func container(_ configuration: ModelConfiguration) throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(versionedSchema: SchemaV1.self),
+            for: Schema(versionedSchema: SchemaV2.self),
             migrationPlan: MetadataMigrationPlan.self,
             configurations: configuration
         )

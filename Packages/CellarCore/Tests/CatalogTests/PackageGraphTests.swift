@@ -54,6 +54,50 @@ struct PackageGraphTests {
         #expect(graph["DiskUsageTests"] == ["DiskUsage", "CellarTestSupport"])
     }
 
+    // MARK: - m4-security — the SecurityKit edges
+
+    /// Vulnerability scanning is a **brew-free** capability: it reads advisories
+    /// over HTTP and matches them against values, and it never needs a `brew`
+    /// binary, a process, or a disk walk to do it. `Catalog` is the only thing it
+    /// may see, and the disjointness half is what makes that a fact rather than a
+    /// hope — a single `SecurityKit -> BrewClient` edge added later would fail
+    /// here rather than quietly widening the target's reach.
+    @Test("The security target depends on the catalog target and nothing else")
+    func securityKitDependsOnCatalogAlone() throws {
+        let graph = try Self.graph()
+
+        #expect(graph["SecurityKit"] == ["Catalog"])
+        #expect(
+            Self.reachable(from: "SecurityKit", in: graph)
+                .isDisjoint(with: ["BrewProcess", "BrewClient", "DiskUsage", "Persistence"])
+        )
+    }
+
+    /// The manifest half of `local-package-metadata`'s "the security comparator is
+    /// structurally unreachable from snooze". The snooze *rule* lives in
+    /// `BrewClient`; `StrictSemVer` and `FixVersionComparison` live in
+    /// `SecurityKit`. Declaring no edge is not enough on its own — a transitive
+    /// path through a future intermediate target would be just as reachable — so
+    /// both halves are asserted, and the reachability half is the load-bearing one.
+    @Test("No path through the manifest reaches the security target from the brew client")
+    func brewClientCannotReachSecurityKit() throws {
+        let graph = try Self.graph()
+
+        #expect(graph["BrewClient"]?.contains("SecurityKit") != true)
+        #expect(Self.reachable(from: "BrewClient", in: graph).contains("SecurityKit") == false)
+    }
+
+    /// `Persistence` gains a second inward edge for `DismissedCVE`, and it is the
+    /// **only** target that sees both libraries. Asserting the exact pair here
+    /// makes the second edge a deliberate, reviewed fact instead of a side effect
+    /// noticed later in a schema commit.
+    @Test("Persistence owns both inward edges and is the only target that sees both")
+    func persistenceOwnsBothInwardEdges() throws {
+        let graph = try Self.graph()
+
+        #expect(graph["Persistence"] == ["BrewClient", "SecurityKit"])
+    }
+
     // MARK: - The manifest
 
     /// `Package.swift`, located from this file rather than the working

@@ -1,0 +1,5 @@
+.TH RG 1 2026-07-15 "15.2.0" "User Commands"
+.
+.
+.SH NAME
+rg \- 

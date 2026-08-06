@@ -1,0 +1,1 @@
+https://services.nvd.nist.gov/rest/json/cves/2.0?cveIds=CVE-2026-18907,CVE-2026-66257

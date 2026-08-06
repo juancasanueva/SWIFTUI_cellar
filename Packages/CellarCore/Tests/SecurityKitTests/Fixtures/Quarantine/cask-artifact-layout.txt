@@ -1,0 +1,58 @@
+Cask artifact layout — the obs 7454(1) fixture check
+Captured 2026-08-06T09:52:44Z on macOS 26.5.2, Homebrew Homebrew 6.0.15-83-gd0b51c6.
+
+For each installed cask: what the Caskroom entry is, what it resolves to, and the
+artifact target brew itself recorded.
+
+--- applite
+  caskroom entry : /opt/homebrew/Caskroom/applite/1.3.1/Applite.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/Applite.app
+  brew artifacts : [{"app": ["Applite.app"], "target": "/Applications/Applite.app"}]
+--- balenaetcher
+  caskroom entry : /opt/homebrew/Caskroom/balenaetcher/2.1.6/balenaEtcher.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/balenaEtcher.app
+  brew artifacts : [{"app": ["balenaEtcher.app"], "target": "/Applications/balenaEtcher.app"}]
+--- codexbar
+  caskroom entry : /opt/homebrew/Caskroom/codexbar/0.47.0/CodexBar.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/CodexBar.app
+  brew artifacts : [{"app": ["CodexBar.app"], "target": "/Applications/CodexBar.app"}]
+--- font-iosevka-term-nerd-font
+  brew artifacts : (no app artifact)
+--- ghostty
+  caskroom entry : /opt/homebrew/Caskroom/ghostty/1.2.3/Ghostty.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/Ghostty.app
+  brew artifacts : [{"app": ["Ghostty.app"], "target": "/Applications/Ghostty.app"}]
+--- revpdf-editor
+  caskroom entry : /opt/homebrew/Caskroom/revpdf-editor/4.6.5/RevPDF Editor.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/RevPDF Editor.app
+  brew artifacts : [{"app": ["RevPDF Editor.app"], "target": "/Applications/RevPDF Editor.app"}]
+--- spotify
+  caskroom entry : /opt/homebrew/Caskroom/spotify/1.2.94.583/Spotify.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/Spotify.app
+  brew artifacts : [{"app": ["Spotify.app"], "target": "/Applications/Spotify.app"}]
+--- supacode
+  caskroom entry : /opt/homebrew/Caskroom/supacode/0.10.8/supacode.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/supacode.app
+  brew artifacts : [{"app": ["supacode.app"], "target": "/Applications/supacode.app"}]
+--- taphouse
+  caskroom entry : /opt/homebrew/Caskroom/taphouse/1.5.5/Taphouse.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/Taphouse.app
+  brew artifacts : [{"app": ["Taphouse.app"], "target": "/Applications/Taphouse.app"}]
+--- the-unarchiver
+  caskroom entry : /opt/homebrew/Caskroom/the-unarchiver/4.3.9,147,1742287964/The Unarchiver.app
+  entry type     : Directory
+  resolves to    : /opt/homebrew/Caskroom/the-unarchiver/4.3.9,147,1742287964/The Unarchiver.app
+  brew artifacts : [{"app": ["The Unarchiver.app"], "target": "/Applications/The Unarchiver.app"}]
+--- vlc
+  caskroom entry : /opt/homebrew/Caskroom/vlc/3.0.23/VLC.app
+  entry type     : Symbolic Link
+  resolves to    : /Applications/VLC.app
+  brew artifacts : [{"app": ["VLC.app"], "target": "/Applications/VLC.app"}]

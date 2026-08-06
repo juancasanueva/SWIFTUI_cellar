@@ -1,0 +1,172 @@
+# U5 probe -- Homebrew's own `Version` test corpus
+#
+# Source      : /opt/homebrew/Library/Homebrew/test/version_spec.rb
+# Extraction  : rg -o 'described_class\.new\("([^"]+)"\)' -r '$1' | sort -u
+# Captured    : 2026-08-06
+# Homebrew    : 6.0.15-83-gd0b51c6 (repo d0b51c6790)
+# Exit status : 0
+# Unique rows : 149
+#
+# These are the strings Homebrew itself considers worth testing its version
+# parser against. They are the adversarial half of the U5 corpus: the real
+# inventory says what is COMMON, this says what is POSSIBLE. StrictSemVer
+# must reject the overwhelming majority of them, and HomebrewRevision.split
+# must return every one of them unchanged (none carries a `_N` suffix).
+#
+# Shapes that must not parse as strict SemVer:
+#   R13B, R15B01, R15B03-1  -- Erlang releases
+#   2017-04-17, 20040914    -- dates
+#   8d, 20c, 2007f, 2.9h    -- trailing letters
+#   9.04, 1.01b, 2.08       -- leading zeros
+#   HEAD, HEAD-abcdef       -- VCS heads
+#   1.2.3-p2, 1.2.3alpha4   -- non-SemVer prerelease spellings
+#
+0
+0.1
+0.1.0
+0.1.1
+0.10.11
+0.15.1b
+0.181
+0.2
+0.35.1
+0.6.1
+0.7.1
+0.80.2
+0.9.1234
+0.9.17
+0.9.8s
+0.99.2
+1
+1.0
+1.0-beta7
+1.0.0
+1.0.2
+1.0.5
+1.01b
+1.1
+1.1-2
+1.1.4
+1.10-beta
+1.14
+1.2
+1.2-20200102
+1.2.0-rc2
+1.2.2
+1.2.2rc1
+1.2.3
+1.2.3-beta1
+1.2.3-p2
+1.2.3-p33
+1.2.3-p34
+1.2.3-P34
+1.2.3-p35
+1.2.3-p4
+1.2.3-p9
+1.2.3.post33
+1.2.3.post34
+1.2.3.post35
+1.2.34
+1.2.3a
+1.2.3a4
+1.2.3A4
+1.2.3alpha
+1.2.3alpha10
+1.2.3alpha2
+1.2.3alpha3
+1.2.3alpha35
+1.2.3alpha4
+1.2.3alpha5
+1.2.3b2
+1.2.3B2
+1.2.3beta1
+1.2.3beta10
+1.2.3beta2
+1.2.3beta3
+1.2.3beta35
+1.2.3beta4
+1.2.3beta5
+1.2.3pre10
+1.2.3pre3
+1.2.3pre4
+1.2.3pre8
+1.2.3pre9
+1.2.3PRE9
+1.2.3rc10
+1.2.3rc2
+1.2.3rc3
+1.2.3RC3
+1.2.3rc35
+1.2.3rc4
+1.2.4
+1.2.4.1
+1.20
+1.21
+1.23
+1.29
+1.3.0-beta.1
+1.3.6p2
+1.39.0
+1.4.1
+1.4.14b
+1.486
+1.5E
+1.7.5.2
+1.8.0-rc1
+1.8.12
+1.9
+1.9.1-p243
+1.9.293
+2-p194
+2.0.1
+2.0.863
+2.074.0-beta1
+2.074.0-rc1
+2.08
+2.1-p194
+2.1-p195
+2.1.0-p194
+2.1.0-p195
+2.1.0beta
+2.10.0
+2.18.3
+2.3.2.0
+2.4c
+2.8
+2.9h
+20.0.1
+20040914
+2007f
+2011.10
+20120731
+2017-04-17
+20c
+3.0.9b
+3.03
+3.1
+3.3.04-1
+3.3.12ga7
+3.4
+3.6.6-0.2
+398-2
+4.0.18
+4.0.18-1
+4.8.0
+4.8.1
+45
+5.0.0-alpha10
+5.5.7-5
+6-20151227
+6.7.5-7
+7.0.4
+7.1.10
+8d
+9.04
+9.2
+HEAD
+HEAD-abcdef
+HEAD-fedcba
+R13B
+R15B
+R15B01
+R15B03-1

@@ -1,0 +1,53 @@
+{
+  "queries": [
+    {
+      "package": {
+        "ecosystem": "crates.io",
+        "name": "bat"
+      },
+      "version": "0.26.1"
+    },
+    {
+      "package": {
+        "ecosystem": "crates.io",
+        "name": "eza"
+      },
+      "version": "0.23.5"
+    },
+    {
+      "package": {
+        "ecosystem": "npm",
+        "name": "llhttp"
+      },
+      "version": "9.4.3"
+    },
+    {
+      "package": {
+        "ecosystem": "PyPI",
+        "name": "protobuf"
+      },
+      "version": "35.1"
+    },
+    {
+      "package": {
+        "ecosystem": "crates.io",
+        "name": "ripgrep"
+      },
+      "version": "15.2.0"
+    },
+    {
+      "package": {
+        "ecosystem": "crates.io",
+        "name": "sd"
+      },
+      "version": "1.1.0"
+    },
+    {
+      "package": {
+        "ecosystem": "PyPI",
+        "name": "uv"
+      },
+      "version": "0.12.1"
+    }
+  ]
+}

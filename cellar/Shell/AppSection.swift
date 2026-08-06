@@ -23,6 +23,11 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case services
     /// Read-only package, version, and cache storage visibility.
     case cleanup
+    /// Advisory coverage, CVE findings, and artifact integrity.
+    ///
+    /// Between Cleanup and History because it is read-only visibility over what
+    /// is installed, like Cleanup, rather than a record of what Cellar did.
+    case security
     /// The durable record of every mutation Cellar performed.
     ///
     /// Favorites is deliberately **not** here: it is a filter chip on the
@@ -40,6 +45,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .taps: "Taps"
         case .services: "Services"
         case .cleanup: "Cleanup"
+        case .security: "Security"
         case .history: "History"
         }
     }
@@ -52,6 +58,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .taps: "externaldrive.connected.to.line.below"
         case .services: "bolt.horizontal.circle"
         case .cleanup: "externaldrive.badge.timemachine"
+        case .security: "checkmark.shield"
         case .history: "clock.arrow.circlepath"
         }
     }

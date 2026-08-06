@@ -3,6 +3,7 @@ import BrewProcess
 import Catalog
 import DiskUsage
 import Foundation
+import SecurityKit
 
 /// Deterministic, process-free app dependencies used only by the XCUITest launch mode.
 enum AppTestFixtures {
@@ -20,11 +21,66 @@ enum AppTestFixtures {
         return arguments.contains("--ui-testing-m3-taps")
             || arguments.contains("--ui-testing-m3-disk-usage")
             || arguments.contains("--ui-testing-m3-cleanup")
+            || arguments.contains("--ui-testing-m4-security")
     }
 
     nonisolated enum CleanupMode: Sendable {
         case content, empty, unknownTotal, partial, error, cancelled
         case brewAbsence, confirmation, staleChanged, denialRefresh, postTerminalRefresh
+    }
+
+    // MARK: - M4 security
+
+    nonisolated static var isSecurityEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m4-security")
+    }
+
+    /// Two integrity reports, fixed, so the identity disclosure can be exercised
+    /// without a real sweep over a real machine.
+    ///
+    /// The signed one carries **the real values this machine reports for
+    /// Ghostty**, verified against `codesign -dv --verbose=4`. Using real values
+    /// rather than invented ones means the UI test fails if the projection ever
+    /// stops matching what MV-7 compares against.
+    nonisolated static var integrityReports: [ArtifactIntegrityReport] {
+        let signed = ArtifactLocation(
+            packageID: PackageID(kind: .cask, name: "ghostty"),
+            url: URL(fileURLWithPath: "/Applications/Ghostty.app"),
+            kind: .bundle
+        )
+        let adHoc = ArtifactLocation(
+            packageID: PackageID(kind: .formula, name: "ripgrep"),
+            url: URL(fileURLWithPath: "/opt/homebrew/Cellar/ripgrep/15.2.0/bin/rg"),
+            kind: .machO
+        )
+        return [
+            ArtifactIntegrityReport(
+                signature: ArtifactSignatureAssessment(
+                    location: signed,
+                    signing: .signed(
+                        ArtifactSigningIdentity(
+                            identifier: "com.mitchellh.ghostty",
+                            teamIdentifier: "24VZTF6M5V",
+                            authorities: [
+                                "Developer ID Application: Mitchell Hashimoto (24VZTF6M5V)",
+                                "Developer ID Certification Authority",
+                                "Apple Root CA"
+                            ]
+                        )
+                    ),
+                    notarization: .notarized
+                ),
+                quarantine: nil
+            ),
+            ArtifactIntegrityReport(
+                signature: ArtifactSignatureAssessment(
+                    location: adHoc,
+                    signing: .adHoc(identifier: "rg-555549448f89ec4d458733e9aff65b2c3b7acce2"),
+                    notarization: .notNotarized
+                ),
+                quarantine: nil
+            )
+        ]
     }
 
     nonisolated static var isCleanupEnabled: Bool {

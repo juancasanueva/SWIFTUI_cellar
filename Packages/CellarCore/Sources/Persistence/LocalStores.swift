@@ -21,6 +21,10 @@ import SwiftData
 public struct LocalStores {
     public let metadata: MetadataStore
     public let history: HistoryStore
+    /// Dismissed findings. Joins the container the other two already hold
+    /// rather than opening a third: the hazard the one-container rule exists to
+    /// prevent does not care that the newcomer only writes a handful of rows.
+    public let dismissals: DismissalStore
 
     /// The one container both stores were given, or `nil` when it could not be
     /// opened. Internal: the invariant is worth asserting, not exporting.
@@ -28,9 +32,9 @@ public struct LocalStores {
 
     /// Opens the store at `url` once and injects it into both stores.
     ///
-    /// Never throws. An open failure folds into **both** stores'
+    /// Never throws. An open failure folds into **every** store's
     /// `.unavailable(reason:)` carrying the same reason, because it is one
-    /// failure — the alternative is an app whose two halves disagree about why
+    /// failure — the alternative is an app whose halves disagree about why
     /// local storage is off. A `try!` here would turn a recoverable disk problem
     /// into a boot loop (design D4).
     public init(at url: URL = PersistenceContainer.defaultURL()) {
@@ -39,10 +43,12 @@ public struct LocalStores {
             self.container = container
             metadata = MetadataStore(container: container)
             history = HistoryStore(container: container)
+            dismissals = DismissalStore(container: container)
         } catch {
             container = nil
             metadata = MetadataStore(unavailable: error)
             history = HistoryStore(unavailable: error)
+            dismissals = DismissalStore(unavailable: error)
         }
     }
 }

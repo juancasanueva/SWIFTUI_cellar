@@ -11,6 +11,7 @@ import BrewProcess
 import Catalog
 import DiskUsage
 import Persistence
+import SecurityKit
 import SwiftUI
 
 @main
@@ -45,6 +46,29 @@ struct cellarApp: App {
     @State private var diskRefresher: DiskUsageRefreshCoordinator
     @State private var cleanup: CleanupStore
     private let cleanupPreviewSource: any CleanupPreviewSourcing
+
+    /// Advisory coverage and findings.
+    ///
+    /// Owned here like every other store, and wired to its engine exactly as the
+    /// catalog is: `Task { await store.start() }`, cancelled with the scene and
+    /// never awaited. The engine reads consent on **every** egress path, so
+    /// revoking takes effect on the next scheduled pass rather than at the next
+    /// launch — which is why the consent preference is injected into the engine
+    /// rather than consulted once here at construction.
+    @State private var security: SecurityStore
+    /// The recorded answer to "may package names and versions leave this Mac".
+    /// A preference, so it lives in defaults; the NVD key is a secret and lives
+    /// in the Keychain instead.
+    @State private var securityConsent: SecurityConsentPreference
+    /// The Keychain seam, held rather than rebuilt per sheet so the consent sheet
+    /// and the enrichment source read the same store.
+    private let advisoryCredentials: any AdvisoryCredentialStoring
+    /// Dismissed findings, on the same container as metadata and history.
+    @State private var dismissals: DismissalStore
+    /// The artifact-integrity half. Its results are not cached — a signature
+    /// verdict describes the artifact as it is now — so this holds them for the
+    /// life of the scene and no longer.
+    @State private var integrity: ArtifactIntegrityStore
 
     /// The queue of Cellar-initiated mutations, and everything the activity
     /// surfaces read. It is what finally drives `mutations`, the gate M2-1
@@ -122,6 +146,9 @@ struct cellarApp: App {
         let diskCacheURL = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory)
             .appendingPathComponent("Cellar/disk-usage-v1.json")
+        let advisoryCacheURL = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory)
+            .appendingPathComponent("Cellar/\(SecurityKit.advisoryCacheFileName)")
         let diskUsage = DiskUsageStore(
             cache: DiskUsageCache(fileURL: diskCacheURL),
             initialSnapshot: isUITesting && AppTestFixtures.mode != .absent
@@ -146,6 +173,51 @@ struct cellarApp: App {
         self.refreshRegistry = refreshRegistry
         _metadata = State(initialValue: stores.metadata)
         _history = State(initialValue: stores.history)
+        _dismissals = State(initialValue: stores.dismissals)
+        _integrity = State(
+            initialValue: ArtifactIntegrityStore(
+                initialReports: AppTestFixtures.isSecurityEnabled ? AppTestFixtures.integrityReports : []
+            )
+        )
+        let securityConsent = SecurityConsentPreference()
+        let advisoryCredentials = KeychainAdvisoryCredentialStore()
+        _securityConsent = State(initialValue: securityConsent)
+        self.advisoryCredentials = advisoryCredentials
+        // The two sources are reachable from this file and from nowhere else in
+        // the app: neither carries an internal consent check, and the gate lives
+        // in the engine. `SecurityCompositionTests` asserts that structurally, so
+        // a view that reached for `OSVSource` directly would fail the suite
+        // rather than quietly transmit before consent.
+        _security = State(
+            initialValue: SecurityStore(
+                engine: SecurityScanEngine(
+                    discovery: OSVSource(),
+                    enrichment: NVDSource(credentials: advisoryCredentials),
+                    cache: AdvisoryCache(fileURL: advisoryCacheURL),
+                    consent: securityConsent,
+                    // Both halves of what the scan must account for. The
+                    // pre-decided majority — unmapped formulae, casks,
+                    // uninterpretable versions — reaches the surface with its
+                    // typed reason instead of being silently absent, which is
+                    // what keeps the Not-covered count over the whole inventory
+                    // rather than over the handful that could be asked about.
+                    request: { @MainActor in
+                        let plan = SecurityQueryBuilder.plan(for: installed.inventory.packages)
+                        return AdvisoryScanRequest(
+                            queries: plan.queries,
+                            predecided: plan.outcomes.map { packageID, outcome in
+                                PredecidedOutcome(
+                                    packageID: packageID,
+                                    installedVersion: installed.inventory.package(packageID)?
+                                        .primaryKeg.version ?? "",
+                                    outcome: outcome
+                                )
+                            }
+                        )
+                    }
+                )
+            )
+        )
         _services = State(initialValue: services)
         _servicesRefresher = State(
             initialValue: ServicesRefreshCoordinator(store: services, mutations: serviceMutations)
@@ -211,7 +283,13 @@ struct cellarApp: App {
                 taps: taps,
                 diskUsage: diskUsage,
                 cleanup: cleanup,
-                cleanupPreviewSource: cleanupPreviewSource
+                cleanupPreviewSource: cleanupPreviewSource,
+                security: security,
+                securityConsent: securityConsent,
+                advisoryCredentials: advisoryCredentials,
+                dismissals: dismissals,
+                integrity: integrity,
+                artifactLocations: artifactLocations
             )
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
@@ -228,6 +306,11 @@ struct cellarApp: App {
                 // id, so a second window joins rather than starting a second
                 // loop, and closing this one leaves both running.
                 .task { loops.start("catalog") { await catalog.start() } }
+                // The same shape as the catalog: the store loads its cache, then
+                // observes the engine and runs the refresh loop for as long as the
+                // scene lives. `loadCache` consults no consent, so findings stay
+                // readable offline and after revocation.
+                .task { loops.start("security") { await security.start() } }
                 .task { loops.start("installed") { await refresher.run() } }
                 .task { loops.start("installed-watcher") { await watchInstalledRoots() } }
                 // The **terminals consumer only** — never the poll. A `LoopOwner`
@@ -251,6 +334,24 @@ struct cellarApp: App {
     /// The operation centre is attached from the same place, so mutations become
     /// available the moment brew does and go unavailable the moment it stops
     /// being — with no restart either way (package-mutation PM7).
+    /// The brew-managed artifacts worth assessing.
+    ///
+    /// Built from Homebrew's **own roots** and from the inventory brew reported.
+    /// `/Applications` is never enumerated: cask bundles are reached through the
+    /// path Homebrew recorded, which the U3 probe confirmed is a symlink the
+    /// locator resolves rather than a directory it walks.
+    @MainActor
+    private var artifactLocations: [ArtifactLocation] {
+        guard let installation = brewDetection.state.installation else { return [] }
+        let roots = HomebrewRoots(
+            installation: installation,
+            userCacheDirectory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+        )
+        return ArtifactLocator(cellar: roots.cellar, caskroom: roots.caskroom)
+            .locations(for: installed.inventory.packages)
+    }
+
     @MainActor
     private func refreshEverything() async {
         await brewDetection.refresh()

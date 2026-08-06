@@ -1,0 +1,195 @@
+# U5 probe -- real Homebrew installed version-string corpus
+#
+# Source      : `brew list --formula --versions` on the author's machine
+# Captured    : 2026-08-06
+# Homebrew    : 6.0.15-83-gd0b51c6
+# macOS       : 26.5.2 (25F84), arm64
+# Exit status : 0
+#
+# This corpus is the `arguments:` source for HomebrewRevisionTests,
+# StrictSemVerTests and VersionBoundaryTests. It is captured rather than
+# hand-written on purpose: a hand-written corpus would test the author's
+# imagination instead of Homebrew's real output.
+#
+# MEASURED SPLIT (the number the fix-comparison feature is worth)
+#
+#   formulae installed           : 159
+#   strict SemVer                : 125 (78.6%)
+#   strict SemVer + `_N` revision: 9 (5.7%)
+#   neither                      : 25 (15.7%)
+#
+# `strict` is MAJOR.MINOR.PATCH with optional SemVer prerelease/build and
+# numeric identifiers without leading zeros. Fix comparison is offered only
+# for `strict`, because it runs over the INSTALLED string, not the query
+# version -- so the `revision` rows are covered but not comparable, which is
+# exactly the spec's `1.2.3_1` / `1.2.4` scenario.
+#
+# Notable real rows, all of which a naive parser gets wrong:
+#   pcre2 10.47_1        -- `_N` revision on a NON-SemVer upstream (`10.47`)
+#   zsh-autocomplete 26.08.04 -- leading zeros, so not strict SemVer
+#   ca-certificates 2026-07-16 -- a date
+#   x264 r3222           -- an `rNNNN` revision
+#   tmux 3.7b            -- a trailing letter
+#   cliclick 5.1         -- two components only
+#
+# Format: <name> <version> <classification>
+#
+abseil 20260107.1 neither
+ada-url 4.0.0 strict
+apktool 3.0.3 strict
+atuin 18.19.0 strict
+bat 0.26.1 strict
+brotli 1.2.0 strict
+btop 1.4.7 strict
+c-ares 1.34.8 strict
+ca-certificates 2026-07-16 neither
+cairo 1.18.4 strict
+carapace 1.7.3 strict
+cliclick 5.1 neither
+cmake 4.4.2 strict
+coreutils 9.11 neither
+cowsay 3.8.4 strict
+curl 8.21.0 strict
+dav1d 1.5.4 strict
+dotnet@9 9.0.119 strict
+druk 1.14.0 strict
+engram 1.20.0 strict
+eza 0.23.5 strict
+fd 10.4.2 strict
+ffmpeg 8.1.2_1 revision
+fmt 12.2.0 strict
+fontconfig 2.18.2 strict
+freetype 2.14.3 strict
+fzf 0.74.2 strict
+gcc 16.1.0 strict
+gemini-cli 0.46.0 strict
+gentle-ai 2.2.4 strict
+gentleman-dots 2.12.1 strict
+gettext 1.0 neither
+gga 2.10.1 strict
+gh 2.97.0 strict
+ghui 0.9.0 strict
+giflib 6.1.3 strict
+git 2.55.0 strict
+git-filter-repo 2.47.0 strict
+glib 2.88.3 strict
+gmp 6.3.0 strict
+gnupg 2.5.21 strict
+gnutls 3.8.13_2 revision
+go 1.26.5 strict
+golangci-lint 2.12.2 strict
+gpgme 2.1.2 strict
+gpgmepp 2.1.0 strict
+graphite2 1.3.15 strict
+harfbuzz 14.3.0 strict
+hdrhistogram_c 0.11.10 strict
+hello 2.12.3 strict
+hunk 0.17.0 strict
+icu4c@78 78.3 neither
+isl 0.28 neither
+jpeg-turbo 3.2.0 strict
+json-c 0.19 neither
+lame 4.0 neither
+lazygit 0.64.0 strict
+libassuan 3.0.2 strict
+libevent 2.1.13 strict
+libffi 3.7.1 strict
+libgcrypt 1.12.2 strict
+libgit2 1.9.6 strict
+libgpg-error 1.61 neither
+libidn2 2.3.8 strict
+libksba 1.8.0 strict
+libmpc 1.4.1 strict
+libnghttp2 1.70.0 strict
+libnghttp3 1.18.0 strict
+libngtcp2 1.25.0 strict
+libpng 1.6.58 strict
+libpsl 0.23.1 strict
+libssh2 1.11.1_4 revision
+libtasn1 4.21.0 strict
+libtiff 4.7.2 strict
+libunistring 1.4.2 strict
+libusb 1.0.30 strict
+libuv 1.52.1 strict
+libvmaf 3.2.0 strict
+libvpx 1.16.0 strict
+libx11 1.8.13 strict
+libxau 1.0.12 strict
+libxcb 1.17.0 strict
+libxdmcp 1.1.5 strict
+libxext 1.3.7 strict
+libxrender 0.9.12 strict
+libyaml 0.2.5 strict
+little-cms2 2.19 neither
+llhttp 9.4.3 strict
+lpeg 1.1.0_2 revision
+luajit 2.1.1785763465 strict
+lumen 2.31.0 strict
+luv 1.52.1-0 strict
+lz4 1.10.0 strict
+lzo 2.10 neither
+make 4.4.1 strict
+merve 1.2.2_1 revision
+mole 1.49.2 strict
+mosh 1.4.0_40 revision
+mpdecimal 4.0.1 strict
+mpfr 4.2.2 strict
+mpg123 1.33.7 strict
+nbytes 0.1.4 strict
+ncurses 6.6 neither
+neovim 0.12.4 strict
+nettle 4.0 neither
+node 26.6.0 strict
+node@22 22.23.2 strict
+npth 1.8 neither
+nspr 4.39 neither
+nss 3.126 neither
+oniguruma 6.9.10 strict
+openjdk 26.0.2 strict
+openjpeg 2.5.4 strict
+openssl@3 3.6.3 strict
+opus 1.6.1 strict
+p11-kit 0.26.4 strict
+pcre2 10.47_1 neither
+pinentry 1.3.3 strict
+pixman 0.46.4 strict
+poppler 26.08.0 neither
+powerlevel10k 1.20.0 strict
+protobuf 35.1 neither
+python@3.12 3.12.13_4 revision
+python@3.14 3.14.6 strict
+readline 8.3.3 strict
+ripgrep 15.2.0 strict
+ruby 4.0.6 strict
+ruby@3.1 3.1.7_1 revision
+sd 1.1.0 strict
+sdl2-compat 2.32.70 strict
+sdl3 3.4.14 strict
+simdjson 4.6.6 strict
+simdutf 9.0.0 strict
+spice-edit 0.0.43 strict
+sqlc 1.31.1 strict
+sqlite 3.53.4 strict
+svt-av1 4.2.0 strict
+swiftlint 0.65.0 strict
+tmux 3.7b neither
+tree-sitter 0.26.11 strict
+tuicr 0.19.1 strict
+unibilium 2.1.2 strict
+utf8proc 2.11.3 strict
+uv 0.12.1 strict
+uvwasi 0.0.23 strict
+webp 1.6.0 strict
+websocat 1.14.1 strict
+x264 r3222 neither
+x265 4.2 neither
+xcbeautify 3.2.1 strict
+xcodegen 2.46.0 strict
+xorgproto 2025.1 neither
+xz 5.8.3 strict
+zoxide 0.10.0 strict
+zsh 5.9.2 strict
+zsh-autocomplete 26.08.04 neither
+zsh-autosuggestions 0.7.1 strict
+zsh-syntax-highlighting 0.8.0 strict
+zstd 1.5.7_1 revision
