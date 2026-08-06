@@ -52,7 +52,7 @@ Features are grouped into the seven main navigation areas plus cross-cutting cap
 - Instant, as-you-type local search (name, description, token); filters: formula/cask, installed/not installed, outdated, deprecated/disabled.
 - Package detail view: description, homepage, license, current version, dependencies (build/runtime, recursive tree view), dependents ("required by"), analytics (365-day install count), caveats, deprecation/disabled status, tap of origin.
 - **Pre-install cask inspection**: for casks, show the artifact list (what gets installed where), download URL, whether the app is signed/notarized (checked post-download during install via `codesign`/`spctl` on the staged artifact when feasible; otherwise surfaced after install), and auto-updates flag.
-- **Discover tab**: curated/featured sections — most-installed formulae and casks (from Homebrew analytics API), "new in the last 30 days", and a hand-curated JSON list shipped with the app (updatable via app releases).
+- **Discover tab**: curated/featured sections — most-installed formulae and casks (from Homebrew analytics API), "new to you" (packages that appeared since your last catalog sync — formulae.brew.sh publishes no date-added data, so newness is derived locally from successive catalog snapshots; empty on first run), and a hand-curated JSON list shipped with the app (updatable via app releases).
 
 ### 3.2 Installed
 
@@ -63,7 +63,6 @@ Features are grouped into the seven main navigation areas plus cross-cutting cap
 - **Pinning** (`brew pin`/`unpin`) surfaced as a toggle; **favorites** and **per-package notes** (local metadata, SwiftData).
 - **Snooze updates**: hide a package's outdated badge for 1 day / 1 week / 1 month / until next version. Snoozes stored locally with the version they apply to.
 - **Release notes preview**: before upgrading, fetch the changelog from GitHub Releases (resolved from the formula/cask homepage or `stable` URL when it points at GitHub). Rendered as Markdown in a sheet. Graceful "no release notes found" fallback.
-- **Adopt existing apps**: scan `/Applications` for apps that exist as casks but were installed manually; offer `brew install --cask --adopt <token>` so brew takes over update management.
 - **Installation history**: local log of every install/uninstall/upgrade performed through the app (date, package, version from→to, outcome), searchable.
 
 ### 3.3 Services
@@ -104,24 +103,18 @@ At-a-glance snapshot combining:
 - Actions: `brew cleanup` (all or per-package), `brew cleanup --prune=all`, `brew autoremove`, purge download cache. Every destructive action shows a dry-run preview (`--dry-run`/`-n` parsed) with reclaimable bytes before confirmation.
 - Duplicate & orphan detection surfaced here and on the Health dashboard.
 
-### 3.7 Apple Silicon Migration
-
-- Scan `/Applications` (and `~/Applications`) reading Mach-O headers to classify each app: native arm64 / universal / x86_64-only (Rosetta).
-- For x86_64-only apps, look up whether a cask exists whose current artifact is arm64/universal; offer one-click replacement (`brew reinstall --cask` for brew-managed apps, or adopt-then-reinstall / guided replace for manually installed ones).
-- Show Rosetta translation status and estimated benefit copy.
-
-### 3.8 Taps & Brewfile
+### 3.7 Taps & Brewfile
 
 - **Taps manager**: list taps, add (`brew tap user/repo`), remove, show packages per tap. Warning copy when adding third-party taps (untrusted code).
 - **Brewfile import/export**: generate a Brewfile from current state (`brew bundle dump` semantics — taps, formulae, casks; MAS entries excluded in v1), export to file/share sheet; import a Brewfile with a diff preview (what would be installed/missing) and selective apply via `brew bundle --file`.
 
-### 3.9 Menu bar & background
+### 3.8 Menu bar & background
 
 - Optional **menu bar extra** (MenuBarExtra): outdated count badge, top outdated packages, quick "upgrade all", quick service toggles, open main window.
 - **Background update checks** via login item (SMAppService) + periodic `brew update` and outdated/CVE re-scan on a user-configurable schedule (off by default; options 6h/12h/daily/weekly).
 - User notifications (UNUserNotificationCenter): "N packages outdated", "New CVE affects <pkg>", operation-finished notifications for long installs. All individually toggleable.
 
-### 3.10 Cross-cutting
+### 3.9 Cross-cutting
 
 - **Command transparency**: every mutation shows the exact `brew` command being run; a global Activity view streams logs of current and past operations. "Copy command" everywhere.
 - **Operation queue**: brew locks preclude parallel mutations — Cellar! serializes all mutating operations through a queue with visible pending items; read-only queries run concurrently.
@@ -149,7 +142,6 @@ Cellar.xcodeproj
     ├── SecurityKit              # OSV/NVD clients, CVE matching, codesign/spctl,
     │                            #   quarantine xattr handling
     ├── DiskUsage                # Cellar/Caskroom/cache sizing, dry-run parsing
-    ├── ArchScan                 # Mach-O arch detection, /Applications scanning
     ├── ReleaseNotes             # GitHub Releases resolution + fetching
     └── Persistence              # SwiftData models + migrations
 ```
@@ -181,7 +173,7 @@ Failure of any external service degrades gracefully (feature shows cached/empty 
 
 ## 5. UI/UX
 
-- **Navigation**: `NavigationSplitView` — sidebar (Discover, Browse, Installed, Outdated, Services, Health, Security, Cleanup, Apple Silicon, Taps, History) → list → detail. Toolbar search scoped per section. ⌘K quick-open for any package.
+- **Navigation**: `NavigationSplitView` — sidebar (Discover, Browse, Installed, Outdated, Services, Health, Security, Cleanup, Taps, History) → list → detail. Toolbar search scoped per section. ⌘K quick-open for any package.
 - **Design language**: macOS 26 Liquid Glass throughout — standard glass toolbars/sidebars, `.glassEffect` only where system components don't provide it, no custom chrome. SF Symbols, accent-colored status chips (green running / orange outdated / red vulnerable), monospaced log views. Light/dark. Targeting 26+ exclusively means no availability checks or dual design paths.
 - **Long operations**: bottom activity bar with progress + expandable log drawer; operations survive view navigation; app quit with active operations prompts (operation continues in brew if user force-quits — warn accordingly).
 - **Destructive actions**: uninstall/cleanup/quarantine-clear always show scope + reclaimed bytes + exact command; require confirmation; no "don't ask again" for uninstalls.
@@ -214,7 +206,7 @@ Services view with start/stop/restart; disk usage engine + Cleanup view with dry
 OSV/NVD clients + CVE matching engine (fixture-tested); Security view with severity tiers, fix-version upgrades, dismissals; codesign/notarization insights; quarantine manager. *Exit: the headline differentiator works end-to-end.*
 
 **M5 — Pro-parity flows**
-Health dashboard + score; Apple Silicon migration; adopt existing apps; pre-install cask inspection; release notes preview; Brewfile import/export; bulk operations polish; Discover tab. *Exit: full TapHouse feature parity (brew-only scope).*
+Health dashboard + score; pre-install cask inspection; release notes preview; Brewfile import/export; bulk operations polish; Discover tab. *Exit: full TapHouse feature parity (brew-only scope).*
 
 **M6 — Ship**
 Menu bar extra; background checks + notifications (SMAppService); Settings; Spanish localization; accessibility pass; Sparkle integration; CI signing/notarization pipeline; self-hosted tap; landing page; tip jar. *Exit: 1.0 public release.*
