@@ -6,7 +6,7 @@ import Foundation
 /// `notComparable` and a user reading "not comparable" deserves to know which
 /// kind of version defeated the comparison. It is also why no part of this file
 /// needs a text type.
-public enum VersionScheme: Sendable, Hashable {
+public enum VersionScheme: Sendable, Hashable, Codable {
     /// Parsed as SemVer 2.0.0.
     case strictSemVer
     /// A Homebrew packaging revision, `1.2.3_1`. Covered by the scan, not
@@ -45,7 +45,7 @@ public enum DeclaredFix: Sendable, Hashable {
 }
 
 /// The verdict for one finding.
-public enum FixVersionComparison: Sendable, Hashable {
+public enum FixVersionComparison: Sendable, Hashable, Codable {
     /// The fix landed at or before the installed version.
     case fixedAtOrBefore
     /// The fix is ahead of the installed version.

@@ -574,21 +574,21 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 8: The advisory cache
 
-- [ ] 8.1 **RED** `Tests/SecurityKitTests/AdvisoryCacheTests.swift` (new), on an injected clock —
+- [x] 8.1 **RED** `Tests/SecurityKitTests/AdvisoryCacheTests.swift` (new), on an injected clock —
       `anEntryOlderThanTwentyFourHoursIsInvalid` and `anEntryInsideTheTtlIsServed`.
-- [ ] 8.2 **RED** same file — `aMappingRevisionOrMatcherVersionMismatchInvalidatesRegardlessOfTtl`:
+- [x] 8.2 **RED** same file — `aMappingRevisionOrMatcherVersionMismatchInvalidatesRegardlessOfTtl`:
       a corrected table or a fixed matcher can never be masked by a fresh-looking entry.
-- [ ] 8.3 **RED** same file — `anAdvisoryModifiedNewerThanTheEntryForcesReHydrationInsideTheTtl` — the
+- [x] 8.3 **RED** same file — `anAdvisoryModifiedNewerThanTheEntryForcesReHydrationInsideTheTtl` — the
       second, independent invalidation the spec requires.
-- [ ] 8.4 **RED** same file — `cachedOutcomesArePublishedAsCachedWithTheirAge` (never `.live`) and
+- [x] 8.4 **RED** same file — `cachedOutcomesArePublishedAsCachedWithTheirAge` (never `.live`) and
       `aCorruptOrUnreadableFileYieldsNoEntriesAndNoErrorPath` (the `DiskUsageCache` rule: derived data
       in `~/Library/Caches/` degrades to a full scan). — sc *"Findings are readable offline"*.
-- [ ] 8.5 **RED** same file — `theRevisionOrdinalSurvivesASimulatedRelaunch`: save at ordinal N, reopen
+- [x] 8.5 **RED** same file — `theRevisionOrdinalSurvivesASimulatedRelaunch`: save at ordinal N, reopen
       from disk, a live scan mints N+1; and
       `aSlowCacheLoadLandingAfterAFastLiveScanIsRejectedByTheOrdinalGuard` — fresh results are never
       blanked by a late cache read. This is the `CatalogStore.loadCache()` → `adopt` precedent stated
       as a test.
-- [ ] 8.6 **GREEN** create `Sources/SecurityKit/AdvisoryCache.swift` — `AdvisoryCaching` +
+- [x] 8.6 **GREEN** create `Sources/SecurityKit/AdvisoryCache.swift` — `AdvisoryCaching` +
       `actor AdvisoryCache`, `AdvisoryCacheKey/Entry/File`, TTL `24 * 60 * 60`, both invalidations, the
       persisted `revisionOrdinal`. **Commit 8. → PR 1 ends here.**
 

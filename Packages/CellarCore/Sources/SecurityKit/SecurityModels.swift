@@ -75,7 +75,7 @@ public enum ResultFreshness: Sendable, Hashable {
 ///
 /// Every case is a *typed* reason a package went unanswered, because the spec
 /// forbids an unanswered package from silently becoming a clean one.
-public enum AdvisoryError: Error, Sendable, Hashable {
+public enum AdvisoryError: Error, Sendable, Hashable, Codable {
     /// The response envelope could not be read at all. Nothing in it is
     /// recoverable, so the whole request failed.
     case malformedPayload
@@ -105,7 +105,7 @@ public enum AdvisoryError: Error, Sendable, Hashable {
 }
 
 /// One advisory that applies to one installed package.
-public struct VulnerabilityFinding: Sendable, Hashable, Identifiable {
+public struct VulnerabilityFinding: Sendable, Hashable, Codable, Identifiable {
     /// The advisory's own identifier in the database that published it —
     /// `GHSA-…`, `PYSEC-…`, `RUSTSEC-…`.
     public let advisoryID: String
@@ -173,7 +173,7 @@ public struct VulnerabilityFinding: Sendable, Hashable, Identifiable {
 /// version and answered "nothing" — so it is not constructible without naming
 /// who was asked and about what. That is what stops "we have no findings" from
 /// being spelled the same way as "we have no answers".
-public struct CleanCoverage: Sendable, Hashable {
+public struct CleanCoverage: Sendable, Hashable, Codable {
     public let answeredBy: AdvisorySourceID
     /// The version actually put on the wire, which for a Homebrew revision is
     /// the upstream part rather than the installed string.
@@ -207,7 +207,7 @@ public struct CleanCoverage: Sendable, Hashable {
 /// of any boolean shortcut are all unchanged; `.covered(.findings)` and
 /// `.covered(.clean)` still read as the spec's own vocabulary, and a `switch`
 /// over `CVEScanOutcome` is still exhaustive over exactly four possibilities.
-public enum CVEScanOutcome: Sendable, Hashable {
+public enum CVEScanOutcome: Sendable, Hashable, Codable {
     /// The package was queried and an answer came back.
     case covered(Coverage)
     /// The package was never queried, for a typed reason.
@@ -217,7 +217,7 @@ public enum CVEScanOutcome: Sendable, Hashable {
 
     /// The two shapes an answer can take. Distinct cases, never an array that
     /// might be empty.
-    public enum Coverage: Sendable, Hashable {
+    public enum Coverage: Sendable, Hashable, Codable {
         case findings([VulnerabilityFinding])
         case clean(CleanCoverage)
     }
