@@ -59,12 +59,89 @@ struct AcquisitionScopeTests {
             #expect(harness.source.requests(for: resource).count == 1, "\(resource) was not requested once")
         }
 
-        // ...and nothing new is left on disk. The persisted artefacts are still
-        // exactly the snapshot and its sidecar: no retained raw payload.
+        // ...and nothing new is left on disk. The persisted artefacts are
+        // exactly four — the snapshot, its state sidecar, and the two newness
+        // sidecars — and no retained raw payload. The list widened from two to
+        // four with this slice, and to **only** those four (catalog-sync CS-M2).
         let remaining = try FileManager.default
             .contentsOfDirectory(atPath: harness.directory.path)
             .sorted()
-        #expect(remaining == ["catalog-state.json", "catalog.json"])
+        #expect(
+            remaining == [
+                "catalog-arrivals.json",
+                "catalog-roster.json",
+                "catalog-state.json",
+                "catalog.json"
+            ]
+        )
+    }
+
+    // MARK: - Deriving newness costs no acquisition (CS-M2 sc3, PD-R2, TM1)
+
+    @Test("A sync that records arrivals issues no additional request and spawns no process")
+    func derivingNewnessIssuesNoRequest() async throws {
+        // Seed a roster from an earlier sync, so the second sync below takes the
+        // *diffing* path rather than the seeding one — otherwise the silence
+        // proved here would be the silence of a branch that never ran.
+        let harness = try SyncHarness()
+        harness.source.script(.payload(Payload.formulae(["wget"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.source.script(
+            .payload(try Fixture.data("analytics-formula-365d")), for: .analyticsFormula
+        )
+        harness.source.script(
+            .payload(try Fixture.data("analytics-cask-365d")), for: .analyticsCask
+        )
+        _ = await harness.engine.sync()
+        #expect(harness.store.loadRoster() != nil, "the roster was not seeded, so nothing diffed")
+
+        let requestsAfterSeeding = harness.source.requests.count
+
+        // A genuinely new package, so the diff has real work to do.
+        harness.source.script(.payload(Payload.formulae(["wget", "newpkg"])), for: .formulae)
+        harness.source.script(.payload(Payload.casks(["iterm2"])), for: .casks)
+        harness.time.advance(by: 90_000)
+        _ = await harness.engine.sync()
+
+        // The diff really ran and recorded something...
+        #expect(harness.store.loadArrivals()?.arrivals.map(\.name) == ["newpkg"])
+
+        // ...and it cost exactly the four resources a sync already asks for.
+        // The roster and the arrivals log are written from data the sync already
+        // holds in memory: no resource, no per-package request, no consent
+        // surface.
+        let secondPass = harness.source.requests.dropFirst(requestsAfterSeeding).map(\.resource)
+        #expect(Set(secondPass) == Set(Self.expectedResources))
+        #expect(secondPass.count == Self.expectedResources.count)
+        for resource in Self.expectedResources {
+            #expect(
+                secondPass.filter { $0 == resource }.count == 1,
+                "\(resource) was not requested exactly once by the diffing sync"
+            )
+        }
+    }
+
+    @Test("The discovery sources cannot reach a subprocess at all")
+    func discoverySourcesCannotSpawnAProcess() throws {
+        // The strongest form this assertion can take: `Catalog` has no dependency
+        // on `BrewProcess`, so there is no launcher to record. A recording
+        // launcher would prove Discover did not *use* one; this proves it could
+        // not (threat-matrix TM1, by prohibition).
+        let discoverySources = [
+            "DiscoverRanking.swift",
+            "CuratedDiscovery.swift",
+            "DiscoveryRoster.swift",
+            "DiscoveryRosterDiff.swift"
+        ]
+
+        for name in discoverySources {
+            let code = try CatalogSources.code(of: name)
+            CatalogSources.assertAnchored(code, expecting: "public")
+            #expect(code.contains("import BrewProcess") == false, "\(name) imports BrewProcess")
+            for forbidden in ["Process(", "URLSession", "URLRequest", "launchctl", "/opt/homebrew"] {
+                #expect(code.contains(forbidden) == false, "\(name) reaches for \(forbidden)")
+            }
+        }
     }
 
     @Test("Inspection resolves offline, with no brew binary and every request failing")

@@ -76,6 +76,24 @@ public actor CatalogSyncEngine {
         return snapshot.carrying(diskRevision)
     }
 
+    /// The wall-clock instant this engine reckons by.
+    ///
+    /// Exposed so a consumer projecting Discover prunes against the *same*
+    /// clock the sync dated the arrivals with, rather than reaching for
+    /// `Date()` and introducing a second, untestable notion of now.
+    public var now: Date { timeSource.now }
+
+    /// The dated arrivals log, already pruned to the retention window.
+    ///
+    /// Mirrors `cachedSnapshot()`: never blocks on the network, and a missing,
+    /// corrupt or version-mismatched file is the ordinary answer "no arrivals"
+    /// rather than an error. Pruned on the way out, so the thirty-day rule holds
+    /// even on a machine that has not synced in six weeks — write-time pruning
+    /// alone would only bound the file (catalog-sync CS-A2).
+    public func arrivals() -> PackageArrivalsLog? {
+        store.loadArrivals()?.pruned(now: timeSource.now)
+    }
+
     /// Whether the oldest payload source is past its shelf life.
     ///
     /// No cache at all counts as stale — that is what makes a cold launch sync.
@@ -219,6 +237,10 @@ public actor CatalogSyncEngine {
                     skippedRecordCount: acquired.skippedRecordCount
                 )
             )
+            // Only on the path that materialized a *new* snapshot. On a fully
+            // revalidated sync the packages are identical, so diffing would be a
+            // guaranteed no-op costing a roster read and a 16k set compare.
+            recordArrivals(in: snapshot, at: now)
             return succeed(with: snapshot, at: now)
         } catch {
             let failure = CatalogSyncError.from(error)
@@ -239,6 +261,30 @@ public actor CatalogSyncEngine {
             diskRevision = nil
             throw error
         }
+    }
+
+    /// Advances the seen-set and the arrivals log against a freshly published
+    /// snapshot.
+    ///
+    /// **Non-throwing by signature, and that is the point.** This runs inside
+    /// `performSync`'s `do` block, whose `catch` turns anything reaching it into
+    /// a failed sync — so a roster that cannot be written would otherwise
+    /// discard a 47 MB catalog that arrived perfectly. Newness is decoration: a
+    /// write failure here costs newness for one sync and nothing else, and the
+    /// signature is what makes the alternative unreachable rather than merely
+    /// unintended (catalog-sync CS-A1).
+    ///
+    /// An absent or rejected roster is the *seeding* pass, which by construction
+    /// records zero arrivals — so a corrupt file degrades to "empty and
+    /// explained", never to "the whole catalog is new".
+    private func recordArrivals(in snapshot: CatalogSnapshot, at instant: Date) {
+        let advanced = DiscoveryRosterDiff.advance(
+            roster: store.loadRoster(),
+            arrivals: store.loadArrivals(),
+            observing: snapshot.packages,
+            now: instant
+        )
+        try? store.persistDiscovery(roster: advanced.roster, arrivals: advanced.arrivals)
     }
 
     /// What one pass over the two payload resources produced.

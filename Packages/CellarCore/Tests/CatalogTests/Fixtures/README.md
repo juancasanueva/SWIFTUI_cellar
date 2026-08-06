@@ -33,6 +33,28 @@ reached the test bundle.
 | `cask-no-check.json` | `"sha256": "no_check"` | the literal is a *declaration of no checksum*, never rendered as a digest |
 | `formula-headless.json` | `urls.stable` and no `urls.head` | an absent head source URL stays absent |
 
+## Discovery fixtures (M5, `m5-discover`)
+
+Synthetic, and in their own `Discovery/` subdirectory: none of them is a payload excerpt, and mixing
+them into the table above would suggest they were captured from `formulae.brew.sh`. Each is
+registered in `Fakes/Fixtures.swift` (`Fixture.discoveryFixtures`) and read through
+`Fixture.discovery(_:)`, which is what proves the file reached the test bundle.
+
+| File | Shape | Why it exists |
+|---|---|---|
+| `curated-tolerant.json` | 3 well-formed entries beside **five** distinct malformed ones, plus category and entry keys the decoder does not model | PD-R3 *Unknown fields and malformed entries are tolerated* — no blurb, blank blurb, no token, no kind, unknown kind; each is skipped **and counted**, and one bad entry never costs the file |
+| `curated-duplicate.json` | formula `ripgrep` declared in two categories | PD-R3 *A duplicate token resolves once* — the first declaration wins and the redundant one is counted |
+| `curated-unsorted.json` | categories `zeta`/`alpha`/`mu`, entries deliberately not alphabetical | PD-R3 *Declared order survives decoding* — a decoder that re-sorted would pass an alphabetical fixture |
+| `roster-corrupt.json` | bytes that are not valid JSON | CS-A1 sc3 — corrupt means "seen nothing", never an error |
+| `roster-wrong-version.json` | `schemaVersion: 99`, otherwise well-formed | CS-A1 sc3 — the gate is exact in both directions against `DiscoverySchema.currentVersion`, not against the snapshot's |
+| `arrivals-corrupt.json` | bytes that are not valid JSON | CS-A2 sc4 — corrupt means "no arrivals" |
+| `arrivals-wrong-version.json` | `schemaVersion: 99`, two decodable arrivals | CS-A2 sc4 — a readable body behind a rejected version is still "no arrivals" |
+| `arrivals-undatable.json` | one entry whose `firstSeenAt` is a string, between two well-formed entries | CS-A2 sc5 — the undatable entry is dropped and the other two survive, so the decode is lossy per entry rather than per file |
+
+The three hostile roster/arrivals fixtures are **untrusted on-disk input** (threat-matrix TM3): both
+sidecars are writable by any local process, so every one of these shapes has to degrade to "seen
+nothing" without throwing and **without the read mutating the file it rejected** (TM2).
+
 `cask-iterm2.json`, `cask-slice.json` and `formula-slice.json` are the widening's regression control
 and must stay **byte-identical**: the slices are what prove the widened wire decodes exactly the
 records the previous build decoded. Note that `cask-iterm2.json` serialises its `app` destination as

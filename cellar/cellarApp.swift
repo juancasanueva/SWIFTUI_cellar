@@ -23,7 +23,12 @@ struct cellarApp: App {
     /// The catalog, likewise owned once. There is no `ModelContainer` any more:
     /// the catalog is derived data with its own on-disk format, and nothing in
     /// this milestone stores anything a user could lose.
-    @State private var catalog = CatalogStore(directory: CatalogStore.defaultDirectory())
+    ///
+    /// The directory is the one fixture seam here: `--ui-testing-m5-discover`
+    /// points it at an empty temporary directory, which is what makes a genuine
+    /// **first run** reachable from a UI test on a machine that already has a
+    /// synced catalog. Nothing else about the store changes.
+    @State private var catalog = CatalogStore(directory: AppTestFixtures.catalogDirectory)
 
     /// What this machine has installed.
     @State private var installed: InstalledStore

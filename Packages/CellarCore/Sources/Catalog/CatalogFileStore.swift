@@ -37,6 +37,10 @@ public struct CatalogFileStore: Sendable {
 
     public var snapshotURL: URL { directory.appendingPathComponent("catalog.json") }
     public var stateURL: URL { directory.appendingPathComponent("catalog-state.json") }
+    /// The undated seen-set. Versioned by `DiscoverySchema`, not by the
+    /// snapshot's schema, so the two gate independently.
+    public var rosterURL: URL { directory.appendingPathComponent("catalog-roster.json") }
+    public var arrivalsURL: URL { directory.appendingPathComponent("catalog-arrivals.json") }
     public var stagingURL: URL { directory.appendingPathComponent("staging", isDirectory: true) }
 
     /// Whether a snapshot this build can actually read is on disk.
@@ -53,7 +57,7 @@ public struct CatalogFileStore: Sendable {
     /// over it would be a self-inflicted outage (catalog-sync CS6).
     public func loadSnapshot() throws -> CatalogSnapshot? {
         guard let data = try? fileSystem.contentsMappedIfSafe(of: snapshotURL) else { return nil }
-        guard schemaVersion(of: data) == expectedSchemaVersion else { return nil }
+        guard records(expectedSchemaVersion, in: data) else { return nil }
         guard let snapshot = try? decoder.decode(CatalogSnapshot.self, from: data) else { return nil }
         // A catalog with no packages is degenerate, and answering with it would
         // leave the machine revalidating into emptiness forever: the stored
@@ -68,15 +72,49 @@ public struct CatalogFileStore: Sendable {
 
     public func loadState() throws -> CatalogState? {
         guard let data = try? fileSystem.contentsMappedIfSafe(of: stateURL) else { return nil }
-        guard schemaVersion(of: data) == expectedSchemaVersion else { return nil }
+        guard records(expectedSchemaVersion, in: data) else { return nil }
         return try? decoder.decode(CatalogState.self, from: data)
     }
 
-    /// Reads only the version field, so a payload whose *other* fields this
-    /// build cannot parse is still classified correctly.
-    private func schemaVersion(of data: Data) -> Int? {
+    /// The set of identities this machine has already observed, or `nil`.
+    ///
+    /// Missing, corrupt and version-mismatched are deliberately the **same**
+    /// answer, "seen nothing" — and by the seeding rule in
+    /// `DiscoveryRosterDiff`, that answer produces zero arrivals rather than
+    /// reporting the whole catalog as new. Non-throwing by signature, because
+    /// "MUST NOT be reported as an error" is stronger as a type than as a
+    /// convention (catalog-sync CS-A1).
+    ///
+    /// Gated against `DiscoverySchema.currentVersion` and never against the
+    /// snapshot's: a snapshot bump must not erase a user's history.
+    public func loadRoster() -> KnownPackageRoster? {
+        guard let data = try? fileSystem.contentsMappedIfSafe(of: rosterURL) else { return nil }
+        guard records(DiscoverySchema.currentVersion, in: data) else { return nil }
+        return try? decoder.decode(KnownPackageRoster.self, from: data)
+    }
+
+    /// The dated arrivals log, or `nil` for "no arrivals".
+    ///
+    /// Gated exactly as the roster is, and independently of it: a corrupt
+    /// arrivals log costs arrivals without costing the seen-set (CS-A2).
+    public func loadArrivals() -> PackageArrivalsLog? {
+        guard let data = try? fileSystem.contentsMappedIfSafe(of: arrivalsURL) else { return nil }
+        guard records(DiscoverySchema.currentVersion, in: data) else { return nil }
+        return try? decoder.decode(PackageArrivalsLog.self, from: data)
+    }
+
+    /// Whether a persisted file records exactly the version its owning schema
+    /// expects.
+    ///
+    /// Takes the expected version rather than reading `expectedSchemaVersion`
+    /// implicitly, which is what lets the snapshot, the state sidecar and the
+    /// two newness sidecars share one gate while answering to **different**
+    /// schemas. Reads only the version field, so a payload whose other fields
+    /// this build cannot parse is still classified correctly, and the check is
+    /// exact in both directions — older and newer are the same answer.
+    private func records(_ expected: Int, in data: Data) -> Bool {
         struct VersionProbe: Decodable { let schemaVersion: Int }
-        return (try? decoder.decode(VersionProbe.self, from: data))?.schemaVersion
+        return (try? decoder.decode(VersionProbe.self, from: data))?.schemaVersion == expected
     }
 
     // MARK: - Writing
@@ -109,6 +147,33 @@ public struct CatalogFileStore: Sendable {
         do {
             try fileSystem.createDirectory(at: directory)
             try publish(try encoder.encode(state), to: stateURL, stagedAs: "catalog-state.json.new")
+        } catch {
+            throw CatalogSyncError.persistence
+        }
+    }
+
+    /// Publishes the two newness sidecars, **arrivals first**.
+    ///
+    /// The crash-order choice, mirroring the snapshot-before-sidecar rule: pick
+    /// the order that costs a redundant repeat rather than a wrong answer. A
+    /// crash between the two leaves an arrival recorded whose identity the
+    /// roster does not yet hold, so the next sync records it again and the
+    /// earliest-`firstSeenAt` rule deduplicates it. Writing the roster first
+    /// would mark the package seen with no arrival ever written, losing it
+    /// permanently (catalog-sync CS-A1, CS-A2).
+    public func persistDiscovery(roster: KnownPackageRoster, arrivals: PackageArrivalsLog) throws {
+        do {
+            try fileSystem.createDirectory(at: directory)
+            try publish(
+                try encoder.encode(arrivals),
+                to: arrivalsURL,
+                stagedAs: "catalog-arrivals.json.new"
+            )
+            try publish(
+                try encoder.encode(roster),
+                to: rosterURL,
+                stagedAs: "catalog-roster.json.new"
+            )
         } catch {
             throw CatalogSyncError.persistence
         }

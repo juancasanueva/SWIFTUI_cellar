@@ -24,6 +24,29 @@ enum AppTestFixtures {
             || arguments.contains("--ui-testing-m4-security")
     }
 
+    // MARK: - M5 discover
+
+    nonisolated static var isDiscoverEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-discover")
+    }
+
+    /// Where the catalog lives for this launch.
+    ///
+    /// The ordinary location, except under `--ui-testing-m5-discover`, where it
+    /// is an empty per-launch temporary directory. That is the only way a UI
+    /// test can reach a genuine **first run** — with no snapshot, no roster and
+    /// no arrivals log — on a developer machine whose real catalog directory is
+    /// already populated. Deliberately narrow: it moves a path and changes no
+    /// behaviour.
+    ///
+    /// Main-actor isolated because `CatalogStore.defaultDirectory()` is, and it
+    /// is only ever read from the composition root, which is on that actor.
+    static var catalogDirectory: URL {
+        guard isDiscoverEnabled else { return CatalogStore.defaultDirectory() }
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent("cellar-ui-discover-\(UUID().uuidString)", isDirectory: true)
+    }
+
     nonisolated enum CleanupMode: Sendable {
         case content, empty, unknownTotal, partial, error, cancelled
         case brewAbsence, confirmation, staleChanged, denialRefresh, postTerminalRefresh

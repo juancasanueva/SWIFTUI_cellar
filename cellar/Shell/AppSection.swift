@@ -11,6 +11,14 @@ import SwiftUI
 /// is a value the shell can hold, restore and switch over exhaustively.
 enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case home
+    /// Ranked ladders, a hand-picked list, and what this Mac has seen for the
+    /// first time recently.
+    ///
+    /// Between Home and Browse because it serves the user *before* they have a
+    /// query: Browse is a search field over ~16k records and answers nothing
+    /// useful when empty. Home keeps the landing spot for now — moving it is
+    /// slice 5's decision, once the Health dashboard exists (D4).
+    case discover
     case browse
     case installed
     /// Homebrew source inventory and third-party tap management.
@@ -40,6 +48,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .home: "Home"
+        case .discover: "Discover"
         case .browse: "Browse"
         case .installed: "Installed"
         case .taps: "Taps"
@@ -53,6 +62,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     var systemImage: String {
         switch self {
         case .home: "house"
+        case .discover: "sparkles"
         case .browse: "square.grid.2x2"
         case .installed: "shippingbox"
         case .taps: "externaldrive.connected.to.line.below"

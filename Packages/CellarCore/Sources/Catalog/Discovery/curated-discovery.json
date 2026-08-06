@@ -1,0 +1,159 @@
+{
+  "categories": [
+    {
+      "id": "cli-essentials",
+      "title": "Command line essentials",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "ripgrep",
+          "blurb": "Search every file in a project in about the time it takes to blink. Most other search tools now measure themselves against it."
+        },
+        {
+          "kind": "formula",
+          "token": "fd",
+          "blurb": "Find files without looking up find's syntax again. Sensible defaults and flags you can remember."
+        },
+        {
+          "kind": "formula",
+          "token": "jq",
+          "blurb": "Read and reshape JSON right in the terminal, so you stop pasting API responses into a browser tab."
+        },
+        {
+          "kind": "formula",
+          "token": "bat",
+          "blurb": "Read a file in the terminal with syntax colours and line numbers instead of a wall of grey text."
+        },
+        {
+          "kind": "formula",
+          "token": "eza",
+          "blurb": "A directory listing that shows sizes, dates and git status in a layout you can scan at a glance."
+        },
+        {
+          "kind": "formula",
+          "token": "fzf",
+          "blurb": "Pick anything by typing a few letters of it: a file, a branch, or a command you ran last week."
+        }
+      ]
+    },
+    {
+      "id": "developer-workflow",
+      "title": "Developer workflow",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "git",
+          "blurb": "The version control nearly every project assumes you have. Worth installing even though macOS bundles an older copy."
+        },
+        {
+          "kind": "formula",
+          "token": "gh",
+          "blurb": "Open a pull request, review one, or check whether CI passed without leaving the terminal."
+        },
+        {
+          "kind": "formula",
+          "token": "lazygit",
+          "blurb": "A visual way to stage, commit and rebase for the days when raw git commands stop being enjoyable."
+        },
+        {
+          "kind": "formula",
+          "token": "direnv",
+          "blurb": "Loads a project's environment variables the moment you step into its folder, and unloads them when you leave."
+        },
+        {
+          "kind": "formula",
+          "token": "httpie",
+          "blurb": "Send an HTTP request and actually read the answer, without assembling a line of curl flags first."
+        },
+        {
+          "kind": "cask",
+          "token": "visual-studio-code",
+          "blurb": "A code editor with an extension for essentially every language you are likely to pick up."
+        }
+      ]
+    },
+    {
+      "id": "desktop-apps",
+      "title": "Apps worth having",
+      "entries": [
+        {
+          "kind": "cask",
+          "token": "iterm2",
+          "blurb": "A terminal you can genuinely configure: split panes, saved profiles, and a search that works."
+        },
+        {
+          "kind": "cask",
+          "token": "rectangle",
+          "blurb": "Snap windows into halves and quarters with a keyboard shortcut, the way you keep wishing macOS would."
+        },
+        {
+          "kind": "cask",
+          "token": "raycast",
+          "blurb": "Launch apps, run small scripts and search your clipboard history from a single keyboard shortcut."
+        },
+        {
+          "kind": "cask",
+          "token": "obsidian",
+          "blurb": "Keep notes as plain Markdown files you own, with links between them that still work in ten years."
+        }
+      ]
+    },
+    {
+      "id": "media-and-files",
+      "title": "Media and files",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "ffmpeg",
+          "blurb": "Convert, trim or re-encode almost any audio or video file. It is the engine inside most apps that claim to do this."
+        },
+        {
+          "kind": "formula",
+          "token": "imagemagick",
+          "blurb": "Resize, crop or convert a whole folder of images in one command instead of one file at a time."
+        },
+        {
+          "kind": "formula",
+          "token": "yt-dlp",
+          "blurb": "Save a video or a podcast episode to watch later, on a train or anywhere else without a connection."
+        },
+        {
+          "kind": "formula",
+          "token": "sevenzip",
+          "blurb": "Open and create 7z archives, along with most other archive formats someone might send you."
+        }
+      ]
+    },
+    {
+      "id": "watching-your-mac",
+      "title": "Keeping an eye on your Mac",
+      "entries": [
+        {
+          "kind": "formula",
+          "token": "btop",
+          "blurb": "See what is using your processor, memory and network in a display you can read at a glance."
+        },
+        {
+          "kind": "formula",
+          "token": "dust",
+          "blurb": "Find out what is actually filling your disk, sorted with the biggest offenders first."
+        },
+        {
+          "kind": "formula",
+          "token": "ncdu",
+          "blurb": "Walk into the folder eating your disk space and delete things from the same screen."
+        },
+        {
+          "kind": "cask",
+          "token": "stats",
+          "blurb": "Put processor, memory, network and battery readouts in the menu bar where you will notice them."
+        },
+        {
+          "kind": "cask",
+          "token": "appcleaner",
+          "blurb": "Remove an app together with the preference and cache files it quietly scattered around your disk."
+        }
+      ]
+    }
+  ]
+}

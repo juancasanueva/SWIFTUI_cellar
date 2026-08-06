@@ -36,6 +36,7 @@ let package = Package(
         // never need a `brew` binary (catalog-sync CS1).
         .target(
             name: "Catalog",
+            resources: [.copy("Discovery")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

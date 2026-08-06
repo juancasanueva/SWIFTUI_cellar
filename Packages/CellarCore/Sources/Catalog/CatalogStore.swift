@@ -25,6 +25,14 @@ public final class CatalogStore {
     /// Becomes true as soon as the cache has been consulted — with or without a
     /// hit. "Ready" means answering, not populated (catalog-sync CS8).
     public private(set) var isReady = false
+    /// What Discover renders for the adopted snapshot.
+    ///
+    /// One `private(set)` property rather than a second store: the engine's
+    /// event stream supports exactly one iterator, so a second `@Observable`
+    /// could not observe snapshots, and one fed by this store would be
+    /// indirection with no boundary. All the logic stays in nonisolated pure
+    /// `Catalog` types — this class gains a value, not behaviour.
+    public private(set) var discover: DiscoverContent = .empty
 
     /// The as-you-type query. Reranks on assignment.
     public var query: String = "" {
@@ -45,6 +53,8 @@ public final class CatalogStore {
     @ObservationIgnored private let engine: CatalogSyncEngine
     @ObservationIgnored private let resultLimit: Int
     @ObservationIgnored private var index = PackageSearchIndex()
+    /// The shipped curated resource, decoded at most once per launch.
+    @ObservationIgnored private var loadedCuratedList: CuratedDiscoveryList?
     @ObservationIgnored private var isRunning = false
     /// Stamped before each adoption's build; only an ordinal still ahead of
     /// `installedSequence` may install.
@@ -200,6 +210,18 @@ public final class CatalogStore {
         let adoption = Task { [weak self] in
             let built = await PackageSearchIndex.build(from: snapshot)
             guard let self else { return }
+            // Every await happens *before* the ordinal guard, so installing is a
+            // single uninterrupted main-actor turn. Awaiting between the guard
+            // and the assignments would reopen exactly the window this design
+            // closes: an observer seeing a fresh index beside a stale Discover.
+            let curated = await curatedList()
+            let arrivals = await engine.arrivals()
+            let projected = await DiscoverProjection.build(
+                snapshot: snapshot,
+                curated: curated,
+                arrivals: arrivals,
+                now: await engine.now
+            )
             // Builds can finish out of order — a 16k snapshot overtaken by a
             // small one. The newer catalog wins, so a stale ordinal is discarded
             // here rather than installed on top of fresher data (design D1).
@@ -209,6 +231,7 @@ public final class CatalogStore {
             // which the store is between indexes.
             index = built
             packageCount = built.recordCount
+            discover = projected
             rerank()
         }
         adoptionInFlight = adoption
@@ -216,6 +239,20 @@ public final class CatalogStore {
         await adoption.value
 
         if adoptionInFlight == adoption { adoptionInFlight = nil }
+    }
+
+    /// The shipped curated list, decoded once per launch.
+    ///
+    /// Cached because the resource cannot change while the app is running, and
+    /// a re-decode per adoption would be pure waste. A resource that fails to
+    /// load is `nil` and stays `nil` for this launch: the curated section then
+    /// reports its own named empty state, which is a designed outcome rather
+    /// than a crash.
+    private func curatedList() async -> CuratedDiscoveryList? {
+        if let loadedCuratedList { return loadedCuratedList }
+        let loaded = try? await CuratedDiscoveryList.shipped()
+        loadedCuratedList = loaded
+        return loaded
     }
 
     /// Recomputes the result list on the main actor, synchronously.
