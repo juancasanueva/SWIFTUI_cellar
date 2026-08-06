@@ -598,11 +598,11 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 9: Consent and credentials
 
-- [ ] 9.1 **RED** `Tests/SecurityKitTests/ScanConsentTests.swift` (new), over a recording fake source —
+- [x] 9.1 **RED** `Tests/SecurityKitTests/ScanConsentTests.swift` (new), over a recording fake source —
       `nothingIsTransmittedBeforeConsent`: construct the store and engine, open the surface, load the
       cache, and assert the recording source saw **zero** requests. — sc *"Nothing is transmitted
       before consent"*.
-- [ ] 9.2 **RED** same file — `turningScanningOffStopsEveryRequestAndEveryScheduledRun`: after
+- [x] 9.2 **RED** same file — `turningScanningOffStopsEveryRequestAndEveryScheduledRun`: after
       revocation, advance the `TestClock` past several poll granularities and past `staleAfter`;
       **zero** requests, **zero** scheduled runs; and `theCacheStaysReadableWithItsAgeAfterRevocation`.
       — sc *"Off means fully off"*.
@@ -620,18 +620,18 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 10: Scan engine and refresh policy
 
-- [ ] 10.1 **RED** `Tests/SecurityKitTests/SecurityScanEngineTests.swift` (new) —
+- [x] 10.1 **RED** `Tests/SecurityKitTests/SecurityScanEngineTests.swift` (new) —
       `overlappingScansCoalesceOntoTheOneInFlightKeyedByToken`;
       `cancellationDrainsThenRestartsRatherThanLeavingAHalfScan`;
       `theEventStreamSupportsExactlyOneObserver`. Mirrors `CatalogSyncEngine`'s shipped guarantees.
-- [ ] 10.2 **RED** `Tests/SecurityKitTests/SecurityRefreshPolicyTests.swift` (new) —
+- [x] 10.2 **RED** `Tests/SecurityKitTests/SecurityRefreshPolicyTests.swift` (new) —
       `stalenessIsWallClockAgainstFetchedAtWhileTheLoopSleepsOnPollGranularity`: `staleAfter` is
       24 h compared against the cache's `fetchedAt`, `pollGranularity` is `.seconds(15 * 60)`; assert
       a simulated overnight sleep still wakes with a pending re-scan. A single 24 h monotonic sleep
       would not (`CatalogSyncEngine.swift:149`), which is exactly why the split exists.
-- [ ] 10.3 **RED** same file — `scanIfStaleDoesNothingWhenTheCacheIsFresh` and
+- [x] 10.3 **RED** same file — `scanIfStaleDoesNothingWhenTheCacheIsFresh` and
       `maximumAttemptsAndBackoffAreHonouredOnRepeatedTransportFailure`.
-- [ ] 10.4 **GREEN** create `Sources/SecurityKit/SecurityScanEngine.swift` (`actor`, single-flight by
+- [x] 10.4 **GREEN** create `Sources/SecurityKit/SecurityScanEngine.swift` (`actor`, single-flight by
       token, `AsyncStream<SecurityScanEvent>`, `scanIfStale()`, `runRefreshLoop()`) and
       `Sources/SecurityKit/SecurityRefreshPolicy.swift`. Every egress path checks `ScanConsent` first.
       **Commit 10.**
