@@ -1,17 +1,17 @@
 # Apply progress: `m4-security`
 
-**Cumulative record — batches 1 and 2 of N.** Later batches MUST read this file and merge; never
-overwrite. Batch 1's record is preserved below verbatim; batch 2 is appended after it.
+**Cumulative record — batches 1, 2 and 3 of N.** Later batches MUST read this file and merge; never
+overwrite. Batches 1 and 2 are preserved below verbatim; batch 3 is appended after them.
 
 | Field | Value |
 |---|---|
-| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6) |
-| Mode | **Strict TDD** (no fallback taken in either batch) |
+| Batches landed | 1 (Phases 0–2), 2 (Phases 3–6), 3 (Phases 7–10) |
+| Mode | **Strict TDD** (no fallback taken in any batch) |
 | Branch | `feature/m4-security` |
 | Branch point | `5863f61` (**not** the planned `0bd1f72` — see Deviation 1) |
 | Delivery | `single-pr` + user-recorded `size:exception` (Engram obs 7456) |
-| Status | **38 / 108 tasks complete**, suite green, no blockers |
-| Resumes at | **Phase 7, task 7.1** (advisory acquisition) |
+| Status | **60 / 108 tasks complete**, suite green, no blockers |
+| Resumes at | **Phase 11, task 11.1** (`SecurityStore`) |
 
 ---
 
@@ -461,3 +461,260 @@ Numbering continues from batch 1's list.
 11. **U3 is still open** and gates every Phase 14 inspector RED test (task 14.0).
 12. Pre-existing lint debt is **not** this change's to fix; the comparable series is the raw total
     (116 → 118 → 118).
+
+---
+
+# Batch 3 — Phases 7, 8, 9, 10
+
+| Field | Value |
+|---|---|
+| Batch | 3 — Phases 7, 8, 9, 10 (work units 7–10) |
+| Mode | **Strict TDD** (no fallback taken) |
+| Attempt authority | acquired with the continuation token, `proceed` |
+| Safety net | 912 tests / 132 suites green at `994c0bd` before any edit |
+| Status | **60 / 108 tasks complete** cumulatively, suite green, no blockers |
+
+## Tasks completed
+
+| Task | What landed |
+|---|---|
+| 7.1 | RED: `OSVSourceTests` + `Fakes/RecordingURLProtocol.swift` (tagged per test) |
+| 7.2 | GREEN: `AdvisorySource.swift` (roles + `AdvisorySession`) and `OSVSource.swift` |
+| 7.3 | RED: `NVDSourceTests` — 159-formula inventory, batching at 100, the credential seam |
+| 7.4 | RED: same file — the rate-limited enrichment scenario, both directions |
+| 7.5 | GREEN: `NVDSource.swift` |
+| 7.6 | RED: `EgressStructureTests.onlyTwoConstantHostsAppearInTheTarget` + its scanner control |
+| 8.1–8.5 | RED: `AdvisoryCacheTests` — TTL, both invalidations, freshness, corruption, the ordinal |
+| 8.6 | GREEN: `AdvisoryCache.swift` — `AdvisoryCaching`, `actor AdvisoryCache`, `SecurityScanRevision` |
+| 9.1–9.2 | RED: `ScanConsentTests` — nothing before consent, off is fully off (landed with commit 10) |
+| 9.3 | RED: same file — `blockedPendingConsent` rather than silence |
+| 9.4 | GREEN: `ScanConsent.swift` — the value, its gate, and the provider seam |
+| 9.5 | RED: `CredentialStoreTests` — round trip plus the no-defaults/no-logging structural scan |
+| 9.6 | GREEN: `KeychainAdvisoryCredentialStore` (protocol half landed in commit 7 — Deviation 19) |
+| 10.1 | RED: `SecurityScanEngineTests` — coalescing, drain-then-restart, the event stream |
+| 10.2–10.3 | RED: `SecurityRefreshPolicyTests` — the wall-clock/monotonic split, retry and backoff |
+| 10.4 | GREEN: `SecurityScanEngine.swift`, `SecurityScanEvents.swift`, `SecurityRefreshPolicy.swift` |
+
+## Commits
+
+| # | Hash | Subject |
+|---|---|---|
+| 7 | `ec953d5` | `feat(security): acquire advisories from two constant hosts` |
+| 8 | `b6797c4` | `feat(security): cache advisory outcomes with two invalidations` |
+| 9 | `af10993` | `feat(security): gate egress on recorded consent and a Keychain seam` |
+| 10 | `a692b33` | `feat(security): schedule scans behind consent on a split clock` |
+
+Not pushed; no PR opened. The orchestrator owns the receipt-driven review lifecycle.
+
+## Suite state
+
+| Point | Tests | Suites | Result |
+|---|---:|---:|---|
+| Baseline (`5863f61`) | 811 | 120 | pass, 1 known issue |
+| After batch 1 | 823 | 122 | pass, 1 known issue |
+| After batch 2 | 912 | 132 | pass, 1 known issue |
+| **After batch 3** | **969** | **139** | pass, 1 known issue |
+
++57 tests, +7 suites: `OSVSourceTests` (11), `NVDSourceTests` (9), `AdvisoryCacheTests` (10),
+`ScanConsentTests` (7), `CredentialStoreTests` (7), `SecurityScanEngineTests` (7),
+`SecurityRefreshPolicyTests` (6), and `EgressStructureTests` (+2).
+
+`swiftlint --quiet` from the repository root: **118 total, unchanged across batches 1, 2 and 3**.
+**Zero authored findings** in `Sources/SecurityKit/` or `Tests/SecurityKitTests/`. Five were
+introduced and all five removed rather than silenced: a cyclomatic-complexity violation in
+`stripComments` (extracted into a `CommentStripper` state machine), two file-length violations
+(`EgressStructureTests` split into `SecurityKitSourceScanning.swift`, `SecurityScanEngine` split into
+`SecurityScanEvents.swift`), a nesting violation in `OSVSource`'s wire types (flattened), and two
+function-body-length violations (`performScan` split into `enrichIfNeeded`/`settle`, two engine tests
+onto a shared helper). One scoped `swiftlint:disable static_over_final_class` with a written
+justification: `URLProtocol` declares `canInit` and `canonicalRequest` as class methods, so an
+override cannot be `static`.
+
+## TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| 7.1 | `OSVSourceTests.swift` | Unit (transport, fixture) | 912/912 green | ✅ `cannot find 'OSVSource' in scope` | ✅ 11 tests | ✅ 8 MiB exactly vs +1; 429 / 503 / 200-with-same-bytes / no-response; count mismatch; empty list | ✅ wire types flattened |
+| 7.2 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ shares 7.1's corpus | ➖ |
+| 7.3 | `NVDSourceTests.swift` | Unit (transport, corpus) | ✅ | ✅ `cannot find type 'NVDSource'` | ✅ 9 tests | ✅ 101 vs exactly 100 vs 0 ids; keyed vs anonymous request; 159-name disjointness with a positive anchor | ➖ |
+| 7.4 | ↑ | Unit (fixture) | ✅ | ✅ | ✅ | ✅ unrated under 429 / scored with enrichment / advertised word survives | ✅ fixture corrected (Deviation 25) |
+| 7.5 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ | ➖ |
+| 7.6 | `EgressStructureTests.swift` | Unit (structural) | ✅ | ✅ failed on the interpolation half | ✅ 2 tests | ✅ third host + interpolated host + commented-out host | ✅ `stripComments` extracted; escape pairs preserved (Deviation 22) |
+| 8.1–8.5 | `AdvisoryCacheTests.swift` | Unit (+ real disk) | ✅ | ✅ `cannot find type 'AdvisoryCacheKey'` | ✅ 10 tests | ✅ TTL boundary both sides + future stamp; stale/newer/matching versions; modified −1/=/+1 and the nil case; absent/corrupt/foreign-schema/good file | ➖ |
+| 8.6 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ | ➖ |
+| 9.3–9.4 | `ScanConsentTests.swift` | Unit | ✅ | ✅ `cannot find 'ScanConsent'` | ✅ 4 tests | ✅ granted vs not vs revoked vs decoded | ➖ |
+| 9.5–9.6 | `CredentialStoreTests.swift` | Unit (+ structural) | ✅ | ✅ `cannot find 'KeychainAdvisoryCredentialStore'` | ✅ 3 tests | ✅ 10 forbidden tokens × 5-case scanner control | ➖ |
+| 9.1–9.2 | `ScanConsentTests.swift` | Unit (engine-level) | ✅ | ✅ `cannot find type 'SecurityScanEngine'` | ✅ 3 tests | ✅ blocked vs consented control; 6 poll granularities and two days after revocation; cache still readable | ➖ |
+| 10.1 | `SecurityScanEngineTests.swift` | Unit (concurrency) | ✅ | ✅ (same compile failure) | ✅ 7 tests | ✅ join then vacate then re-scan; cancelled vs successor; enrichment skipped vs asked vs refused | ✅ `performScan` split; two tests onto one helper |
+| 10.2–10.3 | `SecurityRefreshPolicyTests.swift` | Unit (clock) | ✅ | ✅ (same) | ✅ 6 tests | ✅ never/at/inside/past/future staleness; 3 attempts with 2 backoffs vs 3 non-retryable errors | ➖ |
+| 10.4 | ↑ | Unit | ✅ | ✅ | ✅ | ✅ | ✅ `SecurityScanEvents.swift` extracted |
+
+Tests written this batch: **57**. Passing: 57. Layers: Unit 57 (transport-level through a
+`URLProtocol` seam, fixture-driven, corpus-driven, structural, and clock-driven concurrency).
+Approval tests: none — no refactoring task in this batch, and the one pre-existing helper that was
+changed (`stripComments`) was changed to make a guard able to fail at all, with its own control test.
+
+Pure functions created: `AdvisorySession.configuration`, `AdvisorySession.body`,
+`OSVSource.isWellFormedIdentifier`, `NVDSource.isWellFormedCVEIdentifier`,
+`AdvisoryCacheEntry.isValid`, `AdvisoryCacheEntry.age`, `SecurityScanRevision.next`,
+`SecurityScanRevision.supersedes`, `ScanConsent.authorise`, `SecurityRefreshPolicy.isStale`,
+`SecurityRefreshPolicy.backoff(beforeAttempt:)`, `SecurityRefreshPolicy.isWorthRetrying`,
+`SecurityScanEngine.identifiers(in:)`, `SecurityKitSources.stringLiterals` — 14.
+
+## Work Unit Evidence
+
+| Unit | Focused command | Result | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| 7 | `swift test --filter "OSVSourceTests\|NVDSourceTests\|EgressStructureTests"` | 28 tests pass | **MV-6 not run** — see Risks | `AdvisorySource/OSVSource/NVDSource/AdvisoryCredentialStoring.swift` + `Fakes/RecordingURLProtocol.swift` + 3 test files |
+| 8 | `swift test --filter AdvisoryCacheTests` | 10 tests pass | N/A — real temporary files, no network boundary | `AdvisoryCache.swift` + the `Codable` conformances |
+| 9 | `swift test --filter "ScanConsentTests\|CredentialStoreTests"` | 8 tests pass | **Keychain deliberately not exercised** — asserted by query, not by call | `ScanConsent.swift` + the Keychain half of `AdvisoryCredentialStoring.swift` |
+| 10 | `swift test --filter "SecurityScanEngineTests\|SecurityRefreshPolicyTests\|ScanConsentTests"` | 20 tests pass | N/A — `TestClock` and an injected wall clock | `SecurityScanEngine/SecurityScanEvents/SecurityRefreshPolicy.swift` |
+| all | `swift test --package-path Packages/CellarCore` | **969 / 139 pass**, 1 known issue | — | the four commits above, revertible in order |
+
+**The runtime boundary is exercised at the transport, not at the origin.** Every acquisition test runs
+through a `URLProtocol` beneath a real `URLSession` built from the shipped configuration, so the
+request bytes, method, URL, headers and cache policy under assertion are the ones a real request would
+carry. What is *not* exercised is a live request to `api.osv.dev` or `services.nvd.nist.gov` — that is
+manual step MV-6, and it belongs to the app shell (phase 16) where consent can actually be granted.
+
+## Deviations from plan — batch 3
+
+Numbering continues from batch 2's list.
+
+17. **`AdvisorySource` is two role protocols, not one.** The design names a single protocol exposing
+    `discover` and `enrich`. Both shipped conformers implement exactly one half — OSV decides
+    affectedness, NVD supplies severity, and neither is a fallback for the other — so one protocol
+    would force each to carry a permanently unimplemented method and every call site would have to
+    know which of them does anything. `AdvisoryDiscovering` and `AdvisoryEnriching` are declared in the
+    design's own `AdvisorySource.swift`, with `AdvisorySource` kept as their composition for anything
+    that needs both.
+
+18. **The captured request is byte-compared as canonical JSON, not as raw bytes.** Measured before
+    changing anything: Foundation's `JSONEncoder` with `.prettyPrinted` emits `"queries" : [` — a
+    space before the colon — while the authored fixture is `"queries": [` with a trailing newline, and
+    a real client sends compact JSON anyway. The three forms cannot be byte-equal. Both sides are
+    therefore normalised through `JSONSerialization`, a serializer with no knowledge of this target's
+    types, and the *canonical* bytes are compared. A dropped field, an added field or a reordered
+    array all still fail. The Fixtures README's claim that the file is "the byte-comparison target"
+    remains true of its content; it was never true of its whitespace.
+
+19. **The `AdvisoryCredentialStoring` protocol landed in commit 7**, not commit 9. Task 7.3's
+    `theApiKeyIsReadFromTheCredentialSeamAndNeverFromDefaults` cannot be written without the seam it
+    names. The Keychain implementation landed in commit 9 exactly as planned.
+
+20. **One shared request pipeline: `AdvisorySession`.** Not in the file table. The interesting property
+    of the session is a *negative* one — no cache anywhere — and a duplicated negative is a negative
+    that only half survives the next edit. `AdvisorySession.body(for:on:byteLimit:)` also owns the
+    ordering both sources depend on: transport failure ⇒ `offline`, then status classified, then the
+    byte guard, and only then a decode.
+
+21. **`OSVSource` rejects a `results` count that disagrees with the query count.** Not in the plan.
+    Batch 2's Deviation 7 established that a *dropped* result re-attributes every later answer to the
+    wrong package; the same failure can arrive from the server side, and there is nothing in the
+    payload to catch it. A length mismatch fails the whole request rather than filing somebody else's
+    advisories against the first few packages.
+
+22. **`stripComments` was silently deleting escape pairs, which made task 7.6's interpolation guard
+    unable to fire.** The batch-1 implementation advanced past `\` and its successor without emitting
+    either, so `"https://\(host)/v1"` reached the scanner as `https://host)/v1` and the
+    no-interpolation assertion could never fail. Fixed to preserve both characters, with a control
+    test that feeds the scanner a third host, an interpolated host and a commented-out host and
+    requires exactly the first two.
+
+23. **The recording network is tagged per test, and the first version was wrong.** `URLProtocol`
+    registration is process-global and Swift Testing runs suites concurrently, so a single shared
+    ledger let `OSVSourceTests` consume `NVDSourceTests`' stubs. It surfaced as three plausible-looking
+    assertion failures — a malformed payload, a zero request count, one batch instead of two — none of
+    which was a real defect. Each `RecordingNetwork` now stamps its session with a private header and
+    only ever sees its own exchanges. Recorded because the failure mode was *convincing*: it looked
+    exactly like production bugs.
+
+24. **`AdvisoryError` gained the two planned cases and one doc correction.** `payloadTooLarge` (task
+    7.1) and `blockedPendingConsent` (task 9.3) each arrived with their own RED test, as batch 2
+    required. `transportFailed`'s documentation was widened to cover a non-success status that carries
+    no advisory content, because that is now a second way to reach it.
+
+25. **Task 7.4's advisory had to change, and the scenario is stronger for it.**
+    `GHSA-p24j-h477-76q3` advertises `HIGH` in its own record, so it can never be `unrated` no matter
+    what enrichment does — a test asserting otherwise would have been demanding that a *published*
+    severity be discarded. The scenario is asserted with `PYSEC-2026-899`, which publishes no severity
+    word anywhere and whose alias `CVE-2022-1941` is in the enrichment capture, so the same record runs
+    down both paths. A companion test asserts the advertised word *does* survive a rate limit. The two
+    together are what "does not fabricate severity" actually means: nothing is invented, and nothing
+    published is thrown away.
+
+26. **An entry or a scan stamped in the future is treated as invalid, not as eternally fresh.** Not in
+    the plan. A clock that moved backwards makes an age negative, and a negative age is not an age —
+    without this, one skewed clock freezes the cache and the schedule for as long as the skew lasts.
+
+27. **`SecurityScanRevision` was introduced in phase 8 rather than phase 11.** Task 8.5 requires the
+    ordinal guard "stated as a test", and the guard needs a type. It lives in `AdvisoryCache.swift`
+    beside the persisted `revisionOrdinal`; phase 11's `SecurityStore` consumes it rather than
+    declaring its own.
+
+28. **`SecurityScanOutcome` rather than `Result`.** Cancellation is neither a result nor a failure:
+    folding it into a failure reports a problem where the user simply navigated away, and folding it
+    into a result presents a half-finished scan as an answer. Three cases —
+    `completed` / `cancelled` / `failed` — keeps `AdvisoryError` free of a lifecycle concern.
+
+29. **Tasks 9.1 and 9.2 landed with commit 10.** Both assert consent *through the scan engine*, which
+    task 10.4 creates, so writing them at commit 9 would have left the suite unable to compile. They
+    were written RED against the missing engine and turned green by 10.4, in `ScanConsentTests.swift`
+    as the plan asks. Task 9.1 also names the *store*, which is phase 11 — that half is re-asserted
+    there.
+
+30. **`SecurityTimeSource` is declared locally, not borrowed from `Catalog`.** The two protocols are
+    the same shape today and answer to different owners; `CatalogTimeSource` may change for catalog
+    reasons. Mirroring a discipline is not the same as sharing a type.
+
+31. **Retry is restricted to the two failures another attempt could fix.** `SecurityRefreshPolicy.isWorthRetrying`
+    admits only `offline` and `transportFailed`. Retrying a rate limit immediately is the one thing
+    guaranteed to make a rate limit worse; re-sending an oversized or undecodable payload sends the
+    same bytes again; and consent does not change because it was asked twice.
+
+32. **`Codable` was added across the outcome value tree** — `VulnerabilityFinding`, `CleanCoverage`,
+    `CVEScanOutcome` and its nested `Coverage`, `AdvisoryError`, `FixVersionComparison`,
+    `VersionScheme`. Purely additive, and required by "findings are readable offline": the cache
+    persists the outcome itself, and `cachedOutcomesArePublishedAsCachedWithTheirAge` asserts the real
+    findings survive the disk rather than merely that a file was written.
+
+33. **Two files were split to stay under the 400-line rule**, both mechanical:
+    `Tests/SecurityKitTests/SecurityKitSourceScanning.swift` (the shared source-scanning helpers, now
+    used by five suites) and `Sources/SecurityKit/SecurityScanEvents.swift` (the scan's value types).
+
+34. **Refresh-loop tests cancel without awaiting, and this is measured rather than stylistic.**
+    `TestClock.sleep(until:)` suspends on a `CheckedContinuation` that only `advance(by:)` resumes, so
+    it does not observe task cancellation: `loop.cancel()` followed by `await loop.value` hangs
+    forever. The first version of both loop tests did exactly that and the run had to be killed. They
+    now follow the shipped `SchedulerTests` pattern — `defer { loop.cancel() }`, never awaited.
+
+---
+
+## What the next batch must know
+
+1. **Read this whole file first and merge.** Batches 1, 2 and 3 are above; do not overwrite any of them.
+2. **Resume at Phase 11, task 11.1** (`SecurityStore`). Phases 7–10 are complete and committed.
+3. **`SecurityScanRevision` already exists** in `Sources/SecurityKit/AdvisoryCache.swift`, with
+   `next()` and `supersedes(_:)`. Task 11.1's ordinal guard consumes it; do not declare a second one.
+   `SecurityScanResult` (`revision`, `entries`, `provenance`, `isPartial`) and `SecurityScanOutcome`
+   live in `SecurityScanEvents.swift` and are what the store adopts.
+4. **The engine already publishes what the store needs.** `SecurityScanEngine.events` is a one-observer
+   `AsyncStream<SecurityScanEvent>` carrying `.status(…)` then `.settled(SecurityScanResult)`, and
+   `loadCache()` runs before any network work and consults no consent — task 11.4's
+   `loadCacheRunsBeforeAnyNetworkWorkAndAdoptsAtThePersistedOrdinal` composes those two.
+5. **`isPartial` is already computed** (a refused enrichment, or any skipped OSV record). Task 11.3's
+   `aPartialScanIsAdoptedAsPartialAndNeverAsComplete` reads it rather than re-deriving it.
+6. **The fakes are in `Tests/SecurityKitTests/Fakes/`** and are the ones to reuse:
+   `RecordingNetwork`/`RecordingURLProtocol` (tagged, transport-level), `RecordingAdvisorySource`
+   (counts every call, holds discovery open on a `TestClock`), `MutableScanConsent`,
+   `MutableTimeSource`, `InMemoryAdvisoryCache`, `InMemoryCredentialStore`.
+7. **Never `await` a cancelled refresh loop** — Deviation 34. `defer { loop.cancel() }`.
+8. **`CVEScanOutcome` is still `.covered(.findings(…))` / `.covered(.clean(…))`** — batch 2's
+   Deviation 9.
+9. **U3 is still open** and gates every Phase 14 inspector RED test (task 14.0).
+10. **Adding or editing any fixture still requires regenerating `probe-manifest.txt`** in the same
+    commit. No fixture was added or edited in this batch, so every recorded digest is byte-unchanged.
+11. **Manual step MV-6 (a real request to the two hosts) has not been run.** It needs the app shell and
+    a consent grant, so it belongs to phase 16.
+12. Pre-existing lint debt is **not** this change's to fix; the comparable series is the raw total from
+    the repository root (116 → 118 → 118 → 118).
