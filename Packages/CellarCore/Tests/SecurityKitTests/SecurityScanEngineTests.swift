@@ -257,7 +257,7 @@ struct SecurityScanEngineTests {
     func aLiveScanMintsTheNextOrdinalFromThePersistedOne() async throws {
         let source = RecordingAdvisorySource()
         let cache = InMemoryAdvisoryCache(
-            AdvisoryCacheFile(revisionOrdinal: 12, entries: [])
+            AdvisoryCacheFile.arranged(revisionOrdinal: 12, entries: [])
         )
         let engine = Self.engine(source: source, cache: cache)
 

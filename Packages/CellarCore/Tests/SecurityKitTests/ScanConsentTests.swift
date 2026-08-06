@@ -118,7 +118,7 @@ struct ScanConsentTests {
 
     static func cache(scannedAt fetchedAt: Date) -> InMemoryAdvisoryCache {
         InMemoryAdvisoryCache(
-            AdvisoryCacheFile(
+            AdvisoryCacheFile.arranged(
                 revisionOrdinal: 3,
                 entries: [
                     AdvisoryCacheEntry(

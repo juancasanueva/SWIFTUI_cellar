@@ -194,7 +194,7 @@ struct AdvisoryCacheTests {
 
         let findings = try Self.realFindings()
         try await cache.save(
-            AdvisoryCacheFile(
+            AdvisoryCacheFile.arranged(
                 revisionOrdinal: 1,
                 entries: [Self.entry(outcome: findings, advisoryModified: Self.epoch)]
             )
@@ -253,7 +253,7 @@ struct AdvisoryCacheTests {
         // The control: a file this cache did write comes back. Without it, the
         // three `nil`s above would be satisfied by a `load()` that always
         // returns `nil`.
-        try await cache.save(AdvisoryCacheFile(revisionOrdinal: 4, entries: [Self.entry()]))
+        try await cache.save(AdvisoryCacheFile.arranged(revisionOrdinal: 4, entries: [Self.entry()]))
         let reloaded = try #require(await cache.load())
         #expect(reloaded.revisionOrdinal == 4)
         #expect(reloaded.entries.count == 1)
@@ -271,7 +271,7 @@ struct AdvisoryCacheTests {
 
         let beforeRelaunch = AdvisoryCache(fileURL: fileURL)
         try await beforeRelaunch.save(
-            AdvisoryCacheFile(revisionOrdinal: 7, entries: [Self.entry()])
+            AdvisoryCacheFile.arranged(revisionOrdinal: 7, entries: [Self.entry()])
         )
 
         // A different actor instance on the same URL is what a relaunch looks

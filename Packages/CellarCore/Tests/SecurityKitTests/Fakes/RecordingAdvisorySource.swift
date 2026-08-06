@@ -136,6 +136,34 @@ final class MutableTimeSource: SecurityTimeSource, Sendable {
     }
 }
 
+extension AdvisoryCacheFile {
+    /// A cache file whose provenance is *arrangement* rather than subject.
+    ///
+    /// `provenance` and `isPartial` are persisted and deliberately have no
+    /// defaults on the real initializer, because there is no honest value to
+    /// invent for a file the app writes. In a test that is asserting something
+    /// else entirely — TTL, ordinals, scheduling — they are scenery, and this
+    /// factory says so out loud. The tests that assert *on* provenance build it
+    /// explicitly.
+    static func arranged(
+        revisionOrdinal: Int,
+        entries: [AdvisoryCacheEntry],
+        scannedAt: Date = Date(timeIntervalSince1970: 1_780_000_000),
+        isPartial: Bool = false
+    ) -> AdvisoryCacheFile {
+        AdvisoryCacheFile(
+            revisionOrdinal: revisionOrdinal,
+            entries: entries,
+            provenance: ScanProvenance(
+                scannedAt: scannedAt,
+                matcherVersion: CVEMatcher.version,
+                mappingRevision: EcosystemMapping.revision
+            ),
+            isPartial: isPartial
+        )
+    }
+}
+
 /// An in-memory `AdvisoryCaching`, so scheduling tests never touch a disk.
 final class InMemoryAdvisoryCache: AdvisoryCaching, Sendable {
     private let file: Mutex<AdvisoryCacheFile?>

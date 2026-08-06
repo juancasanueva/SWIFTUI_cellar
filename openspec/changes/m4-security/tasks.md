@@ -638,20 +638,36 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 11: `SecurityStore`
 
-- [ ] 11.1 **RED** `Tests/SecurityKitTests/SecurityStoreTests.swift` (new) —
+- [x] 11.1 **RED** `Tests/SecurityKitTests/SecurityStoreTests.swift` (new) —
       `aSupersededTaskIsKilledByItsGeneration` and
       `aLateArrivingOlderSnapshotIsRejectedByItsOrdinal`. Two guards, two questions — assert both
       independently, or one masks the other.
-- [ ] 11.2 **RED** same file — `aDuplicateOrdinalJoinsTheInFlightAdoptionRatherThanReturning`
+- [x] 11.2 **RED** same file — `aDuplicateOrdinalJoinsTheInFlightAdoptionRatherThanReturning`
       (the `CatalogStore.adopt` contract) and `anOlderOrdinalReturnsWithoutBlanking`.
-- [ ] 11.3 **RED** same file — `lastGoodSurvivesAFailedScan` and
+- [x] 11.3 **RED** same file — `lastGoodSurvivesAFailedScan` and
       `aPartialScanIsAdoptedAsPartialAndNeverAsComplete`. — `vulnerability-scanning` req *"Degradation
       is explicit and never fabricates a clean result"*.
-- [ ] 11.4 **RED** same file — `loadCacheRunsBeforeAnyNetworkWorkAndAdoptsAtThePersistedOrdinal`.
-- [ ] 11.5 **GREEN** create `Sources/SecurityKit/SecurityStore.swift` — `@MainActor @Observable`,
+- [x] 11.4 **RED** same file — `loadCacheRunsBeforeAnyNetworkWorkAndAdoptsAtThePersistedOrdinal`.
+- [x] 11.5 **GREEN** create `Sources/SecurityKit/SecurityStore.swift` — `@MainActor @Observable`,
       `@ObservationIgnored` internals, `private(set)` state, per-`SecurityScope` (`.cveScan`,
       `.integrity`) generations and task map, `lastGood`, plus the `SecurityScanRevision.ordinal`
       guard. **Commit 11.**
+      **Three recorded deviations.** (a) The **cache file now persists `provenance` and `isPartial`**
+      (`schemaVersion` 1 → 2, both non-optional and undefaulted). Task 11.4 cannot be satisfied
+      honestly without them: `loadCache` must publish a `SecurityScanResult`, and the only fields a
+      reader could not get off the disk were exactly the two that say whether enrichment succeeded.
+      Reconstructing them would tell an offline user that a scan whose severities never arrived was
+      complete — the fabrication this capability exists to prevent. Driven by
+      `aCachedLoadCarriesTheScansOwnProvenanceAndPartiality` plus a real round-trip control.
+      (b) Adoption's joinable work is the **coverage projection** (`CoverageTotals` off the main
+      actor), because `CatalogStore`'s duplicate-joins contract needs an in-flight task to join, and
+      counting four states over an inventory is the honest analogue of building the search index.
+      (c) The suite is **two files plus a shared arrangement** — `SecurityStoreGuardTests`,
+      `SecurityStoreLifecycleTests`, `SecurityStoreArrangement.swift` — under the 400-line rule.
+      **Every guard was proven by mutation**: dropping the generation check fails 3 tests, removing
+      the ordinal check fails 9, adopting partial as content fails 4, and returning instead of
+      joining fails 2. The join assertion failed to bite on its first writing and was rewritten to
+      read the coverage *at the instant the duplicate returns* rather than at the end of the test.
 
 ## Phase 12: `SchemaV2`, `DismissedCVE`, and the first migration
 

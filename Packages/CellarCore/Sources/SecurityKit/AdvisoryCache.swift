@@ -168,7 +168,7 @@ public struct AdvisoryCacheFile: Sendable, Hashable, Codable {
     /// Bumped whenever this file's shape changes. A file from another schema is
     /// treated exactly like a corrupt one: discarded, silently, because it is
     /// derived data.
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public let schemaVersion: Int
     /// The ordinal the last published scan was minted at.
@@ -178,18 +178,48 @@ public struct AdvisoryCacheFile: Sendable, Hashable, Codable {
     /// time the app opens.
     public let revisionOrdinal: Int
     public let entries: [AdvisoryCacheEntry]
+    /// What produced these entries.
+    ///
+    /// Persisted rather than reconstructed at load time, and neither optional
+    /// nor defaulted, because there is no honest value to invent for it. A
+    /// reader that had to guess would have to guess `enrichmentSucceeded`, and
+    /// the guess would tell an offline user that a scan whose severities never
+    /// arrived was complete — the exact fabrication this whole capability exists
+    /// to prevent.
+    public let provenance: ScanProvenance
+    /// Whether the scan behind these entries was missing something it set out to
+    /// learn. Carried for the same reason as `provenance`: partiality does not
+    /// survive a relaunch unless it is written down.
+    public let isPartial: Bool
 
     public init(
         schemaVersion: Int = AdvisoryCacheFile.currentSchemaVersion,
         revisionOrdinal: Int,
-        entries: [AdvisoryCacheEntry]
+        entries: [AdvisoryCacheEntry],
+        provenance: ScanProvenance,
+        isPartial: Bool
     ) {
         self.schemaVersion = schemaVersion
         self.revisionOrdinal = revisionOrdinal
         self.entries = entries
+        self.provenance = provenance
+        self.isPartial = isPartial
     }
 
     public var revision: SecurityScanRevision { SecurityScanRevision(ordinal: revisionOrdinal) }
+
+    /// The file read back as the scan it recorded.
+    ///
+    /// A projection, not a reconstruction: every field comes off the disk, so
+    /// nothing here can disagree with what was published when the scan ran.
+    public var scanResult: SecurityScanResult {
+        SecurityScanResult(
+            revision: revision,
+            entries: entries,
+            provenance: provenance,
+            isPartial: isPartial
+        )
+    }
 }
 
 // MARK: - Storage

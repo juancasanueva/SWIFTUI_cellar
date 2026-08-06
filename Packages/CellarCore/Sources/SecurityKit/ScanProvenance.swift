@@ -6,7 +6,10 @@ import Foundation
 /// answer travels with the answer, so a corrected mapping table or a fixed
 /// matcher can be told apart from a stale cache entry rather than guessed at.
 /// The cache invalidates on both version fields for exactly that reason.
-public struct ScanProvenance: Sendable, Hashable {
+/// `Codable` because the cache persists it beside the entries: an outcome read
+/// back offline has to know what produced it, and a provenance reconstructed at
+/// load time would be a guess wearing a fact's clothes.
+public struct ScanProvenance: Sendable, Hashable, Codable {
     public let scannedAt: Date
     /// The matcher that produced this result.
     public let matcherVersion: Int

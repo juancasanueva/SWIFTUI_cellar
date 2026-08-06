@@ -236,8 +236,16 @@ public actor SecurityScanEngine {
                 || discovered.skippedRecordCount > 0
         )
 
+        // Provenance and partiality are persisted with the entries, so a
+        // relaunch reads back the scan that happened rather than a scan-shaped
+        // guess assembled from what survived.
         try? await cache.save(
-            AdvisoryCacheFile(revisionOrdinal: revision.ordinal, entries: entries)
+            AdvisoryCacheFile(
+                revisionOrdinal: revision.ordinal,
+                entries: entries,
+                provenance: result.provenance,
+                isPartial: result.isPartial
+            )
         )
 
         status = .settled(revision)

@@ -29,7 +29,7 @@ struct SecurityRefreshPolicyTests {
     /// "a scan happened then".
     static func cache(scannedAt fetchedAt: Date) -> InMemoryAdvisoryCache {
         InMemoryAdvisoryCache(
-            AdvisoryCacheFile(
+            AdvisoryCacheFile.arranged(
                 revisionOrdinal: 1,
                 entries: [
                     AdvisoryCacheEntry(
