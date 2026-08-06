@@ -19,8 +19,13 @@ import Testing
 /// to look at them.
 @Suite("Security artifact scope")
 struct SecurityArtifactScopeTests {
-    private static func keg(_ version: String) -> InstalledKeg {
-        InstalledKeg(version: version, installedAt: Date(timeIntervalSince1970: 0), installedOnRequest: true)
+    private typealias Arranged = SecurityScopeArrangement
+
+    private static func locator(
+        _ roots: SecurityScopeArrangement.TestRoots,
+        _ fileSystem: RecordingFileSystem
+    ) -> ArtifactLocator {
+        Arranged.locator(roots, fileSystem)
     }
 
     private static func package(
@@ -30,22 +35,15 @@ struct SecurityArtifactScopeTests {
         otherKegs: [String] = [],
         linked: String? = nil
     ) -> InstalledPackage {
-        InstalledPackage(
-            kind: kind,
-            name: name,
-            displayName: name,
-            desc: nil,
-            homepage: nil,
-            tap: "homebrew/core",
-            catalogVersion: version,
-            kegs: ([version] + otherKegs).map(Self.keg),
-            primaryKeg: keg(linked ?? version),
-            snapshotOutdated: false,
-            isPinned: false,
-            pinnedVersion: nil,
-            declaresAutoUpdates: nil,
-            linkedKeg: linked
-        )
+        Arranged.package(name, kind: kind, version: version, otherKegs: otherKegs, linked: linked)
+    }
+
+    private static func makeBundle(at url: URL) throws { try Arranged.makeBundle(at: url) }
+
+    private func withHomebrewTree(
+        _ body: (SecurityScopeArrangement.TestRoots, RecordingFileSystem) throws -> Void
+    ) throws {
+        try Arranged.withHomebrewTree(body)
     }
 
     // MARK: - 15.3 Artifact scope
@@ -54,7 +52,7 @@ struct SecurityArtifactScopeTests {
     func onlyBrewManagedLocationsAreEnumerated() throws {
         try withHomebrewTree { roots, recorder in
             let mapped = Self.package("bat")
-            _ = Self.locator(roots, recorder).locations(for: [mapped], caskArtifacts: [:])
+            _ = Self.locator(roots, recorder).locations(for: [mapped])
 
             #expect(recorder.enumerated.isEmpty == false, "nothing was enumerated at all")
             for path in recorder.enumerated {
@@ -71,7 +69,7 @@ struct SecurityArtifactScopeTests {
     func formulaScopeIsThePrimaryKegsBinAndSbinOnly() throws {
         try withHomebrewTree { roots, recorder in
             let package = Self.package("bat", version: "1.0.0", otherKegs: ["0.9.0"])
-            let located = Self.locator(roots, recorder).locations(for: [package], caskArtifacts: [:])
+            let located = Self.locator(roots, recorder).locations(for: [package])
 
             #expect(located.isEmpty == false, "the keg produced no artifacts at all")
             for path in recorder.enumerated {
@@ -91,54 +89,6 @@ struct SecurityArtifactScopeTests {
         }
     }
 
-    /// The obs 7454(1) carry-forward, driven by the task 14.0 fixture: nine of ten
-    /// Caskroom `.app` entries on this machine are **symlinks into
-    /// `/Applications`**, and the tenth is a stale directory macOS rejects. A
-    /// Caskroom-only walk finds nothing usable, so the locator resolves the path
-    /// **brew itself recorded** — which is not an `/Applications` sweep, because
-    /// only paths Homebrew named are ever visited.
-    @Test("Cask artifacts resolve through brew-recorded paths and not a literal Caskroom walk")
-    func caskArtifactsResolveThroughBrewRecordedPathsAndNotALiteralCaskroomWalk() throws {
-        try withHomebrewTree { roots, recorder in
-            // The real shape: a Caskroom symlink whose target is the actual bundle.
-            let real = roots.prefix.appendingPathComponent("Applications/Ghostty.app")
-            try Self.makeBundle(at: real)
-            let caskroomEntry = roots.caskroom.appendingPathComponent("ghostty/1.2.3/Ghostty.app")
-            try FileManager.default.createDirectory(
-                at: caskroomEntry.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try FileManager.default.createSymbolicLink(at: caskroomEntry, withDestinationURL: real)
-
-            let cask = Self.package("ghostty", kind: .cask, version: "1.2.3")
-            let located = Self.locator(roots, recorder)
-                .locations(for: [cask], caskArtifacts: [cask.id: [real]])
-
-            #expect(located.count == 1, "the brew-recorded artifact was not located")
-            #expect(located.first?.url.path == real.path)
-            #expect(located.first?.kind == .bundle)
-            #expect(
-                located.first?.url.path.hasPrefix(roots.caskroom.path) == false,
-                "the symlink was reported rather than the bundle it points at"
-            )
-        }
-    }
-
-    /// The negative: a cask whose recorded artifact list is empty produces
-    /// nothing, and does **not** fall back to walking the Caskroom.
-    @Test("A cask with no recorded artifact produces nothing rather than a Caskroom guess")
-    func aCaskWithNoRecordedArtifactProducesNothing() throws {
-        try withHomebrewTree { roots, recorder in
-            let caskroomEntry = roots.caskroom.appendingPathComponent("ghostty/1.2.3/Ghostty.app")
-            try Self.makeBundle(at: caskroomEntry)
-
-            let cask = Self.package("ghostty", kind: .cask, version: "1.2.3")
-            let located = Self.locator(roots, recorder).locations(for: [cask], caskArtifacts: [:])
-
-            #expect(located.isEmpty, "an unrecorded Caskroom bundle was located anyway")
-        }
-    }
-
     // MARK: - 15.4 Everything is filtered
 
     @Test("Every candidate is filtered through artifact assessability")
@@ -155,7 +105,7 @@ struct SecurityArtifactScopeTests {
             )
 
             let located = Self.locator(roots, recorder)
-                .locations(for: [Self.package("bat")], caskArtifacts: [:])
+                .locations(for: [Self.package("bat")])
 
             #expect(located.map(\.url.lastPathComponent) == ["bat"], "something unassessable got through")
             #expect(located.allSatisfy { ArtifactAssessability.classify($0.url) != nil })
@@ -215,59 +165,4 @@ struct SecurityArtifactScopeTests {
     }
 
     // MARK: - Helpers
-
-    private static func makeBundle(at url: URL) throws {
-        let macOS = url.appendingPathComponent("Contents/MacOS")
-        try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
-        try Data([0xcf, 0xfa, 0xed, 0xfe] + Array(repeating: 0, count: 60))
-            .write(to: macOS.appendingPathComponent(url.deletingPathExtension().lastPathComponent))
-    }
-
-    /// The two roots the locator needs.
-    ///
-    /// `HomebrewRoots` publishes no memberwise initialiser, and the locator needs
-    /// exactly two of its four URLs — so the seam takes the two rather than the
-    /// whole value. That also keeps the locator honest: it is *given* the roots it
-    /// may enumerate and cannot reach for a third.
-    struct TestRoots {
-        let prefix: URL
-        let cellar: URL
-        let caskroom: URL
-    }
-
-    private static func locator(_ roots: TestRoots, _ fileSystem: RecordingFileSystem) -> ArtifactLocator {
-        ArtifactLocator(cellar: roots.cellar, caskroom: roots.caskroom, fileSystem: fileSystem)
-    }
-
-    private func withHomebrewTree(
-        _ body: (TestRoots, RecordingFileSystem) throws -> Void
-    ) throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("brew-\(UUID().uuidString)")
-        let roots = TestRoots(
-            prefix: root,
-            cellar: root.appendingPathComponent("Cellar"),
-            caskroom: root.appendingPathComponent("Caskroom")
-        )
-        for url in [roots.cellar, roots.caskroom] {
-            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        }
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        // A keg with a real executable in bin/, plus the directories the locator
-        // must decline to walk.
-        for relative in ["bat/1.0.0/bin", "bat/1.0.0/sbin", "bat/1.0.0/include",
-                         "bat/1.0.0/share/man/man1", "bat/0.9.0/bin"] {
-            try FileManager.default.createDirectory(
-                at: roots.cellar.appendingPathComponent(relative),
-                withIntermediateDirectories: true
-            )
-        }
-        try Data([0xcf, 0xfa, 0xed, 0xfe] + Array(repeating: 0, count: 60))
-            .write(to: roots.cellar.appendingPathComponent("bat/1.0.0/bin/bat"))
-        try Data([0xcf, 0xfa, 0xed, 0xfe] + Array(repeating: 0, count: 60))
-            .write(to: roots.cellar.appendingPathComponent("bat/0.9.0/bin/bat"))
-
-        try body(roots, RecordingFileSystem())
-    }
 }

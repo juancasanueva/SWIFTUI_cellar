@@ -344,7 +344,7 @@ struct cellarApp: App {
                 ?? FileManager.default.temporaryDirectory
         )
         return ArtifactLocator(cellar: roots.cellar, caskroom: roots.caskroom)
-            .locations(for: installed.inventory.packages, caskArtifacts: [:])
+            .locations(for: installed.inventory.packages)
     }
 
     @MainActor
