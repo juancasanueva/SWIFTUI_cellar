@@ -216,6 +216,30 @@ The two Homebrew corpora are the adversarial half — the inventory says what is
 `R15B03-1`, `2017-04-17`, `20040914`, `8d`, `20c`, `2007f`, `HEAD`,
 `HEAD-abcdef`, `1.2.3-p2` and `1.0.1e_1`.
 
+### Correction to this capture's own commentary (phase 5)
+
+`homebrew-version-spec-corpus.txt`'s header lists `1.2.3-p2` alongside
+`1.2.3alpha4` as a "non-SemVer prerelease spelling" that must be rejected.
+**That is wrong.** `p2` is an ordinary alphanumeric prerelease identifier, so
+`1.2.3-p2` is valid SemVer 2.0.0 — structurally the same shape as the
+`1.2.3-rc.1+build` task 5.3 requires the parser to accept, and the same shape as
+the real `luv 1.52.1-0` in the installed inventory. `1.2.3alpha4` genuinely is
+invalid, and the parser rejects it.
+
+Accepting it is also the safe direction. Homebrew reads `-p2` as a patch level
+*above* `1.2.3`, while SemVer orders a prerelease *below* its release, so the two
+disagree — and the disagreement makes an installed `1.2.3-p2` look **older** than
+a fix at `1.2.3`. That is a visible false positive rather than a silent false
+negative, which is the direction this codebase chooses. No formula in the
+captured inventory has this shape.
+
+The corpus file's own header is **left byte-unchanged** so its recorded digest
+still stands: the claim is corrected here and pinned by
+`StrictSemVerTests.aHyphenatedPatchLevelIsValidSemVer`, rather than by editing a
+file the manifest is meant to hold still.
+
+### Notable rows
+
 Two real rows carry more weight than the rest:
 
 - `pcre2 10.47_1` (inventory) and `1.0.1e_1` (Homebrew) — a `_N` revision suffix

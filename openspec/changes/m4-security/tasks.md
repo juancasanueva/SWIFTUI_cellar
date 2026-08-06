@@ -393,31 +393,64 @@ If the split is taken, exactly four things move with it — nothing else:
 > is a lexical decomposition, not an ordering. A `<`, `>`, `compare(` or `.numeric` anywhere in it
 > would be the exact leak `local-package-metadata` forbids, one file away from the snooze rule.
 
-- [ ] 5.1 **RED** `Tests/SecurityKitTests/HomebrewRevisionTests.swift` (new) —
+- [x] 5.1 **RED** `Tests/SecurityKitTests/HomebrewRevisionTests.swift` (new) —
       `aTrailingUnderscoreDigitsSuffixIsRemoved` (`1.2.3_1 → ("1.2.3", 1)`),
       `everythingElseIsReturnedUnchanged` parameterized over the U5 corpus (`2024-01-05`, `r5`, `8e`,
       `1.2.3`, `1.2.3_beta`, `1.2_3.4`), and
       `theSplitFileContainsNoComparisonOperator` — a structural scan of
       `Sources/SecurityKit/HomebrewRevision.swift` with comments stripped for `<`, `>`, `compare(`,
       `.numeric`, `precedes`, `isNewer`, `isOlder`, anchored positively on `split(`.
-- [ ] 5.2 **GREEN** create `Sources/SecurityKit/HomebrewRevision.swift` —
+      **The scan normalises `->` away first.** A return arrow is not a comparison, and a raw `>`
+      substring scan would ban every function signature and be satisfiable only by deleting the
+      function — the same failure mode the `xattr` tool / `getxattr` C function distinction avoids
+      in `EgressStructureTests`. `Comparable`, `sorted`, `max(` and `min(` were added to the token
+      list, and `theComparisonScannerDetectsAnOrdering` is the negative control. The prohibition
+      shaped the implementation: it slices with `prefix(upTo:)` rather than a range operator and
+      decides "is this a digit" per character rather than against a bound.
+      All 17 captured `_N` rows are parameterized, and
+      `theWholeCorpusIsUnchangedWhereItCarriesNoSuffix` walks all 298 suffix-free rows of both
+      corpora.
+- [x] 5.2 **GREEN** create `Sources/SecurityKit/HomebrewRevision.swift` —
       `split(_: String) -> (upstream: String, revision: Int?)`.
-- [ ] 5.3 **RED** `Tests/SecurityKitTests/StrictSemVerTests.swift` (new) —
+- [x] 5.3 **RED** `Tests/SecurityKitTests/StrictSemVerTests.swift` (new) —
       `onlyMajorMinorPatchParses` parameterized over the U5 corpus: accepts `1.2.3`,
       `1.2.3-rc.1+build`, rejects `1.2`, `1.2.3.4`, `01.2.3` (leading zero), `v1.2.3`, `1.2.3_1`,
       `2024-01-05`, `r5`. Record the measured accept rate over the real corpus in the test's doc
       comment — that number is what the whole fix-comparison feature is worth.
-- [ ] 5.4 **GREEN** create `Sources/SecurityKit/StrictSemVer.swift` — `parse(_: String) -> StrictSemVer?`.
-- [ ] 5.5 **RED** `Tests/SecurityKitTests/FixVersionComparisonTests.swift` (new) — the five-case
+      **78.6% is recorded in the doc comment and asserted row by row.**
+      `theCorpusClassificationHolds` walks all 159 real rows against the class each was measured as
+      and asserts the three counts (125 / 9 / 25), so the claim fails if the parser drifts either
+      way. The nine `revision` rows additionally assert the boundary itself: the installed string
+      does **not** parse, and the upstream it splits into does.
+      **Correction to a phase-2 capture, recorded not silently followed:** the corpus header lists
+      `1.2.3-p2` among shapes that must be rejected. It is wrong — `p2` is an ordinary alphanumeric
+      prerelease identifier, so `1.2.3-p2` is valid SemVer 2.0.0, structurally identical to the
+      `1.2.3-rc.1+build` this very task requires accepting and to the real `luv 1.52.1-0`. Accepting
+      it is also the safe direction: Homebrew reads `-p2` as a patch level *above* `1.2.3` while
+      SemVer orders a prerelease *below* it, so an installed `1.2.3-p2` looks older than a fix at
+      `1.2.3` — a visible false positive, never a silent false negative. No installed formula has
+      the shape. Corrected in `Fixtures/README.md` and pinned by
+      `aHyphenatedPatchLevelIsValidSemVer`; the corpus file's own bytes are **left unchanged** so
+      its recorded digest still stands.
+- [x] 5.4 **GREEN** create `Sources/SecurityKit/StrictSemVer.swift` — `parse(_: String) -> StrictSemVer?`.
+- [x] 5.5 **RED** `Tests/SecurityKitTests/FixVersionComparisonTests.swift` (new) — the five-case
       matrix: `.fixedAtOrBefore`, `.stillAffected`, `.noFixPublished` (a declared "no fix" is **not**
       `.fixUnknown`), `.fixUnknown`, `.notComparable(scheme:)`. — `vulnerability-scanning` req *"Fix
       version is compared only when both sides are strict SemVer"*.
-- [ ] 5.6 **RED** same file — `theComparatorCannotBeCalledWithStrings`: a structural scan of
+      `everyVerdictIsReachableAndDistinct` reaches all five through one `resolve` call each and
+      asserts `Set(verdicts).count == 5`, so no two can quietly collapse.
+- [x] 5.6 **RED** same file — `theComparatorCannotBeCalledWithStrings`: a structural scan of
       `FixVersionComparison.swift` asserting every public entry point's parameters are typed
       `StrictSemVer`, and that no overload takes `String`. A function that cannot accept two `String`s
       cannot be misapplied to Homebrew version strings — that is the type-level half of the
       `local-package-metadata` guarantee, and the manifest half is task 1.2.
-- [ ] 5.7 **GREEN** create `Sources/SecurityKit/FixVersionComparison.swift`. **Commit 5.**
+      **Stated more absolutely than planned, and therefore checkably:** the word `String` (and
+      `Substring`, `Character`, `rawValue`) appears **nowhere** in the file — not in a signature,
+      not in an overload, not in a raw value, not in a convenience initialiser added later. That
+      forced the two operand types to be typed rather than textual: `VersionScheme` carries no raw
+      value, and `InstalledVersion` is one value rather than an optional plus a scheme, so a caller
+      cannot hand over a missing version and a scheme that disagree.
+- [x] 5.7 **GREEN** create `Sources/SecurityKit/FixVersionComparison.swift`. **Commit 5.**
 
 ## Phase 6: The matcher, the version boundary matrix, and aggregation
 
