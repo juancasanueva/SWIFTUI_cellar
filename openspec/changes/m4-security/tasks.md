@@ -352,20 +352,38 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 4: The curated ecosystem mapping
 
-- [ ] 4.1 **RED** `Tests/SecurityKitTests/EcosystemMappingTests.swift` (new) —
+- [x] 4.1 **RED** `Tests/SecurityKitTests/EcosystemMappingTests.swift` (new) —
       `everyEntryCarriesAnExactEcosystemAndPackageNameAndItsProvenance` (no entry has an empty field,
       no entry is a pattern or prefix) and `theMappingRevisionIsAMonotonicConstant`.
-- [ ] 4.2 **RED** same file — `theU1CollisionNamesAreDeliberatelyAbsent`, parameterized over
+      **"Monotonic constant" was given teeth rather than asserted as `revision >= 1`.** The table
+      carries a `revisionFingerprint` recomputed on every run, so editing an entry without bumping
+      the revision fails the suite — the cache invalidates on `mappingRevision`, and that guarantee
+      is worthless if the constant can go stale. It caught its own placeholder on first run.
+      `theFingerprintDetectsEveryKindOfEdit` is the negative control (edited, grown, shrunken,
+      plus an unedited control). `provenanceCarriesNoScheme` keeps `sharedUpstream` a
+      `host/owner/repo` string rather than a URL, so task 7.6's two-constant-host scan stays a
+      simple fact instead of an allow-list.
+- [x] 4.2 **RED** same file — `theU1CollisionNamesAreDeliberatelyAbsent`, parameterized over
       `["curl", "cmake", "coreutils", "git", "gcc", "ncurses", "glib"]`: each returns `nil` from the
       table. U1 measured these as identity collisions (obs 7451), and a future contributor adding
       `curl → RubyGems` must fail a test that explains why. — `vulnerability-scanning` sc *"An identity
       collision is never a finding"*.
-- [ ] 4.3 **RED** same file — `aPackageAbsentFromTheTableIsNotCoveredUnmapped` and
+- [x] 4.3 **RED** same file — `aPackageAbsentFromTheTableIsNotCoveredUnmapped` and
       `theTableActuallyMapsTheGenuineMatches` (`bat`, `eza`, `ripgrep`, `sd`, `uv`) — the positive
       anchor, or 4.2 passes against an empty table.
-- [ ] 4.4 **GREEN** create `Sources/SecurityKit/EcosystemMapping.swift` — a compiled Swift literal
+      `theTableIsSingleDigit` adds the numeric anchor: measured over the real 159-formula corpus,
+      coverage lands between 2% and 8%, which is U1's measurement stated as a failing condition.
+      `aCaskIsNotCoveredForTheKindReason` covers the sharp case — a **cask** named `bat` must not
+      borrow the mapped formula's coverage.
+- [x] 4.4 **GREEN** create `Sources/SecurityKit/EcosystemMapping.swift` — a compiled Swift literal
       table with per-entry provenance and a `mappingRevision` constant. Single-digit size is correct:
       U1 measured real coverage at ≈3–5%. **Commit 4.**
+      Seven entries, matching the packages the phase-2 `querybatch-request.json` capture was taken
+      for, so task 7.1's byte-comparison has a table that produces it. `protobuf` and `llhttp` are
+      **cross-language bindings of one upstream**, and that caveat is written into their own
+      `provenance` field rather than dropped or hidden. `NotCoveredReason` is decided by
+      `EcosystemMapping.lookup(_:)` rather than re-derived in the matcher, because the table is the
+      only thing that can say "absent".
 
 ## Phase 5: The version boundary — lexical split, strict SemVer, comparator
 
