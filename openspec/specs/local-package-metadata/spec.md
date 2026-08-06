@@ -129,6 +129,21 @@ the badge immediately, on the same refresh. Suppression MUST be a projection ove
 outdated state and the stored snooze: it MUST NOT alter the inventory's own outdated derivation, and
 it MUST NOT hide the package from the Installed list.
 
+A strict-SemVer comparator MAY exist elsewhere in the app, confined to `vulnerability-scanning`. It
+MUST remain structurally unreachable from this capability: this capability's sources MUST declare no
+dependency on the module that owns it, MUST NOT import it, and MUST NOT accept a comparison result,
+comparator, ordering closure or "is newer" value from it in any snooze input, stored field or
+projection. The absence MUST stay enforced structurally rather than by convention: the existing
+structural guard MUST continue to scan this capability's real sources with comments stripped, MUST
+continue to assert the same forbidden comparator tokens absent and to carry its positive equality
+anchor so the scan cannot pass vacuously, and MUST additionally assert that no import of, or
+reference to, the comparator-owning module appears in those sources. The guard's scope narrows from
+"no comparator exists in the repository" to "no comparator is reachable from this capability"; it
+MUST NOT be deleted, weakened to a comment, or satisfied by an allow-list.
+(Previously: the rule was identical for snooze behaviour, but the no-comparator guarantee was
+repository-wide; it is now scoped to this capability's reachability, because `m4-security`
+introduces a strict-SemVer comparator inside `vulnerability-scanning`.)
+
 #### Scenario: The badge is suppressed while the offered version is unchanged
 
 - GIVEN a package snoozed at version `1.2.3` and still outdated toward `1.2.3`
@@ -161,6 +176,15 @@ it MUST NOT hide the package from the Installed list.
 - GIVEN a snoozed, outdated package
 - WHEN the Installed list is read with default filters
 - THEN the package is listed with its installed version
+
+#### Scenario: The security comparator is structurally unreachable from snooze
+
+- GIVEN a strict-SemVer comparator exists in the module owning `vulnerability-scanning`
+- WHEN the structural guard scans this capability's sources with comments stripped, and its declared
+  dependencies are enumerated
+- THEN the forbidden comparator tokens are absent, the positive equality anchor is present, and
+  neither an import of nor a reference to the comparator-owning module appears
+- AND snooze behaviour is byte-identical to its behaviour before that comparator existed
 
 ### Requirement: A cold or unavailable metadata store degrades to the pre-existing behaviour
 
@@ -238,3 +262,36 @@ favorites, notes or snoozes.
   target is the **outermost** node in `Packages/CellarCore` — nothing in the package depends back on
   it, and `BrewClient` never links SwiftData — so this capability can be deleted without touching the
   execution or catalog layers.
+- **Amended by change `m4-security` (archived `2026-08-06`, PRD milestone **M4** — Security)**:
+  **1 MODIFIED** requirement replaced as a whole block — "A snooze suppresses the outdated badge until
+  the offered version changes" — adding **1 scenario**. 7 requirements / 21 scenarios → **7
+  requirements / 22 scenarios**. Nothing was added, removed or renamed; the other six requirements are
+  byte-identical, all five pre-existing snooze scenarios survive unchanged, and the replacement is a
+  strict superset of the text it replaced.
+  - **Snooze behaviour did not change.** Equality is still the whole rule: exact string comparison, no
+    ordering, no clock. What changed is the *scope of the no-comparator guarantee*. `m4-security`
+    introduces a strict-SemVer comparator inside `vulnerability-scanning`, so the repository-wide
+    absence claim of the G5 ruling above became false. Rather than delete the guarantee, the
+    requirement narrows it from "no comparator exists in the repository" to "no comparator is
+    reachable from this capability", and states the reachability prohibition explicitly: no dependency
+    declaration, no import, and no comparison result, comparator, ordering closure or "is newer" value
+    accepted into any snooze input, stored field or projection.
+  - **The structural guard was extended, not weakened.** `SnoozeProjectionTests` keeps the
+    comment-stripped source scan, the same forbidden comparator tokens, and the positive
+    `snoozedVersion == candidate` anchor, and gains an assertion that no import of or reference to the
+    comparator-owning module (`SecurityKit`, `StrictSemVer`, `FixVersionComparison`,
+    `HomebrewRevision`) appears in this capability's sources. `PackageGraphTests` additionally asserts
+    `BrewClient` declares no SecurityKit dependency and cannot reach it transitively.
+  - **The rule is file-scoped, not target-scoped**, and the scope is enumerated exhaustively rather
+    than by allow-list: `Sources/BrewClient/PackageMetadata.swift`,
+    `Sources/BrewClient/InstalledFilterMode.swift`, `Sources/Persistence/MetadataStore.swift`,
+    `Sources/Persistence/LocalStores.swift`, `Sources/Persistence/SchemaV1.swift` and
+    `Sources/Persistence/SchemaV2.swift`. `Sources/Persistence/DismissalStore.swift` implements
+    `vulnerability-scanning`, not this capability, and is excluded — so the guard asserts positively
+    that it is the **only** file in `Sources/Persistence/` containing `import SecurityKit`. A second
+    import anywhere in that target fails the suite.
+  - **`SchemaV2` is additive.** The `Snooze`, `PackageMeta` and `HistoryEntry` models are byte-identical
+    to V1; V2 only adds `DismissedCVE`, which belongs to `vulnerability-scanning`. Verified live against
+    a real user store (MV-4): history survived the migration. The snooze half of that live check is
+    **vacuously satisfied** — the user held zero snoozes pre-migration — and is covered instead by
+    `MigrationTests` against real SQLite.
