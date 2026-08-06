@@ -1,0 +1,32 @@
+# SecurityKit fixture manifest -- SHA-256 of every captured file.
+#
+# Recomputed on every run by FixtureManifestTests, which also asserts this
+# manifest names every file in the tree and every named file exists. A
+# fixture cannot be edited to make a test pass without failing here first.
+#
+# Captured 2026-08-06 -- macOS 26.5.2 (25F84) arm64, Homebrew 6.0.15-83-gd0b51c6,
+# curl 8.7.1. Endpoints, exact requests and exit status: see README.md.
+#
+# Format: <sha256>  <path relative to Fixtures/>
+#
+666e8b06438dd30395a4741136e63266f221da371191d0ecf2fe1ca924c38691  NVD/cveids-request.txt
+10bf49ee10feb08a36a64bb56564fe6cbae401af87969fa1970761b983af456f  NVD/cveids-response.json
+a89ee0164784861e97940c6d5d9cd000b1d05b2978a407875c48546a22fc5f96  NVD/cveids-unrated-request.txt
+f2d5f4a39a55cb05f1a9834689891541de2af769c6253b98d21a85cacc430c98  NVD/cveids-unrated-response.json
+e395ad55dd18b1bf23944d00b156714accfae4ec834df208053575542dfae602  NVD/ratelimited-response.body
+05cc35b131aa5cd15507b236194902a0d85c994aa5a66041678c7b0d5b1e6a14  NVD/ratelimited-response.headers
+2e4f7e94d8dac785661f28d9041066c7520394634bf951179510326d4dfc1c48  OSV/querybatch-affected-request.json
+bafd3b3c2daff92b902e2feba88bcff8fcbb6e5cbbdd0e84c17ee976f7960d3a  OSV/querybatch-affected-response.json
+3950c6aa41f63b1d88763bda11cafe4d4799c6f795c14011e515f7e83845d8a2  OSV/querybatch-request.json
+00a7a4ea40924a110461073f8d40d8fad7b0bed7cf6b8f079af3d461baaf4965  OSV/querybatch-response.json
+d78486551c30b5f7c9c55d244b9926638280abde1de5de415fc469b1a2c4c2f3  OSV/vulns-GHSA-4gg8-gxpx-9rph.json
+2edb7ce74c808ff05bd028c5a259e615ba3e7e88e44c76be94edbddf472e26a7  OSV/vulns-GHSA-7gcm-g887-7qv7.json
+862f822817bc1930f0ac65415286ccfd6afffa36b23a0a513f0df2115cbbce0a  OSV/vulns-GHSA-p24j-h477-76q3.json
+c571b5f7c7790dc10f9d5dfeb008b428e63e68cf105c49ddcbd9a123d4e26bd2  OSV/vulns-PYSEC-2026-1805.json
+a433b649a6d60108ece067bedb7144c3a7d678ac7dba60fa571600312e0efbce  OSV/vulns-PYSEC-2026-899.json
+c52117fea845d2400f2804968c863d632980afd4b76ad53757c72a7c4eda1833  OSV/vulns-RUSTSEC-2020-0163.json
+d26d985b42a00ab7dc102b9ba3cb34781be32a7b1c8b8da403506b3ab46d00fe  OSV/vulns-RUSTSEC-2021-0139.json
+7f9ffce2c9012a6dada4e08273d2463d46d2a01676e67aafbfda15eb5ac13649  README.md
+5ad3d9634255a7c12fdd50db9e0ce91419b3a0ec034a35024dcc343d2c02471d  Versions/homebrew-pkg-version-spec-corpus.txt
+d48114dd4482533893da5a98c87ba84dff2c9193db17145793e2331da19b99e2  Versions/homebrew-version-spec-corpus.txt
+5bb9a8ff177d1c68c2aecca5366973288535d52ac2947ca0fdc66beac5222c11  Versions/installed-versions.txt

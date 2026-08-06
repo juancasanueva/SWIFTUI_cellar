@@ -1,0 +1,31 @@
+# U5 probe -- Homebrew's own `PkgVersion` (revision suffix) test corpus
+#
+# Source      : /opt/homebrew/Library/Homebrew/test/pkg_version_spec.rb
+# Extraction  : rg -o 'parse\("([^"]+)"\)' -r '$1' | sort -u
+# Captured    : 2026-08-06
+# Homebrew    : 6.0.15-83-gd0b51c6 (repo d0b51c6790)
+# Exit status : 0
+# Unique rows : 10
+#
+# This is the authoritative corpus for HomebrewRevision.split, because it is
+# the file Homebrew uses to define what `_N` MEANS. Two rows carry the whole
+# lesson:
+#
+#   1.0.1e_1  -- a revision suffix on a NON-SemVer upstream. The split is
+#                lexical and succeeds (`1.0.1e`, 1); strict SemVer then
+#                rejects the upstream. Two separate rules, two answers.
+#   HEAD      -- no revision, and not a version at all.
+#
+# Note `1.0_0` and `2.1.4_0`: revision ZERO is written explicitly and is not
+# the same string as `1.0`. The split must report 0, not nil.
+#
+1.0
+1.0_0
+1.0_1
+1.0_2
+1.0.1e_1
+1.1
+1.2.3_4
+2.0_1
+2.1.4_0
+HEAD
