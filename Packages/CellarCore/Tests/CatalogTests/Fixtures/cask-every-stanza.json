@@ -1,0 +1,96 @@
+{
+ "token": "every-stanza",
+ "full_token": "every-stanza",
+ "old_tokens": [],
+ "tap": "homebrew/cask",
+ "name": [
+  "Every Stanza"
+ ],
+ "desc": "Synthetic cask publishing one stanza of every shape this build must handle",
+ "homepage": "https://example.invalid/every-stanza",
+ "url": "https://example.invalid/downloads/EveryStanza-2.0.dmg",
+ "url_specs": {},
+ "version": "2.0",
+ "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+ "artifacts": [
+  {
+   "app": [
+    "Every Stanza.app",
+    {
+     "target": "/Applications/Every Stanza.app"
+    }
+   ]
+  },
+  {
+   "binary": [
+    "Every Stanza.app/Contents/MacOS/every-stanza",
+    {
+     "target": "every-stanza"
+    }
+   ]
+  },
+  {
+   "pkg": [
+    "EveryStanza.pkg"
+   ]
+  },
+  {
+   "uninstall": [
+    {
+     "launchctl": "invalid.example.every-stanza.helper",
+     "quit": "invalid.example.every-stanza",
+     "pkgutil": "invalid.example.every-stanza.pkg",
+     "script": {
+      "executable": "/usr/local/bin/every-stanza-uninstall",
+      "sudo": true
+     }
+    }
+   ]
+  },
+  {
+   "zap": [
+    {
+     "trash": [
+      "~/Library/Application Support/EveryStanza",
+      "~/Library/Preferences/invalid.example.every-stanza.plist"
+     ],
+     "rmdir": [
+      "~/Library/EveryStanza"
+     ]
+    }
+   ]
+  }
+ ],
+ "caveats": null,
+ "depends_on": {
+  "formula": [
+   "git"
+  ],
+  "cask": [
+   "xquartz"
+  ],
+  "macos": {
+   ">=": [
+    "13"
+   ]
+  }
+ },
+ "conflicts_with": {
+  "cask": [
+   "every-stanza@beta"
+  ],
+  "formula": [
+   "every-stanza-cli"
+  ]
+ },
+ "container": null,
+ "auto_updates": false,
+ "deprecated": false,
+ "deprecation_date": null,
+ "deprecation_reason": null,
+ "disabled": false,
+ "disable_date": null,
+ "disable_reason": null,
+ "languages": [],
+ "variations": {}
+}

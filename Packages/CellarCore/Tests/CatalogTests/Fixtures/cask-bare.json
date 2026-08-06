@@ -1,0 +1,20 @@
+{
+ "token": "bare",
+ "full_token": "bare",
+ "old_tokens": [],
+ "tap": "homebrew/cask",
+ "name": [
+  "Bare"
+ ],
+ "desc": "Synthetic cask publishing none of the five widened keys",
+ "homepage": "https://example.invalid/bare",
+ "version": "1.0",
+ "caveats": null,
+ "auto_updates": true,
+ "deprecated": false,
+ "deprecation_date": null,
+ "deprecation_reason": null,
+ "disabled": false,
+ "disable_date": null,
+ "disable_reason": null
+}

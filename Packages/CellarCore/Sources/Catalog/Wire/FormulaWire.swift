@@ -16,6 +16,10 @@ struct FormulaWire: Decodable, Sendable {
     let license: String?
     let homepage: String?
     let versions: Versions?
+    /// The source locations the formula builds from (M5, carried for the
+    /// release-notes slice). Only the URLs are read — `urls.stable.checksum` is
+    /// the *formula* digest and is deliberately out of scope.
+    let urls: Urls?
     let dependencies: [String]?
     let buildDependencies: [String]?
     let usesFromMacos: [UsesFromMacOS]?
@@ -33,6 +37,18 @@ struct FormulaWire: Decodable, Sendable {
         let stable: String?
     }
 
+    /// Mirrors `Versions`' tolerance all the way down: every level is optional,
+    /// so a formula that publishes `urls` without `head`, or `head` without a
+    /// `url`, decodes with that level absent rather than failing the record.
+    struct Urls: Decodable, Sendable {
+        let stable: Source?
+        let head: Source?
+
+        struct Source: Decodable, Sendable {
+            let url: String?
+        }
+    }
+
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
@@ -41,6 +57,7 @@ struct FormulaWire: Decodable, Sendable {
         license = try container.decodeIfPresent(String.self, forKey: .license)
         homepage = try container.decodeIfPresent(String.self, forKey: .homepage)
         versions = try container.decodeIfPresent(Versions.self, forKey: .versions)
+        urls = try container.decodeIfPresent(Urls.self, forKey: .urls)
         dependencies = try container.decodeIfPresent([String].self, forKey: .dependencies)
         buildDependencies = try container.decodeIfPresent([String].self, forKey: .buildDependencies)
         usesFromMacos = try container.decodeIfPresent([UsesFromMacOS].self, forKey: .usesFromMacos)
@@ -54,7 +71,7 @@ struct FormulaWire: Decodable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case name, tap, desc, license, homepage, versions, dependencies, caveats
+        case name, tap, desc, license, homepage, versions, urls, dependencies, caveats
         case deprecated, disabled
         case buildDependencies = "build_dependencies"
         case usesFromMacos = "uses_from_macos"

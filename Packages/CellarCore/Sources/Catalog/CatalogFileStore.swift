@@ -8,10 +8,31 @@ import Foundation
 public struct CatalogFileStore: Sendable {
     public let directory: URL
     private let fileSystem: any CatalogFileSystem
+    /// The version this build can read. Exact in both directions: older and
+    /// newer are the same answer, "no cache".
+    ///
+    /// Injectable, and internal rather than public, for exactly one reason — the
+    /// rollback-symmetry test has to observe what a *reverted* build sees
+    /// without editing the constant it is testing. The public initializer's
+    /// signature is unchanged.
+    let expectedSchemaVersion: Int
 
     public init(directory: URL, fileSystem: any CatalogFileSystem = DefaultCatalogFileSystem()) {
+        self.init(
+            directory: directory,
+            fileSystem: fileSystem,
+            expectedSchemaVersion: CatalogSnapshot.currentSchemaVersion
+        )
+    }
+
+    init(
+        directory: URL,
+        fileSystem: any CatalogFileSystem = DefaultCatalogFileSystem(),
+        expectedSchemaVersion: Int
+    ) {
         self.directory = directory
         self.fileSystem = fileSystem
+        self.expectedSchemaVersion = expectedSchemaVersion
     }
 
     public var snapshotURL: URL { directory.appendingPathComponent("catalog.json") }
@@ -32,7 +53,7 @@ public struct CatalogFileStore: Sendable {
     /// over it would be a self-inflicted outage (catalog-sync CS6).
     public func loadSnapshot() throws -> CatalogSnapshot? {
         guard let data = try? fileSystem.contentsMappedIfSafe(of: snapshotURL) else { return nil }
-        guard schemaVersion(of: data) == CatalogSnapshot.currentSchemaVersion else { return nil }
+        guard schemaVersion(of: data) == expectedSchemaVersion else { return nil }
         guard let snapshot = try? decoder.decode(CatalogSnapshot.self, from: data) else { return nil }
         // A catalog with no packages is degenerate, and answering with it would
         // leave the machine revalidating into emptiness forever: the stored
@@ -47,7 +68,7 @@ public struct CatalogFileStore: Sendable {
 
     public func loadState() throws -> CatalogState? {
         guard let data = try? fileSystem.contentsMappedIfSafe(of: stateURL) else { return nil }
-        guard schemaVersion(of: data) == CatalogSnapshot.currentSchemaVersion else { return nil }
+        guard schemaVersion(of: data) == expectedSchemaVersion else { return nil }
         return try? decoder.decode(CatalogState.self, from: data)
     }
 

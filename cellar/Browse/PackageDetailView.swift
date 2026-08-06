@@ -50,6 +50,9 @@ struct PackageDetailView: View {
                 PackageMetadataSection(entry: entry(for: package), metadata: metadata)
                 statuses(for: package)
                 facts(for: package)
+                // Renders nothing for a formula, and nothing for a cask that
+                // published none of the inspection keys.
+                PackageInspectionSection(package: package)
                 analytics(for: package)
                 dependencies(for: package)
                 dependents(for: package)
