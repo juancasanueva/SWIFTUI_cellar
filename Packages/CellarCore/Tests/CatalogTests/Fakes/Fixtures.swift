@@ -22,4 +22,31 @@ enum Fixture {
         wrapped.append(Data("]".utf8))
         return wrapped
     }
+
+    /// Several single-record fixtures joined into one bulk-endpoint payload.
+    static func arrayOf(_ names: [String]) throws -> Data {
+        var payload = Data("[".utf8)
+        for (offset, name) in names.enumerated() {
+            if offset > 0 { payload.append(Data(",".utf8)) }
+            payload.append(try data(name))
+        }
+        payload.append(Data("]".utf8))
+        return payload
+    }
+
+    /// The fixtures the widened cask/formula inspection projection is specified
+    /// against, registered in one place so a file that is added to the directory
+    /// but never copied into the bundle fails loudly here rather than as a
+    /// mystery `#require` failure inside whichever test happened to load it.
+    ///
+    /// See `Fixtures/README.md` for what each one exercises.
+    static let inspectionFixtures = [
+        "cask-every-stanza",
+        "cask-unrepresented",
+        "cask-only-unrepresented",
+        "cask-bare",
+        "cask-bare-null",
+        "cask-no-check",
+        "formula-headless"
+    ]
 }

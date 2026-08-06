@@ -119,6 +119,98 @@ struct FileStoreTests {
         #expect(try store.loadSnapshot() == nil)
     }
 
+    // MARK: - The schema 1 -> 2 transition (P3, P4, P5, TM5)
+
+    @Test("A snapshot written by the previous schema is a cold start, not a failure")
+    func previousSchemaSnapshotIsAColdStart() throws {
+        let fileSystem = FakeCatalogFileSystem()
+        let store = CatalogFileStore(directory: Self.root, fileSystem: fileSystem)
+        // A perfectly readable v1 snapshot: every record decodes, and it is
+        // still no cache, because the *shape* is what changed.
+        let previous = """
+        {"schemaVersion":1,"generatedAt":1800000000,"skippedRecordCount":0,
+         "packages":[{"kind":"formula","name":"wget","displayName":"wget",
+                      "version":"1.25.0","tap":"homebrew/core","dependencies":[],
+                      "buildDependencies":[],"dependents":[],"deprecated":false,
+                      "disabled":false,"autoUpdates":false}]}
+        """
+        fileSystem.seed(Data(previous.utf8), at: store.snapshotURL)
+        fileSystem.seed(
+            Data(#"{"schemaVersion":1,"sources":{},"lastSuccessAt":0,"skippedRecordCount":0}"#.utf8),
+            at: store.stateURL
+        )
+
+        #expect(try store.loadSnapshot() == nil)
+        #expect(store.hasUsableCache == false)
+        // No validator survives either, so the next sync re-downloads both
+        // payloads instead of revalidating into the rejected snapshot.
+        #expect(try store.loadState() == nil)
+        // TM5: classification is a read. It rewrote, replaced and removed nothing.
+        #expect(fileSystem.operations.isEmpty)
+        #expect(fileSystem.contents(at: store.snapshotURL) == Data(previous.utf8))
+    }
+
+    @Test("A previous-schema sidecar is rejected independently of the snapshot")
+    func previousSchemaSidecarIsRejectedIndependently() throws {
+        let fileSystem = FakeCatalogFileSystem()
+        let store = CatalogFileStore(directory: Self.root, fileSystem: fileSystem)
+        try store.persist(Self.snapshot(names: ["wget"]), state: Self.state(recordCount: 1))
+        // The snapshot the store just wrote is current; only the sidecar is old.
+        fileSystem.seed(
+            Data(
+                #"{"schemaVersion":1,"sources":{"casks":{"validators":{"etag":"\"old\""},"downloadedAt":0,"recordCount":1}},"lastSuccessAt":0,"skippedRecordCount":0}"#
+                    .utf8
+            ),
+            at: store.stateURL
+        )
+        let operationsBeforeTheRead = fileSystem.operations
+
+        // Neither file is adopted on the strength of the other's version.
+        #expect(try store.loadState() == nil)
+        #expect(try store.loadSnapshot()?.packages.map(\CatalogPackage.name) == ["wget"])
+        // No validator from the rejected sidecar is replayed.
+        #expect(fileSystem.operations == operationsBeforeTheRead)
+    }
+
+    @Test("Rollback is symmetric: a newer file is no cache for an older build")
+    func rollbackIsSymmetric() throws {
+        let fileSystem = FakeCatalogFileSystem()
+        // Driven by injecting the expected version rather than by editing the
+        // constant: this is what a *reverted* build sees, and the claim that
+        // `git revert` is a complete rollback rests on it.
+        let currentBuild = CatalogFileStore(directory: Self.root, fileSystem: fileSystem)
+        try currentBuild.persist(
+            Self.snapshot(names: ["wget"]), state: Self.state(recordCount: 1)
+        )
+        #expect(try currentBuild.loadSnapshot() != nil)
+
+        let revertedBuild = CatalogFileStore(
+            directory: Self.root,
+            fileSystem: fileSystem,
+            expectedSchemaVersion: CatalogSnapshot.currentSchemaVersion - 1
+        )
+        let operationsBeforeTheRead = fileSystem.operations
+
+        #expect(try revertedBuild.loadSnapshot() == nil)
+        #expect(try revertedBuild.loadState() == nil)
+        #expect(revertedBuild.hasUsableCache == false)
+        // Nothing thrown, and neither file rewritten or deleted by the read.
+        #expect(fileSystem.operations == operationsBeforeTheRead)
+        #expect(fileSystem.contents(at: currentBuild.snapshotURL) != nil)
+        #expect(fileSystem.contents(at: currentBuild.stateURL) != nil)
+        // One full sync restores service for the reverted build. It mints its
+        // own version, which is the other half of the symmetry: the older build
+        // writes older files and reads them back without ceremony.
+        try revertedBuild.persist(
+            Self.snapshot(
+                names: ["wget"],
+                schemaVersion: CatalogSnapshot.currentSchemaVersion - 1
+            ),
+            state: Self.state(recordCount: 1)
+        )
+        #expect(try revertedBuild.loadSnapshot()?.packages.map(\CatalogPackage.name) == ["wget"])
+    }
+
     // MARK: - Full replace (CS3)
 
     @Test("A package absent from the new payload disappears entirely")
@@ -208,8 +300,12 @@ struct FileStoreTests {
         return directory
     }
 
-    static func snapshot(names: [String]) -> CatalogSnapshot {
+    static func snapshot(
+        names: [String],
+        schemaVersion: Int = CatalogSnapshot.currentSchemaVersion
+    ) -> CatalogSnapshot {
         CatalogSnapshot(
+            schemaVersion: schemaVersion,
             generatedAt: Date(timeIntervalSince1970: 1_800_000_000),
             skippedRecordCount: 0,
             packages: names.map { CatalogPackage.stub(kind: .formula, name: $0) }

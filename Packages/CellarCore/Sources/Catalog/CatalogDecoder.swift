@@ -227,7 +227,8 @@ public enum CatalogDecoder {
             disableReason: disabled ? formula.disableReason : nil,
             disableDate: disabled ? day(formula.disableDate) : nil,
             autoUpdates: false,
-            installCount365d: nil
+            installCount365d: nil,
+            formulaSources: project(sources: formula.urls)
         )
     }
 
@@ -257,8 +258,89 @@ public enum CatalogDecoder {
             disableReason: disabled ? cask.disableReason : nil,
             disableDate: disabled ? day(cask.disableDate) : nil,
             autoUpdates: cask.autoUpdates ?? false,
-            installCount365d: nil
+            installCount365d: nil,
+            caskInspection: project(inspection: cask)
         )
+    }
+
+    // MARK: - Inspection projection (M5)
+
+    /// What the record says it downloads and installs.
+    ///
+    /// `nil` — not an empty group — when the record published none of the five
+    /// widened keys. That is the common case for a large part of the catalog,
+    /// and keeping it a single absent optional is what keeps absence cheap
+    /// across 7,684 casks.
+    private static func project(inspection cask: CaskWire) -> CaskInspection? {
+        let inspection = CaskInspection(
+            downloadURL: nonEmpty(cask.url),
+            declaredChecksum: cask.sha256.flatMap(checksum(_:)),
+            installPlan: cask.artifacts.map(plan(from:)),
+            requirements: cask.dependsOn.flatMap(requirements(from:)),
+            conflicts: cask.conflictsWith.flatMap(conflicts(from:))
+        )
+        return inspection.isEmpty ? nil : inspection
+    }
+
+    private static func checksum(_ published: String) -> CaskDownloadChecksum? {
+        guard !published.isEmpty else { return nil }
+        return published == CaskDownloadChecksum.noCheckLiteral
+            ? .notChecked
+            : .declared(published)
+    }
+
+    /// Note the asymmetry with the two relation groups below: a published
+    /// `artifacts` list always yields a plan, even an empty one, because its
+    /// remainder count is a fact about the record — "this cask published stanzas
+    /// I could not represent" is exactly what an empty-looking plan with a
+    /// non-zero count says.
+    private static func plan(from artifacts: CaskArtifactsWire) -> CaskInstallPlan {
+        CaskInstallPlan(
+            apps: artifacts.apps.map(artifact(from:)),
+            binaries: artifacts.binaries.map(artifact(from:)),
+            packageInstallers: artifacts.packageInstallers.map(artifact(from:)),
+            unrepresentedStanzaCount: artifacts.unrepresentedStanzaCount
+        )
+    }
+
+    private static func artifact(from wire: CaskArtifactItemWire) -> CaskInstallArtifact {
+        CaskInstallArtifact(source: wire.source, target: nonEmpty(wire.target))
+    }
+
+    private static func requirements(from wire: CaskRelationsWire) -> CaskRequirements? {
+        let requirements = CaskRequirements(
+            formulae: wire.formulae,
+            casks: wire.casks,
+            macOSRequirement: nonEmpty(wire.macOSRequirement),
+            unrepresentedCount: wire.unrepresentedCount
+        )
+        return requirements.isEmpty ? nil : requirements
+    }
+
+    private static func conflicts(from wire: CaskRelationsWire) -> CaskConflicts? {
+        let conflicts = CaskConflicts(
+            casks: wire.casks,
+            formulae: wire.formulae,
+            unrepresentedCount: wire.unrepresentedCount
+        )
+        return conflicts.isEmpty ? nil : conflicts
+    }
+
+    /// Carried for the release-notes slice; nothing renders these yet.
+    private static func project(sources urls: FormulaWire.Urls?) -> FormulaSources? {
+        guard let urls else { return nil }
+        let sources = FormulaSources(
+            stableURL: nonEmpty(urls.stable?.url),
+            headURL: nonEmpty(urls.head?.url)
+        )
+        return sources.isEmpty ? nil : sources
+    }
+
+    /// A published empty string is the payload's way of publishing nothing, and
+    /// absence is what the projection promises for it.
+    private static func nonEmpty(_ string: String?) -> String? {
+        guard let string, !string.isEmpty else { return nil }
+        return string
     }
 
     /// Dependency edges as declared, before the snapshot knows which resolve.

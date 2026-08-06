@@ -17,6 +17,28 @@ and must never enter the repository.
 | `analytics-formula-365d.json` | envelope + 40 items | CS9 comma-grouped counts, formula namespace |
 | `analytics-cask-365d.json` | envelope + 40 items | CS9 cask namespace |
 
+## Inspection fixtures (M5, `m5-catalog-inspection`)
+
+Synthetic, not captured: they exist to pin shapes the live excerpts happen not to publish. Each is
+registered in `Fakes/Fixtures.swift` (`Fixture.inspectionFixtures`), which is what proves the file
+reached the test bundle.
+
+| File | Shape | Why it exists |
+|---|---|---|
+| `cask-every-stanza.json` | `app` + `binary` + `pkg` + `uninstall` + `zap`; `depends_on` with formula, cask and macOS | every projected stanza kind with its `target` companion, and a remainder of exactly `2` |
+| `cask-unrepresented.json` | one `app` stanza plus `zap`, `uninstall` and an invented `wormhole` kind | the counted remainder is `3`; also carries an unmodelled `depends_on`/`conflicts_with` relation key |
+| `cask-only-unrepresented.json` | `font` + `zap`, no projected stanza at all | a cask of only unmodelled kinds still decodes, with a non-zero count |
+| `cask-bare.json` | publishes none of `url`, `sha256`, `artifacts`, `depends_on`, `conflicts_with` | absence is absence, not an empty string/list/zero |
+| `cask-bare-null.json` | publishes all five widened keys as `null` | `null` and omitted are the same answer |
+| `cask-no-check.json` | `"sha256": "no_check"` | the literal is a *declaration of no checksum*, never rendered as a digest |
+| `formula-headless.json` | `urls.stable` and no `urls.head` | an absent head source URL stays absent |
+
+`cask-iterm2.json`, `cask-slice.json` and `formula-slice.json` are the widening's regression control
+and must stay **byte-identical**: the slices are what prove the widened wire decodes exactly the
+records the previous build decoded. Note that `cask-iterm2.json` serialises its `app` destination as
+a `target` key **beside** the stanza key, while `cask-every-stanza.json` uses the in-array companion
+object — Homebrew emits both, and both must attach rather than count.
+
 Stripped keys (slices only, to keep the diff reviewable): `bottle`, `urls`, `variations`,
 `ruby_source_*`, `tap_git_head`, `installed`, `head_dependencies`, `post_install_steps`,
 `link_overwrite`, `service`, `executables`, `pour_bottle_only_if`, `patches`,

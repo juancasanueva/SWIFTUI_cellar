@@ -1,0 +1,64 @@
+{
+ "token": "unrepresented",
+ "full_token": "unrepresented",
+ "old_tokens": [],
+ "tap": "homebrew/cask",
+ "name": [
+  "Unrepresented"
+ ],
+ "desc": "Synthetic cask whose artifacts list mixes one projected stanza with three this build does not model",
+ "homepage": "https://example.invalid/unrepresented",
+ "url": "https://example.invalid/downloads/Unrepresented-1.0.dmg",
+ "version": "1.0",
+ "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+ "artifacts": [
+  {
+   "app": [
+    "Unrepresented.app"
+   ]
+  },
+  {
+   "zap": [
+    {
+     "trash": [
+      "~/Library/Application Support/Unrepresented"
+     ]
+    }
+   ]
+  },
+  {
+   "uninstall": [
+    {
+     "quit": "invalid.example.unrepresented"
+    }
+   ]
+  },
+  {
+   "wormhole": [
+    {
+     "destination": "a stanza kind that did not exist when this build shipped"
+    }
+   ]
+  }
+ ],
+ "caveats": null,
+ "depends_on": {
+  "formula": [
+   "git"
+  ],
+  "arch": [
+   "arm64"
+  ]
+ },
+ "conflicts_with": {
+  "cask": [
+   "unrepresented@beta"
+  ],
+  "wormhole": [
+   "unrepresented@wormhole"
+  ]
+ },
+ "auto_updates": false,
+ "deprecated": false,
+ "disabled": false
+}

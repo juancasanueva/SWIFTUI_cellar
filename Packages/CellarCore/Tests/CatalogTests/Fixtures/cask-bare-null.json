@@ -1,0 +1,21 @@
+{
+ "token": "bare-null",
+ "full_token": "bare-null",
+ "old_tokens": [],
+ "tap": "homebrew/cask",
+ "name": [
+  "Bare Null"
+ ],
+ "desc": "Synthetic cask publishing all five widened keys as null",
+ "homepage": "https://example.invalid/bare-null",
+ "url": null,
+ "version": "1.0",
+ "sha256": null,
+ "artifacts": null,
+ "caveats": null,
+ "depends_on": null,
+ "conflicts_with": null,
+ "auto_updates": true,
+ "deprecated": false,
+ "disabled": false
+}

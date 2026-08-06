@@ -1,0 +1,25 @@
+{
+ "token": "no-check",
+ "full_token": "no-check",
+ "old_tokens": [],
+ "tap": "homebrew/cask",
+ "name": [
+  "No Check"
+ ],
+ "desc": "Synthetic cask publishing the no_check literal in place of a digest",
+ "homepage": "https://example.invalid/no-check",
+ "url": "https://example.invalid/downloads/NoCheck-latest.dmg",
+ "version": "latest",
+ "sha256": "no_check",
+ "artifacts": [
+  {
+   "app": [
+    "No Check.app"
+   ]
+  }
+ ],
+ "caveats": null,
+ "auto_updates": false,
+ "deprecated": false,
+ "disabled": false
+}

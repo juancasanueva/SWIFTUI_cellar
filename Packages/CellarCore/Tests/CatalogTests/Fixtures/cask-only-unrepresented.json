@@ -1,0 +1,34 @@
+{
+ "token": "only-unrepresented",
+ "full_token": "only-unrepresented",
+ "old_tokens": [],
+ "tap": "homebrew/cask",
+ "name": [
+  "Only Unrepresented"
+ ],
+ "desc": "Synthetic cask whose artifacts list holds no stanza this build projects",
+ "homepage": "https://example.invalid/only-unrepresented",
+ "url": "https://example.invalid/downloads/OnlyUnrepresented-1.0.zip",
+ "version": "1.0",
+ "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+ "artifacts": [
+  {
+   "font": [
+    "OnlyUnrepresented-Regular.otf"
+   ]
+  },
+  {
+   "zap": [
+    {
+     "trash": [
+      "~/Library/Fonts/OnlyUnrepresented-Regular.otf"
+     ]
+    }
+   ]
+  }
+ ],
+ "caveats": null,
+ "auto_updates": false,
+ "deprecated": false,
+ "disabled": false
+}

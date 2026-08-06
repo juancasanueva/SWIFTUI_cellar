@@ -138,8 +138,99 @@ struct CatalogModelsTests {
         #expect(
             Set(object.keys) == ["schemaVersion", "generatedAt", "skippedRecordCount", "packages"]
         )
-        // The whole no-migration claim rests on this: same version, same shape.
-        #expect(object["schemaVersion"] as? Int == 1)
+        // The version moves only when the persisted *shape* moves — which M5's
+        // two new package fields did, hence 2 rather than 1. `revision` still
+        // adds no key: that is what the four-key set above proves.
+        #expect(object["schemaVersion"] as? Int == 2)
+        #expect(object["schemaVersion"] as? Int == CatalogSnapshot.currentSchemaVersion)
+    }
+
+    // MARK: - The copy helpers enumerate every field by hand (M5)
+
+    /// `replacingEdges` and `replacingInstallCount` each rewrite all twenty-odd
+    /// fields by name. Adding a field to `CatalogPackage` without adding it to
+    /// both is a silent drop that no compiler diagnostic catches and no other
+    /// test would notice — the package would simply lose its inspection somewhere
+    /// between decode and snapshot. This is that test.
+    @Test("Inspection fields survive both full-field copy helpers")
+    func inspectionSurvivesTheCopyHelpers() {
+        let inspection = CaskInspection(
+            downloadURL: "https://example.invalid/x.dmg",
+            declaredChecksum: .declared("abc123"),
+            installPlan: CaskInstallPlan(
+                apps: [CaskInstallArtifact(source: "X.app", target: "/Applications/X.app")],
+                binaries: [],
+                packageInstallers: [],
+                unrepresentedStanzaCount: 2
+            ),
+            requirements: CaskRequirements(
+                formulae: ["git"], casks: [], macOSRequirement: ">= 13", unrepresentedCount: 0
+            ),
+            conflicts: CaskConflicts(casks: ["x@beta"], formulae: [], unrepresentedCount: 0)
+        )
+        let sources = FormulaSources(
+            stableURL: "https://example.invalid/x.tar.gz", headURL: "https://example.invalid/x.git"
+        )
+        let package = CatalogPackage.stub(
+            kind: .cask,
+            name: "x",
+            caskInspection: inspection,
+            formulaSources: sources
+        )
+
+        let relinked = package.replacingEdges(
+            dependencies: [PackageDependency(name: "git", isResolvable: true)],
+            buildDependencies: [],
+            dependents: ["y"]
+        )
+        // The edges really were replaced, so the copy is a real one.
+        #expect(relinked.dependencies.map(\.name) == ["git"])
+        #expect(relinked.dependents == ["y"])
+        #expect(relinked.caskInspection == inspection)
+        #expect(relinked.formulaSources == sources)
+
+        let counted = relinked.replacingInstallCount(4_200)
+        #expect(counted.installCount365d == 4_200)
+        #expect(counted.caskInspection == inspection)
+        #expect(counted.formulaSources == sources)
+        // Every unrelated field the second helper also rewrites by hand.
+        #expect(counted.dependents == ["y"])
+        #expect(counted.name == "x")
+    }
+
+    @Test("A package carrying inspection round-trips through the persisted projection")
+    func inspectionRoundTripsThroughCodable() throws {
+        let package = CatalogPackage.stub(
+            kind: .cask,
+            name: "x",
+            caskInspection: CaskInspection(
+                downloadURL: "https://example.invalid/x.dmg",
+                declaredChecksum: .notChecked,
+                installPlan: CaskInstallPlan(
+                    apps: [CaskInstallArtifact(source: "X.app", target: nil)],
+                    binaries: [],
+                    packageInstallers: [],
+                    unrepresentedStanzaCount: 1
+                ),
+                requirements: nil,
+                conflicts: nil
+            )
+        )
+
+        let decoded = try JSONDecoder().decode(
+            CatalogPackage.self, from: JSONEncoder().encode(package)
+        )
+
+        #expect(decoded == package)
+        #expect(decoded.caskInspection?.declaredChecksum == .notChecked)
+        #expect(decoded.caskInspection?.installPlan?.unrepresentedStanzaCount == 1)
+        // A package that carries no inspection stays absent, not empty.
+        let bare = CatalogPackage.stub(kind: .formula, name: "wget")
+        let decodedBare = try JSONDecoder().decode(
+            CatalogPackage.self, from: JSONEncoder().encode(bare)
+        )
+        #expect(decodedBare.caskInspection == nil)
+        #expect(decodedBare.formulaSources == nil)
     }
 }
 
@@ -166,7 +257,9 @@ extension CatalogPackage {
         disableReason: String? = nil,
         disableDate: Date? = nil,
         autoUpdates: Bool = false,
-        installCount365d: Int? = nil
+        installCount365d: Int? = nil,
+        caskInspection: CaskInspection? = nil,
+        formulaSources: FormulaSources? = nil
     ) -> CatalogPackage {
         CatalogPackage(
             kind: kind,
@@ -188,7 +281,9 @@ extension CatalogPackage {
             disableReason: disableReason,
             disableDate: disableDate,
             autoUpdates: autoUpdates,
-            installCount365d: installCount365d
+            installCount365d: installCount365d,
+            caskInspection: caskInspection,
+            formulaSources: formulaSources
         )
     }
 }

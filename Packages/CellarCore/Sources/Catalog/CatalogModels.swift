@@ -91,6 +91,17 @@ public struct CatalogPackage: Codable, Sendable, Hashable, Identifiable {
     public let autoUpdates: Bool
     /// Absent means "no analytics entry", which is not the same as zero installs.
     public let installCount365d: Int?
+    /// Casks only: what the record says it downloads and installs. Absent for a
+    /// cask that published none of the widened keys, and for every formula.
+    ///
+    /// Two grouped optionals and not seven flat fields on purpose: this type has
+    /// a hand-written twenty-parameter `init` and two full-field copy helpers,
+    /// so every field added here costs three call sites and risks a silent drop
+    /// in each.
+    public let caskInspection: CaskInspection?
+    /// Formulae only: where the source comes from. Carried for the release-notes
+    /// slice; nothing renders it yet.
+    public let formulaSources: FormulaSources?
 
     public init(
         kind: PackageKind,
@@ -112,7 +123,10 @@ public struct CatalogPackage: Codable, Sendable, Hashable, Identifiable {
         disableReason: String?,
         disableDate: Date?,
         autoUpdates: Bool,
-        installCount365d: Int?
+        installCount365d: Int?,
+        // Defaulted so no existing call site changes.
+        caskInspection: CaskInspection? = nil,
+        formulaSources: FormulaSources? = nil
     ) {
         self.kind = kind
         self.name = name
@@ -134,6 +148,8 @@ public struct CatalogPackage: Codable, Sendable, Hashable, Identifiable {
         self.disableDate = disableDate
         self.autoUpdates = autoUpdates
         self.installCount365d = installCount365d
+        self.caskInspection = caskInspection
+        self.formulaSources = formulaSources
     }
 
     /// The count with its window, metric and lower-bound semantics attached.
@@ -178,7 +194,9 @@ public struct CatalogPackage: Codable, Sendable, Hashable, Identifiable {
             disableReason: disableReason,
             disableDate: disableDate,
             autoUpdates: autoUpdates,
-            installCount365d: installCount365d
+            installCount365d: installCount365d,
+            caskInspection: caskInspection,
+            formulaSources: formulaSources
         )
     }
 
@@ -204,7 +222,9 @@ public struct CatalogPackage: Codable, Sendable, Hashable, Identifiable {
             disableReason: disableReason,
             disableDate: disableDate,
             autoUpdates: autoUpdates,
-            installCount365d: count
+            installCount365d: count,
+            caskInspection: caskInspection,
+            formulaSources: formulaSources
         )
     }
 }
@@ -226,16 +246,32 @@ public struct CatalogSnapshotRevision: Hashable, Sendable {
 }
 
 /// The persisted catalog: `catalog.json`.
+///
+/// Version history:
+///
+/// * **1** — the original slim projection.
+/// * **2** — M5 inspection: `CatalogPackage` gained `caskInspection` and
+///   `formulaSources`, so every v1 file is classified as no cache and re-synced
+///   once. The check is exact in both directions, which is what makes reverting
+///   that change a complete rollback rather than a decode with missing fields.
 public struct CatalogSnapshot: Codable, Sendable {
-    public static let currentSchemaVersion = 1
+    /// Bumped `1` -> `2` by the M5 inspection widening: the persisted projection
+    /// gained `caskInspection` and `formulaSources`, so every file written by
+    /// the previous build is classified as no cache and re-synced once.
+    ///
+    /// The check is exact in both directions, which is what makes reverting this
+    /// slice a complete rollback rather than a decode of missing fields.
+    public static let currentSchemaVersion = 2
 
     public let schemaVersion: Int
     public let generatedAt: Date
     /// Records the payload published but this build could not read.
     public let skippedRecordCount: Int
     public let packages: [CatalogPackage]
-    /// This materialization's identity. Outside `CodingKeys`, so the persisted
-    /// JSON is byte-identical and `schemaVersion` stays 1.
+    /// This materialization's identity. Outside `CodingKeys`, so it adds no key
+    /// to the persisted JSON and no reason of its own to move `schemaVersion` —
+    /// which the `1` -> `2` bump above did move, for a change to the *packages*
+    /// shape rather than to this field.
     public let revision: CatalogSnapshotRevision
 
     private enum CodingKeys: String, CodingKey {

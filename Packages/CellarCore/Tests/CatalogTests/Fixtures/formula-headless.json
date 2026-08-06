@@ -1,0 +1,40 @@
+{
+ "name": "headless",
+ "full_name": "headless",
+ "tap": "homebrew/core",
+ "oldnames": [],
+ "aliases": [],
+ "desc": "Synthetic formula publishing urls.stable and no urls.head",
+ "license": "MIT",
+ "homepage": "https://example.invalid/headless",
+ "versions": {
+  "stable": "3.1.4",
+  "head": null,
+  "bottle": true
+ },
+ "urls": {
+  "stable": {
+   "url": "https://example.invalid/releases/headless-3.1.4.tar.gz",
+   "tag": null,
+   "revision": null,
+   "using": null,
+   "checksum": "4444444444444444444444444444444444444444444444444444444444444444"
+  }
+ },
+ "revision": 0,
+ "version_scheme": 0,
+ "dependencies": [
+  "openssl@3"
+ ],
+ "build_dependencies": [
+  "pkgconf"
+ ],
+ "uses_from_macos": [],
+ "caveats": null,
+ "deprecated": false,
+ "deprecation_date": null,
+ "deprecation_reason": null,
+ "disabled": false,
+ "disable_date": null,
+ "disable_reason": null
+}
