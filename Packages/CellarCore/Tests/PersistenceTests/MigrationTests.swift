@@ -122,8 +122,23 @@ struct MigrationTests {
         // so that this milestone is a stage rather than a rewrite. This is the
         // moment that claim is cashed in.
         #expect(MetadataMigrationPlan.schemas.count == 2)
-        #expect(MetadataMigrationPlan.stages.count == 1)
         #expect(ThrowawayMigrationPlan.stages.count == 2, "the throwaway plan lost a stage")
+
+        // Counting the stages says only that *a* stage exists. `MigrationStage` is
+        // a pattern-matchable enum, so the claim worth making is which stage it
+        // is: lightweight, from V1, to V2. A count of one survives a stage that
+        // migrates the wrong pair or the wrong way, and SwiftData performs
+        // implicit lightweight migration anyway — so this test is the only thing
+        // standing between the plan and a stage that is silently decorative.
+        let stage = try? #require(MetadataMigrationPlan.stages.first)
+        guard case .lightweight(let fromVersion, let toVersion) = stage else {
+            Issue.record("the V1 to V2 stage is not a lightweight stage")
+            return
+        }
+        #expect(ObjectIdentifier(fromVersion) == ObjectIdentifier(SchemaV1.self))
+        #expect(ObjectIdentifier(toVersion) == ObjectIdentifier(SchemaV2.self))
+        #expect(fromVersion.versionIdentifier == SchemaV1.versionIdentifier)
+        #expect(toVersion.versionIdentifier == SchemaV2.versionIdentifier)
     }
 
     // MARK: - The first real migration: V1 → V2

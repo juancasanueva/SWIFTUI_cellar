@@ -10,6 +10,7 @@ import BrewProcess
 import Catalog
 import DiskUsage
 import Persistence
+import SecurityKit
 import SwiftUI
 
 /// The three-column shell: sections, list, detail.
@@ -32,9 +33,17 @@ struct ContentView: View {
     let diskUsage: DiskUsageStore
     let cleanup: CleanupStore
     let cleanupPreviewSource: any CleanupPreviewSourcing
+    let security: SecurityStore
+    let securityConsent: SecurityConsentPreference
+    let advisoryCredentials: any AdvisoryCredentialStoring
+    let dismissals: DismissalStore
 
     @State private var section: AppSection = .browse
     @State private var selection: PackageID?
+    /// A finding carries its own identity — a package plus an advisory — because
+    /// the same advisory can apply to two installed packages and they are two
+    /// different rows.
+    @State private var findingSelection: SecurityFindingSelection?
     /// Services carry their own identity, not a `PackageID`: a service is its
     /// own entity and never enters the package projection (SM12).
     @State private var serviceSelection: String?
@@ -109,6 +118,14 @@ struct ContentView: View {
                     operations: operations
                 )
                     .navigationSplitViewColumnWidth(min: 360, ideal: 520)
+            case .security:
+                SecurityView(
+                    security: security,
+                    consent: securityConsent,
+                    credentials: advisoryCredentials,
+                    selection: $findingSelection
+                )
+                    .navigationSplitViewColumnWidth(min: 360, ideal: 520)
             case .history:
                 HistoryView(history: history)
                     .navigationSplitViewColumnWidth(min: 320, ideal: 460)
@@ -133,6 +150,14 @@ struct ContentView: View {
                     "Storage visibility",
                     systemImage: AppSection.cleanup.systemImage,
                     description: Text("Expand a package to inspect its installed versions.")
+                )
+            case .security:
+                SecurityFindingDetail(
+                    selection: findingSelection,
+                    security: security,
+                    dismissals: dismissals,
+                    operations: operations,
+                    catalog: catalog
                 )
             case .history:
                 // The list column already carries the whole record; a second
@@ -209,6 +234,21 @@ struct ContentView: View {
             cache: DiskUsageCache(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("preview-disk.json"))
         ),
         cleanup: CleanupStore(),
-        cleanupPreviewSource: CleanupPreviewSource()
+        cleanupPreviewSource: CleanupPreviewSource(),
+        security: SecurityStore(
+            engine: SecurityScanEngine(
+                discovery: OSVSource(),
+                enrichment: NVDSource(),
+                cache: AdvisoryCache(
+                    fileURL: FileManager.default.temporaryDirectory
+                        .appendingPathComponent("preview-advisories.json")
+                ),
+                consent: FixedScanConsent(.notGranted),
+                queries: { [] }
+            )
+        ),
+        securityConsent: SecurityConsentPreference(),
+        advisoryCredentials: KeychainAdvisoryCredentialStore(),
+        dismissals: DismissalStore(container: nil)
     )
 }

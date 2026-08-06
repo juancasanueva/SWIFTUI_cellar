@@ -736,7 +736,7 @@ Numbering continues from batch 2's list.
 
 | Task | What landed |
 |---|---|
-| 11.1 | RED: `SecurityStoreGuardTests` — the generation guard and the ordinal guard, moved independently |
+| 11.1 | RED: `SecurityStoreTests` — the generation guard and the ordinal guard, moved independently |
 | 11.2 | RED: same suite — the duplicate joins, the older returns without disarming the dedup |
 | 11.3 | RED: `SecurityStoreLifecycleTests` — `lastGood` survives a failure, partial is never content |
 | 11.4 | RED: same suite — the cache load precedes every request and adopts at the persisted ordinal |
@@ -775,7 +775,7 @@ Not pushed; no PR opened. The orchestrator owns the receipt-driven review lifecy
 | After batch 3 | 969 | 139 | pass, 1 known issue |
 | **After batch 4** | **1004** | **143** | pass, 1 known issue |
 
-+35 tests, +4 suites: `SecurityStoreGuardTests` (6), `SecurityStoreLifecycleTests` (8),
++35 tests, +4 suites: `SecurityStoreTests` (6), `SecurityStoreLifecycleTests` (8),
 `DismissalStoreTests` (11), `SnoozeGuardTests` (7), `MigrationTests` (+3), `LocalStoresTests` (+1),
 `SnoozeProjectionTests` (−1, moved to the guard suite).
 

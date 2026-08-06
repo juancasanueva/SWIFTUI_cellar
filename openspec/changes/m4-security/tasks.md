@@ -662,7 +662,7 @@ If the split is taken, exactly four things move with it — nothing else:
       (b) Adoption's joinable work is the **coverage projection** (`CoverageTotals` off the main
       actor), because `CatalogStore`'s duplicate-joins contract needs an in-flight task to join, and
       counting four states over an inventory is the honest analogue of building the search index.
-      (c) The suite is **two files plus a shared arrangement** — `SecurityStoreGuardTests`,
+      (c) The suite is **two files plus a shared arrangement** — `SecurityStoreTests`,
       `SecurityStoreLifecycleTests`, `SecurityStoreArrangement.swift` — under the 400-line rule.
       **Every guard was proven by mutation**: dropping the generation check fails 3 tests, removing
       the ordinal check fails 9, adopting partial as content fails 4, and returning instead of
@@ -782,35 +782,35 @@ If the split is taken, exactly four things move with it — nothing else:
 > Numbered 16 to keep the integrity phases contiguous at 14–15; it ships **before** them if the split
 > is taken. Its `ArtifactIntegrityPanel` task (16.9) is the one part deferred to PR 3.
 
-- [ ] 16.1 **RED** `Tests/SecurityKitTests/SecurityPresentationTests.swift` (new) —
+- [x] 16.1 **RED** `Tests/SecurityKitTests/SecurityPresentationTests.swift` (new) —
       `sectionsAreOrderedVulnerableThenNotCoveredThenCleanThenUnavailable` and
       `theNotCoveredSectionRendersWithItsCountEvenAtZeroFindings`. A pure projection in SecurityKit, so
       the rule is provable by `swift test` rather than by reading a view — the project's
       `InstalledPresentation` / `ServicesPresentation` precedent. — `vulnerability-scanning` req
       *"Coverage is typed and never collapses into 'clean'"* (the presentation clause).
-- [ ] 16.2 **RED** same file — `noEmptyStateOrBadgeClaimsTheInventoryHasNoVulnerabilitiesWhenAnythingIsNotCovered`:
+- [x] 16.2 **RED** same file — `noEmptyStateOrBadgeClaimsTheInventoryHasNoVulnerabilitiesWhenAnythingIsNotCovered`:
       exhaustive over the four states, including the all-unmapped inventory U1 says is the realistic
       case. — sc *"Unanswered packages never read as clean"*.
-- [ ] 16.3 **GREEN** create `Sources/SecurityKit/SecurityPresentation.swift` — the section projection,
+- [x] 16.3 **GREEN** create `Sources/SecurityKit/SecurityPresentation.swift` — the section projection,
       counts, and empty-state vocabulary.
-- [ ] 16.4 `cellar/Shell/AppSection.swift` — add `.security` **between `.cleanup` and `.history`**,
+- [x] 16.4 `cellar/Shell/AppSection.swift` — add `.security` **between `.cleanup` and `.history`**,
       title "Security", `systemImage: "checkmark.shield"`. Verified safe: no test asserts a case count
       on `AppSection` (`BulkSelection.Action.allCases` is the suite's only exhaustive enum assertion
       and is untouched).
-- [ ] 16.5 `cellar/ContentView.swift` and `cellar/cellarApp.swift` — selection column plus composition:
+- [x] 16.5 `cellar/ContentView.swift` and `cellar/cellarApp.swift` — selection column plus composition:
       `SecurityStore`, `SecurityScanEngine`, `AdvisoryCache(fileURL:)` at
       `Caches/Cellar/security-advisories-v1.json` built **beside** `diskCacheURL`
       (`cellarApp.swift:122-124`), the credential store, and the consent preference.
-- [ ] 16.6 Create `cellar/Security/SecurityView.swift` — the four sections in order, four counts, the
+- [x] 16.6 Create `cellar/Security/SecurityView.swift` — the four sections in order, four counts, the
       freshness label. Identifiers: `security-coverage-{state}`, `security-finding-{cveID}`,
       `security-freshness`, `security-consent`.
-- [ ] 16.7 Create `cellar/Security/SecurityFindingDetail.swift` — frames every finding as
+- [x] 16.7 Create `cellar/Security/SecurityFindingDetail.swift` — frames every finding as
       "Reported for `<ecosystem>/<package>` `<version>`", links the OSV and NVD records, shows
       freshness and provenance, offers dismissal (`security-dismiss-{cveID}`), and its upgrade button
       submits `MutationCommand.upgrade(target)` through the existing `OperationCenter`, **stating
       plainly** when Homebrew's `catalogVersion` differs from the advisory's fixed version. No new
       `BrewMutating` family. — sc *"The upgrade offer names Homebrew's version"*.
-- [ ] 16.8 Create `cellar/Security/SecurityConsentSheet.swift` — the disclosure names the two hosts and
+- [x] 16.8 Create `cellar/Security/SecurityConsentSheet.swift` — the disclosure names the two hosts and
       exactly what leaves the machine (mapped package names and versions only), and offers revocation.
       Verified by `xcodebuild build` plus manual steps **MV-1, MV-2, MV-3**.
 - [ ] 16.9 *(PR 3)* Create `cellar/Security/ArtifactIntegrityPanel.swift` — see Phase 15.
