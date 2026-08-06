@@ -86,9 +86,22 @@ public enum AdvisoryError: Error, Sendable, Hashable {
     case offline
     /// The source refused on rate grounds. Severity and health are unchanged by
     /// this: a rate limit is not evidence of anything about the package.
+    ///
+    /// Kept apart from every other non-success status because it is the one that
+    /// is *expected*, recoverable and worth retrying later — and because the
+    /// captured 429 is seventeen bytes of `text/plain`, so a decoder reached
+    /// before the classifier would report it as a malformed payload and lose the
+    /// distinction entirely.
     case rateLimited
-    /// The request failed below the application layer.
+    /// The request failed below the application layer, or the source answered
+    /// with a status that carries no advisory content.
     case transportFailed
+    /// The response body exceeded the ceiling this target will read into memory.
+    ///
+    /// Judged from the byte count **before** the decoder is offered a single
+    /// byte, so a hostile or broken origin cannot make the process allocate its
+    /// way out of memory on the way to finding out the payload was nonsense.
+    case payloadTooLarge
 }
 
 /// One advisory that applies to one installed package.

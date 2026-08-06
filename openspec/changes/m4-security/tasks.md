@@ -546,28 +546,28 @@ If the split is taken, exactly four things move with it — nothing else:
 
 ## Phase 7: Advisory acquisition
 
-- [ ] 7.1 **RED** `Tests/SecurityKitTests/OSVSourceTests.swift` (new), over a new
+- [x] 7.1 **RED** `Tests/SecurityKitTests/OSVSourceTests.swift` (new), over a new
       `Tests/SecurityKitTests/Fakes/RecordingURLProtocol.swift` —
       `discoveryPostsExactlyOneQuerybatchWithTheMappedSubset` (the exact request body, byte-compared
       against the Phase 2 fixture); `theSessionIsEphemeralWithNoURLCache` (config asserted:
       `.ephemeral`, `urlCache == nil`, `.reloadIgnoringLocalCacheData` on **both** config and request);
       `aBodyOverEightMebibytesIsRejectedBeforeDecode`;
       `aNonSuccessStatusIsClassifiedBeforeAnyDecodeAttempt`.
-- [ ] 7.2 **GREEN** create `Sources/SecurityKit/AdvisorySource.swift` (the `Sendable` protocol with
+- [x] 7.2 **GREEN** create `Sources/SecurityKit/AdvisorySource.swift` (the `Sendable` protocol with
       `discover`/`enrich`) and `Sources/SecurityKit/OSVSource.swift`. Base URLs are `static let`
       constants; **no host is built from user input**.
-- [ ] 7.3 **RED** `Tests/SecurityKitTests/NVDSourceTests.swift` (new) —
+- [x] 7.3 **RED** `Tests/SecurityKitTests/NVDSourceTests.swift` (new) —
       `enrichmentIsByCveIdsOnlyAndNeverNamesAnInstalledPackage`: 159 formulae producing 3 identifiers
       issue requests whose URLs contain none of the 159 names;
       `identifiersAreBatchedAtOneHundred` (101 ids ⇒ 2 requests);
       `theApiKeyIsReadFromTheCredentialSeamAndNeverFromDefaults`. —
       `vulnerability-scanning` sc *"Volume follows findings, not inventory"*.
-- [ ] 7.4 **RED** same file — `aRateLimitedEnrichmentKeepsFindingsUnratedAndNeverMakesAPackageClean`:
+- [x] 7.4 **RED** same file — `aRateLimitedEnrichmentKeepsFindingsUnratedAndNeverMakesAPackageClean`:
       discovery succeeded, enrichment 429 ⇒ findings survive with `.unrated` and a typed unavailable
       enrichment reason; **no** outcome flips to `covered(clean)`. — sc *"A rate-limited enrichment
       does not fabricate severity or health"*.
-- [ ] 7.5 **GREEN** create `Sources/SecurityKit/NVDSource.swift`.
-- [ ] 7.6 **RED** `Tests/SecurityKitTests/EgressStructureTests.swift` —
+- [x] 7.5 **GREEN** create `Sources/SecurityKit/NVDSource.swift`.
+- [x] 7.6 **RED** `Tests/SecurityKitTests/EgressStructureTests.swift` —
       `onlyTwoConstantHostsAppearInTheTarget`: scan `Sources/SecurityKit/` with comments stripped for
       `https://` literals; exactly the two declared base URLs are present, and no string
       interpolation appears inside a URL literal. — threat matrix, *Network egress*. **Commit 7.**

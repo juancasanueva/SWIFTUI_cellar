@@ -1,4 +1,5 @@
 import Foundation
+import SecurityKit
 import Testing
 
 /// The three prohibitions of `SecurityKit`, asserted structurally rather than
@@ -76,6 +77,68 @@ struct EgressStructureTests {
         )
     }
 
+    // MARK: - Threat matrix: network egress
+
+    /// Advisory acquisition reaches exactly two hosts, and both are compiled in.
+    ///
+    /// Stated as an **exact set equality**, not as an allow-list: a third
+    /// `https://` literal anywhere in the target fails the suite, whatever it is
+    /// for. That is only affordable because provenance in `EcosystemMapping`
+    /// records `host/owner/repo` without a scheme (batch 2, deviation 16) — a
+    /// string that is not a URL cannot become a request by accident, so the
+    /// guard never has to distinguish a URL that is requested from a URL that is
+    /// merely cited.
+    ///
+    /// The interpolation half is the other door. `"https://\(host)/v1"` is one
+    /// literal and would pass a set comparison while building its host from a
+    /// value; no URL literal in this target may contain `\(`.
+    @Test("Exactly two constant hosts appear in the target, and neither interpolates")
+    func onlyTwoConstantHostsAppearInTheTarget() throws {
+        let sources = try SecurityKitSources.load()
+        SecurityKitSources.assertAnchored(sources)
+
+        let literals = sources.flatMap { SecurityKitSources.stringLiterals(in: $0.code) }
+        let urls = literals.filter { $0.contains("https://") }
+
+        #expect(
+            Set(urls) == [OSVSource.baseURL, NVDSource.baseURL],
+            "the target's URL literals are \(Set(urls).sorted())"
+        )
+        // The declared constants are real hosts rather than empty strings that
+        // would make the equality above trivially satisfiable.
+        #expect(OSVSource.baseURL == "https://api.osv.dev/")
+        #expect(NVDSource.baseURL == "https://services.nvd.nist.gov/rest/json/")
+
+        for url in urls {
+            #expect(url.contains("\\(") == false, "a URL literal interpolates: \(url)")
+        }
+    }
+
+    /// The literal scanner, pointed at source that *does* violate the rule.
+    ///
+    /// Without this, `stringLiterals(in:)` could return nothing at all and the
+    /// exact-set assertion above would fail loudly — but a scanner that returned
+    /// only the two known constants and dropped everything else would pass
+    /// silently, which is the dangerous direction.
+    @Test("The literal scanner finds a third host and an interpolated one")
+    func theLiteralScannerFindsAThirdHostAndAnInterpolatedOne() {
+        let offending = """
+            let leak = "https://evil.example.com/collect"
+            let built = "https://\\(host)/v1/querybatch"
+            // "https://commented-out.example.com" is prose, not code
+            """
+        let found = SecurityKitSources
+            .stringLiterals(in: SecurityKitSources.stripComments(from: offending))
+            .filter { $0.contains("https://") }
+
+        #expect(found.contains("https://evil.example.com/collect"))
+        #expect(found.contains { $0.contains("\\(") })
+        // Two, not three: the commented-out host is prose. That is the same
+        // stripping the real scan depends on, exercised in the one direction
+        // where getting it wrong passes quietly.
+        #expect(found.count == 2, "the scanner read \(found)")
+    }
+
     // MARK: - Triangulation: the scanner itself
 
     /// The two tests above assert an **absence**, and an absence is exactly what
@@ -138,128 +201,5 @@ struct EgressStructureTests {
         #expect(namespace.code.containsIdentifier("codesign") == false)
         #expect(namespace.code.contains("advisoryCacheFileName"))
         #expect(namespace.code.contains("import Foundation"))
-    }
-}
-
-// MARK: - The scan
-
-/// One `SecurityKit` source file, with its comments removed.
-struct SecurityKitSource: Sendable {
-    let name: String
-    /// The file's code with `//` line comments and `/* */` block comments
-    /// stripped, so a prohibition *described* in a doc comment is never mistaken
-    /// for a prohibition *violated* in code. This file's own documentation names
-    /// every forbidden token; without stripping, the guard would fail on prose.
-    let code: String
-}
-
-/// Reads `Sources/SecurityKit/` off disk.
-///
-/// Textual by necessity — a structural claim about what a target does *not*
-/// contain cannot be made by importing it — and textual by intent: the claim is
-/// about the source a reviewer reads.
-enum SecurityKitSources {
-    /// The one file permitted to write, because it owns derived cache data
-    /// rather than any inspected artifact.
-    static let cacheFileName = "AdvisoryCache.swift"
-
-    static let directory = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("Sources/SecurityKit")
-
-    static func load() throws -> [SecurityKitSource] {
-        let names = try FileManager.default
-            .contentsOfDirectory(atPath: directory.path)
-            .filter { $0.hasSuffix(".swift") }
-            .sorted()
-
-        return try names.map { name in
-            let text = try String(contentsOf: directory.appendingPathComponent(name), encoding: .utf8)
-            return SecurityKitSource(name: name, code: stripComments(from: text))
-        }
-    }
-
-    /// The positive anchor every scan runs before asserting an absence.
-    ///
-    /// Without this, an empty directory, a moved target or a typo in the path
-    /// would make every prohibition below pass while proving nothing at all.
-    static func assertAnchored(_ sources: [SecurityKitSource]) {
-        #expect(sources.isEmpty == false, "the scan found no Swift file in Sources/SecurityKit")
-        #expect(
-            sources.contains { $0.code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false },
-            "every file the scan read was empty"
-        )
-        #expect(
-            sources.contains { $0.code.contains("import Foundation") },
-            "the scan read no file containing a known-present token, so it read nothing real"
-        )
-    }
-
-    private static func stripComments(from source: String) -> String {
-        var result = ""
-        var characters = Array(source)
-        var index = 0
-        var inString = false
-        var inBlockComment = false
-
-        while index < characters.count {
-            let character = characters[index]
-            let next = index + 1 < characters.count ? characters[index + 1] : nil
-
-            if inBlockComment {
-                if character == "*", next == "/" { inBlockComment = false; index += 2; continue }
-                index += 1
-                continue
-            }
-            if inString {
-                if character == "\\" { index += 2; continue }
-                if character == "\"" { inString = false }
-                result.append(character)
-                index += 1
-                continue
-            }
-            if character == "\"" { inString = true; result.append(character); index += 1; continue }
-            if character == "/", next == "*" { inBlockComment = true; index += 2; continue }
-            if character == "/", next == "/" {
-                while index < characters.count, characters[index] != "\n" { index += 1 }
-                continue
-            }
-            result.append(character)
-            index += 1
-        }
-        return result
-    }
-}
-
-extension String {
-    /// Whether `token` appears as a **whole identifier**, not as a fragment of a
-    /// longer one.
-    ///
-    /// This distinction is load-bearing, not pedantry. The threat matrix forbids
-    /// the `xattr` *command-line tool* while the design mandates the `getxattr`
-    /// and `listxattr` *C functions* as its read-only replacement. A naive
-    /// substring scan would ban the mandated API and pass only by deleting the
-    /// feature. Likewise `Process` must not match `ProcessInfo`.
-    func containsIdentifier(_ token: String) -> Bool {
-        guard token.isEmpty == false else { return false }
-        let haystack = Array(self)
-        let needle = Array(token)
-        guard haystack.count >= needle.count else { return false }
-
-        func isIdentifierCharacter(_ character: Character) -> Bool {
-            character.isLetter || character.isNumber || character == "_"
-        }
-
-        for start in 0...(haystack.count - needle.count)
-        where Array(haystack[start..<(start + needle.count)]) == needle {
-            let before = start > 0 ? haystack[start - 1] : nil
-            let after = start + needle.count < haystack.count ? haystack[start + needle.count] : nil
-            let boundedBefore = before.map { isIdentifierCharacter($0) == false } ?? true
-            let boundedAfter = after.map { isIdentifierCharacter($0) == false } ?? true
-            if boundedBefore, boundedAfter { return true }
-        }
-        return false
     }
 }
