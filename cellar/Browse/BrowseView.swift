@@ -28,6 +28,7 @@ struct BrowseView: View {
     @Binding var selection: PackageID?
 
     @State private var hideInstalled = false
+    @State private var outdatedOnly = false
 
     var body: some View {
         @Bindable var catalog = catalog
@@ -44,6 +45,7 @@ struct BrowseView: View {
                 CatalogFilterBar(
                     filters: $catalog.filters,
                     hideInstalled: $hideInstalled,
+                    outdatedOnly: $outdatedOnly,
                     isInstalledFilterEnabled: browse.isFilterEnabled
                 )
             }
@@ -91,10 +93,10 @@ struct BrowseView: View {
     }
 
     private var rows: [PackageEntry] {
-        // The mode is pinned to `all`: the four-way installed-state chips were
-        // removed by request, and "Hide installed" is the one control left.
+        // Of the old four-way installed-state modes, only Outdated survives —
+        // as the design's fourth chip; "Hide installed" covers the rest.
         let composed = browse.rows(
-            mode: .all,
+            mode: outdatedOnly ? .outdated : .all,
             query: catalog.query,
             // The same controls the index already answers for `all` and
             // `notInstalled`, now honoured under the two inventory-driven modes

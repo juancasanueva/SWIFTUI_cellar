@@ -19,8 +19,11 @@ struct CatalogFilterBar: View {
     /// Hides rows this machine already has. A view-level subtraction over the
     /// composed rows, not a catalog predicate: the catalog still has no idea
     /// what is installed (PS4). The old four-way installed-state chips are
-    /// gone by request — this toggle is the one installed-state control.
+    /// gone by request — this toggle and the Outdated chip are what remain.
     @Binding var hideInstalled: Bool
+    /// The design's fourth chip: narrows the list to installed packages with a
+    /// pending update, composing with the kind chips and the query.
+    @Binding var outdatedOnly: Bool
     /// False when there is no inventory, which makes the toggle inert rather
     /// than wrong — so it is disabled instead.
     let isInstalledFilterEnabled: Bool
@@ -35,6 +38,11 @@ struct CatalogFilterBar: View {
                 }
                 FilterChip(label: "Casks", isOn: kindSelection.wrappedValue == .cask) {
                     kindSelection.wrappedValue = .cask
+                }
+                if isInstalledFilterEnabled {
+                    FilterChip(label: "Outdated", isOn: outdatedOnly) {
+                        outdatedOnly.toggle()
+                    }
                 }
                 Spacer(minLength: 0)
                 Menu {
@@ -90,9 +98,11 @@ struct CatalogFilterBar: View {
 #Preview {
     @Previewable @State var filters = SearchFilters()
     @Previewable @State var hideInstalled = false
+    @Previewable @State var outdatedOnly = false
     return CatalogFilterBar(
         filters: $filters,
         hideInstalled: $hideInstalled,
+        outdatedOnly: $outdatedOnly,
         isInstalledFilterEnabled: true
     )
 }
