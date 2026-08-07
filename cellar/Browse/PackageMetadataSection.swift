@@ -8,17 +8,14 @@ import Catalog
 import Persistence
 import SwiftUI
 
-/// The three local, private things you can record about a package: a star, a
-/// note, and a snooze of the update you are not ready for
-/// (local-package-metadata LPM2, LPM3, LPM4, LPM5).
+/// The private note (local-package-metadata LPM3), in the design's NOTES well.
 ///
-/// A separate view rather than three more methods on `PackageDetailView`: that
-/// file is already at its length budget, and these three share one store, one
-/// availability state and one reason string.
+/// This section used to carry the favorite and snooze affordances as well; the
+/// design port moved the favorite to the header's heart and the snooze into
+/// the Actions row, both writing through the same store. What remains here is
+/// the note — with the same commit discipline it always had.
 ///
-/// The view owns **no rule**. Whether the badge is suppressed is
-/// `PackageMetadata.isSnoozed`, a pure function proven in the package's own
-/// suite; all this decides is layout.
+/// The view owns **no rule**; `NoteDraft` decides what a commit owes.
 struct PackageMetadataSection: View {
     let entry: PackageEntry
     let metadata: MetadataStore
@@ -34,23 +31,10 @@ struct PackageMetadataSection: View {
     @FocusState private var isEditing: Bool
 
     private var stored: PackageMetadata? { metadata.snapshot[entry.id] }
-    private var isFavorite: Bool { stored?.isFavorite == true }
     private var isUnavailable: Bool { !metadata.availability.isAvailable }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Button {
-                    metadata.setFavorite(!isFavorite, for: entry.id)
-                } label: {
-                    Label(
-                        isFavorite ? "Favorite" : "Add to favorites",
-                        systemImage: isFavorite ? "star.fill" : "star"
-                    )
-                }
-                snoozeControl
-                Spacer(minLength: 0)
-            }
             noteEditor
             if let reason = metadata.availability.reason {
                 Text(reason).font(.caption).foregroundStyle(.secondary)
@@ -67,38 +51,6 @@ struct PackageMetadataSection: View {
         }
     }
 
-    /// Snoozes the **currently offered** version, which is the whole of what a
-    /// snooze stores: no duration, no expiry, no clock. When brew offers a
-    /// different version the badge returns on its own, with no user action
-    /// (design D5).
-    @ViewBuilder
-    private var snoozeControl: some View {
-        if let installed = entry.installed, installed.isOutdated {
-            let offered = installed.catalogVersion
-            let isSnoozed = PackageMetadata.isSnoozed(
-                offering: offered,
-                snoozedVersion: stored?.snoozedVersion
-            )
-            Button {
-                if isSnoozed {
-                    metadata.unsnooze(entry.id)
-                } else {
-                    metadata.snooze(entry.id, offering: offered)
-                }
-            } label: {
-                Label(
-                    isSnoozed ? "Snoozed \(offered)" : "Snooze \(offered)",
-                    systemImage: isSnoozed ? "bell.slash.fill" : "bell.slash"
-                )
-            }
-            .help(
-                isSnoozed
-                    ? "Show the update badge for \(offered) again"
-                    : "Hide the badge until a different version is offered"
-            )
-        }
-    }
-
     /// A plain `TextEditor`: **no Markdown rendering and no length cap**.
     ///
     /// The note is stored and returned byte-identical, and it can reach no argv
@@ -106,19 +58,33 @@ struct PackageMetadataSection: View {
     /// searching the Installed list for a word that appears only in a note
     /// returns nothing, by design (settled R4, LPM3 sc3).
     private var noteEditor: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Note").font(.headline)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Notes")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(0.66)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.white.opacity(0.34))
             TextEditor(text: $draft)
-                .font(.body)
-                .frame(minHeight: 80)
+                .font(.system(size: 12.5))
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 64)
+                .padding(EdgeInsets(top: 7, leading: 9, bottom: 7, trailing: 9))
+                .background(
+                    Color.black.opacity(0.24),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5)
+                )
                 .focused($isEditing)
                 .overlay(alignment: .topLeading) {
                     if draft.isEmpty {
-                        Text("Private to this machine. Never sent anywhere.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
+                        Text("Add a private note about why you keep this around…")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Theme.textFaint)
+                            .padding(.top, 15)
+                            .padding(.leading, 14)
                             .allowsHitTesting(false)
                     }
                 }

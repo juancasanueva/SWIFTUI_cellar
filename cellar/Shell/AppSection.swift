@@ -18,14 +18,15 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// query: Browse is a search field over ~16k records and answers nothing
     /// useful when empty.
     ///
-    /// **Home remains its own section, and Browse remains the landing.** Settled
-    /// in slice 5 as D4, once the Health dashboard existed and the question could
-    /// actually be answered: Health is its own section, Home is not folded into
-    /// it, and Health did not take the landing spot. The landing is `.browse` and
-    /// has been since M1 — an earlier draft of this note claimed Home held it,
-    /// which the shell never did. The question is recorded here rather than
-    /// removed, because a deleted question is indistinguishable from one that was
-    /// never asked.
+    /// **Home remains its own section, and now takes the landing.** D4 settled
+    /// the slice-5 half of the question: Health is its own section, Home is not
+    /// folded into it, and Health did not take the landing spot. The landing
+    /// itself was `.browse` from M1 until the design port, when the maintainer
+    /// moved it to `.home` (2026-08-07) — the design document opens on Home,
+    /// and by then Home carried the attention cards and snapshot that make a
+    /// landing worth having. The history is recorded here rather than removed,
+    /// because a deleted question is indistinguishable from one that was never
+    /// asked.
     case discover
     case browse
     case installed

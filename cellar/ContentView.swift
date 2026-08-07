@@ -51,7 +51,7 @@ struct ContentView: View {
     /// Refresh button. Injected so the shell owns no refresh pipeline.
     var refresh: @MainActor () async -> Void = {}
 
-    @State private var section: AppSection = .browse
+    @State private var section: AppSection = .home
     @State private var selection: PackageID?
     /// A finding carries its own identity — a package plus an advisory — because
     /// the same advisory can apply to two installed packages and they are two
@@ -311,6 +311,7 @@ struct ContentView: View {
                     installed: installed,
                     operations: operations,
                     metadata: metadata,
+                    diskUsage: diskUsage,
                     id: selection,
                     selection: $selection
                 )

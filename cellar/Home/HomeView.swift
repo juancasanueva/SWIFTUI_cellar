@@ -494,6 +494,7 @@ private struct RecentActivityRow: View {
 private struct FavoriteRow: View {
     let package: InstalledPackage
     let open: () -> Void
+    @Environment(ThemeStore.self) private var theme
 
     var body: some View {
         Button(action: open) {
@@ -509,7 +510,9 @@ private struct FavoriteRow: View {
                     .foregroundStyle(Color.white.opacity(0.35))
                 Text(status)
                     .font(.system(size: 11))
-                    .foregroundStyle(package.isOutdated ? Theme.infoText : Color.white.opacity(0.35))
+                    // The design writes the pending update in the accent's
+                    // light variant, like every other "this has an update".
+                    .foregroundStyle(package.isOutdated ? theme.light : Color.white.opacity(0.35))
                     .frame(width: 96, alignment: .trailing)
             }
             .padding(EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14))

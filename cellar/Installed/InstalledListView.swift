@@ -113,7 +113,7 @@ struct InstalledListView: View {
             .accessibilityIdentifier("installed-list")
             .overlay {
                 if entries.isEmpty {
-                    InstalledEmptyState(state: installed.state)
+                    InstalledEmptyState(state: installed.state, lens: lens)
                 }
             }
             .onChange(of: selected) { _, current in
@@ -129,6 +129,7 @@ struct InstalledListView: View {
                 let live = Set(entries.map(\.id))
                 selected = selected.intersection(live)
                 adoptExternalSelection(selection)
+                dropForeignSelection()
             }
         }
         // No manual refresh control: the inventory refreshes at launch, on
@@ -138,7 +139,23 @@ struct InstalledListView: View {
         .navigationTitle(AppSection.installed.title)
         .onAppear {
             adoptExternalSelection(selection)
+            dropForeignSelection()
         }
+    }
+
+    /// Clears a detail selection this lens does not contain.
+    ///
+    /// The selection is shared across sections so "Show in Installed" can hand
+    /// one over — but a package selected elsewhere must not keep a detail pane
+    /// standing beside an Updates or Favorites list that does not list it.
+    /// `.all` never drops: it is the handoff's destination, and its entries may
+    /// legitimately be empty mid-refresh.
+    private func dropForeignSelection() {
+        guard lens != .all,
+              let current = selection,
+              !entries.contains(where: { $0.id == current })
+        else { return }
+        selection = nil
     }
 
     private func row(_ entry: PackageEntry) -> some View {

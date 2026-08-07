@@ -15,6 +15,11 @@ import SwiftUI
 /// II9).
 struct InstalledEmptyState: View {
     let state: InstalledLoadState
+    /// Which slice of the inventory is standing empty. "Nothing has an update"
+    /// and "nothing was installed on request" are different facts, and telling
+    /// the first user the second sentence sends them hunting for a toggle that
+    /// would show them nothing.
+    var lens: InstalledLens = .all
 
     var body: some View {
         switch state {
@@ -22,11 +27,26 @@ struct InstalledEmptyState: View {
             ContentUnavailableView("Reading installed packages", systemImage: "shippingbox")
 
         case .loaded:
-            ContentUnavailableView(
-                "Nothing installed on request",
-                systemImage: "shippingbox",
-                description: Text("Turn on “Show dependencies” to see everything brew installed.")
-            )
+            switch lens {
+            case .updates:
+                ContentUnavailableView(
+                    "Everything is up to date",
+                    systemImage: "checkmark.circle",
+                    description: Text("No installed package has a pending update.")
+                )
+            case .favorites:
+                ContentUnavailableView(
+                    "No favorites yet",
+                    systemImage: "heart",
+                    description: Text("Click the star on any package to keep it here.")
+                )
+            case .all:
+                ContentUnavailableView(
+                    "Nothing installed on request",
+                    systemImage: "shippingbox",
+                    description: Text("Turn on “Show dependencies” to see everything brew installed.")
+                )
+            }
 
         case .brewAbsent(let absence):
             BrewAbsentGuidance(absence: absence)

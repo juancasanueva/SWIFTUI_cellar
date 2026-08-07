@@ -70,33 +70,27 @@ struct AppSectionPlacementTests {
         #expect(AppSection.sidebarGroups[2].sections == [.health, .security, .cleanup])
     }
 
-    /// Home keeps its place at the head of the sidebar, and Health did not take
-    /// the landing spot.
+    /// Home keeps its place at the head of the sidebar, and now holds the
+    /// landing spot.
     ///
-    /// **Recorded rather than absorbed (finding F13).** `tasks.md` 9.1 asks for
-    /// "`.home` is still `allCases.first` **and still the landing section** —
-    /// asserted over the shell's default selection". The first half is true and is
-    /// asserted below. The second half was **not** true before this change:
-    /// `ContentView` has shipped `@State private var section: AppSection = .browse`
-    /// since M1, so Home has never been the section the app lands on.
-    ///
-    /// Changing it here would be a user-visible behaviour change that no
-    /// requirement in this delta asks for, and `design.md` HD9 says the opposite
-    /// ("No new `@State` selection. `HomeView` is not touched"). So what is
-    /// asserted is what this change actually owes: **Health did not take the
-    /// landing spot, and this change did not move it.** The literal value is
-    /// pinned so a silent future move fails here rather than passing unnoticed.
+    /// **Rewritten, never deleted.** The landing was `.browse` from M1 until
+    /// the design port; the F13 note that used to live here pinned that literal
+    /// so a move would be a deliberate decision recorded on this line — and
+    /// this is that recording. The maintainer moved the landing to `.home`
+    /// (2026-08-07): the design document opens on Home, and Home now carries
+    /// the attention cards and snapshot that make a landing worth having.
+    /// Health still did not take it.
     @MainActor
-    @Test("Home leads the sidebar, and Health did not take the landing section")
-    func homeLeadsAndHealthDidNotTakeTheLandingSection() throws {
+    @Test("Home leads the sidebar and holds the landing section")
+    func homeLeadsAndHoldsTheLandingSection() throws {
         #expect(AppSection.allCases.first == .home)
 
         let landing = try #require(try AppSectionSourceScan.shellDefaultSection())
         #expect(landing != "health", "the Health section took the landing spot")
         #expect(landing != "security")
-        // The shipped value, pinned. If this ever becomes `home`, that is a
-        // deliberate decision and this line is where it is recorded.
-        #expect(landing == "browse")
+        // The shipped value, pinned so a silent future move fails here rather
+        // than passing unnoticed.
+        #expect(landing == "home")
     }
 
     // MARK: - 9.2 — no `default` arm in an AppSection switch
@@ -203,11 +197,10 @@ struct AppSectionPlacementTests {
         let text = try AppSectionSourceScan.rawSource(named: "Shell/AppSection.swift")
 
         #expect(text.contains("D4"), "the resolution no longer names the decision it settles")
-        #expect(text.lowercased().contains("browse remains the landing"))
-        #expect(
-            text.lowercased().contains("home keeps the landing spot") == false,
-            "the resolution still records the disproved claim; the landing is Browse (F13)"
-        )
+        // The landing moved to Home in the design port; the comment must
+        // record the move rather than restate the superseded M1 value.
+        #expect(text.lowercased().contains("now takes the landing"))
+        #expect(text.lowercased().contains("moved it to `.home`"))
         #expect(
             text.contains("slice 5's decision") == false,
             "the question is still deferred; D4 settled it"
