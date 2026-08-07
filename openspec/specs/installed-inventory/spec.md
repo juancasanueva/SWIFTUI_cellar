@@ -493,7 +493,7 @@ The installed list MUST expose a selection of zero or more packages. The selecti
 order in which packages were selected, because that order determines the order their operations are
 submitted. A package that leaves the inventory MUST leave the selection at the next refresh, so no
 action can be submitted for a package the app no longer lists. Bulk affordances MUST be offered for
-upgrade and uninstall only; pin, unpin, snooze, favorite and note MUST offer no bulk affordance, and
+upgrade, uninstall, pin, unpin and snooze; favorite and note MUST offer no bulk affordance, and
 a bulk control that cannot act on the current selection MUST be unavailable rather than inert.
 
 When more than one package enters the selection in a single action — select-all, or any multi-package
@@ -501,6 +501,29 @@ add — they MUST enter it in the order the list displays them: section by secti
 and within each section in that section's displayed order. They
 MUST NOT enter it in the underlying inventory's order. Because selection order determines submission
 order, the order the resulting operations are submitted MUST therefore match the order the user sees.
+
+Pin and unpin MUST be **two independent verbs**, each with its own eligibility. They MUST NOT be
+collapsed into a single toggle whose meaning depends on how homogeneous the selection happens to be,
+because a selection holding both pinned and unpinned packages has no single correct answer and the
+unavailable-rather-than-inert rule forbids guessing. Every verb's eligible set MUST be derived
+independently from the selection: upgrade over its upgradable members, uninstall over its
+uninstallable members, pin over its formulae that are not pinned, unpin over its formulae that are
+pinned, and snooze over its outdated members that are not already snoozed at the offered version. A
+verb whose eligible set is empty MUST be unavailable. A verb whose eligible set is non-empty MUST act
+on exactly that set, and MUST NOT act on, silently skip past, or guess about the selection's
+ineligible members. A cask MUST NOT enter a pin or unpin set, because pinning is formula-only.
+Bulk pin and bulk unpin MUST require no confirmation.
+
+Bulk snooze MUST NOT enter the bulk verb vocabulary that produces mutation commands, and MUST NOT be
+submitted through the shared mutation spine. It spawns no process, submits no operation and writes no
+history entry. It MUST record one snooze per eligible selected package, each scoped to **that
+package's own** offered version, on exactly the terms `local-package-metadata` sets; its copy MUST NOT
+imply a duration. Its affordance MUST NOT be representable as a case of the bulk mutation vocabulary,
+so no consumer of that vocabulary can hold a case it is unable to execute.
+(Previously: bulk affordances were offered for upgrade and uninstall **only**, and pin, unpin and
+snooze were prohibited alongside favorite and note; nothing was said about per-verb eligibility, about
+pin and unpin being separate verbs, or about a bulk affordance that does not travel the mutation
+spine.)
 
 #### Scenario: Selection preserves order
 
@@ -528,18 +551,55 @@ order, the order the resulting operations are submitted MUST therefore match the
 - WHEN a refresh produces an inventory that no longer contains `wget`
 - THEN the selection no longer contains `wget`
 
-#### Scenario: Only upgrade and uninstall are offered for a selection
+#### Scenario: Upgrade, uninstall, pin, unpin and snooze are offered for a selection
 
-- GIVEN a non-empty selection
+- GIVEN a selection of two outdated, unsnoozed formulae, one of them pinned and one of them not
 - WHEN the bulk controls exposed for it are enumerated
-- THEN upgrade and uninstall are present
-- AND no bulk pin, unpin, snooze, favorite or note control is present
+- THEN upgrade, uninstall, pin, unpin and snooze are present
+- AND no bulk favorite or note control is present
 
 #### Scenario: An empty selection offers no enabled bulk control
 
 - GIVEN an empty selection
 - WHEN the bulk controls are inspected
 - THEN every bulk control is unavailable
+
+#### Scenario: The bulk mutation vocabulary is exactly upgrade, uninstall, pin and unpin
+
+- GIVEN the vocabulary of bulk verbs that produce mutation commands
+- WHEN it is enumerated exhaustively, by case and by displayed title
+- THEN it holds exactly upgrade, uninstall, pin and unpin
+- AND no snooze, favorite, note or service verb appears in it, by case or by title
+
+#### Scenario: A mixed pinned selection offers pin and unpin over their own subsets
+
+- GIVEN a selection of three formulae, one pinned and two unpinned
+- WHEN the pin and unpin controls are inspected
+- THEN both are available
+- AND pin announces and acts on exactly the two unpinned formulae, and unpin announces and acts on
+  exactly the one pinned formula
+
+#### Scenario: A selection with no formula leaves pin and unpin unavailable
+
+- GIVEN a non-empty selection containing only casks
+- WHEN the pin and unpin controls are inspected
+- THEN both are unavailable rather than present and inert
+- AND no pin or unpin operation can be submitted for the selection
+
+#### Scenario: Bulk pin and bulk unpin raise no confirmation
+
+- GIVEN a selection of unpinned formulae, and separately a selection of pinned formulae
+- WHEN bulk pin and bulk unpin are submitted
+- THEN neither presents a confirmation
+- AND each submits exactly one pin or unpin operation per eligible formula, in selection order
+
+#### Scenario: Bulk snooze never enters the mutation spine
+
+- GIVEN a selection of outdated packages and a recording process launcher, operation queue and
+  history store
+- WHEN bulk snooze is submitted
+- THEN no process was spawned, no operation was submitted and no history entry was written
+- AND one snooze is recorded per selected package, each naming that package's own offered version
 
 ### Requirement: A bulk action's label counts exactly the set it submits
 
@@ -568,6 +628,16 @@ be impossible for the control to announce one number and submit a different set.
 - WHEN the bulk-upgrade control's announced count is read and the action is submitted
 - THEN the announced count is 2
 - AND exactly two operations are submitted, neither naming the snoozed package
+
+#### Scenario: Each new verb's label counts its own eligible set
+
+- GIVEN a selection of two unpinned formulae, one pinned formula and one cask, all of them outdated
+  and unsnoozed
+- WHEN the announced counts of the pin, unpin and snooze controls are read and each action is
+  submitted
+- THEN pin announces 2 and submits 2, unpin announces 1 and submits 1, and snooze announces 4 and
+  records 4
+- AND each count was derived from the same projection its own action submitted
 
 ## Provenance
 
@@ -767,3 +837,45 @@ be impossible for the control to announce one number and submit a different set.
   scenarios were preserved. The replacement keeps every existing decoding guarantee and additionally
   requires an absent linked-keg value to remain unlinked rather than being inferred from the newest
   installed keg, so disk attribution can consume the exact payload state.
+- **Amended by change `m5-health` (archived `2026-08-07`, PRD milestone **M5** "Pro-parity flows",
+  slice 5 of 5 — the slice that **closed M5**): 2 MODIFIED requirements, each replaced as a whole
+  block, adding **6 scenarios**. 14 requirements / 58 scenarios → **14 requirements / 64
+  scenarios**. Nothing was added, removed or renamed. Delta archived at
+  `openspec/changes/archive/2026-08-07-m5-health/specs/installed-inventory/spec.md`.
+  - **⚠ This amendment is DESTRUCTIVE, and `openspec/config.yaml` `rules.archive` ("Warn before
+    merging destructive deltas") was applied.** The orchestrator issued the required warning and the
+    maintainer directed the merge to proceed. "Multi-select is explicit, ordered, and offered only
+    for bulk-eligible verbs" (II13) is **not** a strict superset of the text it replaced: a
+    prohibition was **removed**, so this block was verified byte-for-byte against the delta rather
+    than by superset check.
+  - **What was removed, exactly.** (1) The requirement clause "Bulk affordances MUST be offered for
+    upgrade and uninstall only; pin, unpin, snooze, favorite and note MUST offer no bulk affordance"
+    — the prohibition on pin, unpin and snooze is gone; favorite and note remain prohibited. (2) The
+    scenario **"Only upgrade and uninstall are offered for a selection"** and its assertion "AND no
+    bulk pin, unpin, snooze, favorite or note control is present", rewritten as "Upgrade, uninstall,
+    pin, unpin and snooze are offered for a selection". Five lines in total left the spec; every
+    other line of the block is byte-identical.
+  - **Why.** The 2026-08-02 narrowing recorded above was a deliberate scope decision, not an
+    invariant. The maintainer **reversed it** on 2026-08-07 (decisions **D1**/**D2**, Engram
+    `#7532`), so PRD §3.2's full bulk vocabulary ships. The removal is the point of the change, not
+    a merge accident.
+  - **What the rewrite deliberately preserved, byte-identically**: selection order, the
+    displayed-order rule for a multi-package add, the leave-the-inventory rule, and above all **"a
+    bulk control that cannot act on the current selection MUST be unavailable rather than inert"** —
+    the clause that forbids guessing on a mixed pinned/unpinned selection, and therefore the clause
+    that makes pin and unpin two independent verbs rather than one toggle. Four of the six existing
+    scenarios are unchanged.
+  - **What was added**: per-verb independent eligibility (upgradable / uninstallable / unpinned
+    formulae / pinned formulae / outdated-not-already-snoozed); casks never enter a pin or unpin
+    set; bulk pin and unpin raise no confirmation; and bulk snooze, which **MUST NOT** enter the
+    bulk mutation vocabulary or the mutation spine and is not representable as a case of it.
+  - **The earlier "untouched, and that is load-bearing" note above is superseded for its bulk-verb
+    half.** `service-management`'s guard survives with its **intent** intact but its assertion
+    rewritten: `ServiceSubmissionTests.theInstalledBulkVocabularyIsUnchanged` now proves no
+    *service* verb entered the package bulk vocabulary, rather than that the vocabulary is frozen at
+    two cases. `BulkSelectionTests.onlyUpgradeAndUninstallAreBulkEligible` was likewise rewritten,
+    never deleted, keeping its title scan for `snooze`/`favorite`/`note`.
+    `ServiceRowControl.allCases.count == 5` is unaffected.
+  - **II14 "A bulk action's label counts exactly the set it submits" is a strict superset**:
+    requirement text byte-identical, one scenario added so the new verbs' announced counts (pin 2/2,
+    unpin 1/1, snooze 4/4) are covered by the same one-projection rule.

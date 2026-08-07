@@ -99,6 +99,22 @@ duration, an expiry date, or any reading of the clock, so snooze behaviour is re
 clock seam. Snoozing an already-snoozed package MUST replace the stored version rather than
 accumulate a second snooze. Unsnoozing MUST remove the stored snooze entirely.
 
+Snoozing more than one package in a single user action MUST record **one snooze per package, each
+naming that package's own currently offered version**. Such an action MUST NOT record a shared
+version, MUST NOT reuse one package's offered version for another, and MUST NOT introduce a batch
+identity, a group record, or any notion of a snooze that spans packages: the stored result MUST be
+indistinguishable from having snoozed each package individually, in any order. A package in the batch
+with no offered version to snooze toward MUST record nothing, rather than a placeholder, an empty
+string or a neighbour's version. The action MUST NOT compare, order or rank the versions it records.
+
+Copy that offers a snooze — for one package or for many — MUST NOT state or imply a duration, a
+period, an expiry, or a "remind me later" interval. It MUST state what the snooze actually does: it
+lasts until a different version is offered. A stored snooze's creation timestamp is **provenance
+only**: it MUST NOT be read as policy, MUST NOT govern when a snooze ends, and MUST NOT reach any
+projection that decides whether a badge is suppressed.
+(Previously: the requirement governed snoozing a package and said nothing about snoozing several
+packages in one action, nor about the copy that offers a snooze.)
+
 #### Scenario: Snoozing records the version it applies to
 
 - GIVEN an installed package outdated toward published version `1.2.3`
@@ -116,6 +132,33 @@ accumulate a second snooze. Unsnoozing MUST remove the stored snooze entirely.
 - GIVEN a package snoozed at version `1.2.3` that is now outdated toward `1.3.0`
 - WHEN it is snoozed again
 - THEN exactly one snooze is stored for it, naming `1.3.0`
+
+#### Scenario: Snoozing many records each package's own version
+
+- GIVEN three outdated packages offered `1.2.3`, `2026-08-01` and `4.0.0_1` respectively
+- WHEN all three are snoozed in one action
+- THEN three snoozes are stored, naming `1.2.3`, `2026-08-01` and `4.0.0_1` respectively
+- AND no shared version, batch identity or group record was stored
+
+#### Scenario: A multi-package snooze is indistinguishable from individual ones
+
+- GIVEN the same three packages
+- WHEN they are snoozed in one action, and separately snoozed one at a time in a different order
+- THEN the stored snoozes are equal in both cases, field for field apart from provenance
+
+#### Scenario: A package with nothing to snooze toward records nothing
+
+- GIVEN a batch containing one outdated package and one package with no offered version
+- WHEN the batch is snoozed
+- THEN exactly one snooze is stored, naming the outdated package's version
+- AND no placeholder, empty or borrowed version was stored for the other
+
+#### Scenario: The snooze copy implies no duration
+
+- GIVEN every copy that offers a snooze, for one package and for many
+- WHEN it is read
+- THEN none of it states or implies a duration, a period, an expiry or an interval
+- AND each states that the snooze lasts until a different version is offered
 
 ### Requirement: A snooze suppresses the outdated badge until the offered version changes
 
@@ -140,9 +183,19 @@ anchor so the scan cannot pass vacuously, and MUST additionally assert that no i
 reference to, the comparator-owning module appears in those sources. The guard's scope narrows from
 "no comparator exists in the repository" to "no comparator is reachable from this capability"; it
 MUST NOT be deleted, weakened to a comment, or satisfied by an allow-list.
+
+Because that scope is enumerated exhaustively rather than derived from a target boundary, it MUST
+cover **every** source that participates in recording or projecting a snooze, including a source
+outside this capability's own target — such as a surface that snoozes several packages in one action.
+A new snooze caller MUST NOT be able to evade the guarantee by living outside the enumerated list:
+adding such a caller MUST either place it in the guard's scope, or route its snoozes only through a
+source already in that scope. A caller outside the scope that constructs, compares or orders a version
+string itself MUST fail the guard rather than pass it silently.
 (Previously: the rule was identical for snooze behaviour, but the no-comparator guarantee was
 repository-wide; it is now scoped to this capability's reachability, because `m4-security`
-introduces a strict-SemVer comparator inside `vulnerability-scanning`.)
+introduces a strict-SemVer comparator inside `vulnerability-scanning`. This revision adds only the
+rule that the enumerated scope must follow every snooze caller, including one outside this
+capability's target.)
 
 #### Scenario: The badge is suppressed while the offered version is unchanged
 
@@ -185,6 +238,14 @@ introduces a strict-SemVer comparator inside `vulnerability-scanning`.)
 - THEN the forbidden comparator tokens are absent, the positive equality anchor is present, and
   neither an import of nor a reference to the comparator-owning module appears
 - AND snooze behaviour is byte-identical to its behaviour before that comparator existed
+
+#### Scenario: A snooze caller outside this capability cannot evade the guard
+
+- GIVEN a surface outside this capability's own target that records snoozes for several packages in
+  one action
+- WHEN the structural guard's enumerated scope is read
+- THEN that surface is either named in the scope, or records its snoozes only through a source that is
+- AND the forbidden comparator tokens are absent from every source the scope names
 
 ### Requirement: A cold or unavailable metadata store degrades to the pre-existing behaviour
 
@@ -295,3 +356,39 @@ favorites, notes or snoozes.
     a real user store (MV-4): history survived the migration. The snooze half of that live check is
     **vacuously satisfied** — the user held zero snoozes pre-migration — and is covered instead by
     `MigrationTests` against real SQLite.
+- **Amended by change `m5-health` (archived `2026-08-07`, PRD milestone **M5** "Pro-parity flows",
+  slice 5 of 5 — the slice that **closed M5**): 2 MODIFIED requirements, each replaced as a whole
+  block that is a **strict superset** of the text it replaced, adding **5 scenarios**. 7
+  requirements / 22 scenarios → **7 requirements / 27 scenarios**. Nothing was added, removed or
+  renamed; every pre-existing sentence and all 22 pre-existing scenarios survive byte-identically,
+  verified by byte-slicing the replaced ranges against the delta. Delta archived at
+  `openspec/changes/archive/2026-08-07-m5-health/specs/local-package-metadata/spec.md`.
+  - **Snooze behaviour did not change, again.** Equality is still the whole rule: exact string
+    comparison, no ordering, no clock, no duration. What changed is that a snooze can now be
+    recorded for **several packages in one user action** (decision **D2**, Engram `#7532`).
+  - **LPM4 answers "whose version does each row record?" — its own.** N packages are outdated toward
+    N *different* version strings, so a batch that shared one version would mis-scope N−1 snoozes
+    and suppress badges for versions those packages were never outdated toward. The requirement now
+    forbids a shared version, a reused neighbour's version, and any batch identity or group record:
+    the stored result MUST be indistinguishable from individual snoozes in any order, and a package
+    with no offered version records **nothing** rather than a placeholder. It also promotes the copy
+    rule to requirement level — "snooze" is the one verb in the app whose ordinary English meaning
+    is a duration and whose implementation deliberately is not — and pins `createdAt` as provenance
+    only, never reaching a suppression projection.
+  - **LPM5 closes a vacuous-pass gap the bulk surface would otherwise have opened.** The
+    no-comparator guard is deliberately **file-scoped and enumerated exhaustively** rather than
+    target-scoped, so a bulk-snooze surface living outside this capability's target would have been
+    a new snooze caller the enumerated list did not name — the guarantee would have held vacuously
+    for it. The requirement now compels the enumerated scope to follow **every** snooze caller,
+    including one outside the target: such a caller must either be placed in scope or route only
+    through an in-scope source, and one that constructs, compares or orders a version itself must
+    **fail** the guard rather than pass silently. The guard was **extended, not weakened**: the
+    comment-stripped source scan, the forbidden comparator tokens and the positive
+    `snoozedVersion == candidate` anchor all stay. In apply this was discharged by re-rooting
+    `SnoozeGuardTests.source(at:)` from `Packages/CellarCore` to the repository root so it can open
+    `cellar/Installed/BulkActionBar.swift`, keeping the per-file anchor so a read-nothing scan
+    fails.
+  - The `(Previously: …)` annotation on LPM5 is the one line in either block that was rewritten
+    rather than appended to: it gained a closing sentence recording this revision. It is a
+    provenance annotation, not normative text, so both blocks remain strict supersets of everything
+    normative they replaced.
