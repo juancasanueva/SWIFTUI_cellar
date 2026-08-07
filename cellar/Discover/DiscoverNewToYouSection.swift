@@ -25,6 +25,7 @@ struct DiscoverNewToYouSection: View {
                 ForEach(model.rows) { row in
                     DiscoverArrivalRowView(row: row)
                         .tag(row.id)
+            .themedListSelection(isSelected: selection == row.id)
                 }
                 if let hidden = model.hiddenLabel {
                     Text(hidden)

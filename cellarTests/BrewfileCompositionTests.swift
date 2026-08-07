@@ -543,41 +543,35 @@ struct BrewfileCompositionTests {
 
 // MARK: - 9.5 Placement
 
-/// Where the two affordances live (D3).
+/// Where the Brewfile affordances live.
 ///
-/// Inside the **existing** Taps section, and nowhere else. That is a decision
-/// rather than a detail: a Brewfile is a list of taps and packages, and a
-/// sidebar entry of its own would have made "import a Brewfile" a place instead
-/// of an action.
+/// **Rewritten, never deleted**, when the design document promoted the Brewfile
+/// to a sidebar section of its own (`Cellar.dc.html`, 2026-08-07). D3's original
+/// ruling — sheets inside Taps, no destination — was made before that document
+/// existed; the design supersedes the placement half while everything the sheets
+/// guarantee (dump-then-preview-then-panel, panel-chooses-Cellar-writes) is
+/// untouched, because the new section presents the **same** sheets over the same
+/// `BrewfileStore`. The Taps toolbar affordances remain beside it.
 @Suite("Brewfile placement")
 struct BrewfilePlacementTests {
 
-    /// **Rewritten, never deleted**, when slice 5 added `.health` as the tenth
-    /// section (D4).
-    ///
-    /// The list this test pins is a whole-vocabulary assertion, so *any* new
-    /// section fails it — which is exactly what it is for, and why it is corrected
-    /// rather than loosened. Its own claim is unchanged and is the sharp half:
-    /// no section whose name mentions a Brewfile exists, whatever else does. The
-    /// new entry is named explicitly rather than the equality being replaced by a
-    /// weaker `contains`, because a list is what makes the eleventh section fail
-    /// here too.
-    @Test("No sidebar section was added for Brewfiles")
-    func noSidebarSectionWasAddedForBrewfiles() {
+    /// The whole-vocabulary assertion, corrected rather than loosened: *any*
+    /// new section still fails it, which is exactly what it is for. The design
+    /// added four — favorites, updates, brewfile, settings — and each is named
+    /// explicitly so a fifteenth section fails here too.
+    @Test("The sidebar vocabulary is the design document's fourteen sections")
+    func theSidebarVocabularyIsTheDesignDocumentsFourteenSections() {
         #expect(
             AppSection.allCases.map(\.rawValue) == [
-                "home", "discover", "browse", "installed",
-                "taps", "services", "cleanup", "health", "security", "history"
+                "home", "discover", "browse", "installed", "favorites", "updates",
+                "taps", "services", "cleanup", "health", "security", "brewfile",
+                "history", "settings"
             ]
         )
-        #expect(AppSection.allCases.count == 10)
-        #expect(
-            AppSection.allCases.contains { $0.rawValue.contains("brewfile") } == false,
-            "a Brewfile section was added; D3 put both affordances inside Taps"
-        )
+        #expect(AppSection.allCases.count == 14)
     }
 
-    @Test("Both affordances are wired into the Taps list and nowhere else")
+    @Test("Both affordances are wired into the Taps list and the Brewfile section, and nowhere else")
     func bothAffordancesAreWiredIntoTheTapsList() throws {
         let taps = try BrewfileCompositionTests.appSource("TapsListView.swift")
 
@@ -593,8 +587,11 @@ struct BrewfilePlacementTests {
             "the Brewfile affordances added a navigation destination"
         )
 
-        // The sheets are presented from the Taps list and from no other view.
-        for other in try AppSecuritySources.load() where other.name != "TapsListView.swift" {
+        // The sheets are presented from the Taps list and the Brewfile section,
+        // and from no other view — both flows stay on the one store that owns
+        // the DD3/DD4 ordering guarantees.
+        let presenters = ["TapsListView.swift", "BrewfileSectionView.swift"]
+        for other in try AppSecuritySources.load() where !presenters.contains(other.name) {
             #expect(
                 other.code.contains("BrewfileImportSheet(") == false,
                 "\(other.name) also presents the import sheet"

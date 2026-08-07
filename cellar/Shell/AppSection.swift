@@ -29,6 +29,13 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case discover
     case browse
     case installed
+    /// The favorited slice of Installed, promoted to a place of its own by the
+    /// design document. The filter chip on Installed remains; this is the same
+    /// lens with a sidebar row, not a second source of truth.
+    case favorites
+    /// The outdated slice of Installed, likewise promoted by the design so the
+    /// sidebar can carry the count that most often brings a user here.
+    case updates
     /// Homebrew source inventory and third-party tap management.
     case taps
     /// The background services Homebrew manages.
@@ -51,12 +58,16 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// Between Cleanup and History because it is read-only visibility over what
     /// is installed, like Cleanup, rather than a record of what Cellar did.
     case security
+    /// The Brewfile surface: current state, export, and import. Previously
+    /// reached through sheets on Taps; the design gives it a sidebar row.
+    case brewfile
     /// The durable record of every mutation Cellar performed.
     ///
-    /// Favorites is deliberately **not** here: it is a filter chip on the
-    /// Installed list, because a favorite is a lens on what you have rather
-    /// than a separate place (settled Q4).
+    /// Favorites was originally a filter chip only (settled Q4); the design
+    /// document promotes the same lens to a sidebar row, and the chip stays.
     case history
+    /// The app's own preferences — accent colour first among them.
+    case settings
 
     var id: String { rawValue }
 
@@ -64,14 +75,27 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "Home"
         case .discover: "Discover"
-        case .browse: "Browse"
+        case .browse: "Search"
         case .installed: "Installed"
+        case .favorites: "Favorites"
+        case .updates: "Updates"
         case .taps: "Taps"
         case .services: "Services"
         case .cleanup: "Cleanup"
         case .health: "Health"
         case .security: "Security"
+        case .brewfile: "Brewfile"
         case .history: "History"
+        case .settings: "Settings"
+        }
+    }
+
+    /// The sidebar's wording, where the design writes a longer label than the
+    /// toolbar's.
+    var sidebarTitle: String {
+        switch self {
+        case .browse: "Search catalog"
+        default: title
         }
     }
 
@@ -79,14 +103,31 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "house"
         case .discover: "sparkles"
-        case .browse: "square.grid.2x2"
+        case .browse: "magnifyingglass"
         case .installed: "shippingbox"
+        case .favorites: "heart"
+        case .updates: "arrow.up.circle"
         case .taps: "externaldrive.connected.to.line.below"
-        case .services: "bolt.horizontal.circle"
-        case .cleanup: "externaldrive.badge.timemachine"
-        case .health: "heart.text.square"
-        case .security: "checkmark.shield"
-        case .history: "clock.arrow.circlepath"
+        case .services: "gearshape"
+        case .cleanup: "cabinet"
+        case .health: "waveform.path.ecg"
+        case .security: "shield"
+        case .brewfile: "doc.text"
+        case .history: "clock"
+        case .settings: "gearshape.fill"
         }
     }
+
+    // MARK: - Sidebar arrangement
+
+    /// The design's four labelled groups, in its order. `settings` is not in
+    /// any group: it lives in the sidebar's footer.
+    static let sidebarGroups: [(title: String, sections: [AppSection])] = [
+        ("Overview", [.home, .discover, .browse]),
+        ("Packages", [.installed, .favorites, .updates, .services]),
+        ("Insights", [.health, .security, .cleanup]),
+        ("Manage", [.taps, .brewfile, .history]),
+    ]
+
+    static let sidebarFooter: [AppSection] = [.settings]
 }

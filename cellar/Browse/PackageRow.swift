@@ -19,55 +19,130 @@ import SwiftUI
 /// full rather than vanish (installed-inventory II7).
 struct PackageRow: View {
     let entry: PackageEntry
+    /// Measured size on disk, when this machine has the package and the disk
+    /// scan has answered for it. The catalog publishes no size, so a row that
+    /// is not installed has nothing honest to show here and keeps the yearly
+    /// install count instead.
+    var sizeOnDisk: Int64?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Text(entry.displayName)
-                    .font(.body)
+        HStack(spacing: 10) {
+            PackageTile(name: entry.id.name)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(entry.displayName)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.88))
+                        .lineLimit(1)
+                    KindTag(kind: entry.id.kind)
+                    if entry.isInstalled {
+                        Label("Installed", systemImage: "checkmark.circle")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.successText)
+                            .help("Installed")
+                            .accessibilityLabel("Installed")
+                    }
+                    // The same pill the Installed and Updates lists draw, so
+                    // "this has an update" reads identically everywhere.
+                    if let installed = entry.installed, installed.isOutdated {
+                        UpdateTag(nextVersion: installed.catalogVersion)
+                    }
+                    ForEach(entry.catalog?.badges ?? [], id: \.self) { badge in
+                        Label(badge.label, systemImage: badge.systemImage)
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.orange)
+                            .help(badge.label)
+                            .accessibilityLabel(badge.label)
+                    }
+                    Spacer(minLength: 0)
+                }
+                Text(subline)
+                    .font(Theme.mono(11))
+                    .foregroundStyle(Color.white.opacity(0.4))
                     .lineLimit(1)
-                KindTag(kind: entry.id.kind)
-                if entry.isInstalled {
-                    Label("Installed", systemImage: "checkmark.circle")
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(.secondary)
-                        .help("Installed")
-                        .accessibilityLabel("Installed")
-                }
-                ForEach(entry.catalog?.badges ?? [], id: \.self) { badge in
-                    Label(badge.label, systemImage: badge.systemImage)
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(.orange)
-                        .help(badge.label)
-                        .accessibilityLabel(badge.label)
-                }
-                Spacer(minLength: 0)
             }
-            if let desc = entry.desc {
-                Text(desc)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if let meta {
+                Text(meta)
+                    .font(Theme.mono(10.5))
+                    .foregroundStyle(Theme.textFaint)
                     .lineLimit(1)
+                    .fixedSize()
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 3)
+    }
+
+    /// The design's second line is the version story; the description stands in
+    /// when the catalog has no version to tell.
+    private var subline: String {
+        if let installed = entry.installed {
+            if installed.isOutdated {
+                return "\(installed.primaryKeg.version)  →  \(installed.catalogVersion)"
+            }
+            return installed.primaryKeg.version
+        }
+        if let version = entry.catalog?.version { return version }
+        return entry.desc ?? ""
+    }
+
+    /// The design's right-hand metric: size on disk where it is a measured
+    /// fact, the abbreviated yearly install count where it is not.
+    private var meta: String? {
+        if let sizeOnDisk, sizeOnDisk > 0 {
+            return sizeOnDisk.formatted(.byteCount(style: .file))
+        }
+        guard let count = entry.catalog?.installCount365d, count > 0 else { return nil }
+        return count.formatted(.number.notation(.compactName)) + " / yr"
     }
 }
 
-/// Which namespace a row belongs to.
+/// Which namespace a row belongs to — drawn only for casks.
 ///
-/// Always shown, because the same token exists in both and the kind is the only
-/// thing distinguishing the two rows (package-search PS1).
+/// The design chips the exception, not the rule: formulae are the vast
+/// majority, so a FORMULA pill on nearly every row is noise, and a row with no
+/// chip *is* the formula reading. This revises PS1's "always shown" — the two
+/// namespaces stay distinguishable, by the cask pill's presence or absence.
+/// The design's update chip: the cask pill's shape in the accent's colours.
+///
+/// A pill rather than an icon so "this has an update" reads at the same glance
+/// weight as the kind — the design chips both facts identically.
+struct UpdateTag: View {
+    let nextVersion: String
+    @Environment(ThemeStore.self) private var theme
+
+    var body: some View {
+        Text("UPDATE")
+            .font(.system(size: 8.5, weight: .bold))
+            .kerning(0.3)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .background(theme.tint(0.2), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .foregroundStyle(theme.light)
+            .help("Update available: \(nextVersion)")
+            .accessibilityLabel("Update available: \(nextVersion)")
+    }
+}
+
 struct KindTag: View {
     let kind: PackageKind
 
     var body: some View {
-        Text(kind == .formula ? "formula" : "cask")
-            .font(.caption2)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1)
-            .background(.quaternary, in: Capsule())
-            .foregroundStyle(.secondary)
+        if kind == .cask {
+            Text("CASK")
+                .font(.system(size: 8.5, weight: .bold))
+                .kerning(0.3)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1.5)
+                .background(
+                    Theme.caskTint(0.18),
+                    in: RoundedRectangle(cornerRadius: 4, style: .continuous)
+                )
+                .foregroundStyle(Theme.caskText)
+                .accessibilityLabel("Cask")
+        }
     }
 }
 

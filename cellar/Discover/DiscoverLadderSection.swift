@@ -23,6 +23,7 @@ struct DiscoverLadderSection: View {
                 ForEach(model.rows) { row in
                     DiscoverLadderRowView(row: row)
                         .tag(row.id)
+            .themedListSelection(isSelected: selection == row.id)
                 }
             }
         } header: {

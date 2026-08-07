@@ -20,6 +20,7 @@ struct PackageDetailView: View {
     let metadata: MetadataStore
     let id: PackageID?
     @Binding var selection: PackageID?
+    @Environment(ThemeStore.self) private var theme
 
     var body: some View {
         if let id {
@@ -44,7 +45,7 @@ struct PackageDetailView: View {
     @ViewBuilder
     private func content(for package: CatalogPackage) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 22) {
                 header(for: package)
                 actions(for: package)
                 PackageMetadataSection(entry: entry(for: package), metadata: metadata)
@@ -65,9 +66,10 @@ struct PackageDetailView: View {
                 dependents(for: package)
                 caveats(for: package)
             }
-            .padding(20)
+            .padding(EdgeInsets(top: 24, leading: 30, bottom: 34, trailing: 30))
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .background(Theme.windowBackground)
         .navigationTitle(package.displayName)
     }
 
@@ -103,24 +105,86 @@ struct PackageDetailView: View {
 
     @ViewBuilder
     private func header(for package: CatalogPackage) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+        let installedPackage = installed.inventory.package(package.id)
+        HStack(alignment: .top, spacing: 18) {
+            PackageTile(name: package.name, size: 62, fontSize: 24, cornerRadius: 15)
+            VStack(alignment: .leading, spacing: 7) {
                 Text(package.displayName)
-                    .font(.largeTitle.weight(.semibold))
-                KindTag(kind: package.kind)
-            }
-            if package.displayName != package.name {
-                Text(package.name)
-                    .font(.callout.monospaced())
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 23, weight: .semibold))
+                    .kerning(-0.5)
+                    .foregroundStyle(Theme.textPrimary)
                     .textSelection(.enabled)
+                HStack(spacing: 9) {
+                    Text(versionStory(package: package, installed: installedPackage))
+                        .font(Theme.mono(12))
+                        .foregroundStyle(Theme.textSecondary)
+                    Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
+                    Text(package.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                    statusBadge(package: package, installed: installedPackage)
+                }
+                if let desc = package.desc {
+                    Text(desc)
+                        .font(.system(size: 13))
+                        .lineSpacing(3)
+                        .foregroundStyle(Color.white.opacity(0.6))
+                        .padding(.top, 2)
+                }
             }
-            if let desc = package.desc {
-                Text(desc)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(.top, 3)
+            Spacer(minLength: 0)
+            favoriteButton(for: package)
+                .padding(.top, 6)
         }
+    }
+
+    private func versionStory(package: CatalogPackage, installed: InstalledPackage?) -> String {
+        guard let installed else { return package.version }
+        if installed.isOutdated {
+            return "\(installed.primaryKeg.version) → \(installed.catalogVersion)"
+        }
+        return installed.primaryKeg.version
+    }
+
+    @ViewBuilder
+    private func statusBadge(package: CatalogPackage, installed: InstalledPackage?) -> some View {
+        if let installed {
+            if installed.isOutdated {
+                PillBadge(label: "Update available", tone: .accent)
+            } else {
+                PillBadge(label: "Up to date", tone: .success)
+            }
+        } else {
+            PillBadge(label: "Not installed", tone: .neutral)
+        }
+    }
+
+    /// The design's heart, writing through the same metadata store the list's
+    /// star writes — one favorite, two affordances.
+    @ViewBuilder
+    private func favoriteButton(for package: CatalogPackage) -> some View {
+        let isFavorite = metadata.snapshot[package.id]?.isFavorite == true
+        Button {
+            metadata.setFavorite(!isFavorite, for: package.id)
+        } label: {
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isFavorite ? theme.base : Color.white.opacity(0.55))
+                .frame(width: 28, height: 28)
+                .background(
+                    isFavorite ? theme.tint(0.16) : Theme.controlFill,
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!metadata.availability.isAvailable)
+        .help(
+            metadata.availability.reason
+                ?? (isFavorite ? "Remove from favorites" : "Add to favorites")
+        )
+        .accessibilityLabel(isFavorite ? "Favorite" : "Not a favorite")
+        .accessibilityIdentifier("detail-favorite")
     }
 
     @ViewBuilder
@@ -145,26 +209,59 @@ struct PackageDetailView: View {
         }
     }
 
+    /// The design's three-column fact grid: uppercase micro-labels over plain
+    /// values, mono where the value is an identifier.
     @ViewBuilder
     private func facts(for package: CatalogPackage) -> some View {
-        Section {
-            LabeledContent("Version", value: package.version)
-            LabeledContent("Tap", value: package.tap)
-            if let license = package.license {
-                LabeledContent("License", value: license)
-            }
-            if let homepage = package.homepage {
-                LabeledContent("Homepage") {
-                    Link(homepage.absoluteString, destination: homepage)
-                        .lineLimit(1)
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Details")
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 26, alignment: .topLeading),
+                    count: 3
+                ),
+                alignment: .leading,
+                spacing: 16
+            ) {
+                fact("Version", package.version, mono: true)
+                fact("Tap", package.tap, mono: true)
+                fact("Type", package.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
+                if let license = package.license {
+                    fact("License", license)
+                }
+                if let homepage = package.homepage {
+                    VStack(alignment: .leading, spacing: 3) {
+                        factLabel("Homepage")
+                        Link(homepage.absoluteString, destination: homepage)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(theme.base)
+                            .lineLimit(1)
+                    }
+                }
+                if package.kind == .cask, package.autoUpdates {
+                    fact("Updates", "Updates itself")
                 }
             }
-            if package.kind == .cask, package.autoUpdates {
-                LabeledContent("Updates", value: "Updates itself")
-            }
-        } header: {
-            SectionHeader("Details")
+            .frame(maxWidth: 820, alignment: .leading)
         }
+    }
+
+    private func fact(_ label: String, _ value: String, mono: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            factLabel(label)
+            Text(value)
+                .font(mono ? Theme.mono(12.5) : .system(size: 12.5))
+                .foregroundStyle(mono ? Theme.textMono : Color.white.opacity(0.72))
+                .textSelection(.enabled)
+        }
+    }
+
+    private func factLabel(_ label: String) -> some View {
+        Text(label)
+            .font(.system(size: 10.5, weight: .bold))
+            .kerning(0.5)
+            .textCase(.uppercase)
+            .foregroundStyle(Color.white.opacity(0.32))
     }
 
     @ViewBuilder
@@ -254,8 +351,59 @@ private struct SectionHeader: View {
 
     var body: some View {
         Text(title)
-            .font(.headline)
+            .font(.system(size: 11, weight: .bold))
+            .kerning(0.66)
+            .textCase(.uppercase)
+            .foregroundStyle(Color.white.opacity(0.34))
             .padding(.top, 4)
+    }
+}
+
+/// The design's status pill: a dot beside a short word on a tinted capsule.
+struct PillBadge: View {
+    enum Tone { case accent, success, danger, neutral }
+
+    let label: String
+    let tone: Tone
+    @Environment(ThemeStore.self) private var theme
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(dot).frame(width: 5, height: 5)
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(text)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 2)
+        .background(fill, in: Capsule())
+    }
+
+    private var dot: Color {
+        switch tone {
+        case .accent: theme.base
+        case .success: Theme.successBase
+        case .danger: Theme.dangerBase
+        case .neutral: Color.white.opacity(0.35)
+        }
+    }
+
+    private var text: Color {
+        switch tone {
+        case .accent: theme.light
+        case .success: Theme.successText
+        case .danger: Theme.dangerText
+        case .neutral: Color.white.opacity(0.55)
+        }
+    }
+
+    private var fill: Color {
+        switch tone {
+        case .accent: theme.tint(0.16)
+        case .success: Theme.successTint(0.15)
+        case .danger: Theme.dangerTint(0.15)
+        case .neutral: Color.white.opacity(0.07)
+        }
     }
 }
 

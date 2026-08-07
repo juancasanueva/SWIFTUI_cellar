@@ -26,6 +26,8 @@ struct DiscoverView: View {
             DiscoverLadderSection(model: topCasks, selection: $selection)
             DiscoverCuratedSection(model: curated, selection: $selection)
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.white.opacity(0.014))
         .navigationTitle(AppSection.discover.title)
         .toolbar {
             ToolbarItem {

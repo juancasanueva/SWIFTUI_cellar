@@ -20,10 +20,12 @@ struct AppSectionPlacementTests {
     // MARK: - 9.1 — the tenth case, and where it sits
 
     @MainActor
-    @Test("Health is the tenth section, between Cleanup and Security")
-    func healthIsTheTenthSection() throws {
+    @Test("Health sits between Cleanup and Security in declaration order")
+    func healthSitsBetweenCleanupAndSecurity() throws {
         let order = AppSection.allCases
-        #expect(order.count == 10)
+        // Ten M5-era sections, plus the four the design document promoted to
+        // sidebar rows: favorites, updates, brewfile, and settings.
+        #expect(order.count == 14)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -31,19 +33,41 @@ struct AppSectionPlacementTests {
         let services = try #require(order.firstIndex(of: .services))
 
         // Adjacent to Cleanup on one side and Security on the other, which is
-        // what places it between Services and Security in sidebar order (PRD §5).
+        // what places it between Services and Security in declaration order
+        // (PRD §5). The rendered sidebar reads `sidebarGroups`, asserted below.
         #expect(health == cleanup + 1)
         #expect(health + 1 == security)
         #expect(services < health)
 
         #expect(AppSection.health.title == "Health")
-        #expect(AppSection.health.systemImage == "heart.text.square")
+        #expect(AppSection.health.systemImage == "waveform.path.ecg")
         #expect(AppSection.health.rawValue == "health")
         // The sidebar identifier a UI test queries by.
         #expect(order.map(\.rawValue) == [
-            "home", "discover", "browse", "installed",
-            "taps", "services", "cleanup", "health", "security", "history"
+            "home", "discover", "browse", "installed", "favorites", "updates",
+            "taps", "services", "cleanup", "health", "security", "brewfile",
+            "history", "settings"
         ])
+    }
+
+    /// The rendered sidebar arrangement: the design document's four labelled
+    /// groups plus a Settings footer, together covering every section exactly
+    /// once — a section outside the arrangement would be unreachable.
+    @MainActor
+    @Test("The sidebar groups plus the footer cover every section exactly once")
+    func sidebarGroupsCoverEverySectionOnce() {
+        let arranged = AppSection.sidebarGroups.flatMap(\.sections) + AppSection.sidebarFooter
+        #expect(arranged.count == AppSection.allCases.count)
+        #expect(Set(arranged) == Set(AppSection.allCases))
+
+        #expect(AppSection.sidebarGroups.map(\.title) == [
+            "Overview", "Packages", "Insights", "Manage"
+        ])
+        #expect(AppSection.sidebarFooter == [.settings])
+        // Health leads Insights, which is the design's placement of PRD §5's
+        // "between Services and Security": Services closes the group before it,
+        // Security follows it.
+        #expect(AppSection.sidebarGroups[2].sections == [.health, .security, .cleanup])
     }
 
     /// Home keeps its place at the head of the sidebar, and Health did not take

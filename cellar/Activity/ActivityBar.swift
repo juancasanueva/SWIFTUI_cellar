@@ -24,50 +24,62 @@ struct ActivityBar: View {
             EmptyView()
         } else {
             VStack(spacing: 0) {
-                Divider()
+                Rectangle().fill(Color.white.opacity(0.09)).frame(height: 0.5)
                 if isExpanded {
                     ActivityDrawer(center: center)
-                    Divider()
+                        .background(Theme.logWell)
+                    Rectangle().fill(Theme.hairline).frame(height: 0.5)
                 }
                 collapsedBar
             }
-            .background(.bar)
+            .background(Color.white.opacity(0.03))
+            .background(Theme.windowBackground)
         }
     }
 
     private var collapsedBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             statusIcon
-            VStack(alignment: .leading, spacing: 1) {
-                Text(headline)
-                    .font(.callout)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if let detail = subheadline {
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            Text(headline)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if let detail = subheadline {
+                Text(detail)
+                    .font(Theme.mono(11.5))
+                    .foregroundStyle(Color.white.opacity(0.44))
             }
             Spacer(minLength: 8)
             if let running = center.summary.running {
                 Button("Cancel") { center.cancel(running) }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Color.white.opacity(0.7))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 4)
+                    .background(
+                        Theme.controlFillLoud,
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    )
                     .help("Stop \(running.displayCommand)")
             }
             Button {
                 isExpanded.toggle()
             } label: {
-                Label(
-                    isExpanded ? "Hide activity" : "Show activity",
-                    systemImage: isExpanded ? "chevron.down" : "chevron.up"
-                )
-                .labelStyle(.iconOnly)
+                Text(isExpanded ? "Hide log" : "Show log")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Color.white.opacity(0.4))
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            // The design writes "log"; the affordance keeps its shipped
+            // accessible name, which the UI tests click by.
+            .accessibilityLabel(isExpanded ? "Hide activity" : "Show activity")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 18)
+        .frame(height: 40)
+        .contentShape(Rectangle())
+        .onTapGesture { isExpanded.toggle() }
     }
 
     @ViewBuilder
@@ -77,7 +89,8 @@ struct ActivityBar: View {
                 .controlSize(.small)
         } else {
             Image(systemName: "checkmark.circle")
-                .foregroundStyle(.secondary)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.successBase)
         }
     }
 

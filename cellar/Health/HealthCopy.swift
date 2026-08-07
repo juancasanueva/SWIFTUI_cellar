@@ -33,6 +33,12 @@ nonisolated enum HealthCopy {
 
     static let sectionTitle = "Health"
     static let scoreTitle = "Health score"
+    /// The design document's hero heading and ring caption.
+    static let heroTitle = "System health"
+    static let scoreRingCaption = "Score"
+    static let quickActionsTitle = "Quick actions"
+    /// The command shown beside the run-doctor chip, exactly as it would run.
+    static let runDoctorCommand = "brew doctor"
 
     /// What a machine nothing was measured on gets instead of a number.
     ///

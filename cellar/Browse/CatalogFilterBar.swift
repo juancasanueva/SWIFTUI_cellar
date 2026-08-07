@@ -16,45 +16,45 @@ import SwiftUI
 /// renders both controls next to each other.
 struct CatalogFilterBar: View {
     @Binding var filters: SearchFilters
-    @Binding var mode: InstalledFilterMode
-    /// False when there is no inventory, which forces the mode to `all`.
+    /// Hides rows this machine already has. A view-level subtraction over the
+    /// composed rows, not a catalog predicate: the catalog still has no idea
+    /// what is installed (PS4). The old four-way installed-state chips are
+    /// gone by request — this toggle is the one installed-state control.
+    @Binding var hideInstalled: Bool
+    /// False when there is no inventory, which makes the toggle inert rather
+    /// than wrong — so it is disabled instead.
     let isInstalledFilterEnabled: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            Picker("Kind", selection: kindSelection) {
-                Text("All").tag(KindSelection.all)
-                Text("Formulae").tag(KindSelection.formula)
-                Text("Casks").tag(KindSelection.cask)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-
-            Picker("Installed state", selection: $mode) {
-                ForEach(InstalledFilterMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+        HStack(spacing: 5) {
+                FilterChip(label: "All", isOn: kindSelection.wrappedValue == .all) {
+                    kindSelection.wrappedValue = .all
                 }
-            }
-            .labelsHidden()
-            .fixedSize()
-            .disabled(!isInstalledFilterEnabled)
-            .help(
-                isInstalledFilterEnabled
-                    ? "Filter by what this machine has installed"
-                    : "Needs Homebrew: Cellar cannot tell what is installed without it"
-            )
-
-            Toggle("Hide deprecated", isOn: $filters.excludeDeprecated)
-                .toggleStyle(.checkbox)
-            Toggle("Hide disabled", isOn: $filters.excludeDisabled)
-                .toggleStyle(.checkbox)
-
-            Spacer(minLength: 0)
+                FilterChip(label: "Formulae", isOn: kindSelection.wrappedValue == .formula) {
+                    kindSelection.wrappedValue = .formula
+                }
+                FilterChip(label: "Casks", isOn: kindSelection.wrappedValue == .cask) {
+                    kindSelection.wrappedValue = .cask
+                }
+                Spacer(minLength: 0)
+                Menu {
+                    Toggle("Hide deprecated", isOn: $filters.excludeDeprecated)
+                    Toggle("Hide disabled", isOn: $filters.excludeDisabled)
+                    Toggle("Hide installed", isOn: $hideInstalled)
+                        // Without an inventory nothing is known to be
+                        // installed, so the toggle would be inert rather than
+                        // wrong — disabled with the reason, like the mode chips.
+                        .disabled(!isInstalledFilterEnabled)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Deprecated, disabled and installed packages")
         }
-        .font(.caption)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
     }
 
     private var kindSelection: Binding<KindSelection> {
@@ -89,6 +89,10 @@ struct CatalogFilterBar: View {
 
 #Preview {
     @Previewable @State var filters = SearchFilters()
-    @Previewable @State var mode = InstalledFilterMode.all
-    return CatalogFilterBar(filters: $filters, mode: $mode, isInstalledFilterEnabled: true)
+    @Previewable @State var hideInstalled = false
+    return CatalogFilterBar(
+        filters: $filters,
+        hideInstalled: $hideInstalled,
+        isInstalledFilterEnabled: true
+    )
 }

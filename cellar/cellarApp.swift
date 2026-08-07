@@ -143,6 +143,15 @@ struct cellarApp: App {
     /// Correlates a force-untap terminal with both refreshes it must await.
     private let refreshRegistry: MutationRefreshRegistry
 
+    /// The accent choice every tinted surface derives from.
+    @State private var theme = ThemeStore()
+
+    /// Whether this launch has started its one disk measurement. The scan used
+    /// to start only when Cleanup appeared, which left the Search list's size
+    /// column and Home's "On disk" tile empty until the user happened to visit
+    /// it; one launch-time measurement feeds all three.
+    @State private var hasStartedDiskMeasurement = false
+
     /// The app's long-lived loops.
     ///
     /// App-level state outlives every scene, so closing the window that started
@@ -392,12 +401,20 @@ struct cellarApp: App {
                 advisoryCredentials: advisoryCredentials,
                 dismissals: dismissals,
                 integrity: integrity,
-                artifactLocations: artifactLocations
+                artifactLocations: artifactLocations,
+                refresh: { await refreshEverything() }
             )
                 // Injected rather than threaded through four view signatures.
                 // Deliberately **not** accompanied by a `.task`: nothing here
                 // starts release-notes work, and the only thing that can is a
                 // button.
+                .environment(theme)
+                // The design is one appearance: a dark window with its own
+                // surface colours, not a system-material chrome. The tint is
+                // the chosen accent, so list selection and native controls
+                // follow the same colour every custom surface derives from.
+                .tint(theme.base)
+                .preferredColorScheme(.dark)
                 .environment(releaseNotes)
                 .environment(releaseNotesConsent)
                 .environment(\.releaseNotesCredentials, releaseNotesCredentials)
@@ -437,6 +454,10 @@ struct cellarApp: App {
                     }
                 }
         }
+        // The design's window: traffic lights floating over the sidebar, no
+        // separate title bar, 1440×900 by default.
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1440, height: 900)
     }
 
     /// Detection first, then everything that depends on it.
@@ -473,6 +494,30 @@ struct cellarApp: App {
         // launch order, since detection resolves after the first render.
         await servicesRefresher.refresh(for: brewDetection.state)
         readHomebrewAge()
+        startDiskMeasurement()
+    }
+
+    /// The same cache-then-scan sequence `CleanupView` runs on appearance, run
+    /// once per launch so the measurement exists before any section asks.
+    /// Guarded off under UI-test fixtures exactly as the Cleanup path is: the
+    /// fixtures inject their own snapshot and must not be overwritten.
+    @MainActor
+    private func startDiskMeasurement() {
+        guard !hasStartedDiskMeasurement,
+              !AppTestFixtures.isEnabled,
+              let installation = brewDetection.state.installation
+        else { return }
+        hasStartedDiskMeasurement = true
+        let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let roots = HomebrewRoots(installation: installation, userCacheDirectory: cacheDirectory)
+        let links = Dictionary(
+            uniqueKeysWithValues: installed.inventory.packages.map { ($0.id, $0.formulaLinkState) }
+        )
+        Task {
+            await diskUsage.loadCached(for: roots.identity)
+            diskUsage.startScan(roots: roots, formulaLinks: links)
+        }
     }
 
     /// One `attributesOfItem` behind a seam: no process, no network, and no

@@ -25,22 +25,24 @@ struct InstalledFilterBar: View {
     let state: InstalledLoadState
 
     var body: some View {
-        HStack(spacing: 12) {
-            Toggle("Show dependencies", isOn: $includeDependencies)
-                .toggleStyle(.checkbox)
-                .disabled(isDisabled)
-
-            Toggle(isOn: $favoritesOnly) {
-                Label("Favorites", systemImage: favoritesOnly ? "star.fill" : "star")
+        HStack(spacing: 5) {
+            FilterChip(label: "Dependencies", isOn: includeDependencies) {
+                includeDependencies.toggle()
             }
-            .toggleStyle(.button)
-            .controlSize(.small)
+            .disabled(isDisabled)
+            .help("Include packages installed only as dependencies")
+
+            FilterChip(label: "Favorites", isOn: favoritesOnly) {
+                favoritesOnly.toggle()
+            }
             .disabled(isDisabled || !isFavoritesEnabled)
             .help(isFavoritesEnabled ? "Show favorites only" : "Local metadata is unavailable.")
 
             if upgradableCount > 0 {
                 Label("\(upgradableCount) outdated", systemImage: "arrow.up.circle")
-                    .foregroundStyle(.orange)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.orange)
+                    .padding(.leading, 5)
             }
 
             Spacer(minLength: 0)
@@ -49,9 +51,7 @@ struct InstalledFilterBar: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .font(.caption)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(EdgeInsets(top: 10, leading: 13, bottom: 10, trailing: 13))
     }
 
     private var isDisabled: Bool {
