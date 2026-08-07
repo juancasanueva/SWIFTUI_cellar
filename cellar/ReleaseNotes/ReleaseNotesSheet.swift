@@ -170,6 +170,10 @@ struct ReleaseNotesSheet: View {
                     .accessibilityIdentifier("release-notes-rate-limit-token")
             }
         }
+        // `.contain` keeps the reset/token identifiers reachable: without it
+        // this container identifier replaces every child's (the A9 gotcha,
+        // m5-brewfile).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("release-notes-rate-limited")
     }
 

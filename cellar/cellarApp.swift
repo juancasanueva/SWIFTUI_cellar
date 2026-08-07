@@ -279,9 +279,19 @@ struct cellarApp: App {
         // Beside `disk-usage-v1.json` and `security-advisories-v1.json`, and
         // carrying its own schema version — so a catalog field change can never
         // wipe it and reverting this slice leaves it orphaned but intact.
-        let releaseNotesCacheURL = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory)
-            .appendingPathComponent("Cellar/\(ReleaseNotes.cacheFileName)")
+        //
+        // Redirected under the release-notes fixture for the same reason as the
+        // disk and advisory caches under the Health fixture: a rate-limited
+        // launch would otherwise load a note a previous matched-mode run cached
+        // on the developer's machine and show it as last-good, so the
+        // rate-limited presentation becomes unreachable — a UI test that passes
+        // on a fresh CI machine and fails on every real one.
+        let releaseNotesCacheURL = AppTestFixtures.isReleaseNotesEnabled
+            ? FileManager.default.temporaryDirectory
+                .appendingPathComponent("cellar-ui-release-notes-\(UUID().uuidString).json")
+            : (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory)
+                .appendingPathComponent("Cellar/\(ReleaseNotes.cacheFileName)")
         // Under `--ui-testing-m5-release-notes` the grant is a launch argument,
         // so a UI test never has to write the developer's real preferences and
         // the ungranted path is genuinely ungranted rather than left over from a

@@ -59,6 +59,10 @@ struct ReleaseNotesConsentSheet: View {
         }
         .padding(20)
         .frame(minWidth: 540, minHeight: 480)
+        // `.contain` keeps the disclosure/grant/token identifiers reachable:
+        // without it this container identifier replaces every child's (the A9
+        // gotcha, m5-brewfile).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("release-notes-consent")
         .task { await readTokenStatus() }
     }

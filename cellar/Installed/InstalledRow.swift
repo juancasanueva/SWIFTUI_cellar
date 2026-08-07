@@ -48,6 +48,10 @@ struct InstalledRow: View {
             }
         }
         .padding(.vertical, 2)
+        // `.contain` keeps descendants' own identifiers reachable from XCUITest:
+        // without it the row identifier replaces every child's, which left
+        // `release-notes-open-<name>` unaddressable (the A9 gotcha, m5-brewfile).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
             "installed-row-\(entry.id.kind == .formula ? "formula" : "cask")-\(entry.id.name)"
         )

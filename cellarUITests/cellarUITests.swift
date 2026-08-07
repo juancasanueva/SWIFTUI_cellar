@@ -255,7 +255,7 @@ final class cellarUITests: XCTestCase {
         let installedList = app.outlines["installed-list"]
         XCTAssertTrue(installedList.waitForExistence(timeout: 2))
         let widgetRow = installedList.descendants(matching: .outlineRow)
-            .containing(.staticText, identifier: "installed-row-formula-widget")
+            .containing(.any, identifier: "installed-row-formula-widget")
             .firstMatch
         XCTAssertTrue(widgetRow.waitForExistence(timeout: 2))
         XCTAssertTrue(widgetRow.isSelected, "Show in Installed must select formula:widget")
