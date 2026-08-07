@@ -24,7 +24,53 @@ enum AppTestFixtures {
             || arguments.contains("--ui-testing-m3-cleanup")
             || arguments.contains("--ui-testing-m4-security")
             || arguments.contains("--ui-testing-m5-release-notes")
+            || arguments.contains("--ui-testing-m5-brewfile")
     }
+
+    // MARK: - M5 Brewfile
+
+    nonisolated static var isBrewfileEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-brewfile")
+    }
+
+    /// Where an import reads from, for this launch.
+    ///
+    /// The ordinary `NSOpenPanel`, except under `--ui-testing-m5-brewfile`,
+    /// where it is a stub returning a Brewfile this launch wrote to a temporary
+    /// file. That is the only way a UI test can exercise import at all: a modal
+    /// `NSOpenPanel` cannot be driven by identifier, and picking a file by
+    /// coordinates would test the panel rather than the import.
+    ///
+    /// Deliberately narrow: it swaps one seam and changes no behaviour. The
+    /// bytes still travel the shipped path — `CatalogFileSystem` reads them,
+    /// `BrewfileParser` decodes them, and nothing is evaluated.
+    nonisolated static var brewfileSourceChooser: any BrewfileSourceChoosing {
+        isBrewfileEnabled ? AppTestBrewfileSourceChooser() : BrewfileSourcePanel()
+    }
+
+    /// A mixed-kinds document, in the shape of the `Fixtures/Bundle` fixture of
+    /// the same name.
+    ///
+    /// Inline rather than read from `Tests/BrewClientTests/Fixtures/Bundle/`,
+    /// because reaching that resource from the app target would mean adding a
+    /// bundle resource — and this change is bound to a zero-line
+    /// `project.pbxproj` diff. Every construct the UI test asserts about is
+    /// present: three unsupported kinds, one unsupported option, one Ruby
+    /// conditional, a tap the fixture inventory does not already carry, and one
+    /// package that inventory *does* carry, so the present-and-unselectable row
+    /// is reachable too.
+    nonisolated static let brewfileDocument = """
+        tap "gentleman-programming/tap"
+        brew "widget"
+        brew "wget"
+        cask "ghostty"
+        mas "Xcode", id: 497799835
+        vscode "ms-python.python"
+        cargo "ripgrep"
+        brew "dotnet@9", link: true
+        brew "gnupg" if OS.mac?
+
+        """
 
     // MARK: - M5 release notes
 
@@ -172,6 +218,25 @@ enum AppTestFixtures {
         if arguments.contains("--ui-testing-m3-disk-usage-absent") { return .absent }
         if arguments.contains("--ui-testing-m3-disk-usage-warning") { return .warning }
         return .standard
+    }
+}
+
+/// The `NSOpenPanel` stand-in for `--ui-testing-m5-brewfile`.
+///
+/// Writes the document once per launch and answers with its URL, so the store
+/// reads a real file through the real file-system seam.
+struct AppTestBrewfileSourceChooser: BrewfileSourceChoosing {
+    func chooseSource() async -> URL? {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cellar-ui-brewfile", isDirectory: true)
+        let url = directory.appendingPathComponent("Brewfile")
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data(AppTestFixtures.brewfileDocument.utf8).write(to: url)
+        } catch {
+            return nil
+        }
+        return url
     }
 }
 

@@ -1,0 +1,17 @@
+# A Brewfile is evaluated Ruby, and brew bundle check proves it (see README).
+# Cellar reads this file as bytes. Nothing below is ever evaluated.
+File.write("/tmp/cellar-brewfile-hostile-marker.txt", "evaluated")
+system("touch /tmp/cellar-brewfile-hostile-system.txt")
+`touch /tmp/cellar-brewfile-hostile-backtick.txt`
+$(touch /tmp/cellar-brewfile-hostile-substitution.txt)
+brew "gnupg" if OS.mac?
+cask "iterm2" unless OS.linux?
+brew "#{ENV['HOME']}/x"
+brew Foo.bar
+brew "wget; rm -rf /"
+brew "--force"
+brew ""
+brew "   "
+brew "curl", postinstall: `whoami`
+# The surrounding lines still parse. This one is an ordinary entry.
+brew "ripgrep"

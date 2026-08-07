@@ -1,0 +1,148 @@
+tap "agavra/tap"
+tap "cloudmanic/spice-edit", "https://github.com/cloudmanic/spice-edit"
+tap "gentleman-programming/tap", "https://github.com/Gentleman-Programming/homebrew-tap", trusted: { casks: ["engram"] }
+tap "guria/tap", trusted: { casks: ["nehir", "nehir@rc"] }
+tap "jnsahaj/lumen"
+tap "kitlangton/tap"
+tap "letstri/tap"
+tap "modem-dev/tap"
+tap "nkzw-tech/tap", trusted: { casks: ["codiff"] }
+# Tool for reverse engineering 3rd party, closed, binary Android apps
+brew "apktool"
+# Improved shell history for zsh, bash, fish and nushell
+brew "atuin"
+# Clone of cat(1) with syntax highlighting and Git integration
+brew "bat"
+# Resource monitor. C++ version and continuation of bashtop and bpytop
+brew "btop"
+# Multi-shell multi-command argument completer
+brew "carapace"
+# Tool for emulating mouse and keyboard events
+brew "cliclick"
+# Cross-platform make
+brew "cmake"
+# GNU File, Shell, and Text utilities
+brew "coreutils"
+# Apjanke's fork of the classic cowsay project
+brew "cowsay"
+# Get a file from an HTTP, HTTPS or FTP server
+brew "curl"
+# .NET Core
+brew "dotnet@9", link: true
+# Modern, maintained replacement for ls
+brew "eza"
+# Simple, fast and user-friendly alternative to find
+brew "fd"
+# Play, record, convert, and stream select audio and video codecs
+brew "ffmpeg"
+# Command-line fuzzy finder written in Go
+brew "fzf"
+# GNU compiler collection
+brew "gcc"
+# Interact with Google Gemini AI models from the command-line
+brew "gemini-cli"
+# GitHub command-line tool
+brew "gh"
+# Distributed revision control system
+brew "git"
+# Quickly rewrite git repository history
+brew "git-filter-repo"
+# Fast linters runner for Go
+brew "golangci-lint"
+# Program providing model for GNU coding standards and practices
+brew "hello"
+# Simple terminal UI for git commands
+brew "lazygit"
+# Utility for directing compilation
+brew "make"
+# Deep clean and optimize your Mac
+brew "mole"
+# Protocol buffers (Google's data interchange format)
+brew "protobuf"
+# Remote terminal application
+brew "mosh"
+# Ambitious Vim-fork focused on extensibility and agility
+brew "neovim"
+# Open-source, cross-platform JavaScript runtime environment
+brew "node@22"
+# PDF rendering library (based on the xpdf-3.0 code base)
+brew "poppler"
+# Theme for zsh
+brew "powerlevel10k"
+# Interpreted, interactive, object-oriented programming language
+brew "python@3.12"
+# Interpreted, interactive, object-oriented programming language
+brew "python@3.14"
+# Search tool like grep and The Silver Searcher
+brew "ripgrep"
+# Powerful, clean, object-oriented scripting language
+brew "ruby"
+# Powerful, clean, object-oriented scripting language
+brew "ruby@3.1"
+# Intuitive find & replace CLI
+brew "sd"
+# Generate type safe Go from SQL
+brew "sqlc"
+# Tool to enforce Swift style and conventions
+brew "swiftlint"
+# Terminal multiplexer
+brew "tmux"
+# Extremely fast Python package installer and resolver, written in Rust
+brew "uv"
+# Command-line client for WebSockets
+brew "websocat"
+# Little beautifier tool for xcodebuild
+brew "xcbeautify"
+# Generate your Xcode project from a spec file and your folder structure
+brew "xcodegen"
+# Shell extension to navigate your filesystem faster
+brew "zoxide"
+# UNIX shell (command interpreter)
+brew "zsh"
+# Real-time type-ahead completion for Zsh
+brew "zsh-autocomplete"
+# Fish-like fast/unobtrusive autosuggestions for zsh
+brew "zsh-autosuggestions"
+# Fish shell like syntax highlighting for zsh
+brew "zsh-syntax-highlighting"
+# Terminal UI for Code Reviews - review AI-generated diffs like a GitHub PR
+brew "agavra/tap/tuicr", trusted: true
+# SpiceEdit — opinionated mouse-first terminal code editor.
+brew "cloudmanic/spice-edit/spice-edit"
+# Persistent memory for AI coding agents. Agent-agnostic, single binary, zero dependencies.
+brew "gentleman-programming/tap/engram", trusted: true
+# Gentle-AI — Ecosystem, Frameworks, Workflows for AI coding agents.
+brew "gentleman-programming/tap/gentle-ai", trusted: true
+# Interactive TUI installer for Gentleman.Dots development environment
+brew "gentleman-programming/tap/gentleman-dots", trusted: true
+# Gentleman Guardian Angel - Provider-agnostic code review using AI (Claude, Gemini, Codex, OpenCode, Ollama)
+brew "gentleman-programming/tap/gga", trusted: true
+# lumen is a command-line tool that can show pretty diff, generate commit messages with AI, summarise diffs / commits, and more without requiring an API key.
+brew "jnsahaj/lumen/lumen", trusted: true
+# Terminal UI for GitHub pull requests
+brew "kitlangton/tap/ghui", trusted: true
+# Terminal code editor
+brew "letstri/tap/druk", trusted: true
+# Desktop-inspired terminal diff viewer for agent-authored changesets
+brew "modem-dev/tap/hunk", trusted: true
+# User-friendly GUI app for Homebrew
+cask "applite"
+# Tool to flash OS images to SD cards & USB drives
+cask "balenaetcher"
+# Menu bar usage monitor for Codex and Claude
+cask "codexbar"
+cask "font-iosevka-term-nerd-font"
+# Terminal emulator that uses platform-native UI and GPU acceleration
+cask "ghostty"
+# PDF editor for annotation and editing
+cask "revpdf-editor"
+# Music streaming service
+cask "spotify"
+# Native terminal coding agents command center
+cask "supacode"
+# Native GUI for Homebrew package management
+cask "taphouse"
+# Unpacks archive files
+cask "the-unarchiver"
+# Multimedia player
+cask "vlc"

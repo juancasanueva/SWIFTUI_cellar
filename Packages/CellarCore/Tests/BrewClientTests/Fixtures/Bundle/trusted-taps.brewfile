@@ -1,0 +1,5 @@
+tap "cloudmanic/spice-edit", "https://github.com/cloudmanic/spice-edit"
+tap "gentleman-programming/tap", "https://github.com/Gentleman-Programming/homebrew-tap", trusted: { casks: ["engram"] }
+tap "guria/tap", trusted: { casks: ["nehir", "nehir@rc"] }
+brew "gentleman-programming/tap/engram", trusted: true
+cask "acme/tap/app", trusted: true

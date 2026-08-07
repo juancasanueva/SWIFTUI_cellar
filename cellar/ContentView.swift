@@ -33,6 +33,9 @@ struct ContentView: View {
     let diskUsage: DiskUsageStore
     let cleanup: CleanupStore
     let cleanupPreviewSource: any CleanupPreviewSourcing
+    /// The AppKit seam an import reads through, chosen once in the composition
+    /// root so the Taps list holds no launch-argument knowledge (design DD4).
+    let brewfileSourceChooser: any BrewfileSourceChoosing
     let security: SecurityStore
     let securityConsent: SecurityConsentPreference
     let advisoryCredentials: any AdvisoryCredentialStoring
@@ -109,7 +112,13 @@ struct ContentView: View {
                 TapsListView(
                     taps: taps,
                     operations: operations,
-                    selection: $tapSelection
+                    // Both read-only, and both snapshots the app is already
+                    // holding: the Brewfile diff is a pure projection over them
+                    // and forces no re-acquisition.
+                    installed: installed,
+                    detection: brewDetection.state,
+                    selection: $tapSelection,
+                    sourceChooser: brewfileSourceChooser
                 )
                 .navigationSplitViewColumnWidth(min: 300, ideal: 380)
             case .services:

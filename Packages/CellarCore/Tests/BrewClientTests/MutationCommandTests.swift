@@ -300,12 +300,59 @@ struct MutationCommandTests {
             }
 
             // And the names it does place in argv come through the single gate.
+            guard Self.namesNothing.contains(name) else {
+                #expect(
+                    source.contains("MutationName.isSafe"),
+                    "\(name) does not route its names through the one `isSafe` gate"
+                )
+                continue
+            }
+
+            // A family that names **nothing** has no name to gate, and
+            // demanding `isSafe` of it would be theatre. The exemption is
+            // therefore paid for with a *stronger* claim, not a weaker one: the
+            // file must be structurally incapable of putting a name in argv at
+            // all. Adding a file to `namesNothing` is a deliberate act that
+            // must satisfy every expectation below.
             #expect(
-                source.contains("MutationName.isSafe"),
-                "\(name) does not route its names through the one `isSafe` gate"
+                source.contains("MutationName.isSafe") == false,
+                "\(name) is listed as naming nothing but reaches for the name gate"
+            )
+            for naming in ["PackageID", "PackageTarget", "FormulaID", "CaskID", "TapName"] {
+                #expect(
+                    source.contains(naming) == false,
+                    "\(name) is listed as naming nothing but carries a \(naming)"
+                )
+            }
+            // Nothing free-text can get in: the only initialiser takes a `URL`,
+            // and the only `String` in the file is a literal enum raw value.
+            let initialisers = source
+                .split(separator: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { $0.contains("init(") }
+            #expect(
+                initialisers == ["public init(fileURL: URL) {"],
+                "\(name) is listed as naming nothing but offers \(initialisers)"
+            )
+            let storedStrings = source
+                .split(separator: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { ($0.hasPrefix("public let ") || $0.hasPrefix("let ")) && $0.contains("String") }
+            #expect(
+                storedStrings.isEmpty,
+                "\(name) is listed as naming nothing but stores \(storedStrings)"
             )
         }
     }
+
+    /// Command families whose argv contains no package name at any position.
+    ///
+    /// `BundleDumpCommand` is the only member: its vector is literal verb and
+    /// flag tokens plus **one path this capability itself created** under a
+    /// Cellar-owned temporary location. There is no name in it to validate, and
+    /// there is no way to put one in — the initialiser takes a `URL`, not a
+    /// `String` (`brewfile-management` BF1).
+    private static let namesNothing: Set<String> = ["BundleDumpCommand.swift"]
 
     /// Every `*Command.swift` in `BrewClient`, keyed by file name.
     private static func commandFiles() throws -> [String: String] {

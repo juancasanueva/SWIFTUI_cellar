@@ -129,6 +129,14 @@ extension OperationCenter {
     /// destructive action must be agreed once, on the whole of what it will do.
     /// Confirming submits every command it listed; declining submits none of
     /// them, never a partial subset (package-mutation PM3 sc5–6).
+    ///
+    /// The disclosure comes from the batch head **through the shared
+    /// abstraction**. It used to come from `(first as? TapCommand)?.disclosure
+    /// ?? .packageRemoval`, which was total only while every submitted batch was
+    /// unerased: a mixed tap+install batch has to be erased to
+    /// `[AnyBrewMutation]` before it can be a batch at all, and the downcast
+    /// then failed and quietly presented "This removes installed software."
+    /// instead of the tap-trust warning (package-mutation PM1, design DD1).
     public func request(_ commands: [some BrewMutating]) -> ConfirmationRequest? {
         guard let first = commands.first,
               commands.contains(where: \.requiresConfirmation)
@@ -138,7 +146,7 @@ extension OperationCenter {
             id: UUID(),
             command: AnyBrewMutation(first),
             additional: commands.dropFirst().map(AnyBrewMutation.init),
-            disclosure: (first as? TapCommand)?.disclosure ?? .packageRemoval
+            disclosure: first.disclosure
         )
         setPendingConfirmation(request)
         return request

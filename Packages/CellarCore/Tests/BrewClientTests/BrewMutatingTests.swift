@@ -167,6 +167,169 @@ struct BrewMutatingTests {
         #expect(AnyBrewMutation(package).arguments == ["upgrade"])
     }
 
+    // MARK: - DD1 guard — the equality contract the spine change moves (PM1)
+
+    /// Characterisation, written **before** `AnyBrewMutation` gains an eighth
+    /// projection, so the blast radius of adding one is measured rather than
+    /// discovered.
+    ///
+    /// The erased value is `Equatable` and `Hashable`, and three shipped rules
+    /// rest on that and on nothing else:
+    ///
+    /// 1. Two erased values are equal **iff** every projection matches — which
+    ///    is why adding a projection is a semantic change to equality, not a
+    ///    field addition.
+    /// 2. `ConfirmationRequest ==` is what gates `confirm` and `decline`
+    ///    (`OperationCenterBulk.swift:151,158`), and that equality is structural
+    ///    over the erased commands the request carries.
+    /// 3. `ActivityItem.command.verb` — a projection, read through the erasure —
+    ///    is what drives the app's zap retitle
+    ///    (`cellar/Activity/MutationConfirmation.swift:230`).
+    ///
+    /// After DD1 lands, this suite extends rather than moves: two commands
+    /// differing **only** in `disclosure` must be unequal and must hash apart.
+    /// Stating it here is the point — the alternative is discovering it as an
+    /// unexplained `ConfirmationBacklogTests` failure four phases later.
+    @Test("Erased equality is projection-by-projection, and hashing agrees with it")
+    func erasedEqualityIsProjectionByProjectionAndHashingAgreesWithIt() {
+        let base = ProbeMutation()
+
+        // Identical projections, produced independently: equal, and hashed alike.
+        #expect(AnyBrewMutation(base) == AnyBrewMutation(ProbeMutation()))
+        #expect(AnyBrewMutation(base).hashValue == AnyBrewMutation(ProbeMutation()).hashValue)
+
+        // One projection at a time. Every one of them separates the values,
+        // which is what "equality of what will run" means concretely.
+        var byArguments = base
+        byArguments.arguments = ["services", "stop", "atuin"]
+        var byVerb = base
+        byVerb.verb = "probeStop"
+        var byPackage = base
+        byPackage.packageID = PackageID(kind: .formula, name: "wget")
+        var byConfirmation = base
+        byConfirmation.requiresConfirmation = true
+        var byScope = base
+        byScope.invalidates = .installedInventory
+        var byDiskAreas = base
+        byDiskAreas.diskAreas = [.cellar]
+        var byOverrides = base
+        byOverrides.environmentOverrides = [.noAutoremove]
+
+        let divergent: [(String, ProbeMutation)] = [
+            ("arguments", byArguments),
+            ("verb", byVerb),
+            ("packageID", byPackage),
+            ("requiresConfirmation", byConfirmation),
+            ("invalidates", byScope),
+            ("diskAreas", byDiskAreas),
+            ("environmentOverrides", byOverrides)
+        ]
+        #expect(divergent.count == 7, "the projection count changed — DD1's blast radius moved")
+
+        for (name, variant) in divergent {
+            #expect(
+                AnyBrewMutation(base) != AnyBrewMutation(variant),
+                "\(name) stopped separating two erased values"
+            )
+            #expect(
+                AnyBrewMutation(base).hashValue != AnyBrewMutation(variant).hashValue,
+                "\(name) is not hashed, so equality and hashing disagree"
+            )
+        }
+    }
+
+    /// A conformer that declares a disclosure of its own, so the projection can
+    /// be varied **alone**. `ProbeMutation` deliberately declares none — its job
+    /// is to prove the protocol default is real — so it cannot serve here.
+    private struct DisclosingProbe: BrewMutating {
+        var arguments = ["tap", "acme/tap"]
+        var verb = "tapAdd"
+        var packageID: PackageID?
+        var requiresConfirmation = true
+        var invalidates: InvalidationScope = .taps
+        var disclosure: ConfirmationDisclosure = .packageRemoval
+    }
+
+    /// The guard above, extended deliberately once DD1 landed.
+    ///
+    /// Adding an eighth projection widened equality: two commands that run the
+    /// identical argv and differ **only** in what they warn about are no longer
+    /// the same erased value. That is a consequence worth stating out loud —
+    /// the alternative was meeting it as an unexplained failure in
+    /// `ConfirmationBacklogTests`, four phases from here, with nothing pointing
+    /// back at this change.
+    @Test("Two commands differing only in disclosure are unequal and hash apart")
+    func twoCommandsDifferingOnlyInDisclosureAreUnequalAndHashApart() throws {
+        let tap = try #require(TapName("acme/tap"))
+        let plain = DisclosingProbe()
+        var warning = plain
+        warning.disclosure = .tapTrust(tap)
+
+        // Same argv, same verb, same scope, same everything else.
+        #expect(plain.arguments == warning.arguments)
+        #expect(plain.verb == warning.verb)
+        #expect(plain.invalidates == warning.invalidates)
+
+        #expect(AnyBrewMutation(plain) != AnyBrewMutation(warning))
+        #expect(AnyBrewMutation(plain).hashValue != AnyBrewMutation(warning).hashValue)
+        #expect(Set([AnyBrewMutation(plain), AnyBrewMutation(warning)]).count == 2)
+
+        // And it is still equality *of what will run plus what it warns about*:
+        // two independently built values that agree on both are the same value.
+        #expect(AnyBrewMutation(warning) == AnyBrewMutation(DisclosingProbe(disclosure: .tapTrust(tap))))
+    }
+
+    /// `confirm` and `decline` are gated by `pendingConfirmation == request`,
+    /// so a request that is *value-equal* is accepted and one that is not is
+    /// silently refused. Erased-command equality is therefore load-bearing for
+    /// the destructive gate itself, not only for presentation.
+    @Test("Confirmation identity is what gates confirm and decline")
+    func confirmationIdentityIsWhatGatesConfirmAndDecline() async throws {
+        let harness = CenterHarness()
+        let tap = try #require(TapName("acme/tap"))
+        let pending = try #require(harness.center.request(TapCommand.addTap(tap)))
+
+        // A request carrying the same command but a different identity is not
+        // the pending one: both gates refuse it and nothing is spawned.
+        let impostor = OperationCenter.ConfirmationRequest(
+            id: UUID(),
+            command: pending.command,
+            additional: pending.additional,
+            disclosure: pending.disclosure
+        )
+        #expect(impostor != pending)
+        #expect(harness.center.confirm(impostor).isEmpty)
+        harness.center.decline(impostor)
+        #expect(harness.center.pendingConfirmation == pending, "an impostor consumed the gate")
+        #expect(harness.launcher.launchCount == 0)
+
+        // The pending one, by value, submits every command it listed.
+        let items = harness.center.confirm(pending)
+        #expect(items.count == 1)
+        #expect(items.first?.arguments == ["tap", "acme/tap"])
+        #expect(harness.center.pendingConfirmation == nil)
+        try await harness.finish(call: 0)
+    }
+
+    /// The zap retitle reads `command.verb` through the erasure. That is a
+    /// *presentation* read of a verb, explicitly permitted, and it is not a
+    /// disclosure path — which is the distinction DD1's structural test relies
+    /// on.
+    @Test("The zap retitle reads a verb through the erasure, and only zap carries it")
+    func theZapRetitleReadsAVerbThroughTheErasure() throws {
+        let harness = CenterHarness()
+        let cask = try #require(CaskID(PackageID(kind: .cask, name: "iterm2")))
+        let request = try #require(harness.center.request(MutationCommand.zap(cask)))
+
+        #expect(request.command.verb == "zap", "the projection the app's isZap reads changed")
+        #expect(request.commands.map(\.verb) == ["zap"])
+        #expect(
+            Self.everyShippedCommand.filter { $0.verb == "zap" }.count == 1,
+            "a second command started answering to the zap verb"
+        )
+        #expect(request.disclosure == .packageRemoval)
+    }
+
     private static func source(of file: String) throws -> String {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

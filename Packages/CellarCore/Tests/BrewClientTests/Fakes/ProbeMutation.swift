@@ -19,4 +19,5 @@ struct ProbeMutation: BrewMutating, Equatable {
     var requiresConfirmation = false
     var invalidates: InvalidationScope = .services
     var diskAreas: Set<DiskArea> = []
+    var environmentOverrides: Set<BrewEnvironment.CommandOverride> = []
 }
