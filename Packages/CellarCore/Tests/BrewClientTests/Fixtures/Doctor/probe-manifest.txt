@@ -1,0 +1,41 @@
+capture-date=2026-08-07
+brew-binary=/opt/homebrew/bin/brew
+brew-version=6.0.15-125-g7372067
+environment=HOMEBREW_NO_AUTO_UPDATE=1
+argv[1]=doctor
+argv[1]-exit=1
+argv[1]-stability=both streams cmp-equal across two consecutive runs in the same session
+argv[1]-observation=stdout was 1 byte (a bare newline); the entire 622-byte report arrived on stderr
+argv[1]-mutation-observation=<prefix>/.git/FETCH_HEAD modification date identical before and after; doctor is classified .read
+
+provenance[warnings-run/stdout.txt]=captured; the subprocess's stdout, verbatim, one byte
+provenance[warnings-run/stderr.txt]=captured; the subprocess's stderr, verbatim, the entire report
+provenance[clean-run/stdout.txt]=hand-authored; Homebrew's documented clean-run sentence, NOT captured
+provenance[clean-run/stderr.txt]=hand-authored; zero bytes, NOT captured
+provenance[clean-run/HAND-AUTHORED.txt]=hand-authored; the in-directory provenance marker
+provenance[odd-grouping/stdout.txt]=hand-authored; zero bytes, NOT captured
+provenance[odd-grouping/stderr.txt]=hand-authored; hostile grouping shapes, invalid UTF-8 by construction
+provenance[odd-grouping/HAND-AUTHORED.txt]=hand-authored; the in-directory provenance marker
+provenance[README.md]=hand-authored; the capture record
+
+hand-authored-marker[clean-run]=clean-run/HAND-AUTHORED.txt
+hand-authored-marker[odd-grouping]=odd-grouping/HAND-AUTHORED.txt
+captured-directories=warnings-run
+
+sha256[warnings-run/stdout.txt]=01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+sha256[warnings-run/stderr.txt]=57f8455b7227bcfe255668c24499c13457644142d5addf78fda63e413d6f39ba
+sha256[clean-run/stdout.txt]=1b4eef677e3a13e6f3def1fd7ae6c523f54342c3900680ebfc20b2d27aeefb58
+sha256[clean-run/stderr.txt]=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+sha256[clean-run/HAND-AUTHORED.txt]=cc70cc851f51ba4dc3e6d3034e18a79b229b7fe795f3c7d2250dc70d0bd8b15e
+sha256[odd-grouping/stdout.txt]=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+sha256[odd-grouping/stderr.txt]=3beed0da65b5d4f86113d5f805ec5ce01e3e42af63ed4fd5b83f7b478c1d96ff
+sha256[odd-grouping/HAND-AUTHORED.txt]=b24afb4055a64bcdd7d86847662a21f6b12c8bedba95c8b644dfa313e0e3a5d8
+
+bytes[warnings-run/stdout.txt]=1
+bytes[warnings-run/stderr.txt]=622
+bytes[clean-run/stdout.txt]=30
+bytes[clean-run/stderr.txt]=0
+bytes[clean-run/HAND-AUTHORED.txt]=1020
+bytes[odd-grouping/stdout.txt]=0
+bytes[odd-grouping/stderr.txt]=276
+bytes[odd-grouping/HAND-AUTHORED.txt]=1079

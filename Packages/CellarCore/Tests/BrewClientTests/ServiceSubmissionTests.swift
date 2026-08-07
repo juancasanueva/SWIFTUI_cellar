@@ -212,15 +212,24 @@ struct ServiceSubmissionTests {
 
     // MARK: - SM4 sc5, II13 sc4 — the installed bulk vocabulary is untouched
 
-    /// **Load-bearing for `installed-inventory` II13 sc4**, which proves
-    /// exhaustively over `allCases` that exactly two bulk verbs exist. A services
-    /// multi-select — if one ever ships — must be its own type over its own
-    /// entity; adding a case here would break that scenario and silently offer
-    /// "start" over a package selection.
-    @Test("The installed bulk vocabulary is unchanged")
+    /// **Load-bearing for `installed-inventory` II13**, which proves exhaustively
+    /// over `allCases` which bulk verbs exist. A services multi-select — if one
+    /// ever ships — must be its own type over its own entity; adding a case here
+    /// would break that scenario and silently offer "start" over a package
+    /// selection.
+    ///
+    /// **Rewritten, not deleted** (m5-health). Only the two vocabulary lines
+    /// changed, from two cases to four: the package bulk vocabulary widened to
+    /// include pin and unpin by maintainer ruling. Everything below is untouched,
+    /// because this is a **services** test and its point is unaffected by that
+    /// widening — SM4 sc5 asks whether a *service* verb leaked into the package
+    /// vocabulary, not whether that vocabulary is frozen. That question survives
+    /// the widening intact, and it is the reason this file asserts anything about
+    /// `BulkSelection` at all.
+    @Test("The installed bulk vocabulary contains no service verb")
     func theInstalledBulkVocabularyIsUnchanged() {
-        #expect(BulkSelection.Action.allCases == [.upgrade, .uninstall])
-        #expect(BulkSelection.Action.allCases.count == 2)
+        #expect(BulkSelection.Action.allCases == [.upgrade, .uninstall, .pin, .unpin])
+        #expect(BulkSelection.Action.allCases.count == 4)
 
         let verbs = ServiceCommand.allVerbs(for: ServiceTarget(name: "atuin")!).map(\.verb)
         for action in BulkSelection.Action.allCases {

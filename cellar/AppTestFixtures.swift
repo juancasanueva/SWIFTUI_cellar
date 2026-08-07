@@ -25,7 +25,58 @@ enum AppTestFixtures {
             || arguments.contains("--ui-testing-m4-security")
             || arguments.contains("--ui-testing-m5-release-notes")
             || arguments.contains("--ui-testing-m5-brewfile")
+            || arguments.contains("--ui-testing-m5-health")
     }
+
+    // MARK: - M5 Health
+
+    nonisolated static var isHealthEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-health")
+    }
+
+    /// A launch with **no** brew at all, so nothing can be answered and the score
+    /// has to say so rather than showing a `0` or a `100`.
+    nonisolated static var isHealthUnscorable: Bool {
+        isHealthEnabled && ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-health-unscorable")
+    }
+
+    /// A selection of casks only, so pin and unpin have to report **unavailable
+    /// rather than inert** (installed-inventory II13 sc5).
+    nonisolated static var isHealthCasksOnly: Bool {
+        isHealthEnabled && ProcessInfo.processInfo.arguments.contains("--ui-testing-m5-health-casks")
+    }
+
+    /// The mixed selection II14 sc4 names, verbatim: two unpinned outdated
+    /// formulae, one **pinned** outdated formula, and one outdated cask. Pin sees
+    /// two, unpin sees one, snooze sees all four — three different numbers over
+    /// one selection, which is the only arrangement that can prove each verb
+    /// derives its own eligible set.
+    nonisolated static let healthInstalledPayload = #"""
+    {"formulae":[
+      {"name":"git","tap":"homebrew/core","desc":"Distributed revision control system",
+       "versions":{"stable":"2.51.0"},"outdated":true,
+       "installed":[{"version":"2.50.0","time":0,"installed_on_request":true}]},
+      {"name":"jq","tap":"homebrew/core","desc":"Lightweight JSON processor",
+       "versions":{"stable":"1.8.1"},"outdated":true,
+       "installed":[{"version":"1.7.1","time":0,"installed_on_request":true}]},
+      {"name":"hugo","tap":"homebrew/core","desc":"Static site generator",
+       "versions":{"stable":"0.150.0"},"outdated":true,"pinned":true,
+       "installed":[{"version":"0.149.0","time":0,"installed_on_request":true}]}
+    ],"casks":[
+      {"token":"iterm2","tap":"homebrew/cask","name":["iTerm2"],"desc":"Terminal emulator",
+       "version":"3.6.0","outdated":true,"installed":"3.5.0"}
+    ]}
+    """#
+
+    /// Casks only, for the unavailable-not-inert case.
+    nonisolated static let healthCaskOnlyPayload = #"""
+    {"formulae":[],"casks":[
+      {"token":"iterm2","tap":"homebrew/cask","name":["iTerm2"],"desc":"Terminal emulator",
+       "version":"3.6.0","outdated":true,"installed":"3.5.0"},
+      {"token":"rectangle","tap":"homebrew/cask","name":["Rectangle"],"desc":"Window manager",
+       "version":"0.90","outdated":true,"installed":"0.89"}
+    ]}
+    """#
 
     // MARK: - M5 Brewfile
 
@@ -215,6 +266,10 @@ enum AppTestFixtures {
         if arguments.contains("--ui-testing-m3-taps-error") { return .error }
         if arguments.contains("--ui-testing-m3-taps-absent") { return .absent }
         if arguments.contains("--ui-testing-m3-taps-large") { return .large }
+        // Nothing measured means nothing measured: without this the fixture disk
+        // snapshot is still injected, two signals answer, and the "nothing could
+        // be scored" state is unreachable from any launch.
+        if arguments.contains("--ui-testing-m5-health-unscorable") { return .absent }
         if arguments.contains("--ui-testing-m3-disk-usage-absent") { return .absent }
         if arguments.contains("--ui-testing-m3-disk-usage-warning") { return .warning }
         return .standard
@@ -245,6 +300,9 @@ struct AppTestBrewLocator: BrewLocating {
         if AppTestFixtures.isCleanupEnabled, AppTestFixtures.cleanupMode == .brewAbsence {
             return .absent
         }
+        // No brew at all: every health signal is unanswerable, which is the only
+        // way the "nothing could be scored" state is reachable from a launch.
+        if AppTestFixtures.isHealthUnscorable { return .absent }
         return AppTestFixtures.mode == .absent ? .absent : .detected(AppTestFixtures.installation)
     }
 }
@@ -325,6 +383,13 @@ extension AppTestFixtures {
 
 struct AppTestInstalledPayloadSource: InstalledPayloadSourcing {
     func payload(using installation: BrewInstallation) async throws(InstalledInventoryError) -> Data {
+        if AppTestFixtures.isHealthEnabled {
+            return Data(
+                (AppTestFixtures.isHealthCasksOnly
+                    ? AppTestFixtures.healthCaskOnlyPayload
+                    : AppTestFixtures.healthInstalledPayload).utf8
+            )
+        }
         guard AppTestFixtures.isReleaseNotesEnabled else {
             return Data(
                 #"{"formulae":[{"name":"widget","tap":"acme/tools","versions":{"stable":"1.0"},"installed":[{"version":"1.0","time":0,"installed_on_request":true}]}],"casks":[]}"#.utf8

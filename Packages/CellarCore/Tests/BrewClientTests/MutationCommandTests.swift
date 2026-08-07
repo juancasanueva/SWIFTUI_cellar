@@ -300,7 +300,7 @@ struct MutationCommandTests {
             }
 
             // And the names it does place in argv come through the single gate.
-            guard Self.namesNothing.contains(name) else {
+            guard Self.namesNothing.keys.contains(name) else {
                 #expect(
                     source.contains("MutationName.isSafe"),
                     "\(name) does not route its names through the one `isSafe` gate"
@@ -331,7 +331,7 @@ struct MutationCommandTests {
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { $0.contains("init(") }
             #expect(
-                initialisers == ["public init(fileURL: URL) {"],
+                initialisers == Self.namesNothing[name],
                 "\(name) is listed as naming nothing but offers \(initialisers)"
             )
             let storedStrings = source
@@ -345,14 +345,26 @@ struct MutationCommandTests {
         }
     }
 
-    /// Command families whose argv contains no package name at any position.
+    /// Command families whose argv contains no package name at any position,
+    /// each mapped to the **exact** set of initialisers it may offer.
     ///
-    /// `BundleDumpCommand` is the only member: its vector is literal verb and
-    /// flag tokens plus **one path this capability itself created** under a
-    /// Cellar-owned temporary location. There is no name in it to validate, and
-    /// there is no way to put one in — the initialiser takes a `URL`, not a
-    /// `String` (`brewfile-management` BF1).
-    private static let namesNothing: Set<String> = ["BundleDumpCommand.swift"]
+    /// Exact per file rather than a shared rule, because the exemption is paid
+    /// for with a stronger claim than the one it replaces: a member here must be
+    /// structurally incapable of putting a name in argv, and "which initialisers
+    /// exist" is the sharpest way to say that. Adding a member is a deliberate
+    /// act that must satisfy every expectation above.
+    ///
+    /// - `BundleDumpCommand`: literal verb and flag tokens plus **one path this
+    ///   capability itself created** under a Cellar-owned temporary location.
+    ///   There is no name in it to validate and no way to put one in — the
+    ///   initialiser takes a `URL`, not a `String` (`brewfile-management` BF1).
+    /// - `DoctorCommand`: the strictest member possible. Its vector is the single
+    ///   literal `doctor`, and it offers **no initialiser at all**, so there is
+    ///   no parameter through which anything could reach argv (`system-health`).
+    private static let namesNothing: [String: [String]] = [
+        "BundleDumpCommand.swift": ["public init(fileURL: URL) {"],
+        "DoctorCommand.swift": []
+    ]
 
     /// Every `*Command.swift` in `BrewClient`, keyed by file name.
     private static func commandFiles() throws -> [String: String] {

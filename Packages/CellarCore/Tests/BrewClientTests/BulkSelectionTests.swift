@@ -63,19 +63,36 @@ struct BulkSelectionTests {
 
     // MARK: - II13 sc4 — threat: irreversible mutation scope
 
-    /// `Action` is `CaseIterable` with exactly two cases, so the absence of a
-    /// bulk pin, unpin, snooze, favorite or note affordance is an **assertion**
-    /// rather than a convention — the same technique `ActivityItem.Control`
-    /// uses.
-    @Test("Exactly upgrade and uninstall are bulk-eligible, and nothing else is")
-    func onlyUpgradeAndUninstallAreBulkEligible() {
-        #expect(BulkSelection.Action.allCases == [.upgrade, .uninstall])
-        #expect(BulkSelection.Action.allCases.count == 2)
+    /// `Action` is `CaseIterable` with exactly four cases, so the absence of a
+    /// bulk snooze, favorite or note affordance is an **assertion** rather than a
+    /// convention — the same technique `ActivityItem.Control` uses.
+    ///
+    /// **Rewritten, not deleted** (m5-health, II13). This test previously
+    /// asserted a two-case vocabulary and scanned the titles for
+    /// `pin`/`unpin`/`snooze`/`favorite`/`note`. Pin and unpin were deliberately
+    /// narrowed out on 2026-08-02 and the maintainer has reversed that ruling, so
+    /// PRD §3.2's full bulk vocabulary ships. The title scan is the sharp edge
+    /// and it survives: it still fails on any of the three verbs that remain
+    /// prohibited, and `pin` had to be removed from it explicitly rather than
+    /// left to be silently satisfied by a count change.
+    ///
+    /// Note that scanning for `"pin"` would now match `"Unpin"` as a substring
+    /// anyway, which is exactly the kind of accident that makes a scan pass for
+    /// the wrong reason — so the prohibited list is the three verbs and nothing
+    /// that collides with a shipped one.
+    @Test("Exactly upgrade, uninstall, pin and unpin are bulk-eligible, and nothing else is")
+    func onlyTheFourMutationVerbsAreBulkEligible() {
+        #expect(BulkSelection.Action.allCases == [.upgrade, .uninstall, .pin, .unpin])
+        #expect(BulkSelection.Action.allCases.count == 4)
 
         let titles = BulkSelection.Action.allCases.map(\.title).joined(separator: " ").lowercased()
-        for absent in ["pin", "unpin", "snooze", "favorite", "note"] {
+        for absent in ["snooze", "favorite", "note"] {
             #expect(titles.contains(absent) == false, "a bulk \(absent) affordance exists")
         }
+        // And the two new ones really are there, by title as well as by case, so
+        // the count above cannot be satisfied by two unrelated additions.
+        #expect(titles.contains("pin"))
+        #expect(titles.contains("unpin"))
     }
 
     // MARK: - II13 sc5 — an empty selection offers no enabled control
@@ -172,6 +189,151 @@ struct BulkSelectionTests {
         #expect(ids.count == 2)
         #expect(ids.contains(Self.git) == false, "the snoozed package would still have been submitted")
         #expect(Set(ids) == [Self.wget, Self.curl])
+    }
+
+    // MARK: - II13 — pin and unpin are two independent verbs
+
+    /// The clause that makes them two verbs rather than one toggle: a selection
+    /// holding both pinned and unpinned packages has **no single correct answer**,
+    /// and "unavailable rather than inert" forbids guessing. So both are offered,
+    /// each over its own subset, and neither guesses about the other's.
+    @Test("A mixed pinned selection offers both verbs, each over exactly its own subset")
+    func aMixedPinnedSelectionOffersBothVerbs() {
+        let entries = Self.entries(
+            upToDate: [Self.wget, Self.git, Self.curl],
+            pinned: [Self.curl]
+        )
+        let selection = BulkSelection(
+            selection: [Self.wget, Self.git, Self.curl],
+            entries: entries
+        )
+
+        #expect(selection.isAvailable(.pin))
+        #expect(selection.isAvailable(.unpin))
+        #expect(selection.ids(for: .pin) == [Self.wget, Self.git])
+        #expect(selection.ids(for: .unpin) == [Self.curl])
+        // Honest counts: each announces exactly what it would submit.
+        #expect(selection.label(for: .pin) == "Pin 2")
+        #expect(selection.label(for: .unpin) == "Unpin 1")
+    }
+
+    /// Derived independently, so one being empty says nothing about the other.
+    @Test("An all-unpinned selection leaves unpin unavailable, and the reverse")
+    func eachVerbIsDerivedIndependently() {
+        let entries = Self.entries(upToDate: [Self.wget, Self.git], pinned: [Self.git])
+
+        let unpinned = BulkSelection(selection: [Self.wget], entries: entries)
+        #expect(unpinned.isAvailable(.pin))
+        #expect(unpinned.isAvailable(.unpin) == false)
+        #expect(unpinned.ids(for: .unpin).isEmpty)
+
+        let pinned = BulkSelection(selection: [Self.git], entries: entries)
+        #expect(pinned.isAvailable(.unpin))
+        #expect(pinned.isAvailable(.pin) == false)
+        #expect(pinned.ids(for: .pin).isEmpty)
+    }
+
+    /// Pinning is formula-only in brew, and `MutationCommand.pin(formula:)` takes
+    /// a `FormulaID` by construction. A cask must therefore never enter either
+    /// set — and the resulting control is **unavailable rather than present and
+    /// inert**.
+    @Test("A selection containing only casks leaves both pin and unpin unavailable, not inert")
+    func casksNeverEnterEitherSet() {
+        let iterm2 = Self.iterm
+        let entries = Self.entries(upToDate: [iterm2])
+        let selection = BulkSelection(selection: [iterm2], entries: entries)
+
+        #expect(selection.ids(for: .pin).isEmpty)
+        #expect(selection.ids(for: .unpin).isEmpty)
+        #expect(selection.isAvailable(.pin) == false, "a cask selection offered pin")
+        #expect(selection.isAvailable(.unpin) == false, "a cask selection offered unpin")
+        // The control: the same selection *is* uninstallable, so "unavailable"
+        // is about pinning rather than about an empty selection.
+        #expect(selection.isAvailable(.uninstall))
+    }
+
+    @Test("A cask never enters either set even when formulae are selected beside it")
+    func aCaskIsFilteredOutOfAMixedKindSelection() {
+        let entries = Self.entries(
+            upToDate: [Self.wget, Self.iterm, Self.curl],
+            pinned: [Self.curl]
+        )
+        let selection = BulkSelection(
+            selection: [Self.wget, Self.iterm, Self.curl],
+            entries: entries
+        )
+
+        #expect(selection.ids(for: .pin) == [Self.wget])
+        #expect(selection.ids(for: .unpin) == [Self.curl])
+        #expect(selection.ids(for: .pin).contains(Self.iterm) == false)
+        #expect(selection.ids(for: .unpin).contains(Self.iterm) == false)
+        // Uninstall still covers all three, so the filter is pinning-specific.
+        #expect(selection.ids(for: .uninstall).count == 3)
+    }
+
+    /// A package that has left the inventory cannot be pinned either — the
+    /// reconciliation happens once, before any verb's eligibility is derived.
+    @Test("A departed package enters neither the pinnable nor the unpinnable set")
+    func aDepartedPackageEntersNeitherPinSet() {
+        let entries = Self.entries(upToDate: [Self.git])
+        let selection = BulkSelection(selection: [Self.wget, Self.git], entries: entries)
+
+        #expect(selection.ids(for: .pin) == [Self.git])
+        #expect(selection.ids(for: .pin).contains(Self.wget) == false)
+        #expect(selection.ids(for: .unpin).isEmpty)
+    }
+
+    /// Selection order is preserved through the new verbs too, because it
+    /// determines submission order.
+    @Test("Both new verbs report their sets in selection order")
+    func bothNewVerbsPreserveSelectionOrder() {
+        let entries = Self.entries(
+            upToDate: [Self.wget, Self.git, Self.curl],
+            pinned: [Self.git, Self.curl]
+        )
+        let selection = BulkSelection(
+            selection: [Self.curl, Self.wget, Self.git],
+            entries: entries
+        )
+
+        #expect(selection.ids(for: .unpin) == [Self.curl, Self.git])
+        #expect(selection.ids(for: .pin) == [Self.wget])
+    }
+
+    // MARK: - II13 — the bulk mutation vocabulary, by case and by title
+
+    /// The scenario both rewritten tests answer to: the vocabulary of bulk verbs
+    /// that produce mutation commands is exactly these four, enumerated
+    /// exhaustively **by case and by displayed title**.
+    @Test("The bulk mutation vocabulary is exactly upgrade, uninstall, pin and unpin")
+    func theBulkMutationVocabularyIsExactlyFour() {
+        #expect(BulkSelection.Action.allCases == [.upgrade, .uninstall, .pin, .unpin])
+        #expect(BulkSelection.Action.allCases.map(\.title) == ["Upgrade", "Uninstall", "Pin", "Unpin"])
+
+        // By title, so a case renamed to dodge the enumeration above is caught.
+        let titles = Set(BulkSelection.Action.allCases.map { $0.title.lowercased() })
+        #expect(titles == ["upgrade", "uninstall", "pin", "unpin"])
+
+        // No snooze, favorite, note or service verb — by case or by title.
+        // Snooze travels its own app-side path precisely so it cannot be
+        // represented here as a case that produces no command.
+        for absent in ["snooze", "favorite", "note", "start", "stop", "restart"] {
+            #expect(titles.contains(absent) == false, "\(absent) entered the bulk vocabulary by title")
+        }
+        for action in BulkSelection.Action.allCases {
+            #expect(["snooze", "favorite", "note"].contains("\(action)") == false)
+        }
+    }
+
+    /// Only the destructive one asks. Pin and unpin are reversible, so they
+    /// require no confirmation.
+    @Test("Only uninstall requires a confirmation")
+    func onlyUninstallRequiresConfirmation() {
+        #expect(BulkSelection.Action.uninstall.requiresConfirmation)
+        #expect(BulkSelection.Action.upgrade.requiresConfirmation == false)
+        #expect(BulkSelection.Action.pin.requiresConfirmation == false)
+        #expect(BulkSelection.Action.unpin.requiresConfirmation == false)
+        #expect(BulkSelection.Action.allCases.count { $0.requiresConfirmation } == 1)
     }
 
     /// The pinned exclusion lives in the derivation, once — and no unpin is

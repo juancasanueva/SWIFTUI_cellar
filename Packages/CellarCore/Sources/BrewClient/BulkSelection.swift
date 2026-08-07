@@ -15,26 +15,50 @@ public struct BulkSelection: Sendable {
     public let upgradable: [PackageID]
     /// Selected ∧ still installed, in selection order.
     public let uninstallable: [PackageID]
+    /// Selected ∧ still installed ∧ a formula ∧ **not** currently pinned.
+    public let pinnable: [PackageID]
+    /// Selected ∧ still installed ∧ a formula ∧ currently pinned.
+    public let unpinnable: [PackageID]
 
     /// The verbs a selection can be acted on with.
     ///
-    /// `CaseIterable` with exactly two cases, so the absence of a bulk pin,
-    /// unpin, snooze, favorite or note affordance is a **test assertion** rather
-    /// than a convention — the same technique `ActivityItem.Control` uses
-    /// (installed-inventory II13 sc4).
+    /// `CaseIterable` with exactly four cases, so the absence of a bulk snooze,
+    /// favorite or note affordance is a **test assertion** rather than a
+    /// convention — the same technique `ActivityItem.Control` uses
+    /// (installed-inventory II13).
+    ///
+    /// Pin and unpin are **two independent verbs, not one toggle**. A toggle's
+    /// meaning would depend on how homogeneous the selection happened to be, and
+    /// a selection holding both pinned and unpinned packages has no single
+    /// correct answer — which is exactly what II13's "a bulk control that cannot
+    /// act on the current selection MUST be unavailable rather than inert"
+    /// forbids guessing about. Two verbs, each with its own eligibility, is the
+    /// only shape that never guesses.
+    ///
+    /// Snooze is deliberately **not** a case here. It produces no
+    /// `MutationCommand`, so a fifth case would need a `case snooze: []` arm in
+    /// `commands(for:over:)` — a silent no-op the type system cannot catch — and
+    /// `MetadataStore` lives in `Persistence` while this type lives in
+    /// `BrewClient`, which must not link SwiftData. It travels its own app-side
+    /// path instead (design HD11).
     public enum Action: Sendable, Equatable, CaseIterable {
         case upgrade
         case uninstall
+        case pin
+        case unpin
 
         public var title: String {
             switch self {
             case .upgrade: "Upgrade"
             case .uninstall: "Uninstall"
+            case .pin: "Pin"
+            case .unpin: "Unpin"
             }
         }
 
         /// Whether confirming is required before anything is submitted. Only
-        /// the destructive one (package-mutation PM3).
+        /// the destructive one (package-mutation PM3). Pin and unpin are
+        /// reversible in one click and ask nothing.
         public var requiresConfirmation: Bool { self == .uninstall }
     }
 
@@ -61,6 +85,20 @@ public struct BulkSelection: Sendable {
                 snoozedVersion: metadata?(id)?.snoozedVersion
             )
         }
+
+        // Formula-only, because `MutationCommand.pin(formula:)` takes a
+        // `FormulaID` by construction — "pin a cask" is unrepresentable rather
+        // than validated, so a cask in the selection produces no command at all
+        // and must not be counted as though it would.
+        //
+        // Derived **independently** of each other: a mixed pinned/unpinned
+        // selection offers both verbs with honest counts, and neither guesses
+        // about the other's members (II13).
+        let formulae = live.filter { id in
+            id.kind == .formula && present[id]?.installed != nil
+        }
+        pinnable = formulae.filter { present[$0]?.installed?.isPinned == false }
+        unpinnable = formulae.filter { present[$0]?.installed?.isPinned == true }
     }
 
     public var isEmpty: Bool { uninstallable.isEmpty && upgradable.isEmpty }
@@ -70,6 +108,8 @@ public struct BulkSelection: Sendable {
         switch action {
         case .upgrade: upgradable
         case .uninstall: uninstallable
+        case .pin: pinnable
+        case .unpin: unpinnable
         }
     }
 

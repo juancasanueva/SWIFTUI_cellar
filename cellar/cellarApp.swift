@@ -53,6 +53,18 @@ struct cellarApp: App {
     @State private var cleanup: CleanupStore
     private let cleanupPreviewSource: any CleanupPreviewSourcing
 
+    /// The two readings the Health section owns, and nothing else.
+    ///
+    /// Composed once here — the doctor source and the file-metadata seam — like
+    /// every other seam in this file. Note what it is **not** wired to: no
+    /// refresh coordinator, no loop, no `.task` of its own. The doctor run is
+    /// user-initiated (`system-health`, "Doctor is a read"), and this file never
+    /// calls it; the last-update reading is invocation-free and joins the launch
+    /// and activation refresh below, because a file's modification date costs
+    /// nothing to read and telling the user nothing until they click would be an
+    /// affectation rather than a safeguard.
+    @State private var health: HealthStore
+
     /// Advisory coverage and findings.
     ///
     /// Owned here like every other store, and wired to its engine exactly as the
@@ -166,12 +178,27 @@ struct cellarApp: App {
         let diskMutations = InstalledMutationGate()
         let refreshRegistry = MutationRefreshRegistry()
         let services = ServicesStore()
-        let diskCacheURL = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory)
-            .appendingPathComponent("Cellar/disk-usage-v1.json")
-        let advisoryCacheURL = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory)
-            .appendingPathComponent("Cellar/\(SecurityKit.advisoryCacheFileName)")
+        // Under the Health fixture this points at an empty temporary file rather
+        // than the real cache. Without that, a launch meant to answer *nothing*
+        // silently loads the developer's own machine's disk measurement and the
+        // "nothing could be scored" state becomes unreachable — a UI test that
+        // passes on a fresh CI machine and fails on every real one.
+        let diskCacheURL = AppTestFixtures.isHealthEnabled
+            ? FileManager.default.temporaryDirectory
+                .appendingPathComponent("cellar-ui-health-disk-\(UUID().uuidString).json")
+            : (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory)
+                .appendingPathComponent("Cellar/disk-usage-v1.json")
+        // Redirected under the Health fixture for the same reason as the disk
+        // cache: `SecurityStore.start()` loads this file with no consent and no
+        // network, so a launch meant to answer nothing would otherwise adopt the
+        // developer's own last scan and score 63 out of a machine nobody measured.
+        let advisoryCacheURL = AppTestFixtures.isHealthEnabled
+            ? FileManager.default.temporaryDirectory
+                .appendingPathComponent("cellar-ui-health-advisories-\(UUID().uuidString).json")
+            : (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory)
+                .appendingPathComponent("Cellar/\(SecurityKit.advisoryCacheFileName)")
         let diskUsage = DiskUsageStore(
             cache: DiskUsageCache(fileURL: diskCacheURL),
             initialSnapshot: isUITesting && AppTestFixtures.mode != .absent
@@ -200,6 +227,14 @@ struct cellarApp: App {
         _integrity = State(
             initialValue: ArtifactIntegrityStore(
                 initialReports: AppTestFixtures.isSecurityEnabled ? AppTestFixtures.integrityReports : []
+            )
+        )
+        _health = State(
+            initialValue: HealthStore(
+                doctorSource: BrewDoctorSource(
+                    launcher: isUITesting ? AppTestProcessLauncher() : SystemProcessLauncher()
+                ),
+                metadataAccess: SystemFileMetadataAccess()
             )
         )
         let securityConsent = SecurityConsentPreference()
@@ -341,6 +376,7 @@ struct cellarApp: App {
                 cleanupPreviewSource: cleanupPreviewSource,
                 // The ordinary `NSOpenPanel`, unless this launch is a UI test.
                 brewfileSourceChooser: AppTestFixtures.brewfileSourceChooser,
+                health: health,
                 security: security,
                 securityConsent: securityConsent,
                 advisoryCredentials: advisoryCredentials,
@@ -426,6 +462,23 @@ struct cellarApp: App {
         // itself if the surface is already showing — which is the ordinary
         // launch order, since detection resolves after the first render.
         await servicesRefresher.refresh(for: brewDetection.state)
+        readHomebrewAge()
+    }
+
+    /// One `attributesOfItem` behind a seam: no process, no network, and no
+    /// chance for Homebrew to auto-update on the way (`system-health`, "The
+    /// last-update reading costs no brew invocation").
+    @MainActor
+    private func readHomebrewAge() {
+        guard let installation = brewDetection.state.installation else { return }
+        health.readLastUpdate(
+            roots: HomebrewRoots(
+                installation: installation,
+                userCacheDirectory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                    ?? FileManager.default.temporaryDirectory
+            ),
+            now: Date()
+        )
     }
 
     @MainActor

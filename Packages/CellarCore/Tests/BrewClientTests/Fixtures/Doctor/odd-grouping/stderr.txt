@@ -1,0 +1,7 @@
+  an indented detail line, before any warning has opened
+Warning: 
+Warning: first adjacent warning, no detail follows it
+Warning: second adjacent warning, no detail either
+Warning: a warning that does carry one detail line
+  and here is that detail line
+ÿş not valid utf-8 €

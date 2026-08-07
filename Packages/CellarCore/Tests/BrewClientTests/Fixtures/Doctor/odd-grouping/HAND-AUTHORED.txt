@@ -1,0 +1,24 @@
+HAND-AUTHORED — NOT CAPTURED.
+
+Every stream in this directory was written by hand for this change. None of it
+came out of a `brew doctor` process. It is a hostile input built to reach the
+grammar rows a real machine happens not to produce, not a record of anything
+brew has ever printed.
+
+`stderr.txt` carries, in this order:
+
+1. an indented detail line before any warning block has opened;
+2. a `Warning: ` line with an empty headline;
+3. two adjacent warning headlines with no detail line between them;
+4. a fourth warning that does carry one detail line;
+5. a byte run that is **not valid UTF-8** (`ff fe` … `80 81`).
+
+`stdout.txt` is zero bytes on purpose: this fixture exists to prove the document
+is read from stderr even when stdout says nothing at all.
+
+**Do not open `stderr.txt` in an editor that will "repair" the encoding on
+save.** The invalid bytes are the fixture. `probe-manifest.txt` and
+`DoctorFixtureManifestTests` are what catch it if that happens anyway.
+
+Do not remove this marker. An unmarked hand-authored fixture is indistinguishable
+from a capture.

@@ -32,6 +32,35 @@ struct ConfirmationDisclosureTests {
     private static let git = PackageTarget(PackageID(kind: .formula, name: "git"))!
     private static let iterm = PackageTarget(PackageID(kind: .cask, name: "iterm2"))!
 
+    // MARK: - II13 — bulk pin and bulk unpin raise no confirmation
+
+    /// `request(_:)` already returned `nil` for pin and unpin before they had a
+    /// bulk form, because neither destroys anything and both are reversible in
+    /// one click. So `submitBulk` submits them directly, and DD1's
+    /// `first.disclosure` fix — which is what makes an erased mixed batch
+    /// disclose the *right* warning — is untouched by the widening.
+    @Test("Bulk pin and bulk unpin present no confirmation at all")
+    func bulkPinAndUnpinRaiseNoConfirmation() {
+        let harness = CenterHarness()
+
+        for command in [MutationCommand.pin(FormulaID(Self.wget.id)!), .unpin(FormulaID(Self.git.id)!)] {
+            #expect(harness.center.request(command) == nil, "\(command.verb) asked for a confirmation")
+            #expect(command.requiresConfirmation == false)
+        }
+
+        // And as a batch, which is the shape `submitBulk` actually hands it.
+        let batch: [MutationCommand] = [
+            .pin(FormulaID(Self.wget.id)!),
+            .pin(FormulaID(Self.git.id)!)
+        ]
+        #expect(harness.center.request(batch) == nil, "a bulk pin batch asked for a confirmation")
+        #expect(harness.center.pendingConfirmation == nil)
+
+        // The control: the destructive verb still does ask, so "no confirmation"
+        // is about pinning rather than about a gate that stopped working.
+        #expect(harness.center.request(MutationCommand.uninstall(Self.wget)) != nil)
+    }
+
     // MARK: - PM1 — an erased mixed batch still discloses tap trust
 
     @Test("An erased mixed batch still discloses tap trust")
