@@ -1,0 +1,9 @@
+==> Downloading Homebrew API data
+✔︎ JSON API packages.arm64_tahoe.jws.json
+Warning: Formulae dependency graph sorting found a circular dependency:
+  libtiff, webp
+This is usually caused by stale dependency data in installed keg tabs.
+If it persists, run the following commands and try again:
+  brew update
+  brew uninstall --ignore-dependencies --force libtiff webp
+  brew install libtiff webp

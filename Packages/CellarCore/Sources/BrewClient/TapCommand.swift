@@ -40,7 +40,12 @@ public struct ForceUntapEvidence: Sendable, Equatable {
     }
 }
 
-public enum ConfirmationDisclosure: Sendable, Equatable {
+/// `Hashable` rather than merely `Equatable` because `AnyBrewMutation` now
+/// stores one, and that erased value is `Hashable` — carried in sets and used as
+/// a dictionary key by the spine's callers. Both payloads were already hashable
+/// (`TapName`, `Set<PackageID>`), so the conformance is synthesised and no
+/// equality semantics change.
+public enum ConfirmationDisclosure: Sendable, Hashable {
     case packageRemoval
     case tapTrust(TapName)
     case forceUntap(tap: TapName, affected: Set<PackageID>)

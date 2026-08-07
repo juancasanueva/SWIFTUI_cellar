@@ -1,0 +1,38 @@
+capture-date=2026-08-07
+brew-binary=/opt/homebrew/bin/brew
+brew-version=6.0.15-125-g7372067
+argv[1]=bundle dump --file <tmp>/Brewfile --force --formula --cask --tap
+argv[1]-exit=0
+argv[1]-file-destination=a disposable directory created for this capture and removed after it; never a path the user owns
+argv[2]=bundle check --file <tmp>/Hostile.brewfile
+argv[2]-exit=1
+argv[2]-observation=the Brewfile's Ruby was EVALUATED; <tmp>/marker.txt existed afterwards containing "evaluated"
+argv[2]-artifacts=not committed; the hostile Brewfile and its marker were written under the session scratchpad and removed
+
+provenance[dump-file.brewfile]=captured; the bytes brew wrote at --file, verbatim
+provenance[dump-stdout.txt]=captured; the subprocess's stdout, verbatim, byte-empty on purpose
+provenance[dump-stderr.txt]=captured; the subprocess's stderr, verbatim, non-empty at exit 0
+provenance[empty.brewfile]=hand-authored; zero bytes
+provenance[hostile-ruby.brewfile]=hand-authored; adversarial Ruby residue
+provenance[mixed-kinds.brewfile]=hand-authored; unsupported kinds, option hashes, quoting variants
+provenance[trusted-taps.brewfile]=hand-authored; first three lines copied verbatim from dump-file.brewfile (U9)
+provenance[undecodable.brewfile]=hand-authored; invalid UTF-8 in exactly one line
+provenance[README.md]=hand-authored; the capture record
+
+sha256[dump-file.brewfile]=c3da4a530943513e679bb8053bfca0092b2eed7090a92db189d4beb80d96e524
+sha256[dump-stdout.txt]=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+sha256[dump-stderr.txt]=d4314b434e1d29095b9cb292e40295dac8ffde4468a508d45aa9e7103450f583
+sha256[empty.brewfile]=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+sha256[hostile-ruby.brewfile]=301f1b77ace4af7e02e1edf235d44f49df3ba5055f20a5c2f57d3805f107ed59
+sha256[mixed-kinds.brewfile]=814c19d3d115ba51ae5362b7eaf691345955fd658b49043f1bfe58524f4cc367
+sha256[trusted-taps.brewfile]=327c1613482c774701e221ca5c08fa4649d2999d3a07acfeefaff3c58e238a8c
+sha256[undecodable.brewfile]=7b0f93d39e7bf3e921323d8a9968a73aa48d586d1ee13f8321df137200ffa7dd
+
+bytes[dump-file.brewfile]=5268
+bytes[dump-stdout.txt]=0
+bytes[dump-stderr.txt]=399
+bytes[empty.brewfile]=0
+bytes[hostile-ruby.brewfile]=640
+bytes[mixed-kinds.brewfile]=898
+bytes[trusted-taps.brewfile]=342
+bytes[undecodable.brewfile]=44

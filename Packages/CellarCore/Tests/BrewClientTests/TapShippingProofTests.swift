@@ -192,12 +192,16 @@ struct TapShippingProofTests {
             .joined(separator: "\n")
 
         #expect(try staticButtonLabels(in: tapUI) == [
-            "Add Tap", "Untap", "Force Untap", "Show in Installed"
+            "Add Tap", "Untap", "Force Untap", "Show in Installed",
+            // M5 `m5-brewfile` D3 put both Brewfile affordances **inside** this
+            // section rather than in a tenth sidebar place. They join the
+            // enumeration; they do not escape it.
+            "Import Brewfile", "Export Brewfile"
         ])
         #expect(tapUI.contains("Button {") == false, "an unenumerated dynamic tap button exists")
 
         for excludedCapability in [
-            "Brewfile", "Install package", "Search catalog", "Clone official source",
+            "Install package", "Search catalog", "Clone official source",
             "Security scan", "Git management", "Cleanup", "Disk usage", "Service behavior"
         ] {
             #expect(
@@ -205,6 +209,30 @@ struct TapShippingProofTests {
                 "excluded capability appeared in tap UI: \(excludedCapability)"
             )
         }
+
+        // "Brewfile" left the excluded list above because D3 made it an owned
+        // capability of this section. The rule is **extended, not weakened**: it
+        // is paid for with a stronger claim than the one it replaces. The word
+        // may now appear, in exactly the two enumerated buttons and the two
+        // sheet presentations that open them — and no Brewfile *logic* may
+        // appear here at all.
+        #expect(
+            tapUI.components(separatedBy: "Brewfile").count - 1 <= 12,
+            "the Brewfile surface in the tap UI grew beyond its two affordances"
+        )
+        for forbidden in [
+            "BrewfileParser", "BrewfilePlan", "BrewfileDiff", "BundleDumpCommand",
+            "BrewfilePublication", "bundle dump", "--file", "--force", "trusted:"
+        ] {
+            #expect(
+                tapUI.contains(forbidden) == false,
+                "the tap UI reached into Brewfile logic: \(forbidden)"
+            )
+        }
+        // Two sheets, no destination. The affordances are actions inside the
+        // section the user is already in.
+        #expect(tapUI.components(separatedBy: ".sheet(isPresented:").count - 1 == 2)
+        #expect(tapUI.contains("navigationDestination") == false)
     }
 
     private func staticButtonLabels(in source: String) throws -> Set<String> {

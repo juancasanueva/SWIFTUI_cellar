@@ -339,6 +339,8 @@ struct cellarApp: App {
                 diskUsage: diskUsage,
                 cleanup: cleanup,
                 cleanupPreviewSource: cleanupPreviewSource,
+                // The ordinary `NSOpenPanel`, unless this launch is a UI test.
+                brewfileSourceChooser: AppTestFixtures.brewfileSourceChooser,
                 security: security,
                 securityConsent: securityConsent,
                 advisoryCredentials: advisoryCredentials,

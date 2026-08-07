@@ -1,0 +1,34 @@
+# Shape fixture: every unsupported entry kind, beside entries that must survive.
+
+tap "homebrew/cask"
+tap "acme/tap", "https://github.com/acme/homebrew-tap"
+
+# Both quote styles, surrounding whitespace, and a trailing comma.
+brew "wget"
+brew 'git'
+  brew "ripgrep"
+brew "fd",
+
+# A tap-prefixed token from a third-party tap is an ordinary entry.
+brew "acme/tap/thing"
+cask "acme/tap/app"
+
+# Option hashes other than trusted: are counted skips — installing a stripped
+# entry is not what the file's author wrote.
+brew "dotnet@9", link: true
+brew "postgresql@16", postinstall: "initdb"
+brew "vim", args: ["with-override-system-vi"]
+
+# The ten unsupported entry kinds.
+mas "Xcode", id: 497799835
+vscode "ms-python.python"
+whalebrew "whalebrew/wget"
+go "github.com/example/tool"
+cargo "ripgrep"
+uv "ruff"
+npm "typescript"
+krew "ctx"
+flatpak "org.gimp.GIMP"
+winget "Microsoft.PowerToys"
+
+cask "iterm2"

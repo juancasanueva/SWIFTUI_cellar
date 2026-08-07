@@ -80,6 +80,23 @@ public protocol BrewMutating: Sendable {
     var diskAreas: Set<DiskArea> { get }
     /// Typed command-local Homebrew policy applied to this mutation only.
     var environmentOverrides: Set<BrewEnvironment.CommandOverride> { get }
+    /// The warning this command's confirmation must lead with.
+    ///
+    /// A **protocol requirement** rather than a projection the gate recovers by
+    /// downcasting. The difference is not stylistic: the gate previously read
+    /// `(first as? TapCommand)?.disclosure ?? .packageRemoval`, which is total
+    /// only while every submitted batch is unerased. A mixed tap+install batch
+    /// must be erased to `[AnyBrewMutation]` before it can be submitted at all,
+    /// and at that point the downcast fails and a tap-trust warning silently
+    /// becomes "This removes installed software." — a security-relevant
+    /// downgrade of a typed warning another capability owns
+    /// (package-mutation PM1, design DD1).
+    ///
+    /// The extension default below is what makes it a requirement rather than a
+    /// burden: a family with nothing of its own to disclose says nothing, and
+    /// the ordinary package-removal text is supplied **here**, once, instead of
+    /// by every caller remembering the same `??`.
+    var disclosure: ConfirmationDisclosure { get }
 
     /// Decides the outcome from the terminal facts and the output.
     ///
@@ -93,6 +110,7 @@ public protocol BrewMutating: Sendable {
 extension BrewMutating {
     public var diskAreas: Set<DiskArea> { [] }
     public var environmentOverrides: Set<BrewEnvironment.CommandOverride> { [] }
+    public var disclosure: ConfirmationDisclosure { .packageRemoval }
     /// The command as a human reads it — and as they can paste it.
     ///
     /// Display only. Nothing parses this back into argv, which is what makes
@@ -149,6 +167,15 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
     public let invalidates: InvalidationScope
     public let diskAreas: Set<DiskArea>
     public let environmentOverrides: Set<BrewEnvironment.CommandOverride>
+    /// The eighth projection. Carrying it is what makes the confirmation gate's
+    /// read total: an erased batch now discloses exactly what the same commands
+    /// disclosed unerased (design DD1).
+    ///
+    /// It widens equality deliberately — two commands identical in argv but
+    /// differing in what they warn about are no longer the same erased value,
+    /// and they hash apart. That is stated in `BrewMutatingTests` rather than
+    /// discovered downstream.
+    public let disclosure: ConfirmationDisclosure
 
     public init(_ command: some BrewMutating) {
         arguments = command.arguments
@@ -158,6 +185,7 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
         invalidates = command.invalidates
         diskAreas = command.diskAreas
         environmentOverrides = command.environmentOverrides
+        disclosure = command.disclosure
     }
 }
 

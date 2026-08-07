@@ -52,6 +52,7 @@ import SwiftUI
         ),
         cleanup: CleanupStore(),
         cleanupPreviewSource: CleanupPreviewSource(),
+        brewfileSourceChooser: BrewfileSourcePanel(),
         security: SecurityStore(
             engine: SecurityScanEngine(
                 discovery: OSVSource(),

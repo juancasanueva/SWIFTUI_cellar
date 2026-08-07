@@ -96,10 +96,36 @@ public struct CaskID: Sendable, Hashable {
 
 /// The rule that decides whether a package name may reach argv.
 ///
-/// Deliberately narrow. Names come from brew's own snapshot or from the
-/// catalog, never from free text, so this is a second line rather than the
-/// first — and widening it to "alphanumeric only" would refuse names brew
-/// genuinely publishes (`gcc@11`, `font-fira-code`, `python@3.12`).
+/// **The premise this rule was written under no longer holds, and the rule is
+/// unchanged anyway.** It used to argue that names come from brew's own
+/// snapshot or from the catalog and never from free text, so this was a second
+/// line of defence rather than the first. An imported Brewfile is a file the
+/// user supplied, and it *is* a name source. That premise is restated here
+/// deliberately rather than left stale where a future reader would trust it
+/// (`package-mutation` PM9).
+///
+/// What did **not** change:
+///
+/// - No new construction path exists. A file-sourced name becomes a command
+///   only by constructing the same `PackageTarget` / `FormulaID` / `CaskID` as
+///   every other call site, and there is no convenience overload, no
+///   "already validated" bypass, and no path carrying a raw file string into
+///   argv.
+/// - This gate is **not widened**. It still rejects exactly an empty name, a
+///   name that begins with `-`, and a name containing whitespace. Widening it
+///   to "alphanumeric only" would refuse names brew genuinely publishes
+///   (`gcc@11`, `font-fira-code`, `python@3.12`), and `/` stays legal because a
+///   real third-party dump is full of `user/repo/token` tokens.
+/// - This gate is **not weakened** for a file-sourced name either. A name read
+///   out of a Brewfile is subject to exactly these rules and, additionally, to
+///   the parser's own literal grammar: `BrewfileParser.isRepresentableToken`
+///   admits only the character set a Homebrew token is actually spelled with,
+///   so a backtick, a `$(…)` or a `#{…}` interpolation becomes a **counted,
+///   named refusal** at parse time and never reaches this function at all.
+///
+/// The defence in depth that matters most is still structural rather than
+/// textual: `BrewCommand` is argv-only, so even a name that passed every rule
+/// here would remain one literal argument and could never become a shell.
 enum MutationName {
     static func isSafe(_ name: String) -> Bool {
         guard !name.isEmpty, !name.hasPrefix("-") else { return false }
