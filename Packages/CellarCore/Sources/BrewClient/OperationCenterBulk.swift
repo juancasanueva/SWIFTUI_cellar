@@ -66,11 +66,23 @@ extension OperationCenter {
     /// What `action` would run over `ids`: one invocation per package, in
     /// selection order.
     ///
-    /// Keyed on `BulkSelection.Action`, which is `CaseIterable` with exactly two
-    /// cases — so "no bulk pin, unpin, reinstall or zap exists" is enforced by
-    /// the type rather than by this switch remembering to omit them. An identity
-    /// that could not survive argv composition simply produces no command, which
-    /// is why this compacts rather than force-unwraps.
+    /// Keyed on `BulkSelection.Action`, which is `CaseIterable` with exactly four
+    /// cases — so "no bulk reinstall or zap exists, and no bulk snooze" is
+    /// enforced by the type rather than by this switch remembering to omit them.
+    /// An identity that could not survive argv composition simply produces no
+    /// command, which is why this compacts rather than force-unwraps.
+    ///
+    /// That compaction is also what makes pin and unpin **formula-only for
+    /// free**: `MutationCommand.pin` takes a `FormulaID`, a cask cannot construct
+    /// one, and so a cask in `ids` produces no command rather than an invalid
+    /// one. `BulkSelection.pinnable` filters casks out before they get here, and
+    /// this is the second, structural half of the same rule.
+    ///
+    /// Snooze is absent by construction rather than by omission. It produces no
+    /// `MutationCommand` at all, so a fifth case would need a `case snooze: []`
+    /// arm here — a silent no-op returning an empty batch, which the type system
+    /// could never catch and which would submit nothing while looking like it
+    /// had. It travels its own app-side path instead (design HD11).
     public func commands(
         for action: BulkSelection.Action,
         over ids: [PackageID]
@@ -79,6 +91,14 @@ extension OperationCenter {
             switch action {
             case .upgrade: MutationCommand.naming(id, MutationCommand.upgrade)
             case .uninstall: MutationCommand.naming(id, MutationCommand.uninstall)
+            // `FormulaID(_ id:)` and **not** `.pin(formula: id.name)`: the
+            // name-based factory rebuilds the identity as a formula, so a cask's
+            // name would silently become `pin --formula iterm2`. The identity
+            // initialiser checks the kind and returns `nil` for a cask, which is
+            // what makes "a cask never enters a pin set" true here rather than
+            // only in the eligibility derivation.
+            case .pin: FormulaID(id).map(MutationCommand.pin)
+            case .unpin: FormulaID(id).map(MutationCommand.unpin)
             }
         }
     }

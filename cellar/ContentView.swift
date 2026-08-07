@@ -36,6 +36,9 @@ struct ContentView: View {
     /// The AppKit seam an import reads through, chosen once in the composition
     /// root so the Taps list holds no launch-argument knowledge (design DD4).
     let brewfileSourceChooser: any BrewfileSourceChoosing
+    /// The **two** readings the Health section owns. Every other signal it
+    /// renders is one of the stores above, read where it already lives.
+    let health: HealthStore
     let security: SecurityStore
     let securityConsent: SecurityConsentPreference
     let advisoryCredentials: any AdvisoryCredentialStoring
@@ -138,6 +141,20 @@ struct ContentView: View {
                     operations: operations
                 )
                     .navigationSplitViewColumnWidth(min: 360, ideal: 520)
+            case .health:
+                HealthView(
+                    health: health,
+                    brewDetection: brewDetection,
+                    // Six of the eight signals, read where they already live. The
+                    // section holds none of them and refreshes none of them.
+                    installed: installed,
+                    metadata: metadata,
+                    security: security,
+                    cleanup: cleanup,
+                    diskUsage: diskUsage,
+                    operations: operations
+                )
+                    .navigationSplitViewColumnWidth(min: 360, ideal: 520)
             case .security:
                 SecurityView(
                     security: security,
@@ -171,6 +188,10 @@ struct ContentView: View {
                     systemImage: AppSection.cleanup.systemImage,
                     description: Text("Expand a package to inspect its installed versions.")
                 )
+            case .health:
+                // The weights table — the surface that makes the number
+                // arguable, rather than a second copy of the rows.
+                HealthBreakdownPanel(health: health)
             case .security:
                 if findingSelection == nil, artifactLocations.isEmpty == false || integrity.reports.isEmpty == false {
                     // The integrity half occupies the detail column whenever no

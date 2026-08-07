@@ -1,0 +1,19 @@
+HAND-AUTHORED — NOT CAPTURED.
+
+Every stream in this directory was written by hand for this change. None of it
+came out of a `brew doctor` process.
+
+Why it could not be captured: the machine this change was developed on has real
+`brew doctor` warnings (probe U10, Engram #7531, re-measured during apply on
+2026-08-07 — exit 1, stdout 1 byte, stderr 622 bytes, byte-identical across two
+consecutive runs). A clean run exits 0, and there was no way to produce one here
+without changing the machine's Homebrew installation.
+
+The copy is Homebrew's own documented clean-run sentence, transcribed from
+`Library/Homebrew/dev-cmd/doctor.rb`'s success path. It is a documented sentence,
+not an observation: nothing here proves this machine ever printed it.
+
+Do not remove this marker. An unmarked hand-authored fixture is indistinguishable
+from a capture, and every provenance claim in `../README.md` and
+`../probe-manifest.txt` depends on the difference being visible from inside the
+directory as well as from the manifest.

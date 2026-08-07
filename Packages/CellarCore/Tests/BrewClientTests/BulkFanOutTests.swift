@@ -111,29 +111,107 @@ struct BulkFanOutTests {
         #expect(harness.recorder.drafts.count == 3)
     }
 
-    // MARK: - PM8 sc4 — no other verb accepts a selection
+    // MARK: - PM8 sc4, II13 — no verb without a selection form accepts a selection
 
-    @Test("Only upgrade and uninstall expand over a selection, and nothing else does")
+    /// **Rewritten, not deleted** (m5-health, II13). This test also pinned the
+    /// two-case vocabulary, in both of its halves: the exhaustive `allCases`
+    /// assertion, and a source scan asserting `.pin` and `.unpin` appear nowhere
+    /// in the bulk surface. Pin and unpin were deliberately narrowed out on
+    /// 2026-08-02 and the maintainer has reversed that ruling.
+    ///
+    /// Its intent survives exactly and is what the rewrite keeps: **no verb that
+    /// has no selection form may appear in the bulk surface**. `reinstall` and
+    /// `zap` still have none, so they are still scanned for. Pin and unpin now
+    /// do, so they moved from the prohibited list into the exhaustive one — and
+    /// each is asserted to produce only its own verb, which is the half that
+    /// makes the widening honest rather than merely permitted.
+    @Test("Only the four mutation verbs expand over a selection, and each produces only its own")
     func noOtherVerbAcceptsASelection() throws {
         let harness = CenterHarness()
 
-        // Exhaustive over the whole bulk surface: the type admits two verbs, and
-        // both produce only their own.
-        #expect(BulkSelection.Action.allCases == [.upgrade, .uninstall])
+        // Exhaustive over the whole bulk surface.
+        #expect(BulkSelection.Action.allCases == [.upgrade, .uninstall, .pin, .unpin])
+
+        let expectedVerb: [BulkSelection.Action: String] = [
+            .upgrade: "upgrade", .uninstall: "uninstall", .pin: "pin", .unpin: "unpin"
+        ]
         for action in BulkSelection.Action.allCases {
             let commands = harness.center.commands(for: action, over: Self.selection)
-            #expect(commands.count == 3)
             let verbs = Set(commands.map(\.verb))
-            #expect(verbs == [action == .upgrade ? "upgrade" : "uninstall"])
+            #expect(verbs == [expectedVerb[action]], "\(action) produced \(verbs)")
         }
 
-        // And nothing in the bulk surface names a verb that has no selection
-        // form — asserted on the source, so a future overload cannot slip one in
-        // without this failing.
+        // Pin and unpin are formula-only **by construction**, so the cask in the
+        // selection produces no command rather than an invalid one. That is the
+        // fan-out half of "a cask never enters a pin or unpin set".
+        #expect(harness.center.commands(for: .upgrade, over: Self.selection).count == 3)
+        #expect(harness.center.commands(for: .uninstall, over: Self.selection).count == 3)
+        #expect(harness.center.commands(for: .pin, over: Self.selection).count == 2)
+        #expect(harness.center.commands(for: .unpin, over: Self.selection).count == 2)
+
+        // And nothing in the bulk surface names a verb that still has no
+        // selection form — asserted on the source, so a future overload cannot
+        // slip one in without this failing.
         let source = try Self.declarations(of: "OperationCenterBulk.swift")
-        for absent in [".pin", ".unpin", ".reinstall", ".zap"] {
+        for absent in [".reinstall", ".zap"] {
             #expect(source.contains(absent) == false, "a bulk \(absent) mutation exists")
         }
+    }
+
+    // MARK: - II13 — the two new verbs fan out over exactly their eligible set
+
+    @Test("Bulk pin and bulk unpin fan out one command per eligible formula, in selection order")
+    func pinAndUnpinFanOutOverTheirEligibleSet() {
+        let harness = CenterHarness()
+        let formulae = [CenterHarness.wget, CenterHarness.git]
+
+        let pins = harness.center.commands(for: .pin, over: formulae)
+        let unpins = harness.center.commands(for: .unpin, over: formulae)
+
+        #expect(pins.map(\.arguments) == [
+            ["pin", "--formula", "wget"],
+            ["pin", "--formula", "git"]
+        ])
+        #expect(unpins.map(\.arguments) == [
+            ["unpin", "--formula", "wget"],
+            ["unpin", "--formula", "git"]
+        ])
+        // One package per argv, like every other fan-out.
+        for command in pins + unpins {
+            let names = command.arguments.filter { !$0.hasPrefix("-") }
+            #expect(names.count == 2, "an argv named \(names.count - 1) packages")
+        }
+    }
+
+    /// It acts on exactly the set it is handed, and never on an ineligible
+    /// member: a cask cannot become a pin command, because `FormulaID` refuses
+    /// it at construction.
+    @Test("A cask never produces a pin or unpin command")
+    func aCaskNeverProducesAPinCommand() {
+        let harness = CenterHarness()
+
+        #expect(harness.center.commands(for: .pin, over: [CenterHarness.iterm]).isEmpty)
+        #expect(harness.center.commands(for: .unpin, over: [CenterHarness.iterm]).isEmpty)
+        // The control: the same cask does produce an uninstall.
+        #expect(harness.center.commands(for: .uninstall, over: [CenterHarness.iterm]).count == 1)
+    }
+
+    /// Bulk pin and bulk unpin are reversible, so neither raises a confirmation
+    /// and `submitBulk` submits directly — the same rule the single-command path
+    /// applies, not a bulk-specific exception.
+    @Test("Bulk pin and bulk unpin submit directly, asking nothing")
+    func pinAndUnpinAskNothing() async throws {
+        let harness = CenterHarness()
+        let formulae = [CenterHarness.wget, CenterHarness.git]
+
+        #expect(harness.center.submitBulk(.pin, over: formulae) == nil, "bulk pin raised a confirmation")
+        await harness.settle()
+        #expect(harness.center.pendingConfirmation == nil)
+        #expect(harness.center.items.map(\.arguments) == [
+            ["pin", "--formula", "wget"],
+            ["pin", "--formula", "git"]
+        ])
+        for index in 0..<2 { try await harness.finish(call: index) }
     }
 
     // MARK: - PM3 sc5 — threat: irreversible mutation scope

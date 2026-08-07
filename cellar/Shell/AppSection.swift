@@ -16,8 +16,16 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     ///
     /// Between Home and Browse because it serves the user *before* they have a
     /// query: Browse is a search field over ~16k records and answers nothing
-    /// useful when empty. Home keeps the landing spot for now — moving it is
-    /// slice 5's decision, once the Health dashboard exists (D4).
+    /// useful when empty.
+    ///
+    /// **Home remains its own section, and Browse remains the landing.** Settled
+    /// in slice 5 as D4, once the Health dashboard existed and the question could
+    /// actually be answered: Health is its own section, Home is not folded into
+    /// it, and Health did not take the landing spot. The landing is `.browse` and
+    /// has been since M1 — an earlier draft of this note claimed Home held it,
+    /// which the shell never did. The question is recorded here rather than
+    /// removed, because a deleted question is indistinguishable from one that was
+    /// never asked.
     case discover
     case browse
     case installed
@@ -31,6 +39,13 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case services
     /// Read-only package, version, and cache storage visibility.
     case cleanup
+    /// One number over eight signals, and everything it could not answer.
+    ///
+    /// Between Cleanup and Security — which is what PRD §5's "between Services
+    /// and Security" asks for — and adjacent to Cleanup on purpose: three of its
+    /// seven rows remediate through verbs Cleanup already ships, so the section a
+    /// user is sent to is the one next door rather than three places away.
+    case health
     /// Advisory coverage, CVE findings, and artifact integrity.
     ///
     /// Between Cleanup and History because it is read-only visibility over what
@@ -54,6 +69,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .taps: "Taps"
         case .services: "Services"
         case .cleanup: "Cleanup"
+        case .health: "Health"
         case .security: "Security"
         case .history: "History"
         }
@@ -68,6 +84,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .taps: "externaldrive.connected.to.line.below"
         case .services: "bolt.horizontal.circle"
         case .cleanup: "externaldrive.badge.timemachine"
+        case .health: "heart.text.square"
         case .security: "checkmark.shield"
         case .history: "clock.arrow.circlepath"
         }

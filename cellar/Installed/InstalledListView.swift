@@ -56,7 +56,12 @@ struct InstalledListView: View {
                 BulkActionBar(
                     selection: bulk,
                     operations: operations,
-                    inventory: installed.inventory
+                    inventory: installed.inventory,
+                    // Derived from the same entries and the same metadata lookup
+                    // the four mutation verbs are, so every count on the bar comes
+                    // out of one projection (II14).
+                    snooze: bulkSnooze,
+                    metadata: metadata
                 )
             } else if !upgradableIDs.isEmpty {
                 bulkUpgradeBar
@@ -214,6 +219,15 @@ struct InstalledListView: View {
 
     private var bulk: BulkSelection {
         BulkSelection(selection: order, entries: entries, metadata: lookup)
+    }
+
+    /// The snooze half of the same selection.
+    ///
+    /// A separate value rather than a fifth `BulkSelection.Action`, because a
+    /// snooze produces no `MutationCommand` and a case that produced none would be
+    /// a silent no-op inside the mutation spine (design HD11).
+    private var bulkSnooze: BulkSnoozeSelection {
+        BulkSnoozeSelection(selection: order, entries: entries, metadata: lookup)
     }
 
     /// The one projection the three sections and `reconcileOrder` all read, so
