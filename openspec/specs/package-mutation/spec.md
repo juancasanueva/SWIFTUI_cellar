@@ -34,11 +34,25 @@ command MUST enter it through a shared abstraction rather than as an additional 
 capability's command type. Adding a non-package verb as a seventh case is forbidden, because that
 type's identity, verb and argv are package-shaped by construction. Everything the spine needs from a
 command — its argv, its verb, the package identity it acts on **when it has one**, its display
-command, whether it requires confirmation, and the state domains it invalidates — MUST be readable
-through that shared abstraction, so no consumer of the spine needs to know which capability a command
-came from.
-(Previously: the requirement fixed the command count at six but said nothing about how a command from
-another capability may reach the shared spine, leaving "add a case" as the path of least resistance.)
+command, whether it requires confirmation, the state domains it invalidates, and **the confirmation
+disclosure it carries** — MUST be readable through that shared abstraction, so no consumer of the
+spine needs to know which capability a command came from.
+
+The disclosure MUST be part of that abstraction rather than recovered from a concrete command type.
+No consumer of the spine MUST derive a disclosure by downcasting, type-testing, switching on a
+command case, or inspecting a verb string; a command that declares no disclosure of its own MUST
+supply the ordinary package-removal disclosure by default rather than by a caller's fallback. A
+batch's disclosure MUST be derived from the commands themselves — the first submitted command's
+disclosure, which is the command the confirmation leads with — so a batch presents the same
+disclosure whether its commands were submitted as a concrete type or as erased values. Erasure MUST
+NOT change, downgrade or discard a disclosure. This rule governs the **disclosure** only: it does not
+disturb the separate typed cleanup evidence a confirmation may additionally carry, and it does not
+forbid reading a command's verb for a presentation concern that is not the disclosure, such as the
+shipped retitling of a zap confirmation.
+(Previously: the enumerated list of projections readable through the shared abstraction omitted the
+confirmation disclosure, so the spine recovered it by downcasting to a concrete command type and an
+erased batch silently fell back to the package-removal disclosure — defeating a typed warning that
+another capability owns.)
 
 #### Scenario: Installing a formula names it as a formula
 
@@ -78,6 +92,28 @@ another capability may reach the shared spine, leaving "add a case" as the path 
 - WHEN this capability's mutating-command type is enumerated
 - THEN it still carries exactly the six package commands, with no case for that other command
 - AND the submitted command was still projected with its argv, its verb and its terminal outcome
+
+#### Scenario: An erased mixed batch still discloses tap trust
+
+- GIVEN a batch whose first command is a tap add and whose remaining commands are installs, erased
+  to the spine's erased command type before submission
+- WHEN it reaches the shared confirmation gate
+- THEN the confirmation carries the tap-trust disclosure for that tap
+- AND it is identical to the disclosure the same tap add presents when submitted unerased
+
+#### Scenario: An erased install-only batch still discloses package removal
+
+- GIVEN a batch of package mutations only, erased before submission
+- WHEN it reaches the shared confirmation gate
+- THEN the confirmation carries the ordinary package-removal disclosure
+- AND no tap-trust or force-untap disclosure is presented
+
+#### Scenario: No disclosure is recovered by a type test
+
+- GIVEN every consumer of the shared mutation spine that presents a confirmation
+- WHEN the path that produces the disclosure is inspected
+- THEN the disclosure is read from the command through the shared abstraction
+- AND no downcast, type test, case switch or verb-string inspection produces it
 
 ### Requirement: Upgrade has three scopes and follows brew's own defaults
 
@@ -467,6 +503,20 @@ interpreted by brew as an option rather than a package — MUST be rejected at c
 NOT reach the queue or a spawned process. No alternate constructor, initializer or convenience
 overload MUST exist that produces a command from an unvalidated identity.
 
+A name that originated in a **file supplied by the user** — an imported Brewfile — is subject to
+exactly these rules and to no weaker ones. The premise this requirement was written under, that a
+name reaches it from brew's own snapshot or from the catalog and never from free text, no longer
+holds once a user-supplied file is a name source; it is restated here rather than left stale. A
+file-sourced name MUST become a command only by constructing the same validated typed identity every
+other call site constructs. A name that typed identity refuses MUST be reported by its caller as a
+typed, counted refusal, and MUST NOT reach the queue, an argv, or a spawned process by any other
+path. No file-sourced-name convenience constructor MUST exist, no "already validated" bypass MUST
+exist, and no path MUST carry a raw string read out of a file into argv.
+
+(Previously: the requirement governed construction generally while assuming every name arrived from
+brew's own snapshot or from the catalog, and said nothing about a name originating in a
+user-supplied file.)
+
 #### Scenario: An empty or whitespace name is rejected
 
 - GIVEN package identities whose names are the empty string and a single space
@@ -485,6 +535,22 @@ overload MUST exist that produces a command from an unvalidated identity.
 - GIVEN the public construction surface of the mutation command type
 - WHEN every way to obtain a command instance is enumerated
 - THEN each one applies the same identity validation
+
+#### Scenario: A file-sourced name is validated on exactly the same terms
+
+- GIVEN names read out of an imported Brewfile, including `--force`, `wget; rm -rf /`, the empty
+  string and a single space
+- WHEN a mutation command is constructed for each
+- THEN construction fails for every one of them
+- AND none reaches the queue, and no argv containing any of those strings was produced or spawned
+
+#### Scenario: No path carries a raw file-sourced string into argv
+
+- GIVEN the public construction surface and every call site that builds a command from an imported
+  Brewfile
+- WHEN they are enumerated
+- THEN every file-sourced name passes through the same validated typed identity as every other name
+- AND no constructor, overload or bypass accepts an unvalidated string read from a file
 
 ## Provenance
 
@@ -622,3 +688,66 @@ overload MUST exist that produces a command from an unvalidated identity.
   typed tap-add trust disclosure, typed force-untap package disclosure, plain-untap separation, and
   queue-front stale-disclosure rejection. 9 requirements / 40 scenarios → **9 requirements / 43
   scenarios**.
+- **Amended by change `m5-brewfile` (archived `2026-08-07`, PRD milestone **M5** "Pro-parity flows",
+  slice 4 of 5 — Brewfile import & export)**: **2 MODIFIED** requirements — PM1 and PM9 — each
+  replaced as a whole block, adding **5 scenarios**. 9 requirements / 43 scenarios → **9 requirements
+  / 48 scenarios**. Nothing was added, removed or renamed; the other seven requirements are
+  byte-identical, and both replacements are strict supersets of the text they replaced, verified at
+  archive by byte-slicing the replaced ranges rather than by assertion — all six of PM1's original
+  scenarios and all three of PM9's are carried through verbatim, and no package rule is loosened.
+  - **PM1 — a security-relevant disclosure that did not survive erasure.** PM1 already required that
+    everything the spine needs from a command be readable *through the shared abstraction*. Design
+    (`design.md`, Engram `#7523`, decision **DD1**) checked that claim against shipped source and
+    found one projection outside it: the confirmation disclosure.
+    `OperationCenterBulk.swift:141` recovered it by concrete-type downcast —
+    `(first as? TapCommand)?.disclosure ?? .packageRemoval` — while `AnyBrewMutation`
+    (`BrewMutating.swift:144-162`) carried only seven projections, `disclosure` among neither them
+    nor the `BrewMutating` requirements. Every shipped call site happened to submit an unerased
+    `TapCommand`, so **the gap never fired**; a Brewfile batch is the first mixed tap+install
+    submission and must be erased to `[AnyBrewMutation]`, at which point the downcast fails and the
+    sheet silently shows the package-removal disclosure instead of the tap-trust warning that
+    `tap-management` owns. It was fixed as a requirement, not as an implementation detail: the
+    disclosure is now an enumerated projection, deriving one by downcast, type test, case switch or
+    verb-string inspection is forbidden, a command declaring none supplies `.packageRemoval` by
+    protocol default rather than by a caller's fallback, and erasure MUST NOT change, downgrade or
+    discard it. Delivered exactly as DD1 specified — `disclosure` promoted to a `BrewMutating`
+    requirement with a `.packageRemoval` extension default, carried as `AnyBrewMutation`'s eighth
+    stored projection, and `request` reading `first.disclosure`. Verified in source at archive:
+    `rg 'as\? *TapCommand'` finds **zero** executable occurrences (4 hits = 3 doc comments + 1
+    structural guard scanning for the string). Blast radius was measured as **zero** shipped test
+    edits. **Rejected:** splitting the batch into two requests, which would raise two confirmations
+    and let a declined tap still install its packages, breaking all-or-nothing; and a new
+    `BrewfileMutation` conformer, which the proposal forbids and which would still fail the downcast.
+  - **The rule is scoped to the disclosure and nothing else.** It explicitly does not disturb the
+    separate typed cleanup evidence a confirmation may additionally carry, and it explicitly does not
+    forbid the shipped `isZap` verb read, which retitles a zap confirmation — a presentation concern,
+    not a disclosure.
+  - **PM1's rolling `(Previously:)` annotation was replaced, not lost.** The note m3-services left on
+    PM1 (that the requirement fixed the command count at six but said nothing about how another
+    capability's command may reach the shared spine) was superseded by this slice's note about the
+    disclosure, following the one-rolling-note-per-block convention. Its substance is preserved in
+    the m3-services entry above; the five deleted lines at promotion were those two annotation lines
+    plus the three-line projection-list sentence, rewrapped only to add the disclosure to the
+    enumeration. No normative clause was removed.
+  - **PM9 — the provenance premise stopped being true, so it was restated rather than left stale.**
+    The reasoning block at the head of `MutationCommand.swift` argues from "names come from brew's
+    own snapshot or from the catalog, never from free text". An imported Brewfile is a user-supplied
+    file and it is a name source, so that premise no longer holds. PM9 now says a file-sourced name is
+    subject to exactly these rules and to no weaker ones, becomes a command only by constructing the
+    same validated typed identity every other call site constructs, and that a refused name is a
+    typed counted refusal reaching no queue, argv or process by any other path. No file-sourced
+    convenience constructor and no "already validated" bypass may exist.
+  - **Nothing was widened to make this work, and that is the load-bearing part.** `MutationName.isSafe`
+    (`MutationCommand.swift:104-108`) is **unchanged**: it rejects empty, leading `-` and whitespace,
+    so `/` already passed and a tap-prefixed `brew "user/repo/token"` was already representable. The
+    parser added a *narrower* file-boundary grammar rather than relaxing the shipped gate.
+    `MutationCommand.swift` received a comment-only provenance restatement with **zero changed
+    executable lines**. `CatalogFileSystem` was reused unwidened. `Package.swift` and
+    `project.pbxproj` have zero-line diffs.
+  - **`brewfile-management` owns the file; this capability still owns the spine.** A Brewfile
+    selection becomes existing typed commands — `TapCommand.addTap` and `MutationCommand.install` —
+    with no new `BrewMutating` conformer, no seventh case, and no new invalidation domain. Because
+    the confirmation gate derives a batch's disclosure from its **first** command, the new
+    capability's tap-before-install ordering rule is what makes a mixed batch present tap trust; the
+    two requirements are deliberately coupled and were promoted in the same archive so they cannot
+    drift.
