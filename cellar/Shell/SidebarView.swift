@@ -9,8 +9,10 @@ import Persistence
 import SecurityKit
 import SwiftUI
 
-/// The design's sidebar: a fixed 228-point column of four labelled groups and
-/// a Settings footer, drawn on its own wash rather than system material.
+/// The sidebar column: four labelled groups and a Settings footer, drawn on
+/// the system sidebar material `NavigationSplitView` provides — which is what
+/// buys the native toggle, the collapse animation, and the window's rounded
+/// corners for free.
 ///
 /// Every count badge reads a store the shell already owns; the sidebar keeps no
 /// state of its own beyond the binding it is handed.
@@ -25,8 +27,8 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // The traffic lights float here under `.hiddenTitleBar`.
-            Spacer().frame(height: 52)
+            // The traffic lights and the native sidebar toggle live in the
+            // column's toolbar strip; the top safe area already covers it.
             ScrollView {
                 VStack(spacing: 14) {
                     ForEach(AppSection.sidebarGroups, id: \.title) { group in
@@ -56,11 +58,6 @@ struct SidebarView: View {
                 Rectangle().fill(Theme.separator).frame(height: 0.5)
             }
         }
-        .frame(width: 228)
-        .background(Theme.sidebarWash)
-        .overlay(alignment: .trailing) {
-            Rectangle().fill(Theme.hairline).frame(width: 0.5)
-        }
     }
 
     private func row(_ item: AppSection) -> some View {
@@ -87,13 +84,16 @@ struct SidebarView: View {
                         .background(badge.background, in: Capsule())
                 }
             }
-        .padding(.horizontal, 8)
-        .frame(height: 29)
-        .background(
-            isSelected ? theme.tint(0.15) : .clear,
-            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .padding(.horizontal, 12)
+        .frame(height: 31)
+        .background {
+            if isSelected {
+                Capsule()
+                    .fill(theme.tint(0.14))
+                    .overlay(Capsule().strokeBorder(theme.tint(0.35), lineWidth: 1))
+            }
+        }
+        .contentShape(Capsule())
         .onTapGesture { section = item }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)

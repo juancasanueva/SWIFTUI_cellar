@@ -5,9 +5,14 @@
 
 import SwiftUI
 
-/// The design's 52-point header strip: section label on the left, Refresh and
-/// Activity on the right, on a whisper of a wash above a hairline.
-struct ShellToolbar: View {
+/// The shell's toolbar row, expressed as native toolbar content: section label
+/// on the left beside the sidebar toggle, Refresh and Activity on the right.
+///
+/// Toolbar items rather than a drawn strip because macOS clips app content out
+/// of the titlebar region — a custom view laid under it stays clickable but
+/// never paints. The native row is also what keeps the sidebar toggle, the
+/// traffic lights and these controls on one shared baseline.
+struct ShellToolbarItems: ToolbarContent {
     let section: AppSection
     /// The same launch-and-activation refresh the app already runs; the button
     /// adds a way to ask for it, not a second pipeline.
@@ -16,41 +21,38 @@ struct ShellToolbar: View {
 
     @State private var isRefreshing = false
 
-    var body: some View {
-        HStack(spacing: 14) {
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
             Text(section.title)
                 .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
-            Spacer(minLength: 0)
-            HStack(spacing: 7) {
-                button(
-                    label: "Refresh",
-                    systemImage: "arrow.clockwise",
-                    identifier: "shell-refresh",
-                    spinning: isRefreshing
-                ) {
-                    guard !isRefreshing else { return }
-                    isRefreshing = true
-                    Task {
-                        await refresh()
-                        isRefreshing = false
-                    }
-                }
-                button(
-                    label: "Activity",
-                    systemImage: "terminal",
-                    identifier: "shell-activity"
-                ) {
-                    isActivityExpanded.toggle()
+        }
+        // Pushes the actions to the trailing edge; without it every item packs
+        // in beside the title.
+        ToolbarSpacer(.flexible)
+        ToolbarItem(placement: .primaryAction) {
+            button(
+                label: "Refresh",
+                systemImage: "arrow.clockwise",
+                identifier: "shell-refresh",
+                spinning: isRefreshing
+            ) {
+                guard !isRefreshing else { return }
+                isRefreshing = true
+                Task {
+                    await refresh()
+                    isRefreshing = false
                 }
             }
         }
-        .padding(.leading, 20)
-        .padding(.trailing, 16)
-        .frame(height: 52)
-        .background(Color.white.opacity(0.02))
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Theme.hairline).frame(height: 0.5)
+        ToolbarItem(placement: .primaryAction) {
+            button(
+                label: "Activity",
+                systemImage: "terminal",
+                identifier: "shell-activity"
+            ) {
+                isActivityExpanded.toggle()
+            }
         }
     }
 

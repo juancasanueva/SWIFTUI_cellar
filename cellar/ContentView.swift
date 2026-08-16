@@ -67,6 +67,11 @@ struct ContentView: View {
     /// across launches. The design draws 342; the divider makes it the user's.
     @AppStorage("shell.listPaneWidth") private var listPaneWidth = 342.0
 
+    /// The native split view's column state: `.all` or `.detailOnly`. The
+    /// system sidebar toggle drives it, and it is what moves that toggle from
+    /// the sidebar's toolbar to the detail's when the column collapses.
+    @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
+
     /// How narrow and how wide the list pane may be dragged. The lower bound
     /// keeps every row affordance reachable; the upper leaves the detail pane
     /// worth having.
@@ -95,8 +100,10 @@ struct ContentView: View {
             )
     }
 
-    /// The design's window: a fixed custom sidebar beside a toolbar-topped
-    /// content area, drawn on the app's own surfaces rather than system chrome.
+    /// The design's window on the system's chassis: a native
+    /// `NavigationSplitView` sidebar — material background, rounded corners,
+    /// the toggle beside the traffic lights, the collapse animation — beside a
+    /// toolbar-topped content area drawn on the app's own surfaces.
     ///
     /// Sections that keep a list-plus-detail arrangement render it *inside*
     /// their pane; single-surface sections take the whole width. Both panes sit
@@ -104,7 +111,7 @@ struct ContentView: View {
     /// the feature views still declare keep rendering while each section is
     /// ported to the design's own controls.
     private var shell: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
             SidebarView(
                 section: $section,
                 installed: installed,
@@ -113,12 +120,9 @@ struct ContentView: View {
                 security: security,
                 taps: taps
             )
+            .navigationSplitViewColumnWidth(min: 220, ideal: 228, max: 300)
+        } detail: {
             VStack(spacing: 0) {
-                ShellToolbar(
-                    section: section,
-                    refresh: refresh,
-                    isActivityExpanded: $isActivityExpanded
-                )
                 HStack(spacing: 0) {
                     if let detail = detailPane {
                         // The width lives on the pane, not on the view inside
@@ -144,8 +148,24 @@ struct ContentView: View {
                     }
                 }
             }
+            .background(Theme.windowBackground)
+            // Into the native toolbar row rather than a drawn strip: macOS
+            // clips app content out of the titlebar region, so a custom strip
+            // there stays clickable but never paints.
+            .toolbar {
+                ShellToolbarItems(
+                    section: section,
+                    refresh: refresh,
+                    isActivityExpanded: $isActivityExpanded
+                )
+            }
+            // The design draws its own dark ground; the glass wash would sit
+            // between it and the toolbar items.
+            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         }
-        .background(Theme.windowBackground)
+        // The dark ground the sidebar's translucent material blurs over — this
+        // is what tints the system sidebar to the design's palette.
+        .containerBackground(for: .window) { Theme.windowBackground }
     }
 
     @ViewBuilder
