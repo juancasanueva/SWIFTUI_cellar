@@ -150,6 +150,9 @@ struct CaskCollectionView: View {
     /// The selected window's counts, when the page ranks by one; `nil` renders
     /// every card's annual count exactly as before.
     var counts: [String: Int]? = nil
+    /// Where a card's category label navigates, handed a primary category id;
+    /// `nil` keeps the label the inert text it always was.
+    var onSelectCategory: ((String) -> Void)? = nil
 
     var body: some View {
         if viewMode == .grid {
@@ -165,7 +168,8 @@ struct CaskCollectionView: View {
                         operations: operations,
                         assets: assets,
                         iconLoader: iconLoader,
-                        counts: counts
+                        counts: counts,
+                        onSelectCategory: onSelectCategory
                     )
                 }
             }
@@ -178,7 +182,8 @@ struct CaskCollectionView: View {
                         operations: operations,
                         assets: assets,
                         iconLoader: iconLoader,
-                        counts: counts
+                        counts: counts,
+                        onSelectCategory: onSelectCategory
                     )
                 }
             }
@@ -195,6 +200,10 @@ struct CaskListRow: View {
     let iconLoader: CaskIconLoader
     /// See `CaskCollectionView.counts`.
     var counts: [String: Int]? = nil
+    /// See `CaskCollectionView.onSelectCategory`. Accepted so the collection
+    /// hands both renderers the same inputs; the row draws no category label
+    /// today, so it has nothing to wire the closure to yet.
+    var onSelectCategory: ((String) -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {

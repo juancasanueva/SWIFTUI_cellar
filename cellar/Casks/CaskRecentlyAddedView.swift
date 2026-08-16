@@ -44,6 +44,8 @@ struct CaskRecentlyAddedView: View {
     let operations: OperationCenter
     let assets: CaskBrowseAssets
     let iconLoader: CaskIconLoader
+    /// See `CaskCollectionView.onSelectCategory`.
+    var onSelectCategory: ((String) -> Void)? = nil
 
     /// The grid/list choice, the same key every cask page persists.
     @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
@@ -123,7 +125,8 @@ struct CaskRecentlyAddedView: View {
                         installed: installed,
                         operations: operations,
                         assets: assets,
-                        iconLoader: iconLoader
+                        iconLoader: iconLoader,
+                        onSelectCategory: onSelectCategory
                     )
                 }
             }

@@ -23,6 +23,20 @@ public struct CaskBrowseSection: Sendable, Hashable, Identifiable {
     }
 }
 
+/// One category as the sidebar and its page render it: the vendored id, the
+/// display name and the SF Symbol, lifted straight from the category catalog.
+public struct CaskCategorySummary: Sendable, Hashable, Identifiable {
+    public let id: String
+    public let displayName: String
+    public let icon: String
+
+    public init(id: String, displayName: String, icon: String) {
+        self.id = id
+        self.displayName = displayName
+        self.icon = icon
+    }
+}
+
 /// Everything the cask browse page renders. No SwiftUI in sight, mirroring
 /// `DiscoverContent`.
 public struct CaskBrowseContent: Sendable, Hashable {
@@ -42,6 +56,14 @@ public struct CaskBrowseContent: Sendable, Hashable {
     /// How many eligible casks each category holds, uncapped; a cask counts
     /// into **every** unique category of its mapping. The sidebar's numbers.
     public let categoryCounts: [String: Int]
+    /// The vendored categories in presentation order — "other" last, as
+    /// `orderedCategories` already yields. The sidebar's rows and the pages'
+    /// titles.
+    public let categories: [CaskCategorySummary]
+    /// Every eligible cask under every unique category of its mapping,
+    /// uncapped and popularity-ordered — the category pages themselves. The
+    /// shelves sample this; the pages show it whole.
+    public let casksByCategory: [String: [CatalogPackage]]
     /// Token → ISO date string, exactly as the mined dates resource decoded —
     /// the Recently Added page's raw material. Empty when the resource never
     /// loaded, which the recency rule already reads as "nothing is new".
@@ -54,6 +76,8 @@ public struct CaskBrowseContent: Sendable, Hashable {
         allByPopularity: [CatalogPackage],
         caskCount: Int,
         categoryCounts: [String: Int],
+        categories: [CaskCategorySummary],
+        casksByCategory: [String: [CatalogPackage]],
         addedDates: [String: String]
     ) {
         self.housePick = housePick
@@ -62,6 +86,8 @@ public struct CaskBrowseContent: Sendable, Hashable {
         self.allByPopularity = allByPopularity
         self.caskCount = caskCount
         self.categoryCounts = categoryCounts
+        self.categories = categories
+        self.casksByCategory = casksByCategory
         self.addedDates = addedDates
     }
 
@@ -74,6 +100,8 @@ public struct CaskBrowseContent: Sendable, Hashable {
         allByPopularity: [],
         caskCount: 0,
         categoryCounts: [:],
+        categories: [],
+        casksByCategory: [:],
         addedDates: [:]
     )
 }

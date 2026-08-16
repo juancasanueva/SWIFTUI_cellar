@@ -60,6 +60,10 @@ struct ContentView: View {
     var refresh: @MainActor () async -> Void = {}
 
     @State private var section: AppSection = .home
+    /// Which category page `.caskCategory` shows — the data half of the one
+    /// section whose page is not named by its case. Written by the sidebar's
+    /// category rows, the cards' category labels, and the shelves' View All.
+    @State private var caskCategoryID: String?
     @State private var selection: PackageID?
     /// A finding carries its own identity — a package plus an advisory — because
     /// the same advisory can apply to two installed packages and they are two
@@ -122,6 +126,8 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $sidebarVisibility) {
             SidebarView(
                 section: $section,
+                categoryID: $caskCategoryID,
+                catalog: catalog,
                 installed: installed,
                 metadata: metadata,
                 services: services,
@@ -163,6 +169,7 @@ struct ContentView: View {
             .toolbar {
                 ShellToolbarItems(
                     section: section,
+                    titleOverride: toolbarTitleOverride,
                     refresh: refresh,
                     isActivityExpanded: $isActivityExpanded
                 )
@@ -211,7 +218,8 @@ struct ContentView: View {
                 operations: operations,
                 assets: caskAssets,
                 iconLoader: caskIcons,
-                section: $section
+                section: $section,
+                onSelectCategory: openCategory
             )
         case .caskFeatured:
             CaskFeaturedView(
@@ -219,7 +227,8 @@ struct ContentView: View {
                 installed: installed,
                 operations: operations,
                 assets: caskAssets,
-                iconLoader: caskIcons
+                iconLoader: caskIcons,
+                onSelectCategory: openCategory
             )
         case .caskTopCharts:
             CaskTopChartsView(
@@ -228,7 +237,8 @@ struct ContentView: View {
                 operations: operations,
                 assets: caskAssets,
                 iconLoader: caskIcons,
-                charts: caskCharts
+                charts: caskCharts,
+                onSelectCategory: openCategory
             )
         case .caskRecentlyAdded:
             CaskRecentlyAddedView(
@@ -236,7 +246,17 @@ struct ContentView: View {
                 installed: installed,
                 operations: operations,
                 assets: caskAssets,
-                iconLoader: caskIcons
+                iconLoader: caskIcons,
+                onSelectCategory: openCategory
+            )
+        case .caskCategory:
+            CaskCategoryView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                categoryID: caskCategoryID
             )
         case .installed:
             InstalledListView(
@@ -330,7 +350,7 @@ struct ContentView: View {
     private var detailPane: AnyView? {
         switch section {
         case .home, .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded,
-             .cleanup, .brewfile, .history, .settings:
+             .caskCategory, .cleanup, .brewfile, .history, .settings:
             // The cask pages are full-width like CaskHub's own; nothing here
             // drives the shared package detail column.
             return nil
@@ -402,6 +422,21 @@ struct ContentView: View {
     private func showInInstalled(_ id: PackageID) {
         selection = id
         section = .installed
+    }
+
+    /// The one category navigation every affordance shares: the sidebar's
+    /// rows, the cards' labels, and the shelves' View All all land here.
+    private func openCategory(_ id: String) {
+        caskCategoryID = id
+        section = .caskCategory
+    }
+
+    /// The selected category's display name over the case's generic
+    /// "Category" — resolved against the vendored catalog, and `nil` (the
+    /// section's own title) whenever the id is absent or unknown.
+    private var toolbarTitleOverride: String? {
+        guard section == .caskCategory else { return nil }
+        return catalog.caskBrowse.categories.first { $0.id == caskCategoryID }?.displayName
     }
 
     private func confirmCleanup(_ request: OperationCenter.ConfirmationRequest) {

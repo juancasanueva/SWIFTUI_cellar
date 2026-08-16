@@ -205,6 +205,80 @@ struct CaskBrowseProjectionTests {
         #expect(Self.section(.recentlyAdded, in: content) == nil)
     }
 
+    // MARK: - The category pages
+
+    @Test("Content carries the ordered category summaries: id, display name and icon, other last")
+    func contentCarriesOrderedCategorySummaries() {
+        let catalog = Self.catalog(
+            categories: [
+                "other": CaskCategoryDefinition(displayName: "Other", icon: "square.grid.2x2"),
+                "utilities": CaskCategoryDefinition(displayName: "Utilities", icon: "wrench"),
+                "browsers": CaskCategoryDefinition(displayName: "Browsers", icon: "globe")
+            ],
+            mappings: ["arc": CaskCategoryMapping(primary: "browsers", secondary: [])]
+        )
+
+        let content = Self.project(packages: [Self.cask("arc", installs: 1)], catalog: catalog)
+
+        // Unlike the browse sections, "other" *is* a page — it just still
+        // closes the list, exactly as `orderedCategories` puts it.
+        #expect(content.categories.map(\.id) == ["browsers", "utilities", "other"])
+        #expect(
+            content.categories.first
+                == CaskCategorySummary(id: "browsers", displayName: "Browsers", icon: "globe")
+        )
+    }
+
+    @Test("casksByCategory is uncapped, popularity-ordered, and covers every unique category")
+    func casksByCategoryIsTheUncappedFill() throws {
+        let extras = (0..<10).map {
+            Self.cask(String(format: "util%02d", $0), installs: (10 - $0) * 10)
+        }
+        var mappings = Dictionary(
+            uniqueKeysWithValues: extras.map {
+                ($0.name, CaskCategoryMapping(primary: "utilities", secondary: []))
+            }
+        )
+        mappings["arc"] = CaskCategoryMapping(primary: "browsers", secondary: ["utilities"])
+        let catalog = Self.catalog(
+            categories: [
+                "browsers": CaskCategoryDefinition(displayName: "Browsers", icon: "globe"),
+                "utilities": CaskCategoryDefinition(displayName: "Utilities", icon: "wrench")
+            ],
+            mappings: mappings
+        )
+
+        let content = Self.project(
+            packages: extras + [Self.cask("arc", installs: 55), Self.cask("unmapped", installs: 9_000)],
+            catalog: catalog
+        )
+
+        // Eleven utilities: past the shelf's cap of eight, because the page
+        // shows everything the shelf merely samples.
+        let utilities = try #require(content.casksByCategory["utilities"])
+        #expect(utilities.count == 11)
+        #expect(utilities.map(\.name) == [
+            "util00", "util01", "util02", "util03", "util04",
+            "arc", "util05", "util06", "util07", "util08", "util09"
+        ])
+        // The secondary mapping lands `arc` on both pages.
+        #expect(content.casksByCategory["browsers"]?.map(\.name) == ["arc"])
+        // An unmapped token belongs to no page at all, popular or not.
+        #expect(content.casksByCategory.values.allSatisfy { casks in
+            !casks.contains { $0.name == "unmapped" }
+        })
+    }
+
+    @Test("Without a category catalog the summaries and the fill are empty")
+    func categoriesAreEmptyWithoutACatalog() {
+        let content = Self.project(packages: [Self.cask("arc", installs: 1)])
+
+        #expect(content.categories.isEmpty)
+        #expect(content.casksByCategory.isEmpty)
+        #expect(CaskBrowseContent.empty.categories.isEmpty)
+        #expect(CaskBrowseContent.empty.casksByCategory.isEmpty)
+    }
+
     // MARK: - Recently added
 
     @Test("A token dated inside the window is recent; one dated before it is not")

@@ -14,6 +14,10 @@ import SwiftUI
 /// traffic lights and these controls on one shared baseline.
 struct ShellToolbarItems: ToolbarContent {
     let section: AppSection
+    /// A title shown in place of `section.title` when the section alone cannot
+    /// name the page — the category pages, where the case says "Category" and
+    /// the shell knows which one. `nil` keeps the section's own title.
+    var titleOverride: String? = nil
     /// The same launch-and-activation refresh the app already runs; the button
     /// adds a way to ask for it, not a second pipeline.
     let refresh: @MainActor () async -> Void
@@ -23,7 +27,7 @@ struct ShellToolbarItems: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
-            Text(section.title)
+            Text(titleOverride ?? section.title)
                 .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
         }
