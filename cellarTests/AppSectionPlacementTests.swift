@@ -24,8 +24,9 @@ struct AppSectionPlacementTests {
     func healthSitsBetweenCleanupAndSecurity() throws {
         let order = AppSection.allCases
         // Ten M5-era sections, plus the four the design document promoted to
-        // sidebar rows: favorites, updates, brewfile, and settings.
-        #expect(order.count == 14)
+        // sidebar rows — favorites, updates, brewfile, and settings — plus the
+        // four cask-discovery pages the CaskHub port added.
+        #expect(order.count == 18)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -44,7 +45,9 @@ struct AppSectionPlacementTests {
         #expect(AppSection.health.rawValue == "health")
         // The sidebar identifier a UI test queries by.
         #expect(order.map(\.rawValue) == [
-            "home", "discover", "browse", "installed", "favorites", "updates",
+            "home", "discover", "browse",
+            "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
+            "installed", "favorites", "updates",
             "taps", "services", "cleanup", "health", "security", "brewfile",
             "history", "settings"
         ])
@@ -61,13 +64,13 @@ struct AppSectionPlacementTests {
         #expect(Set(arranged) == Set(AppSection.allCases))
 
         #expect(AppSection.sidebarGroups.map(\.title) == [
-            "Overview", "Packages", "Insights", "Manage"
+            "Overview", "Discover Casks", "Packages", "Insights", "Manage"
         ])
         #expect(AppSection.sidebarFooter == [.settings])
         // Health leads Insights, which is the design's placement of PRD §5's
         // "between Services and Security": Services closes the group before it,
         // Security follows it.
-        #expect(AppSection.sidebarGroups[2].sections == [.health, .security, .cleanup])
+        #expect(AppSection.sidebarGroups[3].sections == [.health, .security, .cleanup])
     }
 
     /// Home keeps its place at the head of the sidebar, and now holds the

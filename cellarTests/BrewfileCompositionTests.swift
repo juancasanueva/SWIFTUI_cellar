@@ -557,18 +557,21 @@ struct BrewfilePlacementTests {
 
     /// The whole-vocabulary assertion, corrected rather than loosened: *any*
     /// new section still fails it, which is exactly what it is for. The design
-    /// added four — favorites, updates, brewfile, settings — and each is named
-    /// explicitly so a fifteenth section fails here too.
-    @Test("The sidebar vocabulary is the design document's fourteen sections")
-    func theSidebarVocabularyIsTheDesignDocumentsFourteenSections() {
+    /// added four — favorites, updates, brewfile, settings — and the CaskHub
+    /// port added four more cask-discovery pages; each is named explicitly so
+    /// a nineteenth section fails here too.
+    @Test("The sidebar vocabulary is the design document's eighteen sections")
+    func theSidebarVocabularyIsTheDesignDocumentsEighteenSections() {
         #expect(
             AppSection.allCases.map(\.rawValue) == [
-                "home", "discover", "browse", "installed", "favorites", "updates",
+                "home", "discover", "browse",
+                "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
+                "installed", "favorites", "updates",
                 "taps", "services", "cleanup", "health", "security", "brewfile",
                 "history", "settings"
             ]
         )
-        #expect(AppSection.allCases.count == 14)
+        #expect(AppSection.allCases.count == 18)
     }
 
     @Test("Both affordances are wired into the Taps list and the Brewfile section, and nowhere else")

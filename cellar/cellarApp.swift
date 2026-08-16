@@ -146,6 +146,18 @@ struct cellarApp: App {
     /// The accent choice every tinted surface derives from.
     @State private var theme = ThemeStore()
 
+    /// The vendored cask category catalog, decoded once for every cask surface.
+    @State private var caskAssets = CaskBrowseAssets()
+    /// The cask artwork pipeline. Constructed here and nowhere else, so the
+    /// session is a composition decision — and a UI-test launch disables it
+    /// outright, which is what keeps those runs at zero network.
+    @State private var caskIcons = CaskIconLoader(isDisabled: AppTestFixtures.isEnabled)
+    /// Per-period Top Charts rankings. The HTTP source is constructed here and
+    /// nowhere else, like every other network seam; a UI-test launch swaps in
+    /// the no-network stub and an empty per-launch cache directory, so those
+    /// runs stay at zero network and never adopt the developer's own cache.
+    @State private var caskCharts: CaskChartsStore
+
     /// Whether this launch has started its one disk measurement. The scan used
     /// to start only when Cleanup appeared, which left the Search list's size
     /// column and Home's "On disk" tile empty until the user happened to visit
@@ -327,6 +339,20 @@ struct cellarApp: App {
                 credentials: releaseNotesCredentials
             )
         )
+        // Beside `disk-usage-v1.json` and the other derived caches, carrying
+        // its own schema version for the same reason each of them does.
+        let caskChartsDirectory = isUITesting
+            ? FileManager.default.temporaryDirectory
+                .appendingPathComponent("cellar-ui-cask-charts-\(UUID().uuidString)", isDirectory: true)
+            : (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory)
+                .appendingPathComponent("Cellar", isDirectory: true)
+        _caskCharts = State(
+            initialValue: CaskChartsStore(
+                source: isUITesting ? AppTestCaskChartsSource() : HTTPCaskChartsSource(),
+                directory: caskChartsDirectory
+            )
+        )
         _services = State(initialValue: services)
         _servicesRefresher = State(
             initialValue: ServicesRefreshCoordinator(store: services, mutations: serviceMutations)
@@ -387,6 +413,9 @@ struct cellarApp: App {
                 operations: operations,
                 metadata: metadata,
                 history: history,
+                caskAssets: caskAssets,
+                caskIcons: caskIcons,
+                caskCharts: caskCharts,
                 services: services,
                 servicesRefresher: servicesRefresher,
                 taps: taps,

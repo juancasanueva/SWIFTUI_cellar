@@ -145,7 +145,8 @@ struct SidebarView: View {
             // Its own arm — the source scanner keys on `case .health` to prove
             // this switch is exhaustive over `AppSection` with no default.
             return nil
-        case .home, .discover, .browse, .cleanup, .brewfile, .history, .settings:
+        case .home, .discover, .browse, .caskBrowse, .caskFeatured, .caskTopCharts,
+             .caskRecentlyAdded, .cleanup, .brewfile, .history, .settings:
             // Exhaustive on purpose: a `default:` here is what would let a new
             // section ship with its badge silently absent.
             return nil

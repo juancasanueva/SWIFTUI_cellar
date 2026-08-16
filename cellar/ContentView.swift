@@ -27,6 +27,14 @@ struct ContentView: View {
     /// snapshot because the rows write to it as well as read from it.
     let metadata: MetadataStore
     let history: HistoryStore
+    /// The vendored cask category catalog and the icon pipeline, both owned by
+    /// the composition root like every other store — the cask pages read them,
+    /// construct neither.
+    let caskAssets: CaskBrowseAssets
+    let caskIcons: CaskIconLoader
+    /// Per-period Top Charts rankings, owned by the composition root like the
+    /// assets above — the page reads it, constructs nothing.
+    let caskCharts: CaskChartsStore
     let services: ServicesStore
     let servicesRefresher: ServicesRefreshCoordinator
     let taps: TapStore
@@ -196,6 +204,40 @@ struct ContentView: View {
                 diskUsage: diskUsage,
                 selection: $selection
             )
+        case .caskBrowse:
+            CaskBrowseView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                section: $section
+            )
+        case .caskFeatured:
+            CaskFeaturedView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons
+            )
+        case .caskTopCharts:
+            CaskTopChartsView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                charts: caskCharts
+            )
+        case .caskRecentlyAdded:
+            CaskRecentlyAddedView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons
+            )
         case .installed:
             InstalledListView(
                 installed: installed,
@@ -287,7 +329,10 @@ struct ContentView: View {
     /// The right-hand pane, or `nil` for a section the design draws full-width.
     private var detailPane: AnyView? {
         switch section {
-        case .home, .cleanup, .brewfile, .history, .settings:
+        case .home, .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded,
+             .cleanup, .brewfile, .history, .settings:
+            // The cask pages are full-width like CaskHub's own; nothing here
+            // drives the shared package detail column.
             return nil
         case .services:
             return AnyView(ServiceDetailView(services: services))

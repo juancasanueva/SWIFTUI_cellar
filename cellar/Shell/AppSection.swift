@@ -29,6 +29,19 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// asked.
     case discover
     case browse
+    /// The CaskHub-style cask storefront: a house pick, curated shelves, and a
+    /// grid of app cards. Its own group in the sidebar because it browses one
+    /// kind of package by category rather than the whole catalog by query.
+    case caskBrowse
+    /// A hand-picked set of casks worth showing off. Placeholder page until the
+    /// featured roster ships.
+    case caskFeatured
+    /// Every eligible cask ranked by install count. Placeholder page until the
+    /// full ranked list ships.
+    case caskTopCharts
+    /// The casks this catalog has seen arrive most recently. Placeholder page
+    /// until the added-dates ledger reaches the app.
+    case caskRecentlyAdded
     case installed
     /// The favorited slice of Installed, promoted to a place of its own by the
     /// design document. The filter chip on Installed remains; this is the same
@@ -77,6 +90,10 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .home: "Home"
         case .discover: "Discover"
         case .browse: "Search"
+        case .caskBrowse: "Browse"
+        case .caskFeatured: "Featured"
+        case .caskTopCharts: "Top Charts"
+        case .caskRecentlyAdded: "Recently Added"
         case .installed: "Installed"
         case .favorites: "Favorites"
         case .updates: "Updates"
@@ -105,6 +122,12 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .home: "house"
         case .discover: "sparkles"
         case .browse: "magnifyingglass"
+        case .caskBrowse: "square.grid.2x2"
+        case .caskFeatured: "star"
+        case .caskTopCharts: "chart.line.uptrend.xyaxis"
+        // `clock.badge.plus` does not exist in this SDK's SF Symbols; the
+        // calendar variant is the verified nearest match.
+        case .caskRecentlyAdded: "calendar.badge.plus"
         case .installed: "shippingbox"
         case .favorites: "heart"
         case .updates: "arrow.up.circle"
@@ -125,6 +148,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// any group: it lives in the sidebar's footer.
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
         ("Overview", [.home, .discover, .browse]),
+        ("Discover Casks", [.caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded]),
         ("Packages", [.installed, .favorites, .updates, .services]),
         ("Insights", [.health, .security, .cleanup]),
         ("Manage", [.taps, .brewfile, .history]),

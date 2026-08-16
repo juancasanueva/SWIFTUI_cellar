@@ -41,6 +41,13 @@ import SwiftUI
         operations: OperationCenter(),
         metadata: MetadataStore(container: nil),
         history: HistoryStore(container: nil),
+        caskAssets: CaskBrowseAssets(),
+        caskIcons: CaskIconLoader(isDisabled: true),
+        caskCharts: CaskChartsStore(
+            source: AppTestCaskChartsSource(),
+            directory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("preview-cask-charts", isDirectory: true)
+        ),
         services: services,
         servicesRefresher: ServicesRefreshCoordinator(store: services),
         taps: TapStore(),
