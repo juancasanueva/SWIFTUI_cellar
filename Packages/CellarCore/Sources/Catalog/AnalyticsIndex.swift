@@ -27,6 +27,17 @@ public struct AnalyticsIndex: Sendable, Equatable {
         AnalyticsIndex(counts: counts.merging(other.counts) { _, new in new })
     }
 
+    /// One kind's counts keyed by bare name — the shape the per-period charts
+    /// seam serves, where the kind is fixed by the endpoint that was fetched.
+    public func countsByName(kind: PackageKind) -> [String: Int] {
+        var result: [String: Int] = [:]
+        result.reserveCapacity(counts.count)
+        for (id, count) in counts where id.kind == kind {
+            result[id.name] = count
+        }
+        return result
+    }
+
     // MARK: - Decoding
 
     public static func decode(_ data: Data, kind: PackageKind) throws -> AnalyticsIndex {
