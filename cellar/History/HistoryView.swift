@@ -24,11 +24,20 @@ struct HistoryView: View {
 
     var body: some View {
         @Bindable var history = history
-        return List {
-            ForEach(history.records) { record in
-                HistoryRow(record: record)
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("History")
+                .font(.system(size: 27, weight: .semibold))
+                .kerning(-0.6)
+                .foregroundStyle(Theme.textPrimary)
+                .padding(EdgeInsets(top: 26, leading: 34, bottom: 14, trailing: 34))
+            List {
+                ForEach(history.records) { record in
+                    HistoryRow(record: record)
+                }
             }
+            .scrollContentBackground(.hidden)
         }
+        .background(Theme.windowBackground)
         .searchable(text: $history.search, prompt: "Search by package, verb or command")
         .overlay { emptyState }
         .navigationTitle(AppSection.history.title)

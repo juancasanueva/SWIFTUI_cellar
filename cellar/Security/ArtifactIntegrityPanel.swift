@@ -104,6 +104,7 @@ struct ArtifactIntegrityPanel: View {
                 row(report)
             }
         }
+        .scrollContentBackground(.hidden)
         .navigationTitle("Artifact integrity")
         .toolbar {
             if store.isRunning {

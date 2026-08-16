@@ -36,7 +36,7 @@ struct ReleaseNotesSheet: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    content
+                    ReleaseNotesContent(state: state, onOpenConsent: onOpenConsent, onRetry: onRetry)
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
@@ -74,7 +74,27 @@ struct ReleaseNotesSheet: View {
         }
     }
 
-    // MARK: - Body
+    private var presentation: ReleaseNotesPresentation? {
+        state.outcome.map(ReleaseNotesPresentation.init(outcome:))
+    }
+}
+
+/// The rendered outcome, shared by the row's sheet and the detail pane.
+///
+/// Presentation only, exactly like the sheet around it: which of the outcomes
+/// this is and what it deserves to say was decided in
+/// `ReleaseNotesPresentation`. It fetches nothing — both callbacks are handed
+/// in by the one file allowed to start work.
+struct ReleaseNotesContent: View {
+    let state: ReleaseNotesState
+    var onOpenConsent: () -> Void = {}
+    var onRetry: () -> Void = {}
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+    }
 
     @ViewBuilder
     private var content: some View {

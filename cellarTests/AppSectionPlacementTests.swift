@@ -20,10 +20,12 @@ struct AppSectionPlacementTests {
     // MARK: - 9.1 — the tenth case, and where it sits
 
     @MainActor
-    @Test("Health is the tenth section, between Cleanup and Security")
-    func healthIsTheTenthSection() throws {
+    @Test("Health sits between Cleanup and Security in declaration order")
+    func healthSitsBetweenCleanupAndSecurity() throws {
         let order = AppSection.allCases
-        #expect(order.count == 10)
+        // Ten M5-era sections, plus the four the design document promoted to
+        // sidebar rows: favorites, updates, brewfile, and settings.
+        #expect(order.count == 14)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -31,48 +33,64 @@ struct AppSectionPlacementTests {
         let services = try #require(order.firstIndex(of: .services))
 
         // Adjacent to Cleanup on one side and Security on the other, which is
-        // what places it between Services and Security in sidebar order (PRD §5).
+        // what places it between Services and Security in declaration order
+        // (PRD §5). The rendered sidebar reads `sidebarGroups`, asserted below.
         #expect(health == cleanup + 1)
         #expect(health + 1 == security)
         #expect(services < health)
 
         #expect(AppSection.health.title == "Health")
-        #expect(AppSection.health.systemImage == "heart.text.square")
+        #expect(AppSection.health.systemImage == "waveform.path.ecg")
         #expect(AppSection.health.rawValue == "health")
         // The sidebar identifier a UI test queries by.
         #expect(order.map(\.rawValue) == [
-            "home", "discover", "browse", "installed",
-            "taps", "services", "cleanup", "health", "security", "history"
+            "home", "discover", "browse", "installed", "favorites", "updates",
+            "taps", "services", "cleanup", "health", "security", "brewfile",
+            "history", "settings"
         ])
     }
 
-    /// Home keeps its place at the head of the sidebar, and Health did not take
-    /// the landing spot.
-    ///
-    /// **Recorded rather than absorbed (finding F13).** `tasks.md` 9.1 asks for
-    /// "`.home` is still `allCases.first` **and still the landing section** —
-    /// asserted over the shell's default selection". The first half is true and is
-    /// asserted below. The second half was **not** true before this change:
-    /// `ContentView` has shipped `@State private var section: AppSection = .browse`
-    /// since M1, so Home has never been the section the app lands on.
-    ///
-    /// Changing it here would be a user-visible behaviour change that no
-    /// requirement in this delta asks for, and `design.md` HD9 says the opposite
-    /// ("No new `@State` selection. `HomeView` is not touched"). So what is
-    /// asserted is what this change actually owes: **Health did not take the
-    /// landing spot, and this change did not move it.** The literal value is
-    /// pinned so a silent future move fails here rather than passing unnoticed.
+    /// The rendered sidebar arrangement: the design document's four labelled
+    /// groups plus a Settings footer, together covering every section exactly
+    /// once — a section outside the arrangement would be unreachable.
     @MainActor
-    @Test("Home leads the sidebar, and Health did not take the landing section")
-    func homeLeadsAndHealthDidNotTakeTheLandingSection() throws {
+    @Test("The sidebar groups plus the footer cover every section exactly once")
+    func sidebarGroupsCoverEverySectionOnce() {
+        let arranged = AppSection.sidebarGroups.flatMap(\.sections) + AppSection.sidebarFooter
+        #expect(arranged.count == AppSection.allCases.count)
+        #expect(Set(arranged) == Set(AppSection.allCases))
+
+        #expect(AppSection.sidebarGroups.map(\.title) == [
+            "Overview", "Packages", "Insights", "Manage"
+        ])
+        #expect(AppSection.sidebarFooter == [.settings])
+        // Health leads Insights, which is the design's placement of PRD §5's
+        // "between Services and Security": Services closes the group before it,
+        // Security follows it.
+        #expect(AppSection.sidebarGroups[2].sections == [.health, .security, .cleanup])
+    }
+
+    /// Home keeps its place at the head of the sidebar, and now holds the
+    /// landing spot.
+    ///
+    /// **Rewritten, never deleted.** The landing was `.browse` from M1 until
+    /// the design port; the F13 note that used to live here pinned that literal
+    /// so a move would be a deliberate decision recorded on this line — and
+    /// this is that recording. The maintainer moved the landing to `.home`
+    /// (2026-08-07): the design document opens on Home, and Home now carries
+    /// the attention cards and snapshot that make a landing worth having.
+    /// Health still did not take it.
+    @MainActor
+    @Test("Home leads the sidebar and holds the landing section")
+    func homeLeadsAndHoldsTheLandingSection() throws {
         #expect(AppSection.allCases.first == .home)
 
         let landing = try #require(try AppSectionSourceScan.shellDefaultSection())
         #expect(landing != "health", "the Health section took the landing spot")
         #expect(landing != "security")
-        // The shipped value, pinned. If this ever becomes `home`, that is a
-        // deliberate decision and this line is where it is recorded.
-        #expect(landing == "browse")
+        // The shipped value, pinned so a silent future move fails here rather
+        // than passing unnoticed.
+        #expect(landing == "home")
     }
 
     // MARK: - 9.2 — no `default` arm in an AppSection switch
@@ -179,11 +197,10 @@ struct AppSectionPlacementTests {
         let text = try AppSectionSourceScan.rawSource(named: "Shell/AppSection.swift")
 
         #expect(text.contains("D4"), "the resolution no longer names the decision it settles")
-        #expect(text.lowercased().contains("browse remains the landing"))
-        #expect(
-            text.lowercased().contains("home keeps the landing spot") == false,
-            "the resolution still records the disproved claim; the landing is Browse (F13)"
-        )
+        // The landing moved to Home in the design port; the comment must
+        // record the move rather than restate the superseded M1 value.
+        #expect(text.lowercased().contains("now takes the landing"))
+        #expect(text.lowercased().contains("moved it to `.home`"))
         #expect(
             text.contains("slice 5's decision") == false,
             "the question is still deferred; D4 settled it"

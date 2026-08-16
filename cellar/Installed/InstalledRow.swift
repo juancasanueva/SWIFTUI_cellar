@@ -23,31 +23,37 @@ struct InstalledRow: View {
     var metadata: MetadataStore?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                if metadata != nil { star }
-                Text(entry.displayName)
-                    .font(.body)
-                    .lineLimit(1)
-                KindTag(kind: entry.id.kind)
-                Text(entry.version)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(badges, id: \.self) { badge in
-                    badge.view
+        HStack(spacing: 10) {
+            PackageTile(name: entry.id.name)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(entry.displayName)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.88))
+                        .lineLimit(1)
+                    KindTag(kind: entry.id.kind)
+                    ForEach(badges, id: \.self) { badge in
+                        // Outdated is the design's UPDATE pill; the quieter
+                        // statuses keep their icon badges.
+                        if case .outdated(let version) = badge {
+                            UpdateTag(nextVersion: version)
+                        } else {
+                            badge.view
+                        }
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-                releaseNotes
-                MutationMenu(center: operations, entry: entry)
-            }
-            if let desc = entry.desc {
-                Text(desc)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(subline)
+                    .font(Theme.mono(11))
+                    .foregroundStyle(Color.white.opacity(0.4))
                     .lineLimit(1)
             }
+            Spacer(minLength: 0)
+            releaseNotes
+            if metadata != nil { star }
+            MutationMenu(center: operations, entry: entry)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 3)
         // `.contain` keeps descendants' own identifiers reachable from XCUITest:
         // without it the row identifier replaces every child's, which left
         // `release-notes-open-<name>` unaddressable (the A9 gotcha, m5-brewfile).
@@ -86,6 +92,15 @@ struct InstalledRow: View {
             )
             .font(.caption)
         }
+    }
+
+    /// The design's second line: the version story, with the pending version
+    /// when there is one.
+    private var subline: String {
+        if let installed = entry.installed, installed.isOutdated {
+            return "\(installed.primaryKeg.version)  →  \(installed.catalogVersion)"
+        }
+        return entry.version
     }
 
     /// The catalog record's four URLs when there is one, and the snapshot's own

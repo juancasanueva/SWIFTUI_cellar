@@ -27,6 +27,7 @@ struct DiscoverCuratedSection: View {
                     ForEach(category.rows) { row in
                         DiscoverCuratedRowView(row: row)
                             .tag(row.id)
+                .themedListSelection(isSelected: selection == row.id)
                     }
                 } header: {
                     Text(category.title)

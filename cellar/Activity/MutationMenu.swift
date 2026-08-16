@@ -41,8 +41,12 @@ struct MutationMenu: View {
             }
         } label: {
             Label("Package actions", systemImage: "ellipsis.circle")
+                .labelStyle(.iconOnly)
+                .foregroundStyle(Color.white.opacity(0.5))
         }
+        .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .fixedSize()
         .disabled(!center.isAvailable)
         .help(center.unavailableGuidance ?? "Install, upgrade or remove \(entry.displayName)")
     }

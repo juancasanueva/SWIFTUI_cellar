@@ -40,9 +40,13 @@ final class HealthSectionUITests: XCTestCase {
         XCTAssertTrue(security.exists)
 
         // Compared by vertical position, which is what "between" means on screen.
+        // **Rewritten, never deleted**, for the design-document sidebar: Health
+        // now *leads* the Insights group (health, security, cleanup), so it sits
+        // below Services — the group boundary PRD §5 cared about — and above
+        // both Security and Cleanup.
         XCTAssertLessThan(services.frame.minY, health.frame.minY, "Health is above Services")
-        XCTAssertLessThan(cleanup.frame.minY, health.frame.minY, "Health is above Cleanup")
         XCTAssertLessThan(health.frame.minY, security.frame.minY, "Health is below Security")
+        XCTAssertLessThan(security.frame.minY, cleanup.frame.minY, "Cleanup is above Security")
     }
 
     /// Health did not take the landing spot, and Home still leads the sidebar.

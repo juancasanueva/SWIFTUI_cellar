@@ -29,12 +29,15 @@ struct ServicesListView: View {
         List(services.services, selection: $selection) { service in
             ServiceRow(service: service, operations: operations)
                 .tag(service.id)
+                .themedListSelection(isSelected: selection == service.id)
         }
         .overlay {
             if services.services.isEmpty {
                 emptyState
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.white.opacity(0.014))
         .navigationTitle(AppSection.services.title)
         .onAppear { refresher.setVisible(true) }
         .onDisappear { refresher.setVisible(false) }

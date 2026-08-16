@@ -56,6 +56,7 @@ struct TapsListView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .tag(tap.name)
+                        .themedListSelection(isSelected: selection == tap.name)
                     }
 
                     if case .content(isThirdPartyEmpty: true) = presentationState {
@@ -65,8 +66,10 @@ struct TapsListView: View {
                 }
             }
             .overlay { blockingState }
+            .scrollContentBackground(.hidden)
             .accessibilityIdentifier("taps-list")
         }
+        .background(Color.white.opacity(0.014))
         .navigationTitle(AppSection.taps.title)
         // Inside the section the user is already in, as two actions rather than
         // a tenth sidebar place (D3). No new `AppSection` case, and no

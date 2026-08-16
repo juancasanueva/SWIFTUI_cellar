@@ -25,12 +25,23 @@ enum InstalledSelection {
 /// shows came out of the one `brew info --installed` snapshot, and the catalog
 /// only decorates. A cold, empty or poisoned catalog therefore costs a
 /// description and an install count, never a row (design D5).
+/// Which slice of the inventory this list is standing in front of.
+///
+/// `.favorites` and `.updates` are the design's sidebar promotions of the two
+/// existing lenses — the same projections, preset rather than re-derived.
+enum InstalledLens {
+    case all
+    case favorites
+    case updates
+}
+
 struct InstalledListView: View {
     let installed: InstalledStore
     let catalog: CatalogStore
     let operations: OperationCenter
     let metadata: MetadataStore
     @Binding var selection: PackageID?
+    var lens: InstalledLens = .all
 
     /// Off by default: a machine with 160 packages installed usually has ~40
     /// the user chose and 120 that came along for the ride.
@@ -43,8 +54,14 @@ struct InstalledListView: View {
     /// bar, the confirmation and the submission ever read (design D8).
     @State private var order: [PackageID] = []
 
+    /// A local, name-and-description filter over the projected entries — the
+    /// design's in-pane search. It narrows what is shown and nothing else.
+    @State private var query = ""
+
     var body: some View {
         VStack(spacing: 0) {
+            PaneSearchField(text: $query, prompt: "Filter…")
+                .padding(EdgeInsets(top: 11, leading: 13, bottom: 0, trailing: 13))
             InstalledFilterBar(
                 includeDependencies: $includeDependencies,
                 favoritesOnly: $favoritesOnly,
@@ -92,10 +109,11 @@ struct InstalledListView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
             .accessibilityIdentifier("installed-list")
             .overlay {
                 if entries.isEmpty {
-                    InstalledEmptyState(state: installed.state)
+                    InstalledEmptyState(state: installed.state, lens: lens)
                 }
             }
             .onChange(of: selected) { _, current in
@@ -111,20 +129,39 @@ struct InstalledListView: View {
                 let live = Set(entries.map(\.id))
                 selected = selected.intersection(live)
                 adoptExternalSelection(selection)
+                dropForeignSelection()
             }
         }
         // No manual refresh control: the inventory refreshes at launch, on
         // activation, and within the quiet window of any external change, so a
         // button here would only ever duplicate work already scheduled.
+        .background(Color.white.opacity(0.014))
         .navigationTitle(AppSection.installed.title)
         .onAppear {
             adoptExternalSelection(selection)
+            dropForeignSelection()
         }
+    }
+
+    /// Clears a detail selection this lens does not contain.
+    ///
+    /// The selection is shared across sections so "Show in Installed" can hand
+    /// one over — but a package selected elsewhere must not keep a detail pane
+    /// standing beside an Updates or Favorites list that does not list it.
+    /// `.all` never drops: it is the handoff's destination, and its entries may
+    /// legitimately be empty mid-refresh.
+    private func dropForeignSelection() {
+        guard lens != .all,
+              let current = selection,
+              !entries.contains(where: { $0.id == current })
+        else { return }
+        selection = nil
     }
 
     private func row(_ entry: PackageEntry) -> some View {
         InstalledRow(entry: entry, operations: operations, metadata: metadata)
             .tag(entry.id)
+            .themedListSelection(isSelected: selected.contains(entry.id))
     }
 
     /// Keeps `order` a faithful, ordered view of `selected`.
@@ -203,12 +240,25 @@ struct InstalledListView: View {
     }
 
     private var entries: [PackageEntry] {
-        browse.entries(
-            includingDependencies: includeDependencies,
+        let base = browse.entries(
+            // The Updates lens covers the whole inventory: an outdated
+            // dependency is still an update.
+            includingDependencies: lens == .updates ? true : includeDependencies,
             catalogLookup: { catalog.package($0) },
             metadata: lookup,
-            favoritesOnly: favoritesOnly
+            favoritesOnly: lens == .favorites ? true : favoritesOnly
         )
+        var narrowed = base
+        if lens == .updates {
+            let outdated = browse.outdatedIDs(metadata: lookup)
+            narrowed = narrowed.filter { outdated.contains($0.id) }
+        }
+        let trimmed = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard trimmed.isEmpty == false else { return narrowed }
+        return narrowed.filter {
+            $0.id.name.lowercased().contains(trimmed)
+                || ($0.desc?.lowercased().contains(trimmed) ?? false)
+        }
     }
 
     /// The one projection the label, this section, the badge and the submission

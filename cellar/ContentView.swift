@@ -47,8 +47,11 @@ struct ContentView: View {
     /// The brew-managed artifacts worth assessing, built by `ArtifactLocator`
     /// from Homebrew's own roots. Empty until detection resolves.
     let artifactLocations: [ArtifactLocation]
+    /// The launch-and-activation refresh, offered again behind the toolbar's
+    /// Refresh button. Injected so the shell owns no refresh pipeline.
+    var refresh: @MainActor () async -> Void = {}
 
-    @State private var section: AppSection = .browse
+    @State private var section: AppSection = .home
     @State private var selection: PackageID?
     /// A finding carries its own identity — a package plus an advisory — because
     /// the same advisory can apply to two installed packages and they are two
@@ -59,6 +62,28 @@ struct ContentView: View {
     @State private var serviceSelection: String?
     @State private var tapSelection: String?
     @State private var isActivityExpanded = false
+
+    /// The list pane's width, shared by every list-and-detail section and kept
+    /// across launches. The design draws 342; the divider makes it the user's.
+    @AppStorage("shell.listPaneWidth") private var listPaneWidth = 342.0
+
+    /// The native split view's column state: `.all` or `.detailOnly`. The
+    /// system sidebar toggle drives it, and it is what moves that toggle from
+    /// the sidebar's toolbar to the detail's when the column collapses.
+    @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
+
+    /// How narrow and how wide the list pane may be dragged. The lower bound
+    /// keeps every row affordance reachable; the upper leaves the detail pane
+    /// worth having.
+    private static let listPaneRange: ClosedRange<Double> = 260...600
+
+    /// The sections whose left pane is the resizable list. A `Set` rather than
+    /// a fourth `AppSection` switch on purpose: the placement suite pins the
+    /// shell to exactly two exhaustive switches (content and detail).
+    private static let listSections: Set<AppSection> = [
+        .discover, .browse, .installed, .favorites, .updates,
+        .taps, .services, .security,
+    ]
 
     var body: some View {
         shell
@@ -75,105 +100,199 @@ struct ContentView: View {
             )
     }
 
+    /// The design's window on the system's chassis: a native
+    /// `NavigationSplitView` sidebar — material background, rounded corners,
+    /// the toggle beside the traffic lights, the collapse animation — beside a
+    /// toolbar-topped content area drawn on the app's own surfaces.
+    ///
+    /// Sections that keep a list-plus-detail arrangement render it *inside*
+    /// their pane; single-surface sections take the whole width. Both panes sit
+    /// in their own `NavigationStack` so the toolbar items and search fields
+    /// the feature views still declare keep rendering while each section is
+    /// ported to the design's own controls.
     private var shell: some View {
-        NavigationSplitView {
-            List(AppSection.allCases, selection: $section) { item in
-                Label(item.title, systemImage: item.systemImage)
-                    .tag(item)
-                    // The sidebar label and the navigation title carry the same
-                    // words, so a UI test querying by text matches two elements
-                    // and can assert on neither. An identifier names the row.
-                    .accessibilityIdentifier("sidebar-\(item.rawValue)")
-            }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 240)
-        } content: {
-            switch section {
-            case .home:
-                HomeView(brewDetection: brewDetection, catalog: catalog)
-                    .navigationSplitViewColumnWidth(min: 320, ideal: 480)
-            case .discover:
-                DiscoverView(catalog: catalog, selection: $selection)
-                    .navigationSplitViewColumnWidth(min: 320, ideal: 420)
-            case .browse:
-                BrowseView(
-                    catalog: catalog,
-                    installed: installed,
-                    operations: operations,
-                    selection: $selection
-                )
-                .navigationSplitViewColumnWidth(min: 280, ideal: 360)
-            case .installed:
-                InstalledListView(
-                    installed: installed,
-                    catalog: catalog,
-                    operations: operations,
-                    metadata: metadata,
-                    selection: $selection
-                )
-                .navigationSplitViewColumnWidth(min: 300, ideal: 380)
-            case .taps:
-                TapsListView(
-                    taps: taps,
-                    operations: operations,
-                    // Both read-only, and both snapshots the app is already
-                    // holding: the Brewfile diff is a pure projection over them
-                    // and forces no re-acquisition.
-                    installed: installed,
-                    detection: brewDetection.state,
-                    selection: $tapSelection,
-                    sourceChooser: brewfileSourceChooser
-                )
-                .navigationSplitViewColumnWidth(min: 300, ideal: 380)
-            case .services:
-                ServicesListView(
-                    services: services,
-                    refresher: servicesRefresher,
-                    operations: operations,
-                    selection: $serviceSelection
-                )
-                .navigationSplitViewColumnWidth(min: 280, ideal: 340)
-            case .cleanup:
-                CleanupView(
-                    detection: brewDetection,
-                    installed: installed,
-                    diskUsage: diskUsage,
-                    cleanup: cleanup,
-                    operations: operations
-                )
-                    .navigationSplitViewColumnWidth(min: 360, ideal: 520)
-            case .health:
-                HealthView(
-                    health: health,
-                    brewDetection: brewDetection,
-                    // Six of the eight signals, read where they already live. The
-                    // section holds none of them and refreshes none of them.
-                    installed: installed,
-                    metadata: metadata,
-                    security: security,
-                    cleanup: cleanup,
-                    diskUsage: diskUsage,
-                    operations: operations
-                )
-                    .navigationSplitViewColumnWidth(min: 360, ideal: 520)
-            case .security:
-                SecurityView(
-                    security: security,
-                    consent: securityConsent,
-                    credentials: advisoryCredentials,
-                    selection: $findingSelection
-                )
-                    .navigationSplitViewColumnWidth(min: 360, ideal: 520)
-            case .history:
-                HistoryView(history: history)
-                    .navigationSplitViewColumnWidth(min: 320, ideal: 460)
-            }
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
+            SidebarView(
+                section: $section,
+                installed: installed,
+                metadata: metadata,
+                services: services,
+                security: security,
+                taps: taps
+            )
+            .navigationSplitViewColumnWidth(min: 220, ideal: 228, max: 300)
         } detail: {
-            switch section {
-            case .home:
-                BrewDetectionSummary(state: brewDetection.state)
-            case .services:
-                ServiceDetailView(services: services)
-            case .taps:
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    if let detail = detailPane {
+                        // The width lives on the pane, not on the view inside
+                        // it: a fixed-width child inside a flexible pane is
+                        // what centred the list and opened a gap whenever the
+                        // detail column's empty state had nothing to stretch it.
+                        if Self.listSections.contains(section) {
+                            NavigationStack { content }
+                                .frame(width: listPaneWidth)
+                            PaneResizeDivider(width: $listPaneWidth, range: Self.listPaneRange)
+                            NavigationStack { detail }
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            // Health: a flexible dashboard beside its fixed
+                            // breakdown rail.
+                            NavigationStack { content }
+                                .frame(maxWidth: .infinity)
+                            Rectangle().fill(Theme.hairline).frame(width: 0.5)
+                            NavigationStack { detail }
+                        }
+                    } else {
+                        NavigationStack { content }
+                    }
+                }
+            }
+            .background(Theme.windowBackground)
+            // Into the native toolbar row rather than a drawn strip: macOS
+            // clips app content out of the titlebar region, so a custom strip
+            // there stays clickable but never paints.
+            .toolbar {
+                ShellToolbarItems(
+                    section: section,
+                    refresh: refresh,
+                    isActivityExpanded: $isActivityExpanded
+                )
+            }
+            // The design draws its own dark ground; the glass wash would sit
+            // between it and the toolbar items.
+            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        }
+        // The dark ground the sidebar's translucent material blurs over — this
+        // is what tints the system sidebar to the design's palette.
+        .containerBackground(for: .window) { Theme.windowBackground }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch section {
+        case .home:
+            HomeView(
+                brewDetection: brewDetection,
+                catalog: catalog,
+                installed: installed,
+                metadata: metadata,
+                security: security,
+                diskUsage: diskUsage,
+                taps: taps,
+                services: services,
+                history: history,
+                operations: operations,
+                section: $section,
+                selection: $selection
+            )
+        case .discover:
+            DiscoverView(catalog: catalog, selection: $selection)
+        case .browse:
+            BrowseView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                diskUsage: diskUsage,
+                selection: $selection
+            )
+        case .installed:
+            InstalledListView(
+                installed: installed,
+                catalog: catalog,
+                operations: operations,
+                metadata: metadata,
+                selection: $selection
+            )
+        case .favorites:
+            InstalledListView(
+                installed: installed,
+                catalog: catalog,
+                operations: operations,
+                metadata: metadata,
+                selection: $selection,
+                lens: .favorites
+            )
+        case .updates:
+            InstalledListView(
+                installed: installed,
+                catalog: catalog,
+                operations: operations,
+                metadata: metadata,
+                selection: $selection,
+                lens: .updates
+            )
+        case .taps:
+            TapsListView(
+                taps: taps,
+                operations: operations,
+                // Both read-only, and both snapshots the app is already
+                // holding: the Brewfile diff is a pure projection over them
+                // and forces no re-acquisition.
+                installed: installed,
+                detection: brewDetection.state,
+                selection: $tapSelection,
+                sourceChooser: brewfileSourceChooser
+            )
+        case .services:
+            ServicesListView(
+                services: services,
+                refresher: servicesRefresher,
+                operations: operations,
+                selection: $serviceSelection
+            )
+        case .cleanup:
+            CleanupView(
+                detection: brewDetection,
+                installed: installed,
+                diskUsage: diskUsage,
+                cleanup: cleanup,
+                operations: operations
+            )
+        case .health:
+            HealthView(
+                health: health,
+                brewDetection: brewDetection,
+                // Six of the eight signals, read where they already live. The
+                // section holds none of them and refreshes none of them.
+                installed: installed,
+                metadata: metadata,
+                security: security,
+                cleanup: cleanup,
+                diskUsage: diskUsage,
+                operations: operations
+            )
+        case .security:
+            SecurityView(
+                security: security,
+                consent: securityConsent,
+                credentials: advisoryCredentials,
+                selection: $findingSelection
+            )
+        case .brewfile:
+            BrewfileSectionView(
+                taps: taps,
+                installed: installed,
+                detection: brewDetection.state,
+                operations: operations,
+                sourceChooser: brewfileSourceChooser
+            )
+        case .history:
+            HistoryView(history: history)
+        case .settings:
+            SettingsView(brewDetection: brewDetection)
+        }
+    }
+
+    /// The right-hand pane, or `nil` for a section the design draws full-width.
+    private var detailPane: AnyView? {
+        switch section {
+        case .home, .cleanup, .brewfile, .history, .settings:
+            return nil
+        case .services:
+            return AnyView(ServiceDetailView(services: services))
+        case .taps:
+            return AnyView(
                 TapDetailView(
                     taps: taps,
                     installed: installed,
@@ -182,54 +301,41 @@ struct ContentView: View {
                     currentForceEvidence: forceEvidence,
                     showInInstalled: showInInstalled
                 )
-            case .cleanup:
-                ContentUnavailableView(
-                    "Storage visibility",
-                    systemImage: AppSection.cleanup.systemImage,
-                    description: Text("Expand a package to inspect its installed versions.")
+            )
+        case .health:
+            // The weights table — the surface that makes the number
+            // arguable, rather than a second copy of the rows.
+            return AnyView(HealthBreakdownPanel(health: health).frame(width: 380))
+        case .security:
+            if findingSelection == nil, artifactLocations.isEmpty == false || integrity.reports.isEmpty == false {
+                // The integrity half occupies the detail column whenever no
+                // finding is selected: it is a second view of the same
+                // inventory rather than a separate destination.
+                return AnyView(ArtifactIntegrityPanel(store: integrity, locations: artifactLocations))
+            }
+            return AnyView(
+                SecurityFindingDetail(
+                    selection: findingSelection,
+                    security: security,
+                    dismissals: dismissals,
+                    operations: operations,
+                    catalog: catalog
                 )
-            case .health:
-                // The weights table — the surface that makes the number
-                // arguable, rather than a second copy of the rows.
-                HealthBreakdownPanel(health: health)
-            case .security:
-                if findingSelection == nil, artifactLocations.isEmpty == false || integrity.reports.isEmpty == false {
-                    // The integrity half occupies the detail column whenever no
-                    // finding is selected: it is a second view of the same
-                    // inventory rather than a separate destination.
-                    ArtifactIntegrityPanel(store: integrity, locations: artifactLocations)
-                } else {
-                        SecurityFindingDetail(
-                        selection: findingSelection,
-                        security: security,
-                        dismissals: dismissals,
-                        operations: operations,
-                        catalog: catalog
-                    )
-                }
-            case .history:
-                // The list column already carries the whole record; a second
-                // pane would only repeat it.
-                ContentUnavailableView(
-                    "History",
-                    systemImage: AppSection.history.systemImage,
-                    description: Text("Every package change Cellar made, newest first.")
-                )
-            case .discover, .browse, .installed:
-                // The same detail view for all three: a package is a package,
-                // and the catalog record is the thing worth reading about it.
-                // Discover joins here rather than growing a detail view of its
-                // own — selecting a recommendation should land exactly where
-                // selecting a search result lands.
+            )
+        case .discover, .browse, .installed, .favorites, .updates:
+            // The same detail view for all of them: a package is a package,
+            // and the catalog record is the thing worth reading about it.
+            return AnyView(
                 PackageDetailView(
                     catalog: catalog,
                     installed: installed,
                     operations: operations,
                     metadata: metadata,
+                    diskUsage: diskUsage,
                     id: selection,
                     selection: $selection
                 )
-            }
+            )
         }
     }
 

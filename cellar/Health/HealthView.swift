@@ -44,16 +44,23 @@ struct HealthView: View {
     /// section would become the polling loop this capability forbids.
     @State private var now = Date()
 
+    @Environment(ThemeStore.self) private var theme
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 0) {
                 score
+                Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                    .padding(.top, 26)
                 controls
+                    .padding(.top, 24)
                 rows
+                    .padding(.top, 26)
             }
-            .padding(20)
+            .padding(EdgeInsets(top: 30, leading: 34, bottom: 40, trailing: 34))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(Theme.windowBackground)
         .navigationTitle(AppSection.health.title)
         .task(id: inputs) {
             await health.project(inputs, now: now)
@@ -65,43 +72,121 @@ struct HealthView: View {
     @ViewBuilder
     private var score: some View {
         let presentation = HealthScorePresentation(health.content?.score ?? .unscorable(unknownInputs: []))
-        VStack(alignment: .leading, spacing: 4) {
-            Text(HealthCopy.scoreTitle)
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Text(presentation.headline)
-                .font(presentation.isScored ? .system(size: 44, weight: .semibold) : .title3)
-                .monospacedDigit()
-                .accessibilityIdentifier("health-score")
-            if let caveat = presentation.caveat {
-                Text(caveat)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("health-score-caveat")
+        HStack(alignment: .top, spacing: 28) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(HealthCopy.heroTitle)
+                    .font(.system(size: 30, weight: .bold))
+                    .kerning(-0.8)
+                    .foregroundStyle(Theme.textPrimary)
+                if presentation.isScored == false {
+                    Text(presentation.headline)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.textBody)
+                        .accessibilityIdentifier("health-score")
+                }
+                if let caveat = presentation.caveat {
+                    Text(caveat)
+                        .font(.system(size: 13.5))
+                        .lineSpacing(3)
+                        .foregroundStyle(Color.white.opacity(0.52))
+                        .frame(maxWidth: 620, alignment: .leading)
+                        .accessibilityIdentifier("health-score-caveat")
+                }
+                if let answeredWeight = presentation.answeredWeight {
+                    Text(answeredWeight)
+                        .font(Theme.mono(11.5))
+                        .foregroundStyle(Theme.textTertiary)
+                }
             }
-            if let answeredWeight = presentation.answeredWeight {
-                Text(answeredWeight)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if presentation.isScored, let value = Int(presentation.headline) {
+                scoreRing(value: value, headline: presentation.headline)
             }
         }
+    }
+
+    /// The design's 118-point ring: quiet full track, accent arc by score.
+    private func scoreRing(value: Int, headline: String) -> some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.07), lineWidth: 9)
+            Circle()
+                .trim(from: 0, to: CGFloat(min(max(value, 0), 100)) / 100)
+                .stroke(theme.base, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            VStack(spacing: 0) {
+                Text(headline)
+                    .font(Theme.mono(30, weight: .semibold))
+                    .kerning(-0.9)
+                    .foregroundStyle(Theme.textPrimary)
+                    .accessibilityIdentifier("health-score")
+                Text(HealthCopy.scoreRingCaption)
+                    .font(.system(size: 10, weight: .semibold))
+                    .kerning(0.6)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Color.white.opacity(0.38))
+            }
+        }
+        .frame(width: 118, height: 118)
+        .padding(.top, 4)
     }
 
     // MARK: - The two acquisitions, both behind a control
 
     private var controls: some View {
-        HStack(spacing: 8) {
-            Button(HealthCopy.runDoctorTitle, action: runDoctor)
+        VStack(alignment: .leading, spacing: 11) {
+            Text(HealthCopy.quickActionsTitle)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+            HStack(spacing: 9) {
+                actionChip(
+                    HealthCopy.runDoctorTitle,
+                    command: HealthCopy.runDoctorCommand,
+                    identifier: "health-run-doctor",
+                    action: runDoctor
+                )
                 .disabled(health.isRunningDoctor || brewDetection.state.installation == nil)
-                .accessibilityIdentifier("health-run-doctor")
 
-            Button(HealthCopy.readLastUpdateTitle, action: readHomebrewAge)
-                .accessibilityIdentifier("health-read-last-update")
-
-            Spacer(minLength: 0)
+                actionChip(
+                    HealthCopy.readLastUpdateTitle,
+                    command: nil,
+                    identifier: "health-read-last-update",
+                    action: readHomebrewAge
+                )
+                Spacer(minLength: 0)
+            }
         }
-        .buttonStyle(.borderless)
         .help(HealthCopy.runDoctorExplanation)
+    }
+
+    private func actionChip(
+        _ label: String,
+        command: String?,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Text(label)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(Theme.textPrimary)
+                if let command {
+                    Text(command)
+                        .font(Theme.mono(10.5))
+                        .foregroundStyle(Color.white.opacity(0.32))
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 31)
+            .background(Theme.controlFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     /// The one acquisition that spawns, and it spawns only from here.
@@ -120,19 +205,29 @@ struct HealthView: View {
 
     @ViewBuilder
     private var rows: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 11) {
             Text(HealthCopy.rowsTitle)
-                .font(.headline)
-            ForEach(health.content?.rows ?? [], id: \.input) { row in
-                Divider()
-                HealthRowView(
-                    row: row,
-                    remediate: HealthComposition.command(for: row.remediation).map { command in
-                        { remediate(command) }
-                    },
-                    isRemediationEnabled: operations.isAvailable
-                )
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+            VStack(alignment: .leading, spacing: 0) {
+                let content = health.content?.rows ?? []
+                ForEach(content, id: \.input) { row in
+                    HealthRowView(
+                        row: row,
+                        remediate: HealthComposition.command(for: row.remediation).map { command in
+                            { remediate(command) }
+                        },
+                        isRemediationEnabled: operations.isAvailable
+                    )
+                    .padding(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                    .background(Theme.rowFill)
+                    if row.input != content.last?.input {
+                        Rectangle().fill(Theme.separator).frame(height: 0.5)
+                    }
+                }
             }
+            .themeCard(fill: Theme.rowFill, radius: 10)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .accessibilityIdentifier("health-rows")
     }

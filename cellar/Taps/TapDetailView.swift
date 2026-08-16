@@ -95,6 +95,7 @@ struct TapDetailView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
         .accessibilityIdentifier("tap-package-list")
     }
 

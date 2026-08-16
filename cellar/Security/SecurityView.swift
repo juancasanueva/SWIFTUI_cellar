@@ -39,6 +39,8 @@ struct SecurityView: View {
                 sectionView(section)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.white.opacity(0.014))
         .navigationTitle(AppSection.security.title)
         .overlay { emptyState }
         .toolbar { toolbar }
@@ -204,6 +206,10 @@ struct SecurityView: View {
         }
         .accessibilityIdentifier(SecurityPresentation.findingIdentifier(finding))
         .tag(SecurityFindingSelection(packageID: item.packageID, advisoryID: finding.advisoryID))
+        .themedListSelection(
+            isSelected: selection
+                == SecurityFindingSelection(packageID: item.packageID, advisoryID: finding.advisoryID)
+        )
     }
 
     @ViewBuilder

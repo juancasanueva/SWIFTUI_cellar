@@ -12,20 +12,51 @@ struct CleanupView: View {
     let operations: OperationCenter
 
     var body: some View {
-        List {
-            storageStatus
-            cleanupScopes
-            storageRows
-            packageCleanupScopes
-            Section("Cache") {
-                LabeledContent("Homebrew cache") {
-                    Text(onDisk(diskUsage.visibleSnapshot?.cache.allocatedBytes ?? 0))
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Cleanup")
+                    .font(.system(size: 27, weight: .semibold))
+                    .kerning(-0.6)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(headline)
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(Color.white.opacity(0.48))
+            }
+            .padding(EdgeInsets(top: 28, leading: 34, bottom: 18, trailing: 34))
+            List {
+                storageStatus
+                cleanupScopes
+                storageRows
+                packageCleanupScopes
+                Section("Cache") {
+                    LabeledContent("Homebrew cache") {
+                        Text(onDisk(diskUsage.visibleSnapshot?.cache.allocatedBytes ?? 0))
+                    }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .accessibilityIdentifier("disk-usage-list")
         }
-        .accessibilityIdentifier("disk-usage-list")
+        .background(Theme.windowBackground)
         .navigationTitle("Cleanup")
         .task(id: detection.state.installation?.executableURL) { await refreshStorage() }
+    }
+
+    /// The design's one-sentence summary: how much Homebrew is using, and how
+    /// much of it is cache that can go.
+    private var headline: String {
+        let packages = diskUsage.visibleSnapshot?.packages
+            .reduce(Int64(0)) { $0 + $1.observation.allocatedBytes } ?? 0
+        let cache = diskUsage.visibleSnapshot?.cache.allocatedBytes ?? 0
+        guard packages + cache > 0 else {
+            return "Preview what Homebrew could clean before anything runs."
+        }
+        var sentence = "Homebrew is using \((packages + cache).formatted(.byteCount(style: .file)))."
+        if cache > 0 {
+            sentence += " \(cache.formatted(.byteCount(style: .file))) of that is cache"
+                + " that can go without touching anything you installed."
+        }
+        return sentence
     }
 
     @ViewBuilder

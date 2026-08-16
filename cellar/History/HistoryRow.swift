@@ -18,44 +18,98 @@ struct HistoryRow: View {
     let record: HistoryRecord
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: verbSymbol)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(verbColor)
+                .frame(width: 26, height: 26)
+                .background(verbFill, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(title).font(.body.weight(.medium))
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(Theme.mono(12.5, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
                     Text(record.verb)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .semibold))
+                        .kerning(0.3)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Color.white.opacity(0.45))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 1.5)
+                        .background(
+                            Color.white.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        )
                 }
                 // The exact argv that ran, verbatim — the same projection the
                 // copy button produces, and display only either way.
                 Text(record.commandText)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .font(Theme.mono(11))
+                    .foregroundStyle(Color.white.opacity(0.4))
                     .textSelection(.enabled)
                 if let versions = record.versions {
                     Text("\(versions.from) → \(versions.to)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(Theme.mono(11.5))
+                        .foregroundStyle(Color.white.opacity(0.4))
                 }
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 3) {
-                Text(record.outcomeLabel).font(.caption)
+                Text(record.outcomeLabel)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(outcomeColor)
                 Text(record.date, format: .dateTime.day().month().hour().minute())
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Color.white.opacity(0.34))
             }
             if record.controls.contains(.copyCommand) {
                 Button {
                     copy(record.commandText)
                 } label: {
                     Image(systemName: "doc.on.doc")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.white.opacity(0.5))
                 }
                 .buttonStyle(.borderless)
                 .help("Copy \(record.commandText)")
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 5)
+    }
+
+    private var verbSymbol: String {
+        switch record.verb {
+        case "install": "arrow.down"
+        case "uninstall", "zap": "trash"
+        case "start", "stop", "restart": "gearshape"
+        default: "arrow.up"
+        }
+    }
+
+    private var verbColor: Color {
+        switch record.verb {
+        case "install": Theme.successText
+        case "uninstall", "zap": Theme.dangerText
+        case "start", "stop", "restart": Color.white.opacity(0.55)
+        default: Theme.infoText
+        }
+    }
+
+    private var verbFill: Color {
+        switch record.verb {
+        case "install": Theme.successTint(0.16)
+        case "uninstall", "zap": Theme.dangerTint(0.16)
+        case "start", "stop", "restart": Color.white.opacity(0.06)
+        default: Color(.sRGB, red: 127 / 255, green: 178 / 255, blue: 232 / 255, opacity: 0.16)
+        }
+    }
+
+    private var outcomeColor: Color {
+        switch record.outcomeRaw {
+        case "succeeded": Theme.successText
+        case "failed": Theme.dangerText
+        default: Color.white.opacity(0.5)
+        }
     }
 
     /// What the entry acted on, read off `HistoryRecord.subject`.
