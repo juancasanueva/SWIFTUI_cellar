@@ -25,8 +25,9 @@ struct AppSectionPlacementTests {
         let order = AppSection.allCases
         // Ten M5-era sections, plus the four the design document promoted to
         // sidebar rows — favorites, updates, brewfile, and settings — plus the
-        // four cask-discovery pages the CaskHub port added.
-        #expect(order.count == 18)
+        // four cask-discovery pages the CaskHub port added, plus the one
+        // data-driven category page behind the sidebar's category rows.
+        #expect(order.count == 19)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -47,6 +48,7 @@ struct AppSectionPlacementTests {
         #expect(order.map(\.rawValue) == [
             "home", "discover", "browse",
             "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
+            "caskCategory",
             "installed", "favorites", "updates",
             "taps", "services", "cleanup", "health", "security", "brewfile",
             "history", "settings"
@@ -56,12 +58,27 @@ struct AppSectionPlacementTests {
     /// The rendered sidebar arrangement: the design document's four labelled
     /// groups plus a Settings footer, together covering every section exactly
     /// once — a section outside the arrangement would be unreachable.
+    ///
+    /// **Amended, never weakened**, when the category pages landed.
+    /// `.caskCategory` is the coverage rule's one deliberate exception: it is a
+    /// single case standing for eighteen data-driven pages, selected by a
+    /// category id the shell holds *beside* the section, so no fixed
+    /// `sidebarGroups` row could name it honestly. It is not unreachable — it
+    /// is reached through the sidebar's data-driven CATEGORIES rows, the
+    /// cards' category labels, and the browse shelves' View All. Every other
+    /// section must still appear in the arrangement exactly once, and
+    /// `.caskCategory` must appear in **no** group at all: a static row for it
+    /// would either point at an arbitrary category or at none.
     @MainActor
     @Test("The sidebar groups plus the footer cover every section exactly once")
     func sidebarGroupsCoverEverySectionOnce() {
         let arranged = AppSection.sidebarGroups.flatMap(\.sections) + AppSection.sidebarFooter
-        #expect(arranged.count == AppSection.allCases.count)
-        #expect(Set(arranged) == Set(AppSection.allCases))
+        #expect(arranged.count == AppSection.allCases.count - 1)
+        #expect(Set(arranged + [AppSection.caskCategory]) == Set(AppSection.allCases))
+        #expect(
+            arranged.contains(.caskCategory) == false,
+            "the category page took a static sidebar row; it is reachable only through data-driven rows"
+        )
 
         #expect(AppSection.sidebarGroups.map(\.title) == [
             "Overview", "Discover Casks", "Packages", "Insights", "Manage"

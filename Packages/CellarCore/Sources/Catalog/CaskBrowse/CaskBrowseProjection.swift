@@ -66,21 +66,19 @@ public enum CaskBrowseProjection {
 
         let dates = addedDates?.tokenAddedDates ?? [:]
 
-        // One pass over popularity order fills every category shelf, so each
-        // shelf inherits popularity order for free. The counts run in the same
-        // pass, uncapped: the shelf is a display rule, the number is a fact.
+        // One pass over popularity order fills every category page, uncapped,
+        // so each page inherits popularity order for free. The counts fall out
+        // of the same fill, and the shelves take their eight off the top: the
+        // shelf is a display rule, the page and the number are facts.
         var casksByCategory: [String: [CatalogPackage]] = [:]
-        var categoryCounts: [String: Int] = [:]
         if let catalog {
             for cask in popularityOrder {
                 for categoryID in catalog.uniqueCategoryIDs(for: cask.name) {
-                    categoryCounts[categoryID, default: 0] += 1
-                    if casksByCategory[categoryID, default: []].count < sectionSize {
-                        casksByCategory[categoryID, default: []].append(cask)
-                    }
+                    casksByCategory[categoryID, default: []].append(cask)
                 }
             }
         }
+        let categoryCounts = casksByCategory.mapValues(\.count)
 
         var sections = [
             CaskBrowseSection(
@@ -110,7 +108,7 @@ public enum CaskBrowseProjection {
                 CaskBrowseSection(
                     destination: .category(category.id),
                     title: category.definition.displayName,
-                    casks: casksByCategory[category.id] ?? []
+                    casks: Array((casksByCategory[category.id] ?? []).prefix(sectionSize))
                 )
             )
         }
@@ -122,6 +120,14 @@ public enum CaskBrowseProjection {
             allByPopularity: popularityOrder,
             caskCount: casks.count,
             categoryCounts: categoryCounts,
+            categories: (catalog?.orderedCategories ?? []).map {
+                CaskCategorySummary(
+                    id: $0.id,
+                    displayName: $0.definition.displayName,
+                    icon: $0.definition.icon
+                )
+            },
+            casksByCategory: casksByCategory,
             addedDates: dates
         )
     }

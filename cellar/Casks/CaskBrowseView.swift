@@ -20,6 +20,10 @@ struct CaskBrowseView: View {
     let assets: CaskBrowseAssets
     let iconLoader: CaskIconLoader
     @Binding var section: AppSection
+    /// Where a category navigation lands, handed a category id — the card
+    /// labels' closure and the category shelves' View All, one path. The shell
+    /// sets the id beside the section; `nil` leaves both affordances inert.
+    var onSelectCategory: ((String) -> Void)? = nil
 
     /// The grid/list choice, kept across launches like the shell's pane width.
     @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
@@ -172,29 +176,44 @@ struct CaskBrowseView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 0)
-                // TODO: A `.category` destination has no page yet, so only the
-                // two ranked shelves carry a View All.
-                if let destination = viewAllSection(for: shelf.destination) {
-                    Button("View All") {
-                        section = destination
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.base)
-                    .accessibilityIdentifier("cask-view-all-\(destination.rawValue)")
-                }
+                viewAllButton(for: shelf.destination)
             }
             casksView(shelf.casks)
         }
     }
 
-    /// Where a shelf's View All leads, or `nil` for a shelf with no page yet.
-    private func viewAllSection(for destination: CaskBrowseDestination) -> AppSection? {
+    /// Every shelf's View All: the two ranked shelves lead to their sections,
+    /// and a category shelf leads to its category's page through the same
+    /// closure the card labels use — absent the closure, no button at all.
+    @ViewBuilder
+    private func viewAllButton(for destination: CaskBrowseDestination) -> some View {
         switch destination {
-        case .topCharts: .caskTopCharts
-        case .recentlyAdded: .caskRecentlyAdded
-        case .category: nil
+        case .topCharts:
+            viewAllButton(identifier: "cask-view-all-\(AppSection.caskTopCharts.rawValue)") {
+                section = .caskTopCharts
+            }
+        case .recentlyAdded:
+            viewAllButton(identifier: "cask-view-all-\(AppSection.caskRecentlyAdded.rawValue)") {
+                section = .caskRecentlyAdded
+            }
+        case .category(let id):
+            if let onSelectCategory {
+                viewAllButton(identifier: "cask-view-all-category-\(id)") {
+                    onSelectCategory(id)
+                }
+            }
         }
+    }
+
+    private func viewAllButton(
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button("View All", action: action)
+            .buttonStyle(.plain)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(theme.base)
+            .accessibilityIdentifier(identifier)
     }
 
     private func casksView(_ casks: [CatalogPackage]) -> some View {
@@ -204,7 +223,8 @@ struct CaskBrowseView: View {
             installed: installed,
             operations: operations,
             assets: assets,
-            iconLoader: iconLoader
+            iconLoader: iconLoader,
+            onSelectCategory: onSelectCategory
         )
     }
 

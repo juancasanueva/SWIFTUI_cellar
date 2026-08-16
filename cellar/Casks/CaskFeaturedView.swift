@@ -20,6 +20,8 @@ struct CaskFeaturedView: View {
     let operations: OperationCenter
     let assets: CaskBrowseAssets
     let iconLoader: CaskIconLoader
+    /// See `CaskCollectionView.onSelectCategory`.
+    var onSelectCategory: ((String) -> Void)? = nil
 
     /// The grid/list choice, the same key Browse persists: the toggle carries
     /// across pages.
@@ -61,7 +63,8 @@ struct CaskFeaturedView: View {
                         installed: installed,
                         operations: operations,
                         assets: assets,
-                        iconLoader: iconLoader
+                        iconLoader: iconLoader,
+                        onSelectCategory: onSelectCategory
                     )
                 }
             }

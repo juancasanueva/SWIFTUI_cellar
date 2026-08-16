@@ -17,6 +17,8 @@ struct CaskCardView: View {
     let iconLoader: CaskIconLoader
     /// See `CaskCollectionView.counts`.
     var counts: [String: Int]? = nil
+    /// See `CaskCollectionView.onSelectCategory`.
+    var onSelectCategory: ((String) -> Void)? = nil
 
     @Environment(ThemeStore.self) private var theme
 
@@ -62,17 +64,38 @@ struct CaskCardView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
-                // Catalog-adjacent text stays inert `Text`, the Discover rule.
+                // The Discover rule kept catalog-adjacent text inert; the
+                // category pages amend it. On a page that can navigate the
+                // label is a link to the primary category's page, styled as
+                // the same quiet text; without the closure — or for an
+                // unmapped token — it stays exactly the inert `Text` it was.
                 if let category = assets.primaryCategoryName(for: package.name) {
-                    Text(category)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(theme.base)
-                        .lineLimit(1)
+                    if let onSelectCategory,
+                       let categoryID = assets.primaryCategoryID(for: package.name) {
+                        Button {
+                            onSelectCategory(categoryID)
+                        } label: {
+                            categoryLabel(category)
+                        }
+                        .buttonStyle(.plain)
+                        .pointerStyle(.link)
+                        .accessibilityIdentifier("cask-card-category-\(package.name)")
+                    } else {
+                        categoryLabel(category)
+                    }
                 }
             }
             Spacer(minLength: 0)
         }
         .frame(height: 48, alignment: .top)
+    }
+
+    /// The label's one look, link or not.
+    private func categoryLabel(_ name: String) -> some View {
+        Text(name)
+            .font(.system(size: 10.5))
+            .foregroundStyle(theme.base)
+            .lineLimit(1)
     }
 
     /// One verb by state priority — update, installed, install — and **no**

@@ -39,6 +39,8 @@ struct CaskTopChartsView: View {
     let assets: CaskBrowseAssets
     let iconLoader: CaskIconLoader
     let charts: CaskChartsStore
+    /// See `CaskCollectionView.onSelectCategory`.
+    var onSelectCategory: ((String) -> Void)? = nil
 
     /// The grid/list choice, the same key every cask page persists.
     @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
@@ -111,7 +113,8 @@ struct CaskTopChartsView: View {
                         operations: operations,
                         assets: assets,
                         iconLoader: iconLoader,
-                        counts: selectedCounts
+                        counts: selectedCounts,
+                        onSelectCategory: onSelectCategory
                     )
                 }
             }

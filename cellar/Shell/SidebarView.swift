@@ -9,15 +9,22 @@ import Persistence
 import SecurityKit
 import SwiftUI
 
-/// The sidebar column: four labelled groups and a Settings footer, drawn on
-/// the system sidebar material `NavigationSplitView` provides — which is what
-/// buys the native toggle, the collapse animation, and the window's rounded
-/// corners for free.
+/// The sidebar column: the labelled groups, a data-driven CATEGORIES group,
+/// and a Settings footer, drawn on the system sidebar material
+/// `NavigationSplitView` provides — which is what buys the native toggle, the
+/// collapse animation, and the window's rounded corners for free.
 ///
 /// Every count badge reads a store the shell already owns; the sidebar keeps no
-/// state of its own beyond the binding it is handed.
+/// state of its own beyond the bindings it is handed. The CATEGORIES group is
+/// the one group not in `AppSection.sidebarGroups`: its rows come from the
+/// vendored category catalog, one per `caskBrowse.categories` entry, all
+/// selecting the single `.caskCategory` section with a different category id.
 struct SidebarView: View {
     @Binding var section: AppSection
+    /// Which category page `.caskCategory` shows; written by the category
+    /// rows, read for their selected state.
+    @Binding var categoryID: String?
+    let catalog: CatalogStore
     let installed: InstalledStore
     let metadata: MetadataStore
     let services: ServicesStore
@@ -33,15 +40,21 @@ struct SidebarView: View {
                 VStack(spacing: 14) {
                     ForEach(AppSection.sidebarGroups, id: \.title) { group in
                         VStack(spacing: 1) {
-                            Text(group.title)
-                                .font(.system(size: 10.5, weight: .semibold))
-                                .kerning(0.6)
-                                .textCase(.uppercase)
-                                .foregroundStyle(Color.white.opacity(0.3))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(EdgeInsets(top: 2, leading: 8, bottom: 6, trailing: 8))
+                            groupHeader(group.title)
                             ForEach(group.sections) { item in
                                 row(item)
+                            }
+                        }
+                    }
+                    // Last on purpose, mirroring CaskHub: the fixed sections
+                    // first, then the catalog's own vocabulary. Nothing at all
+                    // until the vendored catalog has been adopted — an empty
+                    // header would promise rows that cannot come.
+                    if catalog.caskBrowse.categories.isEmpty == false {
+                        VStack(spacing: 1) {
+                            groupHeader("Categories")
+                            ForEach(catalog.caskBrowse.categories) { category in
+                                categoryRow(category)
                             }
                         }
                     }
@@ -60,21 +73,68 @@ struct SidebarView: View {
         }
     }
 
+    private func groupHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10.5, weight: .semibold))
+            .kerning(0.6)
+            .textCase(.uppercase)
+            .foregroundStyle(Color.white.opacity(0.3))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(EdgeInsets(top: 2, leading: 8, bottom: 6, trailing: 8))
+    }
+
     private func row(_ item: AppSection) -> some View {
-        let isSelected = section == item
+        rowBody(
+            icon: item.systemImage,
+            title: item.sidebarTitle,
+            isSelected: section == item,
+            badge: badge(for: item),
+            identifier: "sidebar-\(item.rawValue)"
+        ) {
+            section = item
+        }
+    }
+
+    /// One category's row: the vendored icon and name, the uncapped count, and
+    /// selection that reads *both* halves of the shell's state — every
+    /// category row selects the same section, so the id is what distinguishes
+    /// the highlighted one.
+    private func categoryRow(_ category: CaskCategorySummary) -> some View {
+        rowBody(
+            icon: category.icon,
+            title: category.displayName,
+            isSelected: section == .caskCategory && categoryID == category.id,
+            badge: neutralBadge(catalog.caskBrowse.categoryCounts[category.id] ?? 0),
+            identifier: "sidebar-category-\(category.id)"
+        ) {
+            categoryID = category.id
+            section = .caskCategory
+        }
+    }
+
+    /// The one row body both kinds of row share, so a category row is
+    /// indistinguishable from a section row by look.
+    private func rowBody(
+        icon: String,
+        title: String,
+        isSelected: Bool,
+        badge: Badge?,
+        identifier: String,
+        select: @escaping () -> Void
+    ) -> some View {
         // A tappable container rather than a `Button`: a Button folds its label
         // into one element, and the UI tests click sections by their visible
         // title (`staticTexts["Taps"]`), so the texts must stay reachable.
-        return HStack(spacing: 9) {
-                Image(systemName: item.systemImage)
+        HStack(spacing: 9) {
+                Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
                     .frame(width: 15)
                     .foregroundStyle(isSelected ? theme.base : Color.white.opacity(0.42))
-                Text(item.sidebarTitle)
+                Text(title)
                     .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Theme.textPrimary : Color.white.opacity(0.7))
                 Spacer(minLength: 0)
-                if let badge = badge(for: item) {
+                if let badge {
                     Text(badge.count)
                         .font(Theme.mono(10.5, weight: .semibold))
                         .foregroundStyle(badge.foreground)
@@ -94,10 +154,10 @@ struct SidebarView: View {
             }
         }
         .contentShape(Capsule())
-        .onTapGesture { section = item }
+        .onTapGesture(perform: select)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)
-        .accessibilityIdentifier("sidebar-\(item.rawValue)")
+        .accessibilityIdentifier(identifier)
     }
 
     // MARK: - Badges
@@ -108,29 +168,32 @@ struct SidebarView: View {
         let foreground: Color
     }
 
+    /// The design's quiet tone, hidden at zero — the section rows' default and
+    /// the only tone a category row ever carries.
+    private func neutralBadge(_ count: Int) -> Badge? {
+        count > 0
+            ? Badge(
+                count: String(count),
+                background: Color.white.opacity(0.08),
+                foreground: Color.white.opacity(0.5)
+            )
+            : nil
+    }
+
     /// Which rows carry a count, and in which of the design's three tones:
     /// neutral, accent-warn (updates), danger (security findings).
     private func badge(for item: AppSection) -> Badge? {
-        func neutral(_ count: Int) -> Badge? {
-            count > 0
-                ? Badge(
-                    count: String(count),
-                    background: Color.white.opacity(0.08),
-                    foreground: Color.white.opacity(0.5)
-                )
-                : nil
-        }
         switch item {
         case .installed:
-            return neutral(installed.inventory.packages.count)
+            return neutralBadge(installed.inventory.packages.count)
         case .favorites:
-            return neutral(favoritesCount)
+            return neutralBadge(favoritesCount)
         case .updates:
             let count = outdatedCount
             guard count > 0 else { return nil }
             return Badge(count: String(count), background: theme.tint(0.22), foreground: theme.light)
         case .services:
-            return neutral(runningServicesCount)
+            return neutralBadge(runningServicesCount)
         case .security:
             let count = vulnerableCount
             guard count > 0 else { return nil }
@@ -140,13 +203,13 @@ struct SidebarView: View {
                 foreground: Theme.dangerText
             )
         case .taps:
-            return neutral(taps.inventory.taps.count)
+            return neutralBadge(taps.inventory.taps.count)
         case .health:
             // Its own arm — the source scanner keys on `case .health` to prove
             // this switch is exhaustive over `AppSection` with no default.
             return nil
         case .home, .discover, .browse, .caskBrowse, .caskFeatured, .caskTopCharts,
-             .caskRecentlyAdded, .cleanup, .brewfile, .history, .settings:
+             .caskRecentlyAdded, .caskCategory, .cleanup, .brewfile, .history, .settings:
             // Exhaustive on purpose: a `default:` here is what would let a new
             // section ship with its badge silently absent.
             return nil

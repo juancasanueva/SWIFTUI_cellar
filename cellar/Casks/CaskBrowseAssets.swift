@@ -37,6 +37,13 @@ final class CaskBrowseAssets {
         return catalog.categories[mapping.primary]?.displayName
     }
 
+    /// The id of a token's primary category, or `nil` for an unmapped token —
+    /// what a card's category label navigates by, where the display name above
+    /// is what it says.
+    func primaryCategoryID(for token: String) -> String? {
+        catalog?.tokenToCategory[token]?.primary
+    }
+
     /// Whether the CaskFlow icons branch carries artwork for this token — the
     /// manifest gate `CaskIconURL.candidateURLs` asks about.
     func isKnownIconToken(_ token: String) -> Bool {

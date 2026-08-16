@@ -42,6 +42,13 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// The casks this catalog has seen arrive most recently. Placeholder page
     /// until the added-dates ledger reaches the app.
     case caskRecentlyAdded
+    /// One case standing for every category page: *which* category is showing
+    /// is data the shell holds beside the section, not a case of this enum —
+    /// eighteen cases for eighteen rows of vendored JSON would put the asset's
+    /// contents into the type. Deliberately absent from `sidebarGroups`: the
+    /// sidebar reaches it through its data-driven category rows, and the pages
+    /// reach it through card category labels and each shelf's View All.
+    case caskCategory
     case installed
     /// The favorited slice of Installed, promoted to a place of its own by the
     /// design document. The filter chip on Installed remains; this is the same
@@ -94,6 +101,9 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .caskFeatured: "Featured"
         case .caskTopCharts: "Top Charts"
         case .caskRecentlyAdded: "Recently Added"
+        // The generic fallback; the toolbar overrides it with the selected
+        // category's display name whenever one is resolved.
+        case .caskCategory: "Category"
         case .installed: "Installed"
         case .favorites: "Favorites"
         case .updates: "Updates"
@@ -128,6 +138,9 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         // `clock.badge.plus` does not exist in this SDK's SF Symbols; the
         // calendar variant is the verified nearest match.
         case .caskRecentlyAdded: "calendar.badge.plus"
+        // The generic fallback here too: a rendered category row draws the
+        // vendored catalog's own icon instead.
+        case .caskCategory: "square.grid.3x3"
         case .installed: "shippingbox"
         case .favorites: "heart"
         case .updates: "arrow.up.circle"
