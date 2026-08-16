@@ -33,6 +33,12 @@ public final class CatalogStore {
     /// indirection with no boundary. All the logic stays in nonisolated pure
     /// `Catalog` types — this class gains a value, not behaviour.
     public private(set) var discover: DiscoverContent = .empty
+    /// What the cask browse page renders for the adopted snapshot.
+    ///
+    /// Built beside `discover` in the same adoption, installed in the same
+    /// main-actor turn: an observer must never see a fresh index next to a
+    /// stale browse page, for exactly the reason `discover` states.
+    public private(set) var caskBrowse: CaskBrowseContent = .empty
 
     /// The as-you-type query. Reranks on assignment.
     public var query: String = "" {
@@ -55,6 +61,13 @@ public final class CatalogStore {
     @ObservationIgnored private var index = PackageSearchIndex()
     /// The shipped curated resource, decoded at most once per launch.
     @ObservationIgnored private var loadedCuratedList: CuratedDiscoveryList?
+    /// The vendored CaskHub resources, decoded at most once per launch.
+    ///
+    /// ~920 KB of JSON between them, so they load lazily on the first
+    /// adoption's `@concurrent` build path — never on the launch path — and
+    /// then stay cached: the bundle cannot change while the app is running.
+    @ObservationIgnored private var loadedCaskCategoryCatalog: CaskCategoryCatalog?
+    @ObservationIgnored private var loadedCaskAddedDates: CaskAddedDates?
     @ObservationIgnored private var isRunning = false
     /// Stamped before each adoption's build; only an ordinal still ahead of
     /// `installedSequence` may install.
@@ -222,6 +235,12 @@ public final class CatalogStore {
                 arrivals: arrivals,
                 now: await engine.now
             )
+            let browse = await CaskBrowseProjection.build(
+                snapshot: snapshot,
+                catalog: await caskCategoryCatalog(),
+                addedDates: await caskAddedDates(),
+                now: await engine.now
+            )
             // Builds can finish out of order — a 16k snapshot overtaken by a
             // small one. The newer catalog wins, so a stale ordinal is discarded
             // here rather than installed on top of fresher data (design D1).
@@ -232,6 +251,7 @@ public final class CatalogStore {
             index = built
             packageCount = built.recordCount
             discover = projected
+            caskBrowse = browse
             rerank()
         }
         adoptionInFlight = adoption
@@ -252,6 +272,25 @@ public final class CatalogStore {
         if let loadedCuratedList { return loadedCuratedList }
         let loaded = try? await CuratedDiscoveryList.shipped()
         loadedCuratedList = loaded
+        return loaded
+    }
+
+    /// The vendored category catalog, decoded once per launch — same contract
+    /// as `curatedList()`: a resource that fails to load leaves the browse
+    /// page without category shelves, which is a designed outcome.
+    private func caskCategoryCatalog() async -> CaskCategoryCatalog? {
+        if let loadedCaskCategoryCatalog { return loadedCaskCategoryCatalog }
+        let loaded = await CaskCategoryCatalog.shipped()
+        loadedCaskCategoryCatalog = loaded
+        return loaded
+    }
+
+    /// The vendored added dates, decoded once per launch. Absent data means
+    /// "nothing is recent", never an error — the projection's own rule.
+    private func caskAddedDates() async -> CaskAddedDates? {
+        if let loadedCaskAddedDates { return loadedCaskAddedDates }
+        let loaded = await CaskAddedDates.shipped()
+        loadedCaskAddedDates = loaded
         return loaded
     }
 

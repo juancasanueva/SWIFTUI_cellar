@@ -492,6 +492,15 @@ nonisolated final class AppTestReleaseNotesProtocol: URLProtocol {
     }
 }
 
+/// The no-network charts source for UI-test launches.
+///
+/// Every period answers empty, so the Top Charts page renders the annual
+/// ranking the catalog already carries and no request is ever issued —
+/// the `CaskIconLoader(isDisabled:)` rule, restated for this seam.
+struct AppTestCaskChartsSource: CaskChartsSource {
+    func fetchCounts(period: CaskChartsPeriod) async throws -> [String: Int] { [:] }
+}
+
 struct AppTestProcessLauncher: ProcessLaunching {
     func launch(_ spec: ProcessSpec) throws -> any LaunchedProcess {
         AppTestLaunchedProcess()

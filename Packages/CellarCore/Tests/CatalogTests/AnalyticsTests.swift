@@ -55,6 +55,24 @@ struct AnalyticsTests {
         #expect(index.count(for: PackageID(kind: .formula, name: "claude-code")) == nil)
     }
 
+    @Test("countsByName exposes one kind's decoded counts keyed by bare token")
+    func countsByNameExposesOneKindKeyedByToken() throws {
+        let index = try AnalyticsIndex.decode(
+            Fixture.data("analytics-formula-365d"),
+            kind: .formula
+        )
+        .merging(
+            try AnalyticsIndex.decode(Fixture.data("analytics-cask-365d"), kind: .cask)
+        )
+
+        let caskCounts = index.countsByName(kind: .cask)
+
+        // The charts seam's shape: bare tokens, one namespace, nothing leaked.
+        #expect(caskCounts["claude-code"] == 1_070_144)
+        #expect(caskCounts["visual-studio-code"] == 494_727)
+        #expect(caskCounts["gh"] == nil)
+    }
+
     @Test("A package with no analytics entry has an absent count, not zero")
     func missingEntryIsAbsent() throws {
         let index = try AnalyticsIndex.decode(
