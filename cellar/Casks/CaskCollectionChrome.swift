@@ -202,6 +202,24 @@ struct CaskCollectionView: View {
     }
 }
 
+/// The one verb a cask's state earns — update over installed over install,
+/// and nothing at all for an identity brew cannot target. Resolved in one
+/// place so the card and the list row style the same decision rather than
+/// re-deriving it.
+enum CaskActionState {
+    case update(PackageTarget)
+    case installed
+    case install(PackageTarget)
+
+    static func resolve(_ package: CatalogPackage, installed: InstalledStore) -> CaskActionState? {
+        guard let target = PackageTarget(package.id) else { return nil }
+        let installedPackage = installed.inventory.package(package.id)
+        if let installedPackage, installedPackage.isOutdated { return .update(target) }
+        if installedPackage != nil { return .installed }
+        return .install(target)
+    }
+}
+
 /// The list-mode row: the card's facts at row density.
 struct CaskListRow: View {
     let package: CatalogPackage
@@ -220,7 +238,7 @@ struct CaskListRow: View {
         HStack(spacing: 12) {
             CaskIconView(
                 token: package.name,
-                size: 30,
+                size: 44,
                 isKnownToken: assets.isKnownIconToken(package.name),
                 iconLoader: iconLoader
             )
@@ -247,11 +265,67 @@ struct CaskListRow: View {
             ))
             .font(Theme.mono(9.5))
             .foregroundStyle(Theme.textTertiary)
+            actionPill
         }
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
         .background(Theme.rowFill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("cask-row-\(package.name)")
+    }
+
+    @Environment(ThemeStore.self) private var theme
+
+    /// The card's verb at pill density: a fixed-width capsule so the trailing
+    /// column lines up row over row.
+    @ViewBuilder
+    private var actionPill: some View {
+        switch CaskActionState.resolve(package, installed: installed) {
+        case .update(let target):
+            pillButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
+                submit(.upgrade(target))
+            }
+        case .installed:
+            // Not a button: there is nothing further to do from a row.
+            Text("● Installed")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.successText)
+                .frame(width: 100, height: 25)
+                .background(Theme.successTint(0.15), in: Capsule())
+        case .install(let target):
+            pillButton("↓ Install", identifier: "cask-install-\(package.name)") {
+                submit(.install(target))
+            }
+        case nil:
+            EmptyView()
+        }
+    }
+
+    private func pillButton(
+        _ label: String,
+        identifier: String,
+        fill: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.light)
+                .frame(width: 100, height: 25)
+                .background(fill ?? theme.tint(0.12), in: Capsule())
+                .overlay(Capsule().strokeBorder(theme.tint(0.35), lineWidth: 0.5))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!operations.isAvailable)
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// The `PackageDetailView` idiom, verbatim: the confirmation rule is
+    /// applied in exactly one place.
+    private func submit(_ command: MutationCommand) {
+        if operations.request(command) == nil {
+            operations.submit(command)
+        }
     }
 }
 

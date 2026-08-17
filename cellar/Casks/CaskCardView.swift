@@ -55,7 +55,7 @@ struct CaskCardView: View {
         HStack(alignment: .top, spacing: 10) {
             CaskIconView(
                 token: package.name,
-                size: 38,
+                size: 44,
                 isKnownToken: assets.isKnownIconToken(package.name),
                 iconLoader: iconLoader
             )
@@ -98,34 +98,34 @@ struct CaskCardView: View {
             .lineLimit(1)
     }
 
-    /// One verb by state priority — update, installed, install — and **no**
-    /// affordance at all for an identity brew cannot target.
+    /// One verb by `CaskActionState`'s priority — update, installed, install —
+    /// and **no** affordance at all for an identity brew cannot target.
     @ViewBuilder
     private var actionRow: some View {
-        if let target = PackageTarget(package.id) {
-            let installedPackage = installed.inventory.package(package.id)
-            if let installedPackage, installedPackage.isOutdated {
-                // Louder than Install: an update is the verb that most often
-                // brings a user here, the sidebar badge's own rule.
-                actionButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
-                    submit(.upgrade(target))
-                }
-            } else if installedPackage != nil {
-                // Not a button: there is nothing further to do from a card.
-                Text("● Installed")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(Theme.successText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 28)
-                    .background(
-                        Theme.successTint(0.15),
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    )
-            } else {
-                actionButton("↓ Install", identifier: "cask-install-\(package.name)") {
-                    submit(.install(target))
-                }
+        switch CaskActionState.resolve(package, installed: installed) {
+        case .update(let target):
+            // Louder than Install: an update is the verb that most often
+            // brings a user here, the sidebar badge's own rule.
+            actionButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
+                submit(.upgrade(target))
             }
+        case .installed:
+            // Not a button: there is nothing further to do from a card.
+            Text("● Installed")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.successText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .background(
+                    Theme.successTint(0.15),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+        case .install(let target):
+            actionButton("↓ Install", identifier: "cask-install-\(package.name)") {
+                submit(.install(target))
+            }
+        case nil:
+            EmptyView()
         }
     }
 
