@@ -188,7 +188,10 @@ struct CaskCollectionView: View {
                 }
             }
         } else {
-            VStack(spacing: 8) {
+            // Lazy like the grid: Top Charts and Recently Added hand this the
+            // whole uncapped universe, and an eager VStack builds every row
+            // before the first frame — the beachball the grid never showed.
+            LazyVStack(spacing: 8) {
                 ForEach(casks) { cask in
                     CaskListRow(
                         package: cask,
