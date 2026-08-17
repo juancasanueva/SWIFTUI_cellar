@@ -59,31 +59,32 @@ struct AppSectionPlacementTests {
     /// groups plus a Settings footer, together covering every section exactly
     /// once — a section outside the arrangement would be unreachable.
     ///
-    /// **Amended, never weakened**, when the category pages landed.
-    /// `.caskCategory` is the coverage rule's one deliberate exception: it is a
-    /// single case standing for eighteen data-driven pages, selected by a
-    /// category id the shell holds *beside* the section, so no fixed
-    /// `sidebarGroups` row could name it honestly. It is not unreachable — it
-    /// is reached through the sidebar's data-driven CATEGORIES rows, the
-    /// cards' category labels, and the browse shelves' View All. Every other
-    /// section must still appear in the arrangement exactly once, and
-    /// `.caskCategory` must appear in **no** group at all: a static row for it
-    /// would either point at an arbitrary category or at none.
+    /// **Amended twice, never weakened.** When the category pages landed,
+    /// `.caskCategory` was the coverage rule's one deliberate exception: a
+    /// single case behind eighteen data-driven CATEGORIES rows, in no fixed
+    /// group. The maintainer then retired those rows (2026-08-17) — eighteen
+    /// rows cost more sidebar than they earned — and gave the section a static
+    /// "Categories" row in Discover Casks instead, opening a list-and-detail
+    /// arrangement: categories in the list pane, the selected category's page
+    /// in the detail. The row no longer points at an arbitrary category; it
+    /// points at the list of them, so the old objection to a static row no
+    /// longer applies, and the coverage rule holds with no exception at all.
     @MainActor
     @Test("The sidebar groups plus the footer cover every section exactly once")
     func sidebarGroupsCoverEverySectionOnce() {
         let arranged = AppSection.sidebarGroups.flatMap(\.sections) + AppSection.sidebarFooter
-        #expect(arranged.count == AppSection.allCases.count - 1)
-        #expect(Set(arranged + [AppSection.caskCategory]) == Set(AppSection.allCases))
-        #expect(
-            arranged.contains(.caskCategory) == false,
-            "the category page took a static sidebar row; it is reachable only through data-driven rows"
-        )
+        #expect(arranged.count == AppSection.allCases.count)
+        #expect(Set(arranged) == Set(AppSection.allCases))
 
         #expect(AppSection.sidebarGroups.map(\.title) == [
             "Overview", "Discover Casks", "Packages", "Insights", "Manage"
         ])
         #expect(AppSection.sidebarFooter == [.settings])
+        // Categories closes Discover Casks, after Recently Added — the row
+        // that reclaimed the data-driven CATEGORIES group's vertical space.
+        #expect(AppSection.sidebarGroups[1].sections == [
+            .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
+        ])
         // Health leads Insights, which is the design's placement of PRD §5's
         // "between Services and Security": Services closes the group before it,
         // Security follows it.

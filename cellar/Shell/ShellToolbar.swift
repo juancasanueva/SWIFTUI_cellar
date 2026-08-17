@@ -50,9 +50,18 @@ struct ShellHeaderControls: View {
     @State private var isRefreshing = false
 
     var body: some View {
+        // The pair's degradation order in a tight bar: full labels, then
+        // icon-only — a whole label or none, never "Ref…".
+        ViewThatFits(in: .horizontal) {
+            controls(iconOnly: false)
+            controls(iconOnly: true)
+        }
+    }
+
+    private func controls(iconOnly: Bool) -> some View {
         HStack(spacing: 8) {
             button(
-                label: "Refresh",
+                label: iconOnly ? nil : "Refresh",
                 systemImage: "arrow.clockwise",
                 identifier: "shell-refresh",
                 spinning: isRefreshing
@@ -64,18 +73,20 @@ struct ShellHeaderControls: View {
                     isRefreshing = false
                 }
             }
+            .help("Refresh")
             button(
-                label: "Activity",
+                label: iconOnly ? nil : "Activity",
                 systemImage: "terminal",
                 identifier: "shell-activity"
             ) {
                 isActivityExpanded.toggle()
             }
+            .help("Activity")
         }
     }
 
     private func button(
-        label: String,
+        label: String?,
         systemImage: String,
         identifier: String,
         spinning: Bool = false,
@@ -93,14 +104,19 @@ struct ShellHeaderControls: View {
                             : .default,
                         value: spinning
                     )
-                Text(label)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.72))
+                if let label {
+                    Text(label)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                }
             }
             .padding(.horizontal, 11)
             .frame(height: 26)
             .background(Theme.controlFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            // Never truncates: in a tight bar the flexible search field is
+            // what gives, not these labels.
+            .fixedSize()
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)

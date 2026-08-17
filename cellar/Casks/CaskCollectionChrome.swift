@@ -123,7 +123,10 @@ struct CaskCollectionTopBar<Accessory: View>: View {
             }
         }
         .padding(.horizontal, 10)
-        .frame(width: 240, height: 26)
+        // Flexible on purpose: in a narrow pane the search field is what
+        // shrinks, so the fixed-size controls beside it never truncate.
+        .frame(minWidth: 110, maxWidth: 240)
+        .frame(height: 26)
         .background(Theme.controlFill, in: Capsule())
         .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
     }

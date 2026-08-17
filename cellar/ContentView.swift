@@ -89,11 +89,23 @@ struct ContentView: View {
     /// worth having.
     private static let listPaneRange: ClosedRange<Double> = 260...600
 
+    /// What the detail pane keeps before the list pane starts giving width
+    /// back: roughly one grid column plus the pinned bar's icon-only minimum.
+    private static let detailPaneReserve: Double = 480
+
+    /// The list pane's rendered width: the user's dragged choice, narrowed —
+    /// never below the range's floor — when the window cannot host it beside
+    /// `detailPaneReserve`. The stored preference is untouched, so widening
+    /// the window restores exactly the width the user picked.
+    private func clampedListWidth(available: Double) -> Double {
+        min(listPaneWidth, max(Self.listPaneRange.lowerBound, available - Self.detailPaneReserve))
+    }
+
     /// The sections whose left pane is the resizable list. A `Set` rather than
     /// a fourth `AppSection` switch on purpose: the placement suite pins the
     /// shell to exactly two exhaustive switches (content and detail).
     private static let listSections: Set<AppSection> = [
-        .discover, .browse, .installed, .favorites, .updates,
+        .discover, .browse, .caskCategory, .installed, .favorites, .updates,
         .taps, .services, .security,
     ]
 
@@ -126,8 +138,6 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $sidebarVisibility) {
             SidebarView(
                 section: $section,
-                categoryID: $caskCategoryID,
-                catalog: catalog,
                 installed: installed,
                 metadata: metadata,
                 services: services,
@@ -136,7 +146,12 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 220, ideal: 228, max: 300)
         } detail: {
-            VStack(spacing: 0) {
+            // A GeometryReader rather than a plain stack: the pinned cask bars
+            // give the detail pane a hard minimum width, and an HStack whose
+            // children's minimums exceed the column overflows *centred* — which
+            // slides the list pane under the sidebar. The list yields width
+            // first, and whatever still cannot fit clips off the trailing edge.
+            GeometryReader { geometry in
                 HStack(spacing: 0) {
                     if let detail = detailPane {
                         // The width lives on the pane, not on the view inside
@@ -145,7 +160,7 @@ struct ContentView: View {
                         // detail column's empty state had nothing to stretch it.
                         if Self.listSections.contains(section) {
                             NavigationStack { content }
-                                .frame(width: listPaneWidth)
+                                .frame(width: clampedListWidth(available: geometry.size.width))
                             PaneResizeDivider(width: $listPaneWidth, range: Self.listPaneRange)
                             NavigationStack { detail }
                                 .frame(maxWidth: .infinity)
@@ -161,6 +176,11 @@ struct ContentView: View {
                         NavigationStack { content }
                     }
                 }
+                // Leading-aligned, not clipped: an overflowing pane row spills
+                // off the window's own trailing edge, while the pinned cask
+                // bars keep their rise above these bounds into the titlebar
+                // region — which `.clipped()` here was cutting off entirely.
+                .frame(width: geometry.size.width, alignment: .leading)
             }
             .background(Theme.windowBackground)
             // Into the native toolbar row rather than a drawn strip: macOS
@@ -254,15 +274,7 @@ struct ContentView: View {
                 shellControls: shellHeaderControls
             )
         case .caskCategory:
-            CaskCategoryView(
-                catalog: catalog,
-                installed: installed,
-                operations: operations,
-                assets: caskAssets,
-                iconLoader: caskIcons,
-                categoryID: caskCategoryID,
-                shellControls: shellHeaderControls
-            )
+            CaskCategoriesListView(catalog: catalog, selection: $caskCategoryID)
         case .installed:
             InstalledListView(
                 installed: installed,
@@ -355,10 +367,24 @@ struct ContentView: View {
     private var detailPane: AnyView? {
         switch section {
         case .home, .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded,
-             .caskCategory, .cleanup, .brewfile, .history, .settings:
-            // The cask pages are full-width like CaskHub's own; nothing here
-            // drives the shared package detail column.
+             .cleanup, .brewfile, .history, .settings:
+            // The cask collection pages are full-width like CaskHub's own;
+            // nothing here drives the shared package detail column.
             return nil
+        case .caskCategory:
+            // The one cask page that is not full-width: the categories list
+            // pane drives this detail, the selected category's own page.
+            return AnyView(
+                CaskCategoryView(
+                    catalog: catalog,
+                    installed: installed,
+                    operations: operations,
+                    assets: caskAssets,
+                    iconLoader: caskIcons,
+                    categoryID: caskCategoryID,
+                    shellControls: shellHeaderControls
+                )
+            )
         case .services:
             return AnyView(ServiceDetailView(services: services))
         case .taps:

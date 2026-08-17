@@ -9,22 +9,18 @@ import Persistence
 import SecurityKit
 import SwiftUI
 
-/// The sidebar column: the labelled groups, a data-driven CATEGORIES group,
-/// and a Settings footer, drawn on the system sidebar material
-/// `NavigationSplitView` provides — which is what buys the native toggle, the
-/// collapse animation, and the window's rounded corners for free.
+/// The sidebar column: the labelled groups and a Settings footer, drawn on the
+/// system sidebar material `NavigationSplitView` provides — which is what buys
+/// the native toggle, the collapse animation, and the window's rounded corners
+/// for free.
 ///
 /// Every count badge reads a store the shell already owns; the sidebar keeps no
-/// state of its own beyond the bindings it is handed. The CATEGORIES group is
-/// the one group not in `AppSection.sidebarGroups`: its rows come from the
-/// vendored category catalog, one per `caskBrowse.categories` entry, all
-/// selecting the single `.caskCategory` section with a different category id.
+/// state of its own beyond the bindings it is handed. The data-driven
+/// CATEGORIES group that used to close the column was retired (2026-08-17) for
+/// the vertical space it cost: the categories now live in the Categories
+/// section's own list pane.
 struct SidebarView: View {
     @Binding var section: AppSection
-    /// Which category page `.caskCategory` shows; written by the category
-    /// rows, read for their selected state.
-    @Binding var categoryID: String?
-    let catalog: CatalogStore
     let installed: InstalledStore
     let metadata: MetadataStore
     let services: ServicesStore
@@ -43,18 +39,6 @@ struct SidebarView: View {
                             groupHeader(group.title)
                             ForEach(group.sections) { item in
                                 row(item)
-                            }
-                        }
-                    }
-                    // Last on purpose, mirroring CaskHub: the fixed sections
-                    // first, then the catalog's own vocabulary. Nothing at all
-                    // until the vendored catalog has been adopted — an empty
-                    // header would promise rows that cannot come.
-                    if catalog.caskBrowse.categories.isEmpty == false {
-                        VStack(spacing: 1) {
-                            groupHeader("Categories")
-                            ForEach(catalog.caskBrowse.categories) { category in
-                                categoryRow(category)
                             }
                         }
                     }
@@ -95,25 +79,7 @@ struct SidebarView: View {
         }
     }
 
-    /// One category's row: the vendored icon and name, the uncapped count, and
-    /// selection that reads *both* halves of the shell's state — every
-    /// category row selects the same section, so the id is what distinguishes
-    /// the highlighted one.
-    private func categoryRow(_ category: CaskCategorySummary) -> some View {
-        rowBody(
-            icon: category.icon,
-            title: category.displayName,
-            isSelected: section == .caskCategory && categoryID == category.id,
-            badge: neutralBadge(catalog.caskBrowse.categoryCounts[category.id] ?? 0),
-            identifier: "sidebar-category-\(category.id)"
-        ) {
-            categoryID = category.id
-            section = .caskCategory
-        }
-    }
-
-    /// The one row body both kinds of row share, so a category row is
-    /// indistinguishable from a section row by look.
+    /// The one row body every row shares.
     private func rowBody(
         icon: String,
         title: String,
