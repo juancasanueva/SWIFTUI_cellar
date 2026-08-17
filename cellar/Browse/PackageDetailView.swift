@@ -729,21 +729,6 @@ struct PackageDetailView: View {
     }
 }
 
-private struct SectionHeader: View {
-    let title: String
-
-    init(_ title: String) { self.title = title }
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .bold))
-            .kerning(0.66)
-            .textCase(.uppercase)
-            .foregroundStyle(Color.white.opacity(0.34))
-            .padding(.top, 4)
-    }
-}
-
 /// The design's status pill: a dot beside a short word on a tinted capsule.
 struct PillBadge: View {
     enum Tone { case accent, success, danger, neutral }

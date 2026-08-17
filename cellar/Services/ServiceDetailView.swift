@@ -13,6 +13,9 @@ import SwiftUI
 /// lazily when the selection changed — never on a poll tick.
 struct ServiceDetailView: View {
     let services: ServicesStore
+    /// The five verbs submit through the same guarded path everything else
+    /// uses; this pane is where they moved when the list rows went compact.
+    let operations: OperationCenter
     /// The seam. `BrewClient` owns the protocol; this target owns the single
     /// `NSWorkspace` implementation.
     var opener: any LogFileOpening = WorkspaceLogFileOpener()
@@ -43,43 +46,75 @@ struct ServiceDetailView: View {
 
     private func content(for detail: ServiceDetail) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 22) {
                 header(for: detail)
-                Divider()
+                controls(for: detail)
                 facts(for: detail)
-                Divider()
                 logs(for: detail)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(EdgeInsets(top: 24, leading: 30, bottom: 34, trailing: 30))
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .background(Theme.windowBackground)
+    }
+
+    /// The package detail's identity row, in service terms: name, then the
+    /// status chip beside what it runs as.
+    private func header(for detail: ServiceDetail) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(detail.name)
+                .font(.system(size: 23, weight: .semibold))
+                .kerning(-0.5)
+                .foregroundStyle(Theme.textPrimary)
+                .textSelection(.enabled)
+            HStack(spacing: 9) {
+                ServiceStatusTag(status: detail.status)
+                if let user = detail.user {
+                    Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
+                    Text("runs as \(user)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
         }
     }
 
-    private func header(for detail: ServiceDetail) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(detail.name)
-                .font(.title2)
-                .textSelection(.enabled)
-            ServiceStatusTag(status: detail.status)
+    /// The five verbs, where their labels have the width the list rows never
+    /// could give them.
+    @ViewBuilder
+    private func controls(for detail: ServiceDetail) -> some View {
+        if let record = services.services.first(where: { $0.name == detail.name }) {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeader("Actions")
+                ServiceControls(service: record, operations: operations)
+            }
         }
     }
 
     @ViewBuilder
     private func facts(for detail: ServiceDetail) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let user = detail.user {
-                LabeledContent("User", value: user)
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader("Details")
             if let pid = detail.pid {
-                LabeledContent("Process", value: String(pid))
+                fact("Process", String(pid))
             }
             if let plist = detail.plistPath {
-                LabeledContent("Property list") {
-                    Text(plist.path)
-                        .font(.caption)
-                        .textSelection(.enabled)
-                }
+                fact("Property list", plist.path)
             }
+        }
+    }
+
+    private func fact(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.system(size: 10.5, weight: .semibold))
+                .kerning(0.4)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.white.opacity(0.34))
+            Text(value)
+                .font(Theme.mono(12))
+                .foregroundStyle(Color.white.opacity(0.72))
+                .textSelection(.enabled)
         }
     }
 
@@ -91,22 +126,22 @@ struct ServiceDetailView: View {
     /// declaring none says so, and shows no empty or placeholder path.
     @ViewBuilder
     private func logs(for detail: ServiceDetail) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Logs")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("Logs")
             if detail.logPaths.isEmpty {
                 Text("This service declares no log location.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.white.opacity(0.45))
             } else {
                 ForEach(detail.logPaths, id: \.self) { url in
                     HStack(spacing: 8) {
                         Text(url.path)
-                            .font(.caption)
+                            .font(Theme.mono(12))
+                            .foregroundStyle(Color.white.opacity(0.72))
                             .textSelection(.enabled)
                         Spacer(minLength: 0)
                         Button("Open in Console") { opener.open(url) }
-                            .buttonStyle(.borderless)
+                            .buttonStyle(ActionPillStyle())
                     }
                 }
             }
@@ -153,7 +188,11 @@ struct WorkspaceLogFileOpener: LogFileOpening {
 }
 
 #Preview {
-    ServiceDetailView(services: ServicesStore(), opener: NoLogFileOpening())
+    ServiceDetailView(
+        services: ServicesStore(),
+        operations: OperationCenter(),
+        opener: NoLogFileOpening()
+    )
 }
 
 #Preview("Nothing selected") {
