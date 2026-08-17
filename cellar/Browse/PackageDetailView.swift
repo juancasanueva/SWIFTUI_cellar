@@ -41,6 +41,11 @@ struct PackageDetailView: View {
         if let id {
             if let package = catalog.package(id) {
                 content(for: package)
+            } else if let snapshot = installed.inventory.package(id) {
+                // No catalog record, but the machine has it: the snapshot
+                // still carries the identity row, so the package can be
+                // favorited without a catalog entry (installed-inventory II7).
+                uncatalogedContent(for: snapshot)
             } else {
                 ContentUnavailableView(
                     "Package details unavailable",
@@ -340,30 +345,77 @@ struct PackageDetailView: View {
     @ViewBuilder
     private func header(for package: CatalogPackage) -> some View {
         let installedPackage = installed.inventory.package(package.id)
+        header(
+            id: package.id,
+            displayName: package.displayName,
+            versionStory: versionStory(package: package, installed: installedPackage),
+            installed: installedPackage
+        ) {
+            headerPrimaryButton(package: package, installed: installedPackage)
+        }
+    }
+
+    /// The header alone, for an installed package the catalog does not list.
+    /// No tabs and no primary verb — the catalog record those need is exactly
+    /// what is absent — but the identity row and the heart still stand.
+    @ViewBuilder
+    private func uncatalogedContent(for snapshot: InstalledPackage) -> some View {
+        VStack(spacing: 0) {
+            header(
+                id: snapshot.id,
+                displayName: snapshot.displayName,
+                versionStory: versionStory(installed: snapshot),
+                installed: snapshot
+            ) {
+                EmptyView()
+            }
+            .padding(EdgeInsets(top: 24, leading: 30, bottom: 0, trailing: 30))
+            ContentUnavailableView(
+                "No further details",
+                systemImage: "shippingbox",
+                description: Text("This installed package is not in Cellar’s core/cask catalog.")
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(Theme.windowBackground)
+        .navigationTitle(snapshot.displayName)
+    }
+
+    /// The one identity row both paths render: tile, name, version story, kind,
+    /// status and the heart — fed by the catalog record when there is one and
+    /// by the snapshot alone when there is not.
+    @ViewBuilder
+    private func header(
+        id: PackageID,
+        displayName: String,
+        versionStory: String,
+        installed installedPackage: InstalledPackage?,
+        @ViewBuilder primaryButton: () -> some View
+    ) -> some View {
         HStack(alignment: .top, spacing: 18) {
-            PackageTile(name: package.name, size: 62, fontSize: 24, cornerRadius: 15)
+            PackageTile(name: id.name, size: 62, fontSize: 24, cornerRadius: 15)
             VStack(alignment: .leading, spacing: 7) {
-                Text(package.displayName)
+                Text(displayName)
                     .font(.system(size: 23, weight: .semibold))
                     .kerning(-0.5)
                     .foregroundStyle(Theme.textPrimary)
                     .textSelection(.enabled)
                 HStack(spacing: 9) {
-                    Text(versionStory(package: package, installed: installedPackage))
+                    Text(versionStory)
                         .font(Theme.mono(12))
                         .foregroundStyle(Theme.textSecondary)
                     Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
-                    Text(package.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
+                    Text(id.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.textSecondary)
-                    statusBadge(package: package, installed: installedPackage)
+                    statusBadge(installed: installedPackage)
                 }
             }
             .padding(.top, 3)
             Spacer(minLength: 0)
-            headerPrimaryButton(package: package, installed: installedPackage)
+            primaryButton()
                 .padding(.top, 6)
-            favoriteButton(for: package)
+            favoriteButton(for: id)
                 .padding(.top, 6)
         }
     }
@@ -390,6 +442,10 @@ struct PackageDetailView: View {
 
     private func versionStory(package: CatalogPackage, installed: InstalledPackage?) -> String {
         guard let installed else { return package.version }
+        return versionStory(installed: installed)
+    }
+
+    private func versionStory(installed: InstalledPackage) -> String {
         if installed.isOutdated {
             return "\(installed.primaryKeg.version) → \(installed.catalogVersion)"
         }
@@ -397,7 +453,7 @@ struct PackageDetailView: View {
     }
 
     @ViewBuilder
-    private func statusBadge(package: CatalogPackage, installed: InstalledPackage?) -> some View {
+    private func statusBadge(installed: InstalledPackage?) -> some View {
         if let installed {
             if installed.isOutdated {
                 PillBadge(label: "Update available", tone: .accent)
@@ -412,10 +468,10 @@ struct PackageDetailView: View {
     /// The design's heart, writing through the same metadata store the
     /// Favorites list's heart writes — one favorite, two affordances.
     @ViewBuilder
-    private func favoriteButton(for package: CatalogPackage) -> some View {
-        let isFavorite = metadata.snapshot[package.id]?.isFavorite == true
+    private func favoriteButton(for id: PackageID) -> some View {
+        let isFavorite = metadata.snapshot[id]?.isFavorite == true
         Button {
-            metadata.setFavorite(!isFavorite, for: package.id)
+            metadata.setFavorite(!isFavorite, for: id)
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
                 .font(.system(size: 12, weight: .semibold))
