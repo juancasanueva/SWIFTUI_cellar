@@ -28,6 +28,10 @@ struct HomeView: View {
     let services: ServicesStore
     let history: HistoryStore
     let operations: OperationCenter
+    /// The cask artwork pipeline, for the favorites column's cask rows;
+    /// `nil` — a preview, say — keeps the letter tile (see `PackageIconTile`).
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
     @Binding var section: AppSection
     @Binding var selection: PackageID?
     @Environment(ThemeStore.self) private var theme
@@ -70,6 +74,9 @@ struct HomeView: View {
         }
         .background(Theme.windowBackground)
         .accessibilityIdentifier("home-section")
+        // The manifest gate behind the favorites' icon lookups; idempotent, so
+        // the Discover pages and this page can all ask (see `CaskBrowseAssets`).
+        .task { await assets?.load() }
     }
 
     // MARK: - Header
@@ -304,7 +311,7 @@ struct HomeView: View {
                         .background(Theme.rowFill)
                 } else {
                     ForEach(favorites, id: \.id) { package in
-                        FavoriteRow(package: package) {
+                        FavoriteRow(package: package, assets: assets, iconLoader: iconLoader) {
                             selection = package.id
                             section = .installed
                         }
@@ -493,13 +500,21 @@ private struct RecentActivityRow: View {
 
 private struct FavoriteRow: View {
     let package: InstalledPackage
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
     let open: () -> Void
     @Environment(ThemeStore.self) private var theme
 
     var body: some View {
         Button(action: open) {
             HStack(spacing: 11) {
-                PackageTile(name: package.name, size: 26, fontSize: 12)
+                PackageIconTile(
+                    id: package.id,
+                    size: 30,
+                    fontSize: 13,
+                    assets: assets,
+                    iconLoader: iconLoader
+                )
                 Text(package.displayName)
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)

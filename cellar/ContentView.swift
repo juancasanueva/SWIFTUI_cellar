@@ -289,6 +289,8 @@ struct ContentView: View {
                 services: services,
                 history: history,
                 operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
                 section: $section,
                 selection: $selection
             )
@@ -298,6 +300,8 @@ struct ContentView: View {
                 installed: installed,
                 operations: operations,
                 diskUsage: diskUsage,
+                assets: caskAssets,
+                iconLoader: caskIcons,
                 selection: $selection
             )
         case .caskBrowse:
@@ -379,6 +383,8 @@ struct ContentView: View {
                 catalog: catalog,
                 operations: operations,
                 metadata: metadata,
+                assets: caskAssets,
+                iconLoader: caskIcons,
                 selection: $selection
             )
         case .favorites:
@@ -387,6 +393,8 @@ struct ContentView: View {
                 catalog: catalog,
                 operations: operations,
                 metadata: metadata,
+                assets: caskAssets,
+                iconLoader: caskIcons,
                 selection: $selection,
                 lens: .favorites
             )
@@ -396,6 +404,8 @@ struct ContentView: View {
                 catalog: catalog,
                 operations: operations,
                 metadata: metadata,
+                assets: caskAssets,
+                iconLoader: caskIcons,
                 selection: $selection,
                 lens: .updates
             )
@@ -515,6 +525,8 @@ struct ContentView: View {
                     operations: operations,
                     metadata: metadata,
                     diskUsage: diskUsage,
+                    assets: caskAssets,
+                    iconLoader: caskIcons,
                     id: selection,
                     selection: $selection
                 )

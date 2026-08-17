@@ -40,6 +40,10 @@ struct InstalledListView: View {
     let catalog: CatalogStore
     let operations: OperationCenter
     let metadata: MetadataStore
+    /// The cask artwork pipeline; `nil` — a preview, say — keeps the letter
+    /// tile for every row (see `PackageIconTile`).
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
     @Binding var selection: PackageID?
     var lens: InstalledLens = .all
 
@@ -141,6 +145,9 @@ struct InstalledListView: View {
         // activation, and within the quiet window of any external change, so a
         // button here would only ever duplicate work already scheduled.
         .background(Color.white.opacity(0.014))
+        // The manifest gate behind each row's icon lookup; idempotent, so the
+        // Discover pages and this list can all ask (see `CaskBrowseAssets`).
+        .task { await assets?.load() }
         .onAppear {
             adoptExternalSelection(selection)
             dropForeignSelection()
@@ -167,7 +174,9 @@ struct InstalledListView: View {
             entry: entry,
             operations: operations,
             metadata: metadata,
-            showsFavoriteHeart: lens == .favorites
+            showsFavoriteHeart: lens == .favorites,
+            assets: assets,
+            iconLoader: iconLoader
         )
             .tag(entry.id)
             .themedListSelection(isSelected: selected.contains(entry.id))

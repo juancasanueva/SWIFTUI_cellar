@@ -24,10 +24,14 @@ struct InstalledRow: View {
     /// The heart is a management affordance, so only the Favorites lens shows
     /// it; everywhere else the detail pane's heart is the favorite control.
     var showsFavoriteHeart = false
+    /// The cask artwork pipeline; `nil` — a preview, say — keeps the letter
+    /// tile for every row (see `PackageIconTile`).
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
 
     var body: some View {
         HStack(spacing: 10) {
-            PackageTile(name: entry.id.name)
+            PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(entry.displayName)

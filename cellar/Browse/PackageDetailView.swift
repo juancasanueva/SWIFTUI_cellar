@@ -22,6 +22,10 @@ struct PackageDetailView: View {
     /// Read only for the "Size on disk" fact — the same measurement Cleanup
     /// and the Search list show. Nothing here starts a scan.
     let diskUsage: DiskUsageStore
+    /// The cask artwork pipeline; `nil` — a preview, say — keeps the letter
+    /// tile in the header (see `PackageIconTile`).
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
     let id: PackageID?
     @Binding var selection: PackageID?
     @Environment(ThemeStore.self) private var theme
@@ -393,7 +397,14 @@ struct PackageDetailView: View {
         @ViewBuilder primaryButton: () -> some View
     ) -> some View {
         HStack(alignment: .top, spacing: 18) {
-            PackageTile(name: id.name, size: 62, fontSize: 24, cornerRadius: 15)
+            PackageIconTile(
+                id: id,
+                size: 72,
+                fontSize: 27,
+                cornerRadius: 17,
+                assets: assets,
+                iconLoader: iconLoader
+            )
             VStack(alignment: .leading, spacing: 7) {
                 Text(displayName)
                     .font(.system(size: 23, weight: .semibold))
