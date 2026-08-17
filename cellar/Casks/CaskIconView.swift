@@ -4,6 +4,7 @@
 //
 
 import AppKit
+import Catalog
 import SwiftUI
 
 /// A cask's artwork in a rounded well — or Cellar's own letter tile while the
@@ -49,6 +50,40 @@ struct CaskIconView: View {
         .task(id: token) {
             guard loadsRemote else { return }
             icon = await iconLoader.icon(for: token, isKnownToken: isKnownToken)
+        }
+    }
+}
+
+/// The front tile of a mixed formula-and-cask list: a cask gets the Discover
+/// pages' artwork pipeline, a formula keeps the letter tile — CaskFlow and
+/// App-Fair are cask-app registries, so a formula lookup can only miss.
+///
+/// The pipeline dependencies are optional so a preview, and any list that has
+/// not been handed them, render the letter tile for everything — exactly what
+/// those rows drew before artwork existed.
+struct PackageIconTile: View {
+    let id: PackageID
+    var size: CGFloat = 28
+    var fontSize: CGFloat = 12
+    var cornerRadius: CGFloat = 7
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
+
+    var body: some View {
+        if id.kind == .cask, let iconLoader {
+            CaskIconView(
+                token: id.name,
+                size: size,
+                isKnownToken: assets?.isKnownIconToken(id.name) ?? false,
+                iconLoader: iconLoader
+            )
+        } else {
+            PackageTile(
+                name: id.name,
+                size: size,
+                fontSize: fontSize,
+                cornerRadius: cornerRadius
+            )
         }
     }
 }

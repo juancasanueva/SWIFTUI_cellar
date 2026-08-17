@@ -25,6 +25,10 @@ struct BrowseView: View {
     /// Read only for the per-row size metric — the same measurement Cleanup
     /// shows. Nothing here starts a scan.
     let diskUsage: DiskUsageStore
+    /// The cask artwork pipeline; `nil` — a preview, say — keeps the letter
+    /// tile for every row (see `PackageIconTile`).
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
     @Binding var selection: PackageID?
 
     @State private var hideInstalled = false
@@ -54,7 +58,12 @@ struct BrowseView: View {
 
             List(rows, selection: $selection) { entry in
                 HStack(spacing: 6) {
-                    PackageRow(entry: entry, sizeOnDisk: sizesOnDisk[entry.id])
+                    PackageRow(
+                        entry: entry,
+                        sizeOnDisk: sizesOnDisk[entry.id],
+                        assets: assets,
+                        iconLoader: iconLoader
+                    )
                     Spacer(minLength: 0)
                     MutationMenu(center: operations, entry: entry)
                 }
@@ -69,6 +78,9 @@ struct BrowseView: View {
             }
         }
         .background(Color.white.opacity(0.014))
+        // The manifest gate behind each row's icon lookup; idempotent, so the
+        // Discover pages and this list can all ask (see `CaskBrowseAssets`).
+        .task { await assets?.load() }
     }
 
     private var browse: InstalledBrowse {
