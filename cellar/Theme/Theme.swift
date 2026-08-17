@@ -85,6 +85,9 @@ enum Theme {
 
     /// Informational blue and the cask violet.
     static let infoText = Color(designHex: 0x7FB2E8)
+    static func infoTint(_ opacity: Double) -> Color {
+        Color(.sRGB, red: 127 / 255, green: 178 / 255, blue: 232 / 255, opacity: opacity)
+    }
     static let caskText = Color(designHex: 0xC197E0)
     static func caskTint(_ opacity: Double) -> Color {
         Color(.sRGB, red: 190 / 255, green: 140 / 255, blue: 220 / 255, opacity: opacity)

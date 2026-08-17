@@ -71,17 +71,28 @@ struct HistorySearchField: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.4))
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.textTertiary)
             TextField("Search by package, verb or command", text: $history.search)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.textPrimary)
+            if !history.search.isEmpty {
+                Button {
+                    history.search = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 10)
         .frame(height: 26)
         .frame(maxWidth: 300)
-        .background(Theme.controlFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(Theme.controlFill, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
         .accessibilityIdentifier("history-search-field")
     }
 }
