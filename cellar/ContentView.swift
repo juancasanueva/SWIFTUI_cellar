@@ -156,12 +156,6 @@ struct ContentView: View {
 
     var body: some View {
         shell
-            // An inset rather than a sheet: a mutation is background work, and a
-            // sheet would hold the app hostage while brew compiles. The bar
-            // renders nothing at all when the centre is empty (design D10).
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                ActivityBar(center: operations, isExpanded: $isActivityExpanded)
-            }
             .mutationConfirmation(
                 operations,
                 currentForceEvidence: forceEvidence,
@@ -211,6 +205,15 @@ struct ContentView: View {
                 } else {
                     paneArea
                 }
+            }
+            // An inset rather than a sheet: a mutation is background work, and
+            // a sheet would hold the app hostage while brew compiles. The bar
+            // renders nothing at all when the centre is empty (design D10).
+            // On the detail column, not the whole window: the sidebar column
+            // does not yield to a window-wide bottom inset, so a bar there
+            // paints over its Settings footer instead of above it.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                ActivityBar(center: operations, isExpanded: $isActivityExpanded)
             }
             .background(Theme.windowBackground)
             // Into the native toolbar row rather than a drawn strip: macOS
