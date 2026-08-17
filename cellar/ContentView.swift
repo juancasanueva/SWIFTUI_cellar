@@ -186,9 +186,10 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 220, ideal: 228, max: 300)
         } detail: {
             Group {
-                // Home and Search catalog lead with the discover pages' capsule
-                // card — title and shell controls, no collection controls —
-                // pinned at the shell so it spans the whole pane row.
+                // Home, Search catalog and the installed lenses lead with the
+                // discover pages' capsule card — title and shell controls, no
+                // collection controls — pinned at the shell so it spans the
+                // whole pane row.
                 if Self.shellTitleBarSections.contains(section) {
                     paneArea.caskCollectionTopBarPinned {
                         // The sidebar's wording, not the toolbar's: the row a
@@ -567,17 +568,19 @@ struct ContentView: View {
     /// The sections whose pinned capsule bar is the whole header: the toolbar
     /// row shows no title and no controls for them — the bar names the page
     /// and carries the shared `ShellHeaderControls` itself. The discover pages
-    /// pin their own collection bar; Home and Search catalog get the shell's
-    /// plain `ShellTitleBar` instead.
+    /// pin their own collection bar; the rest get the shell's plain
+    /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
-        .home, .browse,
+        .home, .browse, .installed, .favorites, .updates,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
 
     /// The subset whose bar the shell itself pins — the sections with no
     /// collection controls of their own.
-    private static let shellTitleBarSections: Set<AppSection> = [.home, .browse]
+    private static let shellTitleBarSections: Set<AppSection> = [
+        .home, .browse, .installed, .favorites, .updates,
+    ]
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the
     /// same closure and binding the toolbar row renders everywhere else.

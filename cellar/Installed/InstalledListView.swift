@@ -141,7 +141,6 @@ struct InstalledListView: View {
         // activation, and within the quiet window of any external change, so a
         // button here would only ever duplicate work already scheduled.
         .background(Color.white.opacity(0.014))
-        .navigationTitle(AppSection.installed.title)
         .onAppear {
             adoptExternalSelection(selection)
             dropForeignSelection()
