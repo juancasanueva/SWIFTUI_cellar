@@ -43,6 +43,9 @@ struct HealthView: View {
     /// `.task(id:)` below would rebuild the projection continuously and the
     /// section would become the polling loop this capability forbids.
     @State private var now = Date()
+    /// The weights table, shown on demand from the score's "?" — the surface
+    /// that makes the number arguable moved from a fixed rail to a popover.
+    @State private var isBreakdownPresented = false
 
     @Environment(ThemeStore.self) private var theme
 
@@ -61,7 +64,6 @@ struct HealthView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.windowBackground)
-        .navigationTitle(AppSection.health.title)
         .task(id: inputs) {
             await health.project(inputs, now: now)
         }
@@ -102,6 +104,31 @@ struct HealthView: View {
             if presentation.isScored, let value = Int(presentation.headline) {
                 scoreRing(value: value, headline: presentation.headline)
             }
+            breakdownButton
+        }
+    }
+
+    /// The "?" beside the score, and the only way into the weights table.
+    /// Rendered even while unscorable: the panel then says what was missing,
+    /// which is exactly when the number needs arguing with.
+    private var breakdownButton: some View {
+        Button {
+            isBreakdownPresented.toggle()
+        } label: {
+            Image(systemName: "questionmark.circle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.45))
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(HealthCopy.breakdownTitle)
+        .accessibilityLabel(HealthCopy.breakdownTitle)
+        .accessibilityIdentifier("health-breakdown-toggle")
+        .popover(isPresented: $isBreakdownPresented, arrowEdge: .bottom) {
+            HealthBreakdownPanel(health: health)
+                .frame(width: 420, height: 460)
+                .background(Theme.windowBackground)
         }
     }
 
@@ -168,24 +195,16 @@ struct HealthView: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Text(label)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Theme.textPrimary)
                 if let command {
+                    // Inherits the pill's tint rather than naming a colour, so
+                    // the de-emphasis survives the disabled dim too.
                     Text(command)
                         .font(Theme.mono(10.5))
-                        .foregroundStyle(Color.white.opacity(0.32))
+                        .opacity(0.55)
                 }
             }
-            .padding(.horizontal, 14)
-            .frame(height: 31)
-            .background(Theme.controlFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ActionPillStyle())
         .accessibilityIdentifier(identifier)
     }
 

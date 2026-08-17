@@ -252,20 +252,14 @@ struct ContentView: View {
                         // it: a fixed-width child inside a flexible pane is
                         // what centred the list and opened a gap whenever the
                         // detail column's empty state had nothing to stretch it.
-                        if Self.listSections.contains(section) {
-                            NavigationStack { content }
-                                .frame(width: clampedListWidth(available: geometry.size.width))
-                            PaneResizeDivider(width: listPaneWidthBinding, range: Self.listPaneRange)
-                            NavigationStack { detail }
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            // Health: a flexible dashboard beside its fixed
-                            // breakdown rail.
-                            NavigationStack { content }
-                                .frame(maxWidth: .infinity)
-                            Rectangle().fill(Theme.hairline).frame(width: 0.5)
-                            NavigationStack { detail }
-                        }
+                        // Every section with a detail pane is a list section:
+                        // Health, the one flexible-beside-fixed layout, now
+                        // opens its breakdown from the score's popover instead.
+                        NavigationStack { content }
+                            .frame(width: clampedListWidth(available: geometry.size.width))
+                        PaneResizeDivider(width: listPaneWidthBinding, range: Self.listPaneRange)
+                        NavigationStack { detail }
+                            .frame(maxWidth: .infinity)
                     } else {
                         NavigationStack { content }
                     }
@@ -501,9 +495,9 @@ struct ContentView: View {
                 )
             )
         case .health:
-            // The weights table — the surface that makes the number
-            // arguable, rather than a second copy of the rows.
-            return AnyView(HealthBreakdownPanel(health: health).frame(width: 380))
+            // No fixed rail: the weights table opens from the score's "?"
+            // popover, so the dashboard takes the whole width.
+            return nil
         case .security:
             if findingSelection == nil, artifactLocations.isEmpty == false || integrity.reports.isEmpty == false {
                 // The integrity half occupies the detail column whenever no
@@ -570,7 +564,7 @@ struct ContentView: View {
     /// pin their own collection bar; the rest get the shell's plain
     /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates, .services,
+        .home, .browse, .installed, .favorites, .updates, .services, .health,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
@@ -578,7 +572,7 @@ struct ContentView: View {
     /// The subset whose bar the shell itself pins — the sections with no
     /// collection controls of their own.
     private static let shellTitleBarSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates, .services,
+        .home, .browse, .installed, .favorites, .updates, .services, .health,
     ]
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the
