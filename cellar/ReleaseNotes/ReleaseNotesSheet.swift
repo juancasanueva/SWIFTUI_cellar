@@ -50,6 +50,7 @@ struct ReleaseNotesSheet: View {
                 }
                 Spacer(minLength: 0)
                 Button("Done") { dismiss() }
+                    .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
             }
         }
