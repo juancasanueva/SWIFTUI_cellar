@@ -50,7 +50,7 @@ struct CaskRecentlyAddedView: View {
     var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, the same key every cask page persists.
-    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
+    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .list
     /// The recency window, persisted like CaskHub persists it.
     @AppStorage("casks.recentWindow") private var windowDays = 30
 

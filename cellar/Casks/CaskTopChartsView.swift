@@ -45,7 +45,7 @@ struct CaskTopChartsView: View {
     var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, the same key every cask page persists.
-    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
+    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .list
 
     @State private var searchText = ""
     /// `searchText` debounced 200 ms — see `caskSearchDebounce`.

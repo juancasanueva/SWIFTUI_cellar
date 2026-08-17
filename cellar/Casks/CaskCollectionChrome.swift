@@ -63,8 +63,8 @@ struct CaskCollectionTopBar<Accessory: View>: View {
                 .foregroundStyle(Theme.textSecondary)
             Spacer(minLength: 0)
             accessory
-            viewModeToggle
             searchField
+            viewModeToggle
             if let shellControls {
                 shellControls
             }
@@ -74,9 +74,11 @@ struct CaskCollectionTopBar<Accessory: View>: View {
     }
 
     private var viewModeToggle: some View {
+        // List leads: it is the pages' default mode, so the first segment is
+        // the one already selected on a fresh install.
         HStack(spacing: 2) {
-            modeSegment(.grid, systemImage: "square.grid.2x2")
             modeSegment(.list, systemImage: "list.bullet")
+            modeSegment(.grid, systemImage: "square.grid.2x2")
         }
         .padding(2)
         .background(Theme.controlFill, in: Capsule())
@@ -107,7 +109,7 @@ struct CaskCollectionTopBar<Accessory: View>: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.textTertiary)
-            TextField("Search apps…", text: $searchText)
+            TextField("Search…", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.textPrimary)

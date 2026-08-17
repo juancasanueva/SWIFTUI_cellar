@@ -36,12 +36,13 @@ struct PackageRow: View {
                         .lineLimit(1)
                     KindTag(kind: entry.id.kind)
                     if entry.isInstalled {
-                        Label("Installed", systemImage: "checkmark.circle")
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 10))
-                            .foregroundStyle(Theme.successText)
-                            .help("Installed")
-                            .accessibilityLabel("Installed")
+                        // A pill, not an icon: the row already speaks in chips
+                        // (CASK, UPDATE), so its states read in chips too.
+                        statusPill(
+                            "Installed",
+                            background: Theme.successTint(0.16),
+                            foreground: Theme.successText
+                        )
                     }
                     // The same pill the Installed and Updates lists draw, so
                     // "this has an update" reads identically everywhere.
@@ -49,12 +50,11 @@ struct PackageRow: View {
                         UpdateTag(nextVersion: installed.catalogVersion)
                     }
                     ForEach(entry.catalog?.badges ?? [], id: \.self) { badge in
-                        Label(badge.label, systemImage: badge.systemImage)
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 10))
-                            .foregroundStyle(Color.orange)
-                            .help(badge.label)
-                            .accessibilityLabel(badge.label)
+                        statusPill(
+                            badge.label,
+                            background: Color.orange.opacity(0.16),
+                            foreground: Color.orange
+                        )
                     }
                     Spacer(minLength: 0)
                 }
@@ -73,6 +73,25 @@ struct PackageRow: View {
             }
         }
         .padding(.vertical, 3)
+    }
+
+    /// The row's state chips — Installed, Deprecated, Disabled — in the CASK
+    /// and UPDATE chips' exact shape, so every fact on the line carries the
+    /// same glance weight.
+    private func statusPill(
+        _ label: String,
+        background: Color,
+        foreground: Color
+    ) -> some View {
+        Text(label.uppercased())
+            .font(.system(size: 8.5, weight: .bold))
+            .kerning(0.3)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .background(background, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .foregroundStyle(foreground)
+            .help(label)
+            .accessibilityLabel(label)
     }
 
     /// The design's second line is the version story; the description stands in

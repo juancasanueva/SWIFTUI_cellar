@@ -20,7 +20,7 @@ struct FormulaTopChartsView: View {
     var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, the formula pages' shared key.
-    @AppStorage("formulae.viewMode") private var viewMode: CaskBrowseViewMode = .grid
+    @AppStorage("formulae.viewMode") private var viewMode: CaskBrowseViewMode = .list
 
     @State private var searchText = ""
     /// `searchText` debounced 200 ms — see `caskSearchDebounce`.

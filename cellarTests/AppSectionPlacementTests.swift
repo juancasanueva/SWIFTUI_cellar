@@ -27,8 +27,11 @@ struct AppSectionPlacementTests {
         // sidebar rows — favorites, updates, brewfile, and settings — plus the
         // four cask-discovery pages the CaskHub port added, plus the one
         // data-driven category page behind the sidebar's category rows, plus
-        // the three formula-discovery pages that mirror the cask ones.
-        #expect(order.count == 22)
+        // the three formula-discovery pages that mirror the cask ones, minus
+        // the original Discover section: the maintainer retired it
+        // (2026-08-17) once the two Discover groups covered its job with
+        // live analytics rather than a static curated list.
+        #expect(order.count == 21)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -47,7 +50,7 @@ struct AppSectionPlacementTests {
         #expect(AppSection.health.rawValue == "health")
         // The sidebar identifier a UI test queries by.
         #expect(order.map(\.rawValue) == [
-            "home", "discover", "browse",
+            "home", "browse",
             "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
             "caskCategory",
             "formulaBrowse", "formulaFeatured", "formulaTopCharts",

@@ -40,6 +40,35 @@ struct ShellToolbarItems: ToolbarContent {
     }
 }
 
+/// The discover pages' capsule header without their collection controls:
+/// title, an optional count, and the shared Refresh/Activity pair. Home and
+/// Search catalog pin it at the shell level, so every page leads with the
+/// same card whether or not it browses a collection.
+struct ShellTitleBar: View {
+    let title: String
+    var countLabel: String? = nil
+    var shellControls: ShellHeaderControls?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+            if let countLabel {
+                Text(countLabel)
+                    .font(Theme.mono(10.5))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            Spacer(minLength: 0)
+            if let shellControls {
+                shellControls
+            }
+        }
+        .padding(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 12))
+        .themeCard(radius: 999)
+    }
+}
+
 /// The Refresh and Activity pair as one reusable view: the toolbar row renders
 /// it on most sections, and the cask pages draw the same pair inside their
 /// pinned capsule bar instead — one control, two homes, no second pipeline.

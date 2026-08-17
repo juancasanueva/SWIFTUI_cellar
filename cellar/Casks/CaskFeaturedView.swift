@@ -27,7 +27,7 @@ struct CaskFeaturedView: View {
 
     /// The grid/list choice, the same key Browse persists: the toggle carries
     /// across pages.
-    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
+    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .list
 
     @State private var searchText = ""
     /// `searchText` debounced 200 ms — see `caskSearchDebounce`.
