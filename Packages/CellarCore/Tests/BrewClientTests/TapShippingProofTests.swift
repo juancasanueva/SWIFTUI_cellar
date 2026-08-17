@@ -80,7 +80,7 @@ struct TapShippingProofTests {
         ])
     }
 
-    @Test("The complete tap action surface stays bounded to its six capabilities")
+    @Test("The complete tap action surface stays bounded to its four capabilities")
     func completeActionSurfaceIsBounded() async throws {
         let launcher = actionSurfaceLauncher()
         let store = TapStore(source: BrewTapPayloadSource(launcher: launcher))
@@ -192,17 +192,18 @@ struct TapShippingProofTests {
             .joined(separator: "\n")
 
         #expect(try staticButtonLabels(in: tapUI) == [
-            "Add Tap", "Untap", "Force Untap", "Show in Installed",
-            // M5 `m5-brewfile` D3 put both Brewfile affordances **inside** this
-            // section rather than in a tenth sidebar place. They join the
-            // enumeration; they do not escape it.
-            "Import Brewfile", "Export Brewfile"
+            "Add Tap", "Untap", "Force Untap", "Show in Installed"
         ])
         #expect(tapUI.contains("Button {") == false, "an unenumerated dynamic tap button exists")
 
         for excludedCapability in [
             "Install package", "Search catalog", "Clone official source",
-            "Security scan", "Git management", "Cleanup", "Disk usage", "Service behavior"
+            "Security scan", "Git management", "Cleanup", "Disk usage", "Service behavior",
+            // The M5 D3 carve-out is repealed (2026-08-17): the Brewfile
+            // section owns its own sidebar place and both affordances now,
+            // so the word — and with it any Brewfile surface or logic — is
+            // excluded here outright again.
+            "Brewfile"
         ] {
             #expect(
                 tapUI.localizedCaseInsensitiveContains(excludedCapability) == false,
@@ -210,28 +211,8 @@ struct TapShippingProofTests {
             )
         }
 
-        // "Brewfile" left the excluded list above because D3 made it an owned
-        // capability of this section. The rule is **extended, not weakened**: it
-        // is paid for with a stronger claim than the one it replaces. The word
-        // may now appear, in exactly the two enumerated buttons and the two
-        // sheet presentations that open them — and no Brewfile *logic* may
-        // appear here at all.
-        #expect(
-            tapUI.components(separatedBy: "Brewfile").count - 1 <= 12,
-            "the Brewfile surface in the tap UI grew beyond its two affordances"
-        )
-        for forbidden in [
-            "BrewfileParser", "BrewfilePlan", "BrewfileDiff", "BundleDumpCommand",
-            "BrewfilePublication", "bundle dump", "--file", "--force", "trusted:"
-        ] {
-            #expect(
-                tapUI.contains(forbidden) == false,
-                "the tap UI reached into Brewfile logic: \(forbidden)"
-            )
-        }
-        // Two sheets, no destination. The affordances are actions inside the
-        // section the user is already in.
-        #expect(tapUI.components(separatedBy: ".sheet(isPresented:").count - 1 == 2)
+        // No sheets and no destination: every tap action acts in place.
+        #expect(tapUI.contains(".sheet(isPresented:") == false)
         #expect(tapUI.contains("navigationDestination") == false)
     }
 

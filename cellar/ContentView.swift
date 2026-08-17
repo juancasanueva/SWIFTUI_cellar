@@ -200,7 +200,9 @@ struct ContentView: View {
                             countLabel: section == .browse
                                 ? "\(catalog.packageCount.formatted()) packages"
                                 : nil,
-                            shellControls: shellHeaderControls
+                            shellControls: shellHeaderControls,
+                            leadingAccessories: shellTitleBarLeadingAccessories,
+                            accessories: shellTitleBarAccessories
                         )
                     }
                 } else {
@@ -401,13 +403,7 @@ struct ContentView: View {
             TapsListView(
                 taps: taps,
                 operations: operations,
-                // Both read-only, and both snapshots the app is already
-                // holding: the Brewfile diff is a pure projection over them
-                // and forces no re-acquisition.
-                installed: installed,
-                detection: brewDetection.state,
-                selection: $tapSelection,
-                sourceChooser: brewfileSourceChooser
+                selection: $tapSelection
             )
         case .services:
             ServicesListView(
@@ -560,7 +556,7 @@ struct ContentView: View {
     /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
         .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
-        .cleanup,
+        .cleanup, .taps, .brewfile, .history,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
@@ -569,8 +565,29 @@ struct ContentView: View {
     /// collection controls of their own.
     private static let shellTitleBarSections: Set<AppSection> = [
         .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
-        .cleanup,
+        .cleanup, .taps, .brewfile, .history,
     ]
+
+    /// The section-owned control the pinned bar draws before the shared pair.
+    private var shellTitleBarLeadingAccessories: AnyView? {
+        switch section {
+        case .history:
+            AnyView(HistorySearchField(history: history))
+        default:
+            nil
+        }
+    }
+
+    /// The section-owned chips the pinned bar carries beside the shared pair —
+    /// each one a self-contained accessory view the section's own file defines.
+    private var shellTitleBarAccessories: AnyView? {
+        switch section {
+        case .history:
+            AnyView(HistoryShellAccessories(history: history))
+        default:
+            nil
+        }
+    }
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the
     /// same closure and binding the toolbar row renders everywhere else.

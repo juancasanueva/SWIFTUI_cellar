@@ -114,14 +114,14 @@ final class BrewfileImportUITests: XCTestCase {
 
     @MainActor
     private func openImportSheet(in app: XCUIApplication) {
-        let taps = app.descendants(matching: .any)["sidebar-taps"]
-        XCTAssertTrue(taps.waitForExistence(timeout: 20), "the Taps section never appeared")
-        taps.click()
+        let brewfile = app.descendants(matching: .any)["sidebar-brewfile"]
+        XCTAssertTrue(brewfile.waitForExistence(timeout: 20), "the Brewfile section never appeared")
+        brewfile.click()
 
-        let affordance = app.descendants(matching: .any)["brewfile-import-affordance"]
+        let affordance = app.descendants(matching: .any)["brewfile-section-import"]
         XCTAssertTrue(
             affordance.waitForExistence(timeout: 20),
-            "the import affordance is not in the Taps toolbar"
+            "the import affordance is not in the Brewfile section"
         )
         affordance.click()
 

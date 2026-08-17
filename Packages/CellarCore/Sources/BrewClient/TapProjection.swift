@@ -92,6 +92,18 @@ public struct TapProjection: Sendable, Equatable {
         return formulae + casks
     }
 
+    /// The design's count line — "5 formulae · 1 cask" — with zero components
+    /// omitted rather than rendered, and emptiness named outright.
+    public static func packageSummary(for tap: TapRecord) -> String {
+        let formulae = tap.formulaNames.count
+        let casks = tap.caskTokens.count
+        let components = [
+            formulae > 0 ? "\(formulae) formula\(formulae == 1 ? "" : "e")" : nil,
+            casks > 0 ? "\(casks) cask\(casks == 1 ? "" : "s")" : nil
+        ].compactMap(\.self)
+        return components.isEmpty ? "No packages" : components.joined(separator: " · ")
+    }
+
     public static func filter(
         _ packages: [TapPackage],
         query: String,

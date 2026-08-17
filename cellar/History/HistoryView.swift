@@ -20,8 +20,6 @@ import SwiftUI
 struct HistoryView: View {
     let history: HistoryStore
 
-    @State private var isClearing = false
-
     var body: some View {
         @Bindable var history = history
         return VStack(alignment: .leading, spacing: 0) {
@@ -38,28 +36,8 @@ struct HistoryView: View {
             .scrollContentBackground(.hidden)
         }
         .background(Theme.windowBackground)
-        .searchable(text: $history.search, prompt: "Search by package, verb or command")
         .overlay { emptyState }
         .navigationTitle(AppSection.history.title)
-        .toolbar {
-            Button("Clear History…", role: .destructive) { isClearing = true }
-                .disabled(history.records.isEmpty || !history.availability.isAvailable)
-        }
-        .confirmationDialog(
-            "Clear the whole history?",
-            isPresented: $isClearing,
-            titleVisibility: .visible
-        ) {
-            Button("Clear History", role: .destructive) { history.clearAll() }
-            Button("Cancel", role: .cancel) { isClearing = false }
-        } message: {
-            Text(
-                """
-                This removes every recorded package change. \
-                Your favorites, notes and snoozes are not affected.
-                """
-            )
-        }
     }
 
     /// Three different emptinesses, and they mean different things: a store that
@@ -82,6 +60,59 @@ struct HistoryView: View {
                 description: Text("Package changes you make in Cellar are recorded here.")
             )
         }
+    }
+}
+
+/// The section's search as a shell-bar field: in the pinned capsule rather
+/// than `.searchable`, whose native toolbar placement floats over the bar.
+struct HistorySearchField: View {
+    @Bindable var history: HistoryStore
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.4))
+            TextField("Search by package, verb or command", text: $history.search)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.textPrimary)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 26)
+        .frame(maxWidth: 300)
+        .background(Theme.controlFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityIdentifier("history-search-field")
+    }
+}
+
+/// The section's one action as a shell-bar chip, owning its own confirmation
+/// so the shell embeds one accessory and inherits the whole flow.
+struct HistoryShellAccessories: View {
+    let history: HistoryStore
+
+    @State private var isClearing = false
+
+    var body: some View {
+        Button("Clear History…", systemImage: "trash") { isClearing = true }
+            .buttonStyle(ShellChipButtonStyle(iconOnly: true))
+            .help("Clear History")
+            .disabled(history.records.isEmpty || !history.availability.isAvailable)
+            .confirmationDialog(
+                "Clear the whole history?",
+                isPresented: $isClearing,
+                titleVisibility: .visible
+            ) {
+                Button("Clear History", role: .destructive) { history.clearAll() }
+                Button("Cancel", role: .cancel) { isClearing = false }
+            } message: {
+                Text(
+                    """
+                    This removes every recorded package change. \
+                    Your favorites, notes and snoozes are not affected.
+                    """
+                )
+            }
     }
 }
 

@@ -23,6 +23,26 @@ struct TapProjectionTests {
         #expect(projection.canAddTap)
     }
 
+    @Test("The package summary pluralizes, omits zero components, and names emptiness")
+    func packageSummaryReadsLikeTheDesign() {
+        #expect(summary(formulae: 5, casks: 1) == "5 formulae · 1 cask")
+        #expect(summary(formulae: 1, casks: 2) == "1 formula · 2 casks")
+        #expect(summary(formulae: 4, casks: 0) == "4 formulae")
+        #expect(summary(formulae: 0, casks: 1) == "1 cask")
+        #expect(summary(formulae: 0, casks: 0) == "No packages")
+    }
+
+    private func summary(formulae: Int, casks: Int) -> String {
+        TapProjection.packageSummary(
+            for: TapRecord(
+                name: "acme/tools",
+                repository: "tools",
+                formulaNames: (0..<formulae).map { "f\($0)" },
+                caskTokens: (0..<casks).map { "c\($0)" }
+            )
+        )
+    }
+
     @Test("Only the selected tap prefix is removed and equal tokens keep kind identity")
     func packageIdentityAndDisplayAreKindAware() {
         let tap = TapRecord(

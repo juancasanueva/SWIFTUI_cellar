@@ -12,16 +12,19 @@ struct TapDetailView: View {
 
     @State private var query = ""
     @State private var kind: PackageKind?
+    @Environment(ThemeStore.self) private var theme
 
     var body: some View {
         Group {
             if let tap {
                 VStack(alignment: .leading, spacing: 0) {
                     header(tap)
-                    Divider()
+                    HairlineDivider()
                     filterBar
-                    Divider()
+                    HairlineDivider()
                     packageList(for: tap)
+                    HairlineDivider()
+                    footer(tap)
                 }
             } else {
                 ContentUnavailableView(
@@ -34,35 +37,69 @@ struct TapDetailView: View {
         .navigationTitle(tap?.name ?? AppSection.taps.title)
     }
 
+    /// The identity row every detail pane shares — tile, name, story line and
+    /// the pane's verbs — in `PackageDetailView.header`'s exact dimensions.
     private func header(_ tap: TapRecord) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(tap.name)
-                .font(.title2.bold())
-            if let remote = tap.remote {
-                Link(remote.absoluteString, destination: remote)
-                    .lineLimit(1)
-            }
-            if let lastCommit = tap.lastCommit {
-                LabeledContent("Last commit", value: lastCommit)
-            }
-            HStack {
-                Button("Untap") { untap(tap) }
-                    .disabled(!operations.isAvailable)
-                    .accessibilityIdentifier("tap-untap-button")
-                if let name = TapName(tap.name), currentForceEvidence(name) != nil {
-                    Button("Force Untap", role: .destructive) { requestForceUntap(name) }
-                        .disabled(!operations.isAvailable)
-                        .accessibilityIdentifier("tap-force-untap-button")
+        HStack(alignment: .top, spacing: 18) {
+            PackageTile(name: tap.name, size: 62, fontSize: 24, cornerRadius: 15)
+            VStack(alignment: .leading, spacing: 7) {
+                Text(tap.name)
+                    .font(.system(size: 23, weight: .semibold))
+                    .kerning(-0.5)
+                    .foregroundStyle(Theme.textPrimary)
+                    .textSelection(.enabled)
+                HStack(spacing: 9) {
+                    Text(TapProjection.packageSummary(for: tap))
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                    Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
+                    Text("Third-party tap")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
                 }
             }
+            .padding(.top, 3)
+            Spacer(minLength: 12)
+            Button("Untap") { untap(tap) }
+                .buttonStyle(TapActionButtonStyle(
+                    fill: Theme.dangerTint(0.12),
+                    text: Theme.dangerText,
+                    stroke: Theme.dangerTint(0.3)
+                ))
+                .disabled(!operations.isAvailable)
+                .accessibilityIdentifier("tap-untap-button")
+                .padding(.top, 6)
+            if let name = TapName(tap.name), currentForceEvidence(name) != nil {
+                Button("Force Untap", role: .destructive) { requestForceUntap(name) }
+                    .buttonStyle(TapActionButtonStyle(
+                        fill: Theme.dangerTint(0.22),
+                        text: Theme.dangerText,
+                        stroke: Theme.dangerTint(0.4)
+                    ))
+                    .disabled(!operations.isAvailable)
+                    .accessibilityIdentifier("tap-force-untap-button")
+                    .padding(.top, 6)
+            }
         }
-        .padding(16)
+        .padding(EdgeInsets(top: 24, leading: 30, bottom: 18, trailing: 30))
     }
 
     private var filterBar: some View {
-        HStack {
+        HStack(spacing: 10) {
+            Text("Packages")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+            Spacer(minLength: 12)
             TextField("Filter packages", text: $query)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .padding(.horizontal, 10)
+                .frame(height: 27, alignment: .leading)
+                .frame(maxWidth: 220)
+                .background(
+                    Theme.controlFill,
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
                 .accessibilityIdentifier("tap-package-filter")
             Picker("Kind", selection: $kind) {
                 Text("All").tag(PackageKind?.none)
@@ -70,33 +107,104 @@ struct TapDetailView: View {
                 Text("Casks").tag(PackageKind?.some(.cask))
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 260)
+            .labelsHidden()
+            .frame(maxWidth: 240)
         }
-        .padding(12)
+        .padding(EdgeInsets(top: 12, leading: 30, bottom: 12, trailing: 30))
     }
 
     private func packageList(for tap: TapRecord) -> some View {
         List(filteredPackages(for: tap)) { package in
-            HStack {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(package.isInstalled ? Theme.successBase : Color.white.opacity(0.22))
+                    .frame(width: 6, height: 6)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(package.displayName)
-                    Text(package.id.kind == .formula ? "Formula" : "Cask")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(package.displayName)
+                            .font(Theme.mono(12.5))
+                            .foregroundStyle(Theme.textPrimary)
+                        kindBadge(package.id.kind)
+                    }
                     if let explanation = package.uninstalledExplanation {
                         Text(explanation)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.38))
                     }
                 }
-                Spacer()
+                Spacer(minLength: 12)
                 if let installedID = package.installedHandoff {
                     Button("Show in Installed") { showInInstalled(installedID) }
+                        .buttonStyle(TapActionButtonStyle(
+                            fill: Theme.controlFill,
+                            text: Theme.textBody
+                        ))
                 }
             }
+            .padding(.vertical, 3)
         }
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("tap-package-list")
+    }
+
+    private func kindBadge(_ kind: PackageKind) -> some View {
+        Text(kind == .formula ? "FORMULA" : "CASK")
+            .font(.system(size: 9, weight: .semibold))
+            .kerning(0.5)
+            .foregroundStyle(Theme.textTertiary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Theme.controlFill,
+                in: RoundedRectangle(cornerRadius: 4, style: .continuous)
+            )
+    }
+
+    private func footer(_ tap: TapRecord) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let remote = tap.remote {
+                metaRow("Repository") {
+                    Link(remote.absoluteString, destination: remote)
+                        .font(Theme.mono(11.5))
+                        .foregroundStyle(theme.base)
+                        .lineLimit(1)
+                }
+            }
+            if let lastCommit = tap.lastCommit {
+                metaRow("Last commit") {
+                    Text(lastCommit)
+                        .font(Theme.mono(11.5))
+                        .foregroundStyle(Theme.textMono)
+                }
+            }
+            Text("Third-party taps are arbitrary code from GitHub, run with your user's permissions. Add ones you trust.")
+                .font(.system(size: 11.5))
+                .lineSpacing(2)
+                .foregroundStyle(Theme.textBody)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    theme.tint(0.07),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(theme.tint(0.28), lineWidth: 0.5)
+                )
+        }
+        .padding(EdgeInsets(top: 14, leading: 30, bottom: 16, trailing: 30))
+    }
+
+    private func metaRow(_ label: String, @ViewBuilder value: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .kerning(0.6)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.white.opacity(0.3))
+            value()
+        }
     }
 
     private var tap: TapRecord? {
@@ -122,5 +230,30 @@ struct TapDetailView: View {
               let command = TapCommand.forceUntap(evidence: evidence)
         else { return }
         _ = operations.request(command)
+    }
+}
+
+/// The design's compact action chip: tinted fill, hairline stroke, 28pt tall.
+/// A style rather than a custom label so every tap button keeps its static
+/// string-literal form, which `TapShippingProofTests` enumerates.
+struct TapActionButtonStyle: ButtonStyle {
+    var fill: Color
+    var text: Color
+    var stroke: Color = .clear
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(text)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(fill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(stroke, lineWidth: 0.5)
+            )
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 }
