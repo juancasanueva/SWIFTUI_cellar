@@ -15,8 +15,8 @@ final class cellarUITests: XCTestCase {
         openCleanup(in: app)
 
         XCTAssertTrue(app.outlines["disk-usage-list"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts["disk-package-formula-wget"].exists)
-        XCTAssertTrue(app.staticTexts["disk-package-cask-ghostty"].exists)
+        XCTAssertTrue(app.buttons["disk-package-formula-wget"].exists)
+        XCTAssertTrue(app.buttons["disk-package-cask-ghostty"].exists)
 
         for scope in ["global", "package-formula-wget", "full", "autoremove"] {
             let preview = app.buttons["cleanup-preview-\(scope)"]
@@ -137,13 +137,15 @@ final class cellarUITests: XCTestCase {
         app.staticTexts["Cleanup"].click()
 
         XCTAssertTrue(app.outlines["disk-usage-list"].waitForExistence(timeout: 2))
-        let wget = app.staticTexts["disk-package-formula-wget"]
+        // The rows are hand-built disclosures (buttons), not DisclosureGroups:
+        // the native control merges its label into one element, which made the
+        // per-package cleanup pills unreachable — see CleanupRow.
+        let wget = app.buttons["disk-package-formula-wget"]
         XCTAssertTrue(wget.exists)
-        XCTAssertTrue(app.staticTexts["disk-package-cask-ghostty"].exists)
+        XCTAssertTrue(app.buttons["disk-package-cask-ghostty"].exists)
         XCTAssertTrue(wget.label.contains("20 kB on disk"))
-        let disclosure = app.disclosureTriangles.firstMatch
-        disclosure.click()
-        XCTAssertEqual(disclosure.value as? Int, 1)
+        wget.click()
+        XCTAssertEqual(wget.value as? String, "Expanded")
         XCTAssertTrue(app.staticTexts["1.25.0"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Last complete scan — revalidating"].exists)
     }
@@ -158,7 +160,7 @@ final class cellarUITests: XCTestCase {
         let warning = launchDiskFixture("--ui-testing-m3-disk-usage-warning")
         warning.staticTexts["Cleanup"].click()
         XCTAssertTrue(warning.staticTexts["Some storage could not be measured"].waitForExistence(timeout: 2))
-        XCTAssertTrue(warning.staticTexts["disk-package-formula-wget"].exists)
+        XCTAssertTrue(warning.buttons["disk-package-formula-wget"].exists)
         XCTAssertFalse(warning.buttons["Uninstall"].exists)
         XCTAssertFalse(warning.staticTexts["reclaimable"].exists)
     }
