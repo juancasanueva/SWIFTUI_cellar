@@ -251,8 +251,24 @@ public enum CleanupParser {
         if path.hasSuffix("...") { path.removeLast(3) }
         let sizeStart = body.index(after: open)
         let size = String(body[sizeStart..<body.index(before: body.endIndex)])
-        guard !path.isEmpty, let bytes = byteCount(size) else { return nil }
+        guard !path.isEmpty, let bytes = byteCount(stripFileCount(size)) else { return nil }
         return CleanupRow(path: path, bytes: bytes)
+    }
+    /// A Cellar keg's parenthetical leads with a file count — `4 files, 197.9KB`
+    /// or `1,050 files, 9.5MB` — while a cache file's carries the size alone.
+    /// The count is dropped only when it is exactly a grouped number and the
+    /// word file(s); anything else stays intact and fails the size parse as
+    /// the unknown shape it is.
+    private static func stripFileCount(_ size: String) -> String {
+        guard let comma = size.range(of: ", ") else { return size }
+        let prefix = size[..<comma.lowerBound]
+        let words = prefix.split(separator: " ")
+        guard words.count == 2,
+              let first = words[0].first, first.isNumber,
+              words[0].allSatisfy({ $0.isNumber || $0 == "," }),
+              words[1] == "file" || words[1] == "files"
+        else { return size }
+        return String(size[comma.upperBound...])
     }
     /// Dry-run only: the real run removes empty directories silently
     /// (`rmdir_if_possible` in Homebrew's cleanup.rb), so there is no

@@ -59,6 +59,40 @@ struct CleanupParserTests {
         #expect(result.evidence.total == .unknown)
         #expect(result.evidence.isPartial == false)
     }
+    @Test("A keg row's file count is not part of its size")
+    func kegRowFileCountIsNotPartOfItsSize() {
+        // Cellar keg rows carry a file count before the size; cache rows carry
+        // the size alone. Both are complete evidence — treating the keg shape
+        // as malformed is what turned every preview on a machine with old kegs
+        // partial, and partial means cleanup refuses.
+        let stdout = Data(
+            """
+            Would remove: /opt/homebrew/Cellar/ca-certificates/2026-07-16 (4 files, 197.9KB)
+            Would remove: /opt/homebrew/Cellar/openssl@3/3.3.1 (1 file, 12B)
+            Would remove: /opt/homebrew/Cellar/gcc/14.2.0 (1,050 files, 9.5MB)
+            Would remove: /tmp/cache/druk--1.16.0.arm64.bottle.tar.gz (30.9MB)
+            """.utf8
+        )
+        let result = CleanupParser.parse(
+            CleanupPreviewRequest(scope: .global),
+            rawStdout: stdout,
+            rawStderr: Data()
+        )
+        #expect(result.evidence.rows.map(\.bytes) == [202_650, 12, 9_961_472, 32_400_998])
+        #expect(result.evidence.issues.isEmpty)
+        #expect(result.evidence.isPartial == false)
+    }
+    @Test("A parenthetical with a non-count prefix stays malformed")
+    func nonCountParentheticalStaysMalformed() {
+        let stdout = Data("Would remove: /tmp/a (weird, 12B)\n".utf8)
+        let result = CleanupParser.parse(
+            CleanupPreviewRequest(scope: .global),
+            rawStdout: stdout,
+            rawStderr: Data()
+        )
+        #expect(result.evidence.rows.isEmpty)
+        #expect(result.evidence.issues == [.malformedSize])
+    }
     @Test("Empty-directory lines are typed evidence, not unknown output")
     func emptyDirectoryLinesAreTyped() {
         // Homebrew's cleanup.rb prints `Would remove (empty directory): #{d}`
