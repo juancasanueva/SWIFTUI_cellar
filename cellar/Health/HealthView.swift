@@ -53,7 +53,7 @@ struct HealthView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 score
-                Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                HairlineDivider()
                     .padding(.top, 26)
                 controls
                     .padding(.top, 24)

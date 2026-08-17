@@ -49,7 +49,7 @@ struct CaskInfoPopover: View {
             VStack(alignment: .leading, spacing: 0) {
                 headerRow
                 ForEach(rows, id: \.property) { row in
-                    Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                    HairlineDivider()
                     tableRow(row)
                 }
             }

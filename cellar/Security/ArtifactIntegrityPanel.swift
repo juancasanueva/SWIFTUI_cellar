@@ -85,7 +85,7 @@ final class ArtifactIntegrityStore {
 /// public surface; this is the UI half of one rule, and the two are asserted
 /// separately because a surface with no method and a method with no button are
 /// different failures.
-struct ArtifactIntegrityPanel: View {
+struct ArtifactIntegritySection: View {
     let store: ArtifactIntegrityStore
     let locations: [ArtifactLocation]
 
@@ -98,51 +98,62 @@ struct ArtifactIntegrityPanel: View {
     @State private var expandedIdentities: Set<URL> = []
 
     var body: some View {
-        List {
-            summary
-            ForEach(store.reports) { report in
-                row(report)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                SectionHeader("Artifact integrity")
+                Spacer(minLength: 8)
+                if store.isRunning {
+                    Button("Cancel") { store.cancel() }
+                        .buttonStyle(ActionPillStyle())
+                        .accessibilityIdentifier("security-integrity-cancel")
+                } else {
+                    Button("Check artifacts") { store.run(over: locations) }
+                        .buttonStyle(ActionPillStyle())
+                        .accessibilityIdentifier("security-integrity-run")
+                }
             }
-        }
-        .scrollContentBackground(.hidden)
-        .navigationTitle("Artifact integrity")
-        .toolbar {
-            if store.isRunning {
-                Button("Cancel") { store.cancel() }
-                    .accessibilityIdentifier("security-integrity-cancel")
-            } else {
-                Button("Check artifacts") { store.run(over: locations) }
-                    .accessibilityIdentifier("security-integrity-run")
+            // A plain stack rather than a lazy one on purpose: the rows carry
+            // the identifiers the identity UI tests address, and a lazy stack
+            // would only realize the ones scrolled into view.
+            VStack(alignment: .leading, spacing: 0) {
+                summary
+                ForEach(store.reports) { report in
+                    HairlineDivider()
+                        .padding(.vertical, 10)
+                    row(report)
+                }
             }
+            .padding(EdgeInsets(top: 15, leading: 18, bottom: 15, trailing: 18))
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .themeCard(radius: 10)
         }
     }
 
     @ViewBuilder
     private var summary: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 4) {
-                let totals = NotarizationTotals(of: store.reports.map(\.signature.notarization))
-                Text("\(store.reports.count) of \(store.expected) artifacts checked")
-                    .font(.headline)
-                // Three counts, kept three. Folding "could not assess" into
-                // "not notarized" would silently decide every artifact whose
-                // ticket this build cannot resolve.
-                Text(
-                    """
-                    \(totals.notarized) notarized, \(totals.notNotarized) not notarized, \
-                    \(totals.couldNotAssess) could not be assessed.
-                    """
-                )
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                if store.isRunning || (store.isComplete == false && store.reports.isEmpty == false) {
-                    Text(store.isRunning ? "Checking…" : "Stopped before the end — this is a partial list.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            let totals = NotarizationTotals(of: store.reports.map(\.signature.notarization))
+            Text("\(store.reports.count) of \(store.expected) artifacts checked")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+            // Three counts, kept three. Folding "could not assess" into
+            // "not notarized" would silently decide every artifact whose
+            // ticket this build cannot resolve.
+            Text(
+                """
+                \(totals.notarized) notarized, \(totals.notNotarized) not notarized, \
+                \(totals.couldNotAssess) could not be assessed.
+                """
+            )
+            .font(.system(size: 12))
+            .foregroundStyle(Color.white.opacity(0.5))
+            if store.isRunning || (store.isComplete == false && store.reports.isEmpty == false) {
+                Text(store.isRunning ? "Checking…" : "Stopped before the end — this is a partial list.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Color.white.opacity(0.4))
             }
-            .accessibilityIdentifier("security-integrity-summary")
         }
+        .accessibilityIdentifier("security-integrity-summary")
     }
 
     @ViewBuilder
