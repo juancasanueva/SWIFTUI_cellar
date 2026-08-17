@@ -409,8 +409,8 @@ struct PackageDetailView: View {
         }
     }
 
-    /// The design's heart, writing through the same metadata store the list's
-    /// star writes — one favorite, two affordances.
+    /// The design's heart, writing through the same metadata store the
+    /// Favorites list's heart writes — one favorite, two affordances.
     @ViewBuilder
     private func favoriteButton(for package: CatalogPackage) -> some View {
         let isFavorite = metadata.snapshot[package.id]?.isFavorite == true
@@ -419,10 +419,10 @@ struct PackageDetailView: View {
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isFavorite ? theme.base : Color.white.opacity(0.55))
+                .foregroundStyle(isFavorite ? Color.red : Color.white.opacity(0.55))
                 .frame(width: 28, height: 28)
                 .background(
-                    isFavorite ? theme.tint(0.16) : Theme.controlFill,
+                    isFavorite ? Color.red.opacity(0.16) : Theme.controlFill,
                     in: RoundedRectangle(cornerRadius: 7, style: .continuous)
                 )
         }
