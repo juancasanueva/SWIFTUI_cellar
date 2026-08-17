@@ -41,7 +41,7 @@ struct TapDetailView: View {
     /// the pane's verbs — in `PackageDetailView.header`'s exact dimensions.
     private func header(_ tap: TapRecord) -> some View {
         HStack(alignment: .top, spacing: 18) {
-            PackageTile(name: tap.name, size: 62, fontSize: 24, cornerRadius: 15)
+            PackageTile(name: tap.name, size: 72, fontSize: 27, cornerRadius: 17)
             VStack(alignment: .leading, spacing: 7) {
                 Text(tap.name)
                     .font(.system(size: 23, weight: .semibold))

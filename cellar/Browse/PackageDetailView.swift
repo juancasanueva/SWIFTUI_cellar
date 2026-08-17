@@ -399,9 +399,9 @@ struct PackageDetailView: View {
         HStack(alignment: .top, spacing: 18) {
             PackageIconTile(
                 id: id,
-                size: 72,
-                fontSize: 27,
-                cornerRadius: 17,
+                size: 80,
+                fontSize: 30,
+                cornerRadius: 18,
                 assets: assets,
                 iconLoader: iconLoader
             )

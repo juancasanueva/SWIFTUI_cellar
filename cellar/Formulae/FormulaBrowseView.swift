@@ -106,7 +106,7 @@ struct FormulaBrowseView: View {
                     )
                 CaskIconView(
                     token: housePick.name,
-                    size: 76,
+                    size: 96,
                     isKnownToken: false,
                     iconLoader: iconLoader,
                     loadsRemote: false

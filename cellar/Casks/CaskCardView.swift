@@ -57,7 +57,7 @@ struct CaskCardView: View {
         HStack(alignment: .top, spacing: 10) {
             CaskIconView(
                 token: package.name,
-                size: 44,
+                size: 58,
                 isKnownToken: assets.isKnownIconToken(package.name),
                 iconLoader: iconLoader,
                 loadsRemote: remoteIcons

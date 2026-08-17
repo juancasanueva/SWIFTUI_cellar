@@ -118,7 +118,7 @@ struct CaskBrowseView: View {
                     )
                 CaskIconView(
                     token: housePick.name,
-                    size: 76,
+                    size: 96,
                     isKnownToken: assets.isKnownIconToken(housePick.name),
                     iconLoader: iconLoader
                 )

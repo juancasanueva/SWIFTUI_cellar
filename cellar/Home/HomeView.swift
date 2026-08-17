@@ -510,8 +510,8 @@ private struct FavoriteRow: View {
             HStack(spacing: 11) {
                 PackageIconTile(
                     id: package.id,
-                    size: 30,
-                    fontSize: 13,
+                    size: 34,
+                    fontSize: 14,
                     assets: assets,
                     iconLoader: iconLoader
                 )
