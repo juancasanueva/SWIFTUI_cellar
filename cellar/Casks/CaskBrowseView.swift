@@ -24,6 +24,9 @@ struct CaskBrowseView: View {
     /// labels' closure and the category shelves' View All, one path. The shell
     /// sets the id beside the section; `nil` leaves both affordances inert.
     var onSelectCategory: ((String) -> Void)? = nil
+    /// The shell's Refresh/Activity pair, rendered inside the pinned bar —
+    /// see `CaskCollectionTopBar.shellControls`.
+    var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, kept across launches like the shell's pane width.
     @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
@@ -38,7 +41,6 @@ struct CaskBrowseView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                topBar
                 if content == .empty {
                     CaskCatalogSyncingNote()
                 } else if appliedSearch.isEmpty {
@@ -54,8 +56,9 @@ struct CaskBrowseView: View {
             }
             .frame(maxWidth: 1086)
             .frame(maxWidth: .infinity)
-            .padding(EdgeInsets(top: 18, leading: 20, bottom: 48, trailing: 20))
+            .padding(EdgeInsets(top: 6, leading: 20, bottom: 48, trailing: 20))
         }
+        .caskCollectionTopBarPinned { topBar }
         .background(Color.white.opacity(0.014))
         .task { await assets.load() }
         .caskSearchDebounce(searchText, into: $appliedSearch)
@@ -69,7 +72,8 @@ struct CaskBrowseView: View {
             title: "Browse",
             countLabel: "\(content.caskCount.formatted()) casks",
             viewMode: $viewMode,
-            searchText: $searchText
+            searchText: $searchText,
+            shellControls: shellControls
         )
     }
 

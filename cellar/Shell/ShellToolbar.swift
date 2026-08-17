@@ -14,27 +14,43 @@ import SwiftUI
 /// traffic lights and these controls on one shared baseline.
 struct ShellToolbarItems: ToolbarContent {
     let section: AppSection
-    /// A title shown in place of `section.title` when the section alone cannot
-    /// name the page — the category pages, where the case says "Category" and
-    /// the shell knows which one. `nil` keeps the section's own title.
-    var titleOverride: String? = nil
+    /// Whether the row draws the title and controls at all. The cask pages
+    /// render `false`: their pinned capsule bar carries the page name and the
+    /// same `ShellHeaderControls`, so the toolbar row would say it all twice.
+    var showsPageChrome: Bool = true
     /// The same launch-and-activation refresh the app already runs; the button
     /// adds a way to ask for it, not a second pipeline.
     let refresh: @MainActor () async -> Void
     @Binding var isActivityExpanded: Bool
 
+    var body: some ToolbarContent {
+        if showsPageChrome {
+            ToolbarItem(placement: .navigation) {
+                Text(section.title)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            // Pushes the actions to the trailing edge; without it every item
+            // packs in beside the title.
+            ToolbarSpacer(.flexible)
+            ToolbarItem(placement: .primaryAction) {
+                ShellHeaderControls(refresh: refresh, isActivityExpanded: $isActivityExpanded)
+            }
+        }
+    }
+}
+
+/// The Refresh and Activity pair as one reusable view: the toolbar row renders
+/// it on most sections, and the cask pages draw the same pair inside their
+/// pinned capsule bar instead — one control, two homes, no second pipeline.
+struct ShellHeaderControls: View {
+    let refresh: @MainActor () async -> Void
+    @Binding var isActivityExpanded: Bool
+
     @State private var isRefreshing = false
 
-    var body: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            Text(titleOverride ?? section.title)
-                .font(.system(size: 13.5, weight: .semibold))
-                .foregroundStyle(Theme.textPrimary)
-        }
-        // Pushes the actions to the trailing edge; without it every item packs
-        // in beside the title.
-        ToolbarSpacer(.flexible)
-        ToolbarItem(placement: .primaryAction) {
+    var body: some View {
+        HStack(spacing: 8) {
             button(
                 label: "Refresh",
                 systemImage: "arrow.clockwise",
@@ -48,8 +64,6 @@ struct ShellToolbarItems: ToolbarContent {
                     isRefreshing = false
                 }
             }
-        }
-        ToolbarItem(placement: .primaryAction) {
             button(
                 label: "Activity",
                 systemImage: "terminal",

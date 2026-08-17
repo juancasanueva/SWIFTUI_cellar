@@ -169,7 +169,7 @@ struct ContentView: View {
             .toolbar {
                 ShellToolbarItems(
                     section: section,
-                    titleOverride: toolbarTitleOverride,
+                    showsPageChrome: !Self.caskSections.contains(section),
                     refresh: refresh,
                     isActivityExpanded: $isActivityExpanded
                 )
@@ -219,7 +219,8 @@ struct ContentView: View {
                 assets: caskAssets,
                 iconLoader: caskIcons,
                 section: $section,
-                onSelectCategory: openCategory
+                onSelectCategory: openCategory,
+                shellControls: shellHeaderControls
             )
         case .caskFeatured:
             CaskFeaturedView(
@@ -228,7 +229,8 @@ struct ContentView: View {
                 operations: operations,
                 assets: caskAssets,
                 iconLoader: caskIcons,
-                onSelectCategory: openCategory
+                onSelectCategory: openCategory,
+                shellControls: shellHeaderControls
             )
         case .caskTopCharts:
             CaskTopChartsView(
@@ -238,7 +240,8 @@ struct ContentView: View {
                 assets: caskAssets,
                 iconLoader: caskIcons,
                 charts: caskCharts,
-                onSelectCategory: openCategory
+                onSelectCategory: openCategory,
+                shellControls: shellHeaderControls
             )
         case .caskRecentlyAdded:
             CaskRecentlyAddedView(
@@ -247,7 +250,8 @@ struct ContentView: View {
                 operations: operations,
                 assets: caskAssets,
                 iconLoader: caskIcons,
-                onSelectCategory: openCategory
+                onSelectCategory: openCategory,
+                shellControls: shellHeaderControls
             )
         case .caskCategory:
             CaskCategoryView(
@@ -256,7 +260,8 @@ struct ContentView: View {
                 operations: operations,
                 assets: caskAssets,
                 iconLoader: caskIcons,
-                categoryID: caskCategoryID
+                categoryID: caskCategoryID,
+                shellControls: shellHeaderControls
             )
         case .installed:
             InstalledListView(
@@ -431,12 +436,17 @@ struct ContentView: View {
         section = .caskCategory
     }
 
-    /// The selected category's display name over the case's generic
-    /// "Category" — resolved against the vendored catalog, and `nil` (the
-    /// section's own title) whenever the id is absent or unknown.
-    private var toolbarTitleOverride: String? {
-        guard section == .caskCategory else { return nil }
-        return catalog.caskBrowse.categories.first { $0.id == caskCategoryID }?.displayName
+    /// The sections whose pinned capsule bar is the whole header: the toolbar
+    /// row shows no title and no controls for them — the bar names the page
+    /// and carries the shared `ShellHeaderControls` itself.
+    private static let caskSections: Set<AppSection> = [
+        .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
+    ]
+
+    /// The one Refresh/Activity pair the cask pages embed in their bars — the
+    /// same closure and binding the toolbar row renders everywhere else.
+    private var shellHeaderControls: ShellHeaderControls {
+        ShellHeaderControls(refresh: refresh, isActivityExpanded: $isActivityExpanded)
     }
 
     private func confirmCleanup(_ request: OperationCenter.ConfirmationRequest) {

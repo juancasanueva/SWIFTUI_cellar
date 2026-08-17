@@ -41,6 +41,8 @@ struct CaskTopChartsView: View {
     let charts: CaskChartsStore
     /// See `CaskCollectionView.onSelectCategory`.
     var onSelectCategory: ((String) -> Void)? = nil
+    /// See `CaskCollectionTopBar.shellControls`.
+    var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, the same key every cask page persists.
     @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
@@ -84,19 +86,6 @@ struct CaskTopChartsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                CaskCollectionTopBar(
-                    title: "Top Charts",
-                    countLabel: "\(displayedCasks.count.formatted()) casks",
-                    viewMode: $viewMode,
-                    searchText: $searchText
-                ) {
-                    if charts.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    periodChip
-                    sortMenu
-                }
                 if content == .empty {
                     CaskCatalogSyncingNote()
                 } else if displayedCasks.isEmpty {
@@ -120,7 +109,23 @@ struct CaskTopChartsView: View {
             }
             .frame(maxWidth: 1086)
             .frame(maxWidth: .infinity)
-            .padding(EdgeInsets(top: 18, leading: 20, bottom: 48, trailing: 20))
+            .padding(EdgeInsets(top: 6, leading: 20, bottom: 48, trailing: 20))
+        }
+        .caskCollectionTopBarPinned {
+            CaskCollectionTopBar(
+                title: "Top Charts",
+                countLabel: "\(displayedCasks.count.formatted()) casks",
+                viewMode: $viewMode,
+                searchText: $searchText,
+                shellControls: shellControls
+            ) {
+                if charts.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                periodChip
+                sortMenu
+            }
         }
         .background(Color.white.opacity(0.014))
         .task { await assets.load() }
