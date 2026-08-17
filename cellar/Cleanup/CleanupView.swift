@@ -124,6 +124,14 @@ struct CleanupView: View {
                     }
                     .frame(height: 36)
                     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    // The combined element is the bar alone, so the rescan
+                    // control below stays its own, reachable element.
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(
+                        segments.map {
+                            "\($0.name) \($0.bytes.formatted(.byteCount(style: .file)))"
+                        }.joined(separator: ", ")
+                    )
                     HStack(spacing: 16) {
                         ForEach(segments) { segment in
                             HStack(spacing: 6) {
@@ -137,17 +145,22 @@ struct CleanupView: View {
                             }
                         }
                         Spacer(minLength: 0)
+                        // A scan runs on entry and after a confirmed cleanup —
+                        // this is for the change those never see, like a
+                        // `brew cleanup` run from a terminal while this page
+                        // is open. Absent mid-scan: Cancel owns that state.
+                        if !diskUsage.isScanning {
+                            Button("Rescan storage") { Task { await refreshStorage() } }
+                                .buttonStyle(ActionPillStyle())
+                                .disabled(detection.state.installation == nil)
+                                .help("Measure Homebrew's storage again")
+                                .accessibilityIdentifier("cleanup-rescan")
+                        }
                     }
                 }
                 .padding(.vertical, 6)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(
-                    segments.map {
-                        "\($0.name) \($0.bytes.formatted(.byteCount(style: .file)))"
-                    }.joined(separator: ", ")
-                )
             }
         }
     }
@@ -285,6 +298,7 @@ struct CleanupView: View {
             HStack {
                 ProgressView(value: progressFraction)
                 Button("Cancel storage scan") { diskUsage.cancel() }
+                    .buttonStyle(ActionPillStyle())
             }
         }
     }
