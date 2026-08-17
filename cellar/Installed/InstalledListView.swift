@@ -224,9 +224,11 @@ struct InstalledListView: View {
             Button("Upgrade outdated (\(upgradableIDs.count))") {
                 operations.submitUpgrades(for: upgradableIDs, in: installed.inventory)
             }
+            .buttonStyle(ActionPillStyle())
             Button("Upgrade all") {
                 operations.submit(.upgradeAll)
             }
+            .buttonStyle(ActionPillStyle())
             Spacer(minLength: 0)
             CopyCommandButton(text: MutationCommand.upgradeAll.displayCommand)
         }
