@@ -46,7 +46,9 @@ struct InstalledListView: View {
     /// Off by default: a machine with 160 packages installed usually has ~40
     /// the user chose and 120 that came along for the ride.
     @State private var includeDependencies = false
-    @State private var favoritesOnly = false
+    /// The kind narrowing, `nil` for both — the Search catalog's three-way
+    /// choice, applied here as a display filter like the in-pane query.
+    @State private var kind: PackageKind?
 
     /// The native multi-select binding. A `Set` cannot carry order.
     @State private var selected: Set<PackageID> = []
@@ -63,10 +65,9 @@ struct InstalledListView: View {
             PaneSearchField(text: $query, prompt: "Filter…")
                 .padding(EdgeInsets(top: 11, leading: 13, bottom: 0, trailing: 13))
             InstalledFilterBar(
+                kind: $kind,
                 includeDependencies: $includeDependencies,
-                favoritesOnly: $favoritesOnly,
                 upgradableCount: upgradableIDs.count,
-                isFavoritesEnabled: browse.isFavoritesFilterEnabled(metadata: lookup),
                 state: installed.state
             )
             if !bulk.isEmpty {
@@ -103,9 +104,13 @@ struct InstalledListView: View {
                         }
                     }
                 }
-                Section(includeDependencies ? "All packages" : "Installed on request") {
-                    ForEach(sections.rest) { entry in
-                        row(entry)
+                // Empty under the Updates lens, whose entries are all outdated
+                // — a bare header there announces a section that cannot fill.
+                if !sections.rest.isEmpty {
+                    Section(includeDependencies ? "All packages" : "Installed on request") {
+                        ForEach(sections.rest) { entry in
+                            row(entry)
+                        }
                     }
                 }
             }
@@ -159,7 +164,12 @@ struct InstalledListView: View {
     }
 
     private func row(_ entry: PackageEntry) -> some View {
-        InstalledRow(entry: entry, operations: operations, metadata: metadata)
+        InstalledRow(
+            entry: entry,
+            operations: operations,
+            metadata: metadata,
+            showsFavoriteHeart: lens == .favorites
+        )
             .tag(entry.id)
             .themedListSelection(isSelected: selected.contains(entry.id))
     }
@@ -241,14 +251,15 @@ struct InstalledListView: View {
 
     private var entries: [PackageEntry] {
         let base = browse.entries(
-            // The Updates lens covers the whole inventory: an outdated
-            // dependency is still an update.
-            includingDependencies: lens == .updates ? true : includeDependencies,
+            includingDependencies: includeDependencies,
             catalogLookup: { catalog.package($0) },
             metadata: lookup,
-            favoritesOnly: lens == .favorites ? true : favoritesOnly
+            favoritesOnly: lens == .favorites
         )
         var narrowed = base
+        if let kind {
+            narrowed = narrowed.filter { $0.id.kind == kind }
+        }
         if lens == .updates {
             let outdated = browse.outdatedIDs(metadata: lookup)
             narrowed = narrowed.filter { outdated.contains($0.id) }

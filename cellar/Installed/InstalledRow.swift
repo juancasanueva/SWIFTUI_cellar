@@ -19,8 +19,11 @@ struct InstalledRow: View {
     let entry: PackageEntry
     let operations: OperationCenter
     /// Optional so a preview, and a launch whose store would not open, both
-    /// render the row in full with the star simply absent.
+    /// render the row in full with the heart simply absent.
     var metadata: MetadataStore?
+    /// The heart is a management affordance, so only the Favorites lens shows
+    /// it; everywhere else the detail pane's heart is the favorite control.
+    var showsFavoriteHeart = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -50,7 +53,7 @@ struct InstalledRow: View {
             }
             Spacer(minLength: 0)
             releaseNotes
-            if metadata != nil { star }
+            if showsFavoriteHeart, metadata != nil { heart }
             MutationMenu(center: operations, entry: entry)
         }
         .padding(.vertical, 3)
@@ -130,14 +133,14 @@ struct InstalledRow: View {
     /// when pressed is the failure mode a degraded store must not produce
     /// (design D4, local-package-metadata LPM6).
     @ViewBuilder
-    private var star: some View {
+    private var heart: some View {
         if let metadata {
             let isFavorite = metadata.snapshot[entry.id]?.isFavorite == true
             Button {
                 metadata.setFavorite(!isFavorite, for: entry.id)
             } label: {
-                Image(systemName: isFavorite ? "star.fill" : "star")
-                    .foregroundStyle(isFavorite ? .yellow : .secondary)
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .foregroundStyle(isFavorite ? .red : .secondary)
             }
             .buttonStyle(.borderless)
             .disabled(!metadata.availability.isAvailable)
