@@ -39,15 +39,21 @@ struct PaneSearchField: View {
     }
 }
 
-/// The design's action pill: `FilterChip`'s capsule in accent (or danger)
-/// tint, for the compact command rows above a list.
+/// The design's action button: accent (or danger) tint on the shell controls'
+/// 6-point rounded rectangle, for the compact command rows above a list.
 ///
 /// A contained shape rather than bare accent text, so a command reads as
-/// pressable next to the inert counts that share these rows.
+/// pressable next to the inert counts that share these rows — and squarer
+/// than `FilterChip`'s capsule on purpose, so a command never reads as a
+/// filter.
 struct ActionPillStyle: ButtonStyle {
     var isDestructive = false
     @Environment(ThemeStore.self) private var theme
     @Environment(\.isEnabled) private var isEnabled
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+    }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -57,15 +63,15 @@ struct ActionPillStyle: ButtonStyle {
             .padding(.vertical, 3)
             .background(
                 isDestructive ? Theme.dangerTint(0.16) : theme.tint(0.16),
-                in: Capsule()
+                in: shape
             )
             .overlay(
-                Capsule().strokeBorder(
+                shape.strokeBorder(
                     isDestructive ? Theme.dangerTint(0.3) : theme.tint(0.3),
                     lineWidth: 0.5
                 )
             )
-            .contentShape(Capsule())
+            .contentShape(shape)
             .opacity(configuration.isPressed ? 0.7 : (isEnabled ? 1 : 0.4))
     }
 }
