@@ -93,7 +93,7 @@ struct CaskCategoryView: View {
                 if content == .empty {
                     CaskCatalogSyncingNote()
                 } else if summary == nil {
-                    note("Pick a category from the sidebar.")
+                    note("Pick a category.")
                 } else if displayedCasks.isEmpty {
                     note(
                         appliedSearch.isEmpty
