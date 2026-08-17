@@ -157,6 +157,9 @@ struct cellarApp: App {
     /// the no-network stub and an empty per-launch cache directory, so those
     /// runs stay at zero network and never adopt the developer's own cache.
     @State private var caskCharts: CaskChartsStore
+    /// The same store class, formula-configured: the install-on-request
+    /// endpoints, decoded as formulae, cached in its own file.
+    @State private var formulaCharts: CaskChartsStore
 
     /// Whether this launch has started its one disk measurement. The scan used
     /// to start only when Cleanup appeared, which left the Search list's size
@@ -353,6 +356,18 @@ struct cellarApp: App {
                 directory: caskChartsDirectory
             )
         )
+        _formulaCharts = State(
+            initialValue: CaskChartsStore(
+                source: isUITesting
+                    ? AppTestCaskChartsSource()
+                    : HTTPCaskChartsSource(
+                        baseURL: HTTPCaskChartsSource.formulaBaseURL,
+                        kind: .formula
+                    ),
+                directory: caskChartsDirectory,
+                cacheFileName: "formula-charts-v1.json"
+            )
+        )
         _services = State(initialValue: services)
         _servicesRefresher = State(
             initialValue: ServicesRefreshCoordinator(store: services, mutations: serviceMutations)
@@ -416,6 +431,7 @@ struct cellarApp: App {
                 caskAssets: caskAssets,
                 caskIcons: caskIcons,
                 caskCharts: caskCharts,
+                formulaCharts: formulaCharts,
                 services: services,
                 servicesRefresher: servicesRefresher,
                 taps: taps,

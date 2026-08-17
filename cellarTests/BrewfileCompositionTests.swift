@@ -561,21 +561,23 @@ struct BrewfilePlacementTests {
     /// port added four more cask-discovery pages; each is named explicitly so
     /// a nineteenth section fails here too. The nineteenth then arrived on
     /// purpose — `caskCategory`, the one case behind every data-driven
-    /// category page — and is named explicitly like the rest, so a twentieth
-    /// still fails.
-    @Test("The sidebar vocabulary is the design document's nineteen sections")
-    func theSidebarVocabularyIsTheDesignDocumentsNineteenSections() {
+    /// category page — followed by the three formula-discovery pages that
+    /// mirror the cask ones (2026-08-17); each is named explicitly like the
+    /// rest, so a twenty-third still fails.
+    @Test("The sidebar vocabulary is the design document's twenty-two sections")
+    func theSidebarVocabularyIsTheDesignDocumentsSections() {
         #expect(
             AppSection.allCases.map(\.rawValue) == [
                 "home", "discover", "browse",
                 "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
                 "caskCategory",
+                "formulaBrowse", "formulaFeatured", "formulaTopCharts",
                 "installed", "favorites", "updates",
                 "taps", "services", "cleanup", "health", "security", "brewfile",
                 "history", "settings"
             ]
         )
-        #expect(AppSection.allCases.count == 19)
+        #expect(AppSection.allCases.count == 22)
     }
 
     @Test("Both affordances are wired into the Taps list and the Brewfile section, and nowhere else")

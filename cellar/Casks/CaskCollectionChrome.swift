@@ -167,6 +167,9 @@ struct CaskCollectionView: View {
     /// Where a card's category label navigates, handed a primary category id;
     /// `nil` keeps the label the inert text it always was.
     var onSelectCategory: ((String) -> Void)? = nil
+    /// `false` renders every icon as the letter tile with no remote lookup —
+    /// the formula pages' setting; see `CaskIconView.loadsRemote`.
+    var remoteIcons: Bool = true
 
     var body: some View {
         if viewMode == .grid {
@@ -183,7 +186,8 @@ struct CaskCollectionView: View {
                         assets: assets,
                         iconLoader: iconLoader,
                         counts: counts,
-                        onSelectCategory: onSelectCategory
+                        onSelectCategory: onSelectCategory,
+                        remoteIcons: remoteIcons
                     )
                 }
             }
@@ -200,7 +204,8 @@ struct CaskCollectionView: View {
                         assets: assets,
                         iconLoader: iconLoader,
                         counts: counts,
-                        onSelectCategory: onSelectCategory
+                        onSelectCategory: onSelectCategory,
+                        remoteIcons: remoteIcons
                     )
                 }
             }
@@ -241,6 +246,8 @@ struct CaskListRow: View {
     /// hands both renderers the same inputs; the row draws no category label
     /// today, so it has nothing to wire the closure to yet.
     var onSelectCategory: ((String) -> Void)? = nil
+    /// See `CaskCollectionView.remoteIcons`.
+    var remoteIcons: Bool = true
 
     var body: some View {
         HStack(spacing: 12) {
@@ -248,7 +255,8 @@ struct CaskListRow: View {
                 token: package.name,
                 size: 44,
                 isKnownToken: assets.isKnownIconToken(package.name),
-                iconLoader: iconLoader
+                iconLoader: iconLoader,
+                loadsRemote: remoteIcons
             )
             VStack(alignment: .leading, spacing: 1) {
                 Text(package.displayName)

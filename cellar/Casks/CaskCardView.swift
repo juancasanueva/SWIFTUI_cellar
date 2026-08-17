@@ -19,6 +19,8 @@ struct CaskCardView: View {
     var counts: [String: Int]? = nil
     /// See `CaskCollectionView.onSelectCategory`.
     var onSelectCategory: ((String) -> Void)? = nil
+    /// See `CaskCollectionView.remoteIcons`.
+    var remoteIcons: Bool = true
 
     @Environment(ThemeStore.self) private var theme
 
@@ -57,7 +59,8 @@ struct CaskCardView: View {
                 token: package.name,
                 size: 44,
                 isKnownToken: assets.isKnownIconToken(package.name),
-                iconLoader: iconLoader
+                iconLoader: iconLoader,
+                loadsRemote: remoteIcons
             )
             VStack(alignment: .leading, spacing: 2) {
                 Text(package.displayName)

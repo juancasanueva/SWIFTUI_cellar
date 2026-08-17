@@ -9,13 +9,21 @@ public protocol CaskChartsSource: Sendable {
     func fetchCounts(period: CaskChartsPeriod) async throws -> [String: Int]
 }
 
-/// The real thing: `formulae.brew.sh`'s per-window cask-install endpoints.
+/// The real thing: `formulae.brew.sh`'s per-window install endpoints — the
+/// cask ones by default, the formula ones when built with `.formula`, because
+/// the origin publishes both kinds in the identical envelope.
 public struct HTTPCaskChartsSource: CaskChartsSource {
     public static let defaultBaseURL = URL(
         string: "https://formulae.brew.sh/api/analytics/cask-install/"
     )!
+    /// The formula windows' home: install-on-request, the same metric the
+    /// catalog's own 365d join uses for formulae.
+    public static let formulaBaseURL = URL(
+        string: "https://formulae.brew.sh/api/analytics/install-on-request/"
+    )!
 
     private let baseURL: URL
+    private let kind: PackageKind
     private let session: URLSession
     private let byteLimit: Int
 
@@ -23,10 +31,12 @@ public struct HTTPCaskChartsSource: CaskChartsSource {
     /// far below anything that could be mistaken for the 31 MB catalog.
     public init(
         baseURL: URL = HTTPCaskChartsSource.defaultBaseURL,
+        kind: PackageKind = .cask,
         session: URLSession? = nil,
         byteLimit: Int = 32 * 1_048_576
     ) {
         self.baseURL = baseURL
+        self.kind = kind
         self.byteLimit = byteLimit
         if let session {
             self.session = session
@@ -66,6 +76,6 @@ public struct HTTPCaskChartsSource: CaskChartsSource {
 
         // The existing analytics decoder, verbatim — including its locale-proof
         // comma-string parsing (CS9). This source adds transport, not decoding.
-        return try AnalyticsIndex.decode(data, kind: .cask).countsByName(kind: .cask)
+        return try AnalyticsIndex.decode(data, kind: kind).countsByName(kind: kind)
     }
 }
