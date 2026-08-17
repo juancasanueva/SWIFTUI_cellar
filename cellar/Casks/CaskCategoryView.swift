@@ -40,6 +40,8 @@ struct CaskCategoryView: View {
     let iconLoader: CaskIconLoader
     /// The category to show, or `nil` when nothing has picked one yet.
     let categoryID: String?
+    /// See `CaskCollectionTopBar.shellControls`.
+    var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, the same key every cask page persists.
     @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
@@ -88,14 +90,6 @@ struct CaskCategoryView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                CaskCollectionTopBar(
-                    title: summary?.displayName ?? AppSection.caskCategory.title,
-                    countLabel: "\(displayedCasks.count.formatted()) casks",
-                    viewMode: $viewMode,
-                    searchText: $searchText
-                ) {
-                    sortMenu
-                }
                 if content == .empty {
                     CaskCatalogSyncingNote()
                 } else if summary == nil {
@@ -119,7 +113,18 @@ struct CaskCategoryView: View {
             }
             .frame(maxWidth: 1086)
             .frame(maxWidth: .infinity)
-            .padding(EdgeInsets(top: 18, leading: 20, bottom: 48, trailing: 20))
+            .padding(EdgeInsets(top: 6, leading: 20, bottom: 48, trailing: 20))
+        }
+        .caskCollectionTopBarPinned {
+            CaskCollectionTopBar(
+                title: summary?.displayName ?? AppSection.caskCategory.title,
+                countLabel: "\(displayedCasks.count.formatted()) casks",
+                viewMode: $viewMode,
+                searchText: $searchText,
+                shellControls: shellControls
+            ) {
+                sortMenu
+            }
         }
         .background(Color.white.opacity(0.014))
         .task { await assets.load() }

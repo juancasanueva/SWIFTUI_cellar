@@ -22,6 +22,8 @@ struct CaskFeaturedView: View {
     let iconLoader: CaskIconLoader
     /// See `CaskCollectionView.onSelectCategory`.
     var onSelectCategory: ((String) -> Void)? = nil
+    /// See `CaskCollectionTopBar.shellControls`.
+    var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, the same key Browse persists: the toggle carries
     /// across pages.
@@ -42,12 +44,6 @@ struct CaskFeaturedView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                CaskCollectionTopBar(
-                    title: "Featured",
-                    countLabel: "\(displayedCasks.count.formatted()) casks",
-                    viewMode: $viewMode,
-                    searchText: $searchText
-                )
                 if content == .empty {
                     CaskCatalogSyncingNote()
                 } else if displayedCasks.isEmpty {
@@ -70,7 +66,16 @@ struct CaskFeaturedView: View {
             }
             .frame(maxWidth: 1086)
             .frame(maxWidth: .infinity)
-            .padding(EdgeInsets(top: 18, leading: 20, bottom: 48, trailing: 20))
+            .padding(EdgeInsets(top: 6, leading: 20, bottom: 48, trailing: 20))
+        }
+        .caskCollectionTopBarPinned {
+            CaskCollectionTopBar(
+                title: "Featured",
+                countLabel: "\(displayedCasks.count.formatted()) casks",
+                viewMode: $viewMode,
+                searchText: $searchText,
+                shellControls: shellControls
+            )
         }
         .background(Color.white.opacity(0.014))
         .task { await assets.load() }

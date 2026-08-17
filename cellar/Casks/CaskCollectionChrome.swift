@@ -31,6 +31,10 @@ struct CaskCollectionTopBar<Accessory: View>: View {
     let countLabel: String
     @Binding var viewMode: CaskBrowseViewMode
     @Binding var searchText: String
+    /// The shell's Refresh/Activity pair, drawn at the trailing edge when the
+    /// page carries the whole header itself — the toolbar row shows no chrome
+    /// on cask pages, so the pair lives here instead. `nil` draws nothing.
+    var shellControls: ShellHeaderControls?
     @ViewBuilder let accessory: Accessory
 
     init(
@@ -38,12 +42,14 @@ struct CaskCollectionTopBar<Accessory: View>: View {
         countLabel: String,
         viewMode: Binding<CaskBrowseViewMode>,
         searchText: Binding<String>,
+        shellControls: ShellHeaderControls? = nil,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.title = title
         self.countLabel = countLabel
         _viewMode = viewMode
         _searchText = searchText
+        self.shellControls = shellControls
         self.accessory = accessory()
     }
 
@@ -59,6 +65,9 @@ struct CaskCollectionTopBar<Accessory: View>: View {
             accessory
             viewModeToggle
             searchField
+            if let shellControls {
+                shellControls
+            }
         }
         .padding(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 12))
         .themeCard(radius: 999)
@@ -126,13 +135,15 @@ extension CaskCollectionTopBar where Accessory == EmptyView {
         title: String,
         countLabel: String,
         viewMode: Binding<CaskBrowseViewMode>,
-        searchText: Binding<String>
+        searchText: Binding<String>,
+        shellControls: ShellHeaderControls? = nil
     ) {
         self.init(
             title: title,
             countLabel: countLabel,
             viewMode: viewMode,
             searchText: searchText,
+            shellControls: shellControls,
             accessory: { EmptyView() }
         )
     }
@@ -258,6 +269,30 @@ enum CaskCollectionSearch {
 }
 
 extension View {
+    /// Pins a page's top bar above its scrolling content: the bar sits in a
+    /// top safe-area inset, so the cards scroll beneath it while it stays put.
+    /// The backdrop reaches up through the transparent toolbar row, so scrolled
+    /// content never bleeds behind the window title either.
+    func caskCollectionTopBarPinned(@ViewBuilder _ bar: () -> some View) -> some View {
+        safeAreaInset(edge: .top, spacing: 0) {
+            bar()
+                .frame(maxWidth: 1086)
+                .frame(maxWidth: .infinity)
+                // Top 16 mirrors the gap below the bar: its own 10 bottom
+                // padding plus the content's 6 top padding.
+                .padding(EdgeInsets(top: 16, leading: 20, bottom: 10, trailing: 20))
+                .background {
+                    Rectangle()
+                        .fill(Theme.windowBackground)
+                        .overlay(Color.white.opacity(0.014))
+                }
+        }
+        // The page owns its whole header: with the toolbar row empty on cask
+        // sections, the bar rises through the top safe area so the capsule
+        // sits on the traffic lights' and sidebar toggle's own baseline.
+        .ignoresSafeArea(edges: .top)
+    }
+
     /// `searchText` debounced 200 ms into `applied` — typing filters a few
     /// thousand cards, so the filter runs per pause rather than per keystroke.
     func caskSearchDebounce(_ searchText: String, into applied: Binding<String>) -> some View {
