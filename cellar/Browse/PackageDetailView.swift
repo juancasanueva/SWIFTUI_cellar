@@ -468,6 +468,12 @@ struct PackageDetailView: View {
         if let installed {
             if installed.isOutdated {
                 PillBadge(label: "Update available", tone: .accent)
+            } else if installed.hasNewerVersion {
+                // A self-updating cask behind its record: "Up to date" would
+                // overclaim what brew can know — the app is its own updater,
+                // and the keg version stops tracking it after first launch.
+                // Informational wording, never the outdated treatment (II5).
+                PillBadge(label: "Updates itself", tone: .neutral)
             } else {
                 PillBadge(label: "Up to date", tone: .success)
             }
@@ -538,7 +544,10 @@ struct PackageDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                fact("Version", package.version, mono: true)
+                // "Latest", not "Version": this is the catalog record's number,
+                // which can sit above the header's installed version — an
+                // unlabeled pair read as a contradiction.
+                fact("Latest version", package.version, mono: true)
                 if let size = sizeOnDisk(for: package.id) {
                     fact("Size on disk", size.formatted(.byteCount(style: .file)), mono: true)
                 }
