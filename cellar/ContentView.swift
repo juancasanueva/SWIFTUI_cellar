@@ -35,6 +35,8 @@ struct ContentView: View {
     /// Per-period Top Charts rankings, owned by the composition root like the
     /// assets above — the page reads it, constructs nothing.
     let caskCharts: CaskChartsStore
+    /// The formula-configured sibling — see `cellarApp.formulaCharts`.
+    let formulaCharts: CaskChartsStore
     let services: ServicesStore
     let servicesRefresher: ServicesRefreshCoordinator
     let taps: TapStore
@@ -275,6 +277,35 @@ struct ContentView: View {
             )
         case .caskCategory:
             CaskCategoriesListView(catalog: catalog, selection: $caskCategoryID)
+        case .formulaBrowse:
+            FormulaBrowseView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                section: $section,
+                shellControls: shellHeaderControls
+            )
+        case .formulaFeatured:
+            FormulaFeaturedView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                shellControls: shellHeaderControls
+            )
+        case .formulaTopCharts:
+            FormulaTopChartsView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                charts: formulaCharts,
+                shellControls: shellHeaderControls
+            )
         case .installed:
             InstalledListView(
                 installed: installed,
@@ -367,9 +398,10 @@ struct ContentView: View {
     private var detailPane: AnyView? {
         switch section {
         case .home, .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded,
+             .formulaBrowse, .formulaFeatured, .formulaTopCharts,
              .cleanup, .brewfile, .history, .settings:
-            // The cask collection pages are full-width like CaskHub's own;
-            // nothing here drives the shared package detail column.
+            // The collection pages are full-width like CaskHub's own; nothing
+            // here drives the shared package detail column.
             return nil
         case .caskCategory:
             // The one cask page that is not full-width: the categories list
@@ -467,6 +499,7 @@ struct ContentView: View {
     /// and carries the shared `ShellHeaderControls` itself.
     private static let caskSections: Set<AppSection> = [
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
+        .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the

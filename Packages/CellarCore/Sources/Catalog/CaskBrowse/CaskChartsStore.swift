@@ -60,6 +60,9 @@ public final class CaskChartsStore {
 
     private let source: any CaskChartsSource
     private let directory: URL
+    /// This instance's cache file. Parameterized so the formula charts store
+    /// keeps its windows beside — never on top of — the cask ones.
+    private let cacheFileName: String
     private let now: @Sendable () -> Date
     private var fetchedAt: [CaskChartsPeriod: Date] = [:]
     private var hasLoadedCache = false
@@ -73,10 +76,12 @@ public final class CaskChartsStore {
     public init(
         source: any CaskChartsSource,
         directory: URL,
+        cacheFileName: String = CaskChartsStore.cacheFileName,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.source = source
         self.directory = directory
+        self.cacheFileName = cacheFileName
         self.now = now
     }
 
@@ -122,7 +127,7 @@ public final class CaskChartsStore {
 
     // MARK: - Disk cache
 
-    private var fileURL: URL { directory.appendingPathComponent(Self.cacheFileName) }
+    private var fileURL: URL { directory.appendingPathComponent(cacheFileName) }
 
     /// Loaded lazily on the first selection, so a launch that never opens Top
     /// Charts never reads the file.

@@ -14,6 +14,11 @@ struct CaskIconView: View {
     let size: CGFloat
     let isKnownToken: Bool
     let iconLoader: CaskIconLoader
+    /// `false` skips the remote pipeline entirely. The formula pages pass it:
+    /// CaskFlow and App-Fair are cask-app registries, so a formula token
+    /// would only buy a guaranteed miss per row — the letter tile *is* the
+    /// designed answer there, not a fallback.
+    var loadsRemote: Bool = true
 
     @State private var icon: NSImage?
 
@@ -42,6 +47,7 @@ struct CaskIconView: View {
         }
         .frame(width: size, height: size)
         .task(id: token) {
+            guard loadsRemote else { return }
             icon = await iconLoader.icon(for: token, isKnownToken: isKnownToken)
         }
     }

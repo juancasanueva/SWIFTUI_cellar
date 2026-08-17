@@ -52,6 +52,15 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// categories in the list pane, the selected category's page in the detail.
     /// Cards' category labels and each shelf's View All still land here too.
     case caskCategory
+    /// The formula storefront: the cask Browse's rules on the other kind. No
+    /// Recently Added and no Categories siblings, because both lean on
+    /// cask-mined data — added dates and the category map — that has no
+    /// formula equivalent.
+    case formulaBrowse
+    /// The top hundred formulae by annual installs-on-request.
+    case formulaFeatured
+    /// Every eligible formula ranked by one analytics window's installs.
+    case formulaTopCharts
     case installed
     /// The favorited slice of Installed, promoted to a place of its own by the
     /// design document. The filter chip on Installed remains; this is the same
@@ -107,6 +116,9 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         // The list-pane header and the capsule bar's fallback; the bar shows
         // the selected category's display name whenever one is resolved.
         case .caskCategory: "Categories"
+        case .formulaBrowse: "Browse"
+        case .formulaFeatured: "Featured"
+        case .formulaTopCharts: "Top Charts"
         case .installed: "Installed"
         case .favorites: "Favorites"
         case .updates: "Updates"
@@ -142,6 +154,9 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         // calendar variant is the verified nearest match.
         case .caskRecentlyAdded: "calendar.badge.plus"
         case .caskCategory: "square.grid.3x3"
+        case .formulaBrowse: "terminal"
+        case .formulaFeatured: "star"
+        case .formulaTopCharts: "chart.line.uptrend.xyaxis"
         case .installed: "shippingbox"
         case .favorites: "heart"
         case .updates: "arrow.up.circle"
@@ -163,6 +178,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
         ("Overview", [.home, .discover, .browse]),
         ("Discover Casks", [.caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory]),
+        ("Discover Formulae", [.formulaBrowse, .formulaFeatured, .formulaTopCharts]),
         ("Packages", [.installed, .favorites, .updates, .services]),
         ("Insights", [.health, .security, .cleanup]),
         ("Manage", [.taps, .brewfile, .history]),

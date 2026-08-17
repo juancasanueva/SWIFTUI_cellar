@@ -26,8 +26,9 @@ struct AppSectionPlacementTests {
         // Ten M5-era sections, plus the four the design document promoted to
         // sidebar rows — favorites, updates, brewfile, and settings — plus the
         // four cask-discovery pages the CaskHub port added, plus the one
-        // data-driven category page behind the sidebar's category rows.
-        #expect(order.count == 19)
+        // data-driven category page behind the sidebar's category rows, plus
+        // the three formula-discovery pages that mirror the cask ones.
+        #expect(order.count == 22)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -49,6 +50,7 @@ struct AppSectionPlacementTests {
             "home", "discover", "browse",
             "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
             "caskCategory",
+            "formulaBrowse", "formulaFeatured", "formulaTopCharts",
             "installed", "favorites", "updates",
             "taps", "services", "cleanup", "health", "security", "brewfile",
             "history", "settings"
@@ -77,7 +79,7 @@ struct AppSectionPlacementTests {
         #expect(Set(arranged) == Set(AppSection.allCases))
 
         #expect(AppSection.sidebarGroups.map(\.title) == [
-            "Overview", "Discover Casks", "Packages", "Insights", "Manage"
+            "Overview", "Discover Casks", "Discover Formulae", "Packages", "Insights", "Manage"
         ])
         #expect(AppSection.sidebarFooter == [.settings])
         // Categories closes Discover Casks, after Recently Added — the row
@@ -85,10 +87,16 @@ struct AppSectionPlacementTests {
         #expect(AppSection.sidebarGroups[1].sections == [
             .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         ])
+        // The formula mirror carries only the pages its data can honestly
+        // fill: no added dates and no categories exist for formulae, so
+        // Recently Added and Categories have no formula siblings.
+        #expect(AppSection.sidebarGroups[2].sections == [
+            .formulaBrowse, .formulaFeatured, .formulaTopCharts,
+        ])
         // Health leads Insights, which is the design's placement of PRD §5's
         // "between Services and Security": Services closes the group before it,
         // Security follows it.
-        #expect(AppSection.sidebarGroups[3].sections == [.health, .security, .cleanup])
+        #expect(AppSection.sidebarGroups[4].sections == [.health, .security, .cleanup])
     }
 
     /// Home keeps its place at the head of the sidebar, and now holds the

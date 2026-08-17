@@ -48,6 +48,12 @@ import SwiftUI
             directory: FileManager.default.temporaryDirectory
                 .appendingPathComponent("preview-cask-charts", isDirectory: true)
         ),
+        formulaCharts: CaskChartsStore(
+            source: AppTestCaskChartsSource(),
+            directory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("preview-formula-charts", isDirectory: true),
+            cacheFileName: "formula-charts-v1.json"
+        ),
         services: services,
         servicesRefresher: ServicesRefreshCoordinator(store: services),
         taps: TapStore(),

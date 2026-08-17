@@ -39,6 +39,9 @@ public final class CatalogStore {
     /// main-actor turn: an observer must never see a fresh index next to a
     /// stale browse page, for exactly the reason `discover` states.
     public private(set) var caskBrowse: CaskBrowseContent = .empty
+    /// What the formula browse pages render — the same contract as
+    /// `caskBrowse`, for the other kind.
+    public private(set) var formulaBrowse: FormulaBrowseContent = .empty
 
     /// The as-you-type query. Reranks on assignment.
     public var query: String = "" {
@@ -241,6 +244,7 @@ public final class CatalogStore {
                 addedDates: await caskAddedDates(),
                 now: await engine.now
             )
+            let formulaContent = await FormulaBrowseProjection.build(snapshot: snapshot)
             // Builds can finish out of order — a 16k snapshot overtaken by a
             // small one. The newer catalog wins, so a stale ordinal is discarded
             // here rather than installed on top of fresher data (design D1).
@@ -252,6 +256,7 @@ public final class CatalogStore {
             packageCount = built.recordCount
             discover = projected
             caskBrowse = browse
+            formulaBrowse = formulaContent
             rerank()
         }
         adoptionInFlight = adoption
