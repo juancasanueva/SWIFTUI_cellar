@@ -63,8 +63,8 @@ struct CaskIconView: View {
 /// those rows drew before artwork existed.
 struct PackageIconTile: View {
     let id: PackageID
-    var size: CGFloat = 32
-    var fontSize: CGFloat = 13
+    var size: CGFloat = 36
+    var fontSize: CGFloat = 14
     var cornerRadius: CGFloat = 7
     var assets: CaskBrowseAssets?
     var iconLoader: CaskIconLoader?

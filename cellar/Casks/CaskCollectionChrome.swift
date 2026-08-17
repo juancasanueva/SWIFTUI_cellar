@@ -255,7 +255,7 @@ struct CaskListRow: View {
         HStack(spacing: 12) {
             CaskIconView(
                 token: package.name,
-                size: 44,
+                size: 58,
                 isKnownToken: assets.isKnownIconToken(package.name),
                 iconLoader: iconLoader,
                 loadsRemote: remoteIcons
