@@ -86,6 +86,7 @@ struct CaskCardView: View {
                 }
             }
             Spacer(minLength: 0)
+            CaskInfoButton(package: package, installed: installed, assets: assets)
         }
         .frame(height: 48, alignment: .top)
     }
@@ -104,22 +105,28 @@ struct CaskCardView: View {
     private var actionRow: some View {
         switch CaskActionState.resolve(package, installed: installed) {
         case .update(let target):
-            // Louder than Install: an update is the verb that most often
-            // brings a user here, the sidebar badge's own rule.
-            actionButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
-                submit(.upgrade(target))
+            HStack(spacing: 8) {
+                // Louder than Install: an update is the verb that most often
+                // brings a user here, the sidebar badge's own rule.
+                actionButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
+                    submit(.upgrade(target))
+                }
+                uninstallButton(target)
             }
-        case .installed:
-            // Not a button: there is nothing further to do from a card.
-            Text("● Installed")
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Theme.successText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 28)
-                .background(
-                    Theme.successTint(0.15),
-                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                )
+        case .installed(let target):
+            HStack(spacing: 8) {
+                // Not a button: the state itself asks for nothing further.
+                Text("● Installed")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.successText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 28)
+                    .background(
+                        Theme.successTint(0.15),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                uninstallButton(target)
+            }
         case .install(let target):
             actionButton("↓ Install", identifier: "cask-install-\(package.name)") {
                 submit(.install(target))
@@ -127,6 +134,33 @@ struct CaskCardView: View {
         case nil:
             EmptyView()
         }
+    }
+
+    /// The destructive verb beside whichever state an installed cask shows.
+    /// Routed through the same `submit` idiom, so the operation center's
+    /// uninstall confirmation still fronts it.
+    private func uninstallButton(_ target: PackageTarget) -> some View {
+        Button {
+            submit(.uninstall(target))
+        } label: {
+            Text("Uninstall")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.dangerText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .background(
+                    Theme.dangerTint(0.12),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Theme.dangerTint(0.35), lineWidth: 0.5)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!operations.isAvailable)
+        .accessibilityIdentifier("cask-uninstall-\(package.name)")
     }
 
     private func actionButton(
