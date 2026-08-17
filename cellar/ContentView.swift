@@ -558,6 +558,7 @@ struct ContentView: View {
     /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
         .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
+        .cleanup,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
@@ -566,6 +567,7 @@ struct ContentView: View {
     /// collection controls of their own.
     private static let shellTitleBarSections: Set<AppSection> = [
         .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
+        .cleanup,
     ]
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the
