@@ -107,7 +107,7 @@ struct ContentView: View {
     /// a fourth `AppSection` switch on purpose: the placement suite pins the
     /// shell to exactly two exhaustive switches (content and detail).
     private static let listSections: Set<AppSection> = [
-        .discover, .browse, .caskCategory, .installed, .favorites, .updates,
+        .browse, .caskCategory, .installed, .favorites, .updates,
         .taps, .services, .security,
     ]
 
@@ -148,6 +148,51 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 220, ideal: 228, max: 300)
         } detail: {
+            Group {
+                // Home and Search catalog lead with the discover pages' capsule
+                // card — title and shell controls, no collection controls —
+                // pinned at the shell so it spans the whole pane row.
+                if Self.shellTitleBarSections.contains(section) {
+                    paneArea.caskCollectionTopBarPinned {
+                        // The sidebar's wording, not the toolbar's: the row a
+                        // user clicked says "Search catalog", so the card it
+                        // lands on says the same.
+                        ShellTitleBar(
+                            title: section.sidebarTitle,
+                            countLabel: section == .browse
+                                ? "\(catalog.packageCount.formatted()) packages"
+                                : nil,
+                            shellControls: shellHeaderControls
+                        )
+                    }
+                } else {
+                    paneArea
+                }
+            }
+            .background(Theme.windowBackground)
+            // Into the native toolbar row rather than a drawn strip: macOS
+            // clips app content out of the titlebar region, so a custom strip
+            // there stays clickable but never paints.
+            .toolbar {
+                ShellToolbarItems(
+                    section: section,
+                    showsPageChrome: !Self.pinnedHeaderSections.contains(section),
+                    refresh: refresh,
+                    isActivityExpanded: $isActivityExpanded
+                )
+            }
+            // The design draws its own dark ground; the glass wash would sit
+            // between it and the toolbar items.
+            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        }
+        // The dark ground the sidebar's translucent material blurs over — this
+        // is what tints the system sidebar to the design's palette.
+        .containerBackground(for: .window) { Theme.windowBackground }
+    }
+
+    /// The pane row itself, extracted so the shell can pin a title bar over it
+    /// for the sections that want one.
+    private var paneArea: some View {
             // A GeometryReader rather than a plain stack: the pinned cask bars
             // give the detail pane a hard minimum width, and an HStack whose
             // children's minimums exceed the column overflows *centred* — which
@@ -184,25 +229,6 @@ struct ContentView: View {
                 // region — which `.clipped()` here was cutting off entirely.
                 .frame(width: geometry.size.width, alignment: .leading)
             }
-            .background(Theme.windowBackground)
-            // Into the native toolbar row rather than a drawn strip: macOS
-            // clips app content out of the titlebar region, so a custom strip
-            // there stays clickable but never paints.
-            .toolbar {
-                ShellToolbarItems(
-                    section: section,
-                    showsPageChrome: !Self.caskSections.contains(section),
-                    refresh: refresh,
-                    isActivityExpanded: $isActivityExpanded
-                )
-            }
-            // The design draws its own dark ground; the glass wash would sit
-            // between it and the toolbar items.
-            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        }
-        // The dark ground the sidebar's translucent material blurs over — this
-        // is what tints the system sidebar to the design's palette.
-        .containerBackground(for: .window) { Theme.windowBackground }
     }
 
     @ViewBuilder
@@ -223,8 +249,6 @@ struct ContentView: View {
                 section: $section,
                 selection: $selection
             )
-        case .discover:
-            DiscoverView(catalog: catalog, selection: $selection)
         case .browse:
             BrowseView(
                 catalog: catalog,
@@ -450,7 +474,7 @@ struct ContentView: View {
                     catalog: catalog
                 )
             )
-        case .discover, .browse, .installed, .favorites, .updates:
+        case .browse, .installed, .favorites, .updates:
             // The same detail view for all of them: a package is a package,
             // and the catalog record is the thing worth reading about it.
             return AnyView(
@@ -496,11 +520,18 @@ struct ContentView: View {
 
     /// The sections whose pinned capsule bar is the whole header: the toolbar
     /// row shows no title and no controls for them — the bar names the page
-    /// and carries the shared `ShellHeaderControls` itself.
-    private static let caskSections: Set<AppSection> = [
+    /// and carries the shared `ShellHeaderControls` itself. The discover pages
+    /// pin their own collection bar; Home and Search catalog get the shell's
+    /// plain `ShellTitleBar` instead.
+    private static let pinnedHeaderSections: Set<AppSection> = [
+        .home, .browse,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
+
+    /// The subset whose bar the shell itself pins — the sections with no
+    /// collection controls of their own.
+    private static let shellTitleBarSections: Set<AppSection> = [.home, .browse]
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the
     /// same closure and binding the toolbar row renders everywhere else.

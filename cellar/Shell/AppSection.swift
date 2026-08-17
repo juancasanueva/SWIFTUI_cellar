@@ -11,13 +11,6 @@ import SwiftUI
 /// is a value the shell can hold, restore and switch over exhaustively.
 enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case home
-    /// Ranked ladders, a hand-picked list, and what this Mac has seen for the
-    /// first time recently.
-    ///
-    /// Between Home and Browse because it serves the user *before* they have a
-    /// query: Browse is a search field over ~16k records and answers nothing
-    /// useful when empty.
-    ///
     /// **Home remains its own section, and now takes the landing.** D4 settled
     /// the slice-5 half of the question: Health is its own section, Home is not
     /// folded into it, and Health did not take the landing spot. The landing
@@ -27,7 +20,11 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// landing worth having. The history is recorded here rather than removed,
     /// because a deleted question is indistinguishable from one that was never
     /// asked.
-    case discover
+    ///
+    /// A `discover` case used to sit here — ranked ladders, a curated list,
+    /// and this Mac's first observations. The maintainer retired it
+    /// (2026-08-17) once the Discover Casks and Discover Formulae groups
+    /// covered its job with live analytics rather than a static curated list.
     case browse
     /// The CaskHub-style cask storefront: a house pick, curated shelves, and a
     /// grid of app cards. Its own group in the sidebar because it browses one
@@ -107,7 +104,6 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .home: "Home"
-        case .discover: "Discover"
         case .browse: "Search"
         case .caskBrowse: "Browse"
         case .caskFeatured: "Featured"
@@ -145,7 +141,6 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     var systemImage: String {
         switch self {
         case .home: "house"
-        case .discover: "sparkles"
         case .browse: "magnifyingglass"
         case .caskBrowse: "square.grid.2x2"
         case .caskFeatured: "star"
@@ -176,7 +171,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// The design's four labelled groups, in its order. `settings` is not in
     /// any group: it lives in the sidebar's footer.
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
-        ("Overview", [.home, .discover, .browse]),
+        ("Overview", [.home, .browse]),
         ("Discover Casks", [.caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory]),
         ("Discover Formulae", [.formulaBrowse, .formulaFeatured, .formulaTopCharts]),
         ("Packages", [.installed, .favorites, .updates, .services]),

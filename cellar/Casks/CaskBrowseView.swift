@@ -29,7 +29,7 @@ struct CaskBrowseView: View {
     var shellControls: ShellHeaderControls? = nil
 
     /// The grid/list choice, kept across launches like the shell's pane width.
-    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .grid
+    @AppStorage("casks.viewMode") private var viewMode: CaskBrowseViewMode = .list
 
     @State private var searchText = ""
     /// `searchText` debounced 200 ms — typing filters a few thousand cards, so
