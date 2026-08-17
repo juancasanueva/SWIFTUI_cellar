@@ -208,14 +208,16 @@ struct CaskCollectionView: View {
 /// re-deriving it.
 enum CaskActionState {
     case update(PackageTarget)
-    case installed
+    /// Installed and current. Carries the target because an installed cask
+    /// still has one verb left: uninstall.
+    case installed(PackageTarget)
     case install(PackageTarget)
 
     static func resolve(_ package: CatalogPackage, installed: InstalledStore) -> CaskActionState? {
         guard let target = PackageTarget(package.id) else { return nil }
         let installedPackage = installed.inventory.package(package.id)
         if let installedPackage, installedPackage.isOutdated { return .update(target) }
-        if installedPackage != nil { return .installed }
+        if installedPackage != nil { return .installed(target) }
         return .install(target)
     }
 }
@@ -266,6 +268,7 @@ struct CaskListRow: View {
             .font(Theme.mono(9.5))
             .foregroundStyle(Theme.textTertiary)
             actionPill
+            CaskInfoButton(package: package, installed: installed, assets: assets)
         }
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
         .background(Theme.rowFill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -284,13 +287,15 @@ struct CaskListRow: View {
             pillButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
                 submit(.upgrade(target))
             }
-        case .installed:
-            // Not a button: there is nothing further to do from a row.
+            uninstallPill(target)
+        case .installed(let target):
+            // Not a button: the state itself asks for nothing further.
             Text("● Installed")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Theme.successText)
                 .frame(width: 100, height: 25)
                 .background(Theme.successTint(0.15), in: Capsule())
+            uninstallPill(target)
         case .install(let target):
             pillButton("↓ Install", identifier: "cask-install-\(package.name)") {
                 submit(.install(target))
@@ -298,6 +303,26 @@ struct CaskListRow: View {
         case nil:
             EmptyView()
         }
+    }
+
+    /// The destructive verb at pill density, beside whichever state pill an
+    /// installed cask shows. Routed through the same `submit` idiom, so the
+    /// operation center's uninstall confirmation still fronts it.
+    private func uninstallPill(_ target: PackageTarget) -> some View {
+        Button {
+            submit(.uninstall(target))
+        } label: {
+            Text("Uninstall")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.dangerText)
+                .frame(width: 100, height: 25)
+                .background(Theme.dangerTint(0.12), in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.dangerTint(0.35), lineWidth: 0.5))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!operations.isAvailable)
+        .accessibilityIdentifier("cask-uninstall-\(package.name)")
     }
 
     private func pillButton(
