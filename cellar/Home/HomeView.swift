@@ -250,7 +250,7 @@ struct HomeView: View {
                     .foregroundStyle(theme.base)
             }
             VStack(spacing: 0) {
-                let records = Array(history.records.prefix(4))
+                let records = Array(history.records.prefix(8))
                 if records.isEmpty {
                     Text("Nothing yet — package changes Cellar makes appear here.")
                         .font(.system(size: 12.5))
@@ -264,7 +264,7 @@ struct HomeView: View {
                     ForEach(records) { record in
                         RecentActivityRow(record: record)
                         if record.id != records.last?.id {
-                            Rectangle().fill(Theme.separator).frame(height: 0.5)
+                            HairlineDivider()
                         }
                     }
                 }
@@ -309,7 +309,7 @@ struct HomeView: View {
                             section = .installed
                         }
                         if package.id != favorites.last?.id {
-                            Rectangle().fill(Theme.separator).frame(height: 0.5)
+                            HairlineDivider()
                         }
                     }
                 }
