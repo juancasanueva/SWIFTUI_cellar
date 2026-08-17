@@ -87,7 +87,8 @@ struct TapDetailView: View {
     private var filterBar: some View {
         HStack(spacing: 10) {
             Text("Packages")
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
+                .kerning(-0.3)
                 .foregroundStyle(Theme.textPrimary)
             Spacer(minLength: 12)
             TextField("Filter packages", text: $query)
@@ -101,14 +102,17 @@ struct TapDetailView: View {
                     in: RoundedRectangle(cornerRadius: 7, style: .continuous)
                 )
                 .accessibilityIdentifier("tap-package-filter")
-            Picker("Kind", selection: $kind) {
-                Text("All").tag(PackageKind?.none)
-                Text("Formulae").tag(PackageKind?.some(.formula))
-                Text("Casks").tag(PackageKind?.some(.cask))
+            HStack(spacing: 5) {
+                FilterChip(label: "All", isOn: kind == nil) {
+                    kind = nil
+                }
+                FilterChip(label: "Formulae", isOn: kind == .formula) {
+                    kind = .formula
+                }
+                FilterChip(label: "Casks", isOn: kind == .cask) {
+                    kind = .cask
+                }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 240)
         }
         .padding(EdgeInsets(top: 12, leading: 30, bottom: 12, trailing: 30))
     }
@@ -135,13 +139,12 @@ struct TapDetailView: View {
                 Spacer(minLength: 12)
                 if let installedID = package.installedHandoff {
                     Button("Show in Installed") { showInInstalled(installedID) }
-                        .buttonStyle(TapActionButtonStyle(
-                            fill: Theme.controlFill,
-                            text: Theme.textBody
-                        ))
+                        .buttonStyle(ActionPillStyle())
                 }
             }
-            .padding(.vertical, 3)
+            // Leading 14 on top of the native row inset lands the status dot
+            // on the pane's 30pt gutter, in line with the Packages heading.
+            .padding(EdgeInsets(top: 3, leading: 14, bottom: 3, trailing: 0))
         }
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("tap-package-list")
@@ -151,11 +154,11 @@ struct TapDetailView: View {
         Text(kind == .formula ? "FORMULA" : "CASK")
             .font(.system(size: 9, weight: .semibold))
             .kerning(0.5)
-            .foregroundStyle(Theme.textTertiary)
+            .foregroundStyle(kind == .cask ? Theme.caskText : Theme.infoText)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
-                Theme.controlFill,
+                kind == .cask ? Theme.caskTint(0.18) : Theme.infoTint(0.15),
                 in: RoundedRectangle(cornerRadius: 4, style: .continuous)
             )
     }
