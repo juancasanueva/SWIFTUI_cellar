@@ -156,7 +156,7 @@ struct PackageDetailView: View {
                 }
                 Spacer(minLength: 0)
             }
-            Rectangle().fill(Theme.hairline).frame(height: 0.5)
+            HairlineDivider()
         }
     }
 

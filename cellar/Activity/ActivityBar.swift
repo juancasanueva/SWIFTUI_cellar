@@ -28,7 +28,7 @@ struct ActivityBar: View {
                 if isExpanded {
                     ActivityDrawer(center: center)
                         .background(Theme.logWell)
-                    Rectangle().fill(Theme.hairline).frame(height: 0.5)
+                    HairlineDivider()
                 }
                 collapsedBar
             }

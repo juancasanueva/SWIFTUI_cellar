@@ -151,7 +151,7 @@ struct ContentView: View {
     /// shell to exactly two exhaustive switches (content and detail).
     private static let listSections: Set<AppSection> = [
         .browse, .caskCategory, .installed, .favorites, .updates,
-        .taps, .services, .security,
+        .taps, .services,
     ]
 
     var body: some View {
@@ -441,7 +441,12 @@ struct ContentView: View {
                 security: security,
                 consent: securityConsent,
                 credentials: advisoryCredentials,
-                selection: $findingSelection
+                selection: $findingSelection,
+                dismissals: dismissals,
+                operations: operations,
+                catalog: catalog,
+                integrity: integrity,
+                artifactLocations: artifactLocations
             )
         case .brewfile:
             BrewfileSectionView(
@@ -499,21 +504,9 @@ struct ContentView: View {
             // popover, so the dashboard takes the whole width.
             return nil
         case .security:
-            if findingSelection == nil, artifactLocations.isEmpty == false || integrity.reports.isEmpty == false {
-                // The integrity half occupies the detail column whenever no
-                // finding is selected: it is a second view of the same
-                // inventory rather than a separate destination.
-                return AnyView(ArtifactIntegrityPanel(store: integrity, locations: artifactLocations))
-            }
-            return AnyView(
-                SecurityFindingDetail(
-                    selection: findingSelection,
-                    security: security,
-                    dismissals: dismissals,
-                    operations: operations,
-                    catalog: catalog
-                )
-            )
+            // No detail column: the dashboard embeds the integrity section
+            // and opens a finding in a sheet.
+            return nil
         case .browse, .installed, .favorites, .updates:
             // The same detail view for all of them: a package is a package,
             // and the catalog record is the thing worth reading about it.
@@ -564,7 +557,7 @@ struct ContentView: View {
     /// pin their own collection bar; the rest get the shell's plain
     /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates, .services, .health,
+        .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
@@ -572,7 +565,7 @@ struct ContentView: View {
     /// The subset whose bar the shell itself pins — the sections with no
     /// collection controls of their own.
     private static let shellTitleBarSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates, .services, .health,
+        .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
     ]
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the

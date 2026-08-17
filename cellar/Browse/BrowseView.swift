@@ -50,7 +50,7 @@ struct BrowseView: View {
                 )
             }
             .padding(EdgeInsets(top: 11, leading: 13, bottom: 11, trailing: 13))
-            Rectangle().fill(Theme.hairline).frame(height: 0.5)
+            HairlineDivider()
 
             List(rows, selection: $selection) { entry in
                 HStack(spacing: 6) {
