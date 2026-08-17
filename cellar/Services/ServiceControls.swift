@@ -32,12 +32,11 @@ struct ServiceControls: View {
 
     var body: some View {
         if let target {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ForEach(ServiceRowControl.allCases, id: \.self) { control in
                     button(control, target)
                 }
             }
-            .buttonStyle(.borderless)
             .disabled(!operations.isAvailable)
             .help(operations.unavailableGuidance ?? "Start, stop or restart \(service.name)")
         }
@@ -46,6 +45,7 @@ struct ServiceControls: View {
     @ViewBuilder
     private func button(_ control: ServiceRowControl, _ target: ServiceTarget) -> some View {
         Button(control.label) { invoke(control, target) }
+            .buttonStyle(ActionPillStyle())
             .accessibilityLabel("\(control.label) \(service.name)")
     }
 

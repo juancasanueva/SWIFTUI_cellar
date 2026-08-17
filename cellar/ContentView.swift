@@ -419,7 +419,6 @@ struct ContentView: View {
             ServicesListView(
                 services: services,
                 refresher: servicesRefresher,
-                operations: operations,
                 selection: $serviceSelection
             )
         case .cleanup:
@@ -489,7 +488,7 @@ struct ContentView: View {
                 )
             )
         case .services:
-            return AnyView(ServiceDetailView(services: services))
+            return AnyView(ServiceDetailView(services: services, operations: operations))
         case .taps:
             return AnyView(
                 TapDetailView(
@@ -571,7 +570,7 @@ struct ContentView: View {
     /// pin their own collection bar; the rest get the shell's plain
     /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates,
+        .home, .browse, .installed, .favorites, .updates, .services,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
@@ -579,7 +578,7 @@ struct ContentView: View {
     /// The subset whose bar the shell itself pins — the sections with no
     /// collection controls of their own.
     private static let shellTitleBarSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates,
+        .home, .browse, .installed, .favorites, .updates, .services,
     ]
 
     /// The one Refresh/Activity pair the cask pages embed in their bars — the

@@ -20,14 +20,11 @@ import SwiftUI
 struct ServicesListView: View {
     let services: ServicesStore
     let refresher: ServicesRefreshCoordinator
-    /// Passed to the rows so each one's controls submit through the same
-    /// guarded path; the list itself submits nothing.
-    let operations: OperationCenter
     @Binding var selection: String?
 
     var body: some View {
         List(services.services, selection: $selection) { service in
-            ServiceRow(service: service, operations: operations)
+            ServiceRow(service: service)
                 .tag(service.id)
                 .themedListSelection(isSelected: selection == service.id)
         }
@@ -38,7 +35,6 @@ struct ServicesListView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.white.opacity(0.014))
-        .navigationTitle(AppSection.services.title)
         .onAppear { refresher.setVisible(true) }
         .onDisappear { refresher.setVisible(false) }
         .onChange(of: selection) { _, name in
@@ -104,7 +100,6 @@ private struct ServicesEmptyStateView: View {
     return ServicesListView(
         services: ServicesStore(),
         refresher: ServicesRefreshCoordinator(store: ServicesStore()),
-        operations: OperationCenter(),
         selection: $selection
     )
 }

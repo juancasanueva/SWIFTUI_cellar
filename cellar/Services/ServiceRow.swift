@@ -6,15 +6,13 @@
 import BrewClient
 import SwiftUI
 
-/// One background service: its name, what brew says it is doing, and the five
-/// controls it offers.
+/// One background service: its name and what brew says it is doing.
 ///
-/// The controls arrive with the mutation spine rather than before it: a row that
-/// showed them while nothing could be submitted would be an affordance that does
-/// nothing, which is the failure mode this project refuses elsewhere.
+/// Identity and status only — the five verbs live in the detail pane, where
+/// they have the width their labels need. Five text buttons in a 342-point
+/// list pane wrapped letter by letter, which is the row this replaces.
 struct ServiceRow: View {
     let service: ServiceRecord
-    let operations: OperationCenter
 
     var body: some View {
         HStack(spacing: 11) {
@@ -36,7 +34,6 @@ struct ServiceRow: View {
                     .foregroundStyle(Color.white.opacity(0.38))
                     .help("Runs as \(user)")
             }
-            ServiceControls(service: service, operations: operations)
         }
         .padding(.vertical, 4)
     }
@@ -104,17 +101,10 @@ struct ServiceStatusTag: View {
 }
 
 #Preview {
-    let operations = OperationCenter()
-    return List {
-        ServiceRow(
-            service: ServiceRecord(name: "atuin", status: .started, user: "tester"),
-            operations: operations
-        )
-        ServiceRow(service: ServiceRecord(name: "postgresql@16", status: .none), operations: operations)
-        ServiceRow(service: ServiceRecord(name: "unbound", status: .error, exitCode: 1), operations: operations)
-        ServiceRow(
-            service: ServiceRecord(name: "enigma", status: .unrecognised("mystery")),
-            operations: operations
-        )
+    List {
+        ServiceRow(service: ServiceRecord(name: "atuin", status: .started, user: "tester"))
+        ServiceRow(service: ServiceRecord(name: "postgresql@16", status: .none))
+        ServiceRow(service: ServiceRecord(name: "unbound", status: .error, exitCode: 1))
+        ServiceRow(service: ServiceRecord(name: "enigma", status: .unrecognised("mystery")))
     }
 }
