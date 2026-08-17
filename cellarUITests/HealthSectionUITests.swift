@@ -188,15 +188,17 @@ final class HealthSectionUITests: XCTestCase {
         let app = launchHealthFixture(extraArguments: ["--ui-testing-m5-health-casks"])
         selectEverythingInstalled(in: app)
 
-        let pin = app.buttons["Pin 0"]
+        // The bar itself is up before absence is asserted, or the assertions
+        // below would pass vacuously against a bar that never rendered.
         XCTAssertTrue(
-            pin.waitForExistence(timeout: 15),
-            "the pin control never appeared; buttons were \(Self.labels(in: app))"
+            app.descendants(matching: .any)["bulk-snooze"].waitForExistence(timeout: 15),
+            "the bulk bar never appeared; buttons were \(Self.labels(in: app))"
         )
-        // Present, and **disabled** — a control that is enabled and does nothing
-        // when pressed is the failure mode II13 sc5 forbids by name.
-        XCTAssertFalse(pin.isEnabled, "pin is enabled over a selection it cannot act on")
-        XCTAssertFalse(app.buttons["Unpin 0"].isEnabled, "unpin is enabled over a selection it cannot act on")
+        // Absent, not inert — a verb with an empty eligible set does not render:
+        // a control that is enabled and does nothing when pressed is the failure
+        // mode II13 sc5 forbids by name, and a dimmed zero adds no information.
+        XCTAssertFalse(app.buttons["Pin 0"].exists, "pin rendered over a selection it cannot act on")
+        XCTAssertFalse(app.buttons["Unpin 0"].exists, "unpin rendered over a selection it cannot act on")
     }
 
     @MainActor

@@ -162,7 +162,8 @@ nonisolated struct BulkActionBarPresentation: Sendable, Hashable {
 ///
 /// Every control is **unavailable rather than inert**: a button that is enabled
 /// and does nothing when pressed is the failure mode II13 sc5 forbids, so each
-/// label counts exactly what would be submitted and disables itself at zero.
+/// label counts exactly what would be submitted, and a verb whose eligible set
+/// is empty does not render at all.
 struct BulkActionBar: View {
     let selection: BulkSelection
     let operations: OperationCenter
@@ -175,25 +176,32 @@ struct BulkActionBar: View {
     var body: some View {
         HStack(spacing: 8) {
             ForEach(BulkSelection.Action.allCases, id: \.self) { action in
-                let control = presentation.control(for: action)
-                Button(control?.label ?? "", role: action == .uninstall ? .destructive : nil) {
-                    // Confirming is decided by the centre, not here: a `nil`
-                    // request means it was already submitted.
-                    operations.submitBulk(
-                        action,
-                        over: selection.ids(for: action),
-                        in: inventory
-                    )
+                // A verb with nothing to act on does not render at all: a
+                // zero-count control adds a number and no information, and a
+                // dimmed one makes the whole row read like a summary line.
+                if let control = presentation.control(for: action), control.count > 0 {
+                    Button(control.label, role: action == .uninstall ? .destructive : nil) {
+                        // Confirming is decided by the centre, not here: a `nil`
+                        // request means it was already submitted.
+                        operations.submitBulk(
+                            action,
+                            over: selection.ids(for: action),
+                            in: inventory
+                        )
+                    }
+                    .buttonStyle(ActionPillStyle(isDestructive: control.isDestructive))
+                    .disabled(!control.isEnabled)
                 }
-                .disabled(!(control?.isEnabled ?? false))
             }
-            Button(presentation.snooze.label, action: applySnooze)
-                .disabled(!presentation.snooze.isEnabled)
-                .help(BulkSnoozeCopy.explanation)
-                .accessibilityIdentifier("bulk-snooze")
+            if presentation.snooze.count > 0 {
+                Button(presentation.snooze.label, action: applySnooze)
+                    .buttonStyle(ActionPillStyle())
+                    .disabled(!presentation.snooze.isEnabled)
+                    .help(BulkSnoozeCopy.explanation)
+                    .accessibilityIdentifier("bulk-snooze")
+            }
             Spacer(minLength: 0)
         }
-        .buttonStyle(.borderless)
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
         .help(operations.unavailableGuidance ?? "Act on the selected packages")

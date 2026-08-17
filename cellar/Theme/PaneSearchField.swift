@@ -39,6 +39,37 @@ struct PaneSearchField: View {
     }
 }
 
+/// The design's action pill: `FilterChip`'s capsule in accent (or danger)
+/// tint, for the compact command rows above a list.
+///
+/// A contained shape rather than bare accent text, so a command reads as
+/// pressable next to the inert counts that share these rows.
+struct ActionPillStyle: ButtonStyle {
+    var isDestructive = false
+    @Environment(ThemeStore.self) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(isDestructive ? Theme.dangerText : theme.light)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .background(
+                isDestructive ? Theme.dangerTint(0.16) : theme.tint(0.16),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    isDestructive ? Theme.dangerTint(0.3) : theme.tint(0.3),
+                    lineWidth: 0.5
+                )
+            )
+            .contentShape(Capsule())
+            .opacity(configuration.isPressed ? 0.7 : (isEnabled ? 1 : 0.4))
+    }
+}
+
 /// The design's filter chip: a 14-point-radius pill that fills with accent
 /// tint when active.
 struct FilterChip: View {
