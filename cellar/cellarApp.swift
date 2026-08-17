@@ -503,6 +503,17 @@ struct cellarApp: App {
         // separate title bar, 1440×900 by default.
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)
+        .commands { AboutCommands() }
+
+        Window("About \(AppIdentity.name)", id: "about") {
+            AboutView()
+                .environment(theme)
+                .tint(theme.base)
+                .preferredColorScheme(.dark)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 
     /// Detection first, then everything that depends on it.
