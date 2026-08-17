@@ -77,9 +77,49 @@ struct ContentView: View {
     @State private var tapSelection: String?
     @State private var isActivityExpanded = false
 
-    /// The list pane's width, shared by every list-and-detail section and kept
-    /// across launches. The design draws 342; the divider makes it the user's.
-    @AppStorage("shell.listPaneWidth") private var listPaneWidth = 342.0
+    /// Each list-and-detail section's own pane width, kept across launches.
+    /// Per section rather than shared, because a categories rail and a package
+    /// list earn different widths — dragging one must not move the other. The
+    /// design draws 342; the divider makes each one the user's.
+    ///
+    /// A `@State` cache over per-section `UserDefaults` keys instead of
+    /// `@AppStorage`, because `@AppStorage` cannot vary its key by section.
+    /// The retired shared `shell.listPaneWidth` seeds a section's first read,
+    /// so an existing user's dragged width carries over.
+    @State private var listPaneWidths: [AppSection: Double] = [:]
+
+    /// The design's 342 — except Search catalog, whose rows carry state chips
+    /// and a trailing metric that 342 truncates; it opens at 400.
+    private static func defaultListPaneWidth(for section: AppSection) -> Double {
+        section == .browse ? 400 : 342
+    }
+
+    private static let legacyListPaneWidthKey = "shell.listPaneWidth"
+
+    private func listPaneWidth(for section: AppSection) -> Double {
+        if let width = listPaneWidths[section] { return width }
+        let defaults = UserDefaults.standard
+        let key = "shell.listPaneWidth.\(section.rawValue)"
+        if defaults.object(forKey: key) != nil { return defaults.double(forKey: key) }
+        if defaults.object(forKey: Self.legacyListPaneWidthKey) != nil {
+            return defaults.double(forKey: Self.legacyListPaneWidthKey)
+        }
+        return Self.defaultListPaneWidth(for: section)
+    }
+
+    /// The current section's width as a binding, for the divider's drag.
+    private var listPaneWidthBinding: Binding<Double> {
+        Binding(
+            get: { listPaneWidth(for: section) },
+            set: { newValue in
+                listPaneWidths[section] = newValue
+                UserDefaults.standard.set(
+                    newValue,
+                    forKey: "shell.listPaneWidth.\(section.rawValue)"
+                )
+            }
+        )
+    }
 
     /// The native split view's column state: `.all` or `.detailOnly`. The
     /// system sidebar toggle drives it, and it is what moves that toggle from
@@ -100,7 +140,10 @@ struct ContentView: View {
     /// `detailPaneReserve`. The stored preference is untouched, so widening
     /// the window restores exactly the width the user picked.
     private func clampedListWidth(available: Double) -> Double {
-        min(listPaneWidth, max(Self.listPaneRange.lowerBound, available - Self.detailPaneReserve))
+        min(
+            listPaneWidth(for: section),
+            max(Self.listPaneRange.lowerBound, available - Self.detailPaneReserve)
+        )
     }
 
     /// The sections whose left pane is the resizable list. A `Set` rather than
@@ -208,7 +251,7 @@ struct ContentView: View {
                         if Self.listSections.contains(section) {
                             NavigationStack { content }
                                 .frame(width: clampedListWidth(available: geometry.size.width))
-                            PaneResizeDivider(width: $listPaneWidth, range: Self.listPaneRange)
+                            PaneResizeDivider(width: listPaneWidthBinding, range: Self.listPaneRange)
                             NavigationStack { detail }
                                 .frame(maxWidth: .infinity)
                         } else {
