@@ -145,6 +145,25 @@ extension View {
     }
 }
 
+/// The design's filled accent button — dark text on the accent, matching the
+/// Brewfile section's primary — for a dialog's one default action. The system
+/// prominent style paints white on the accent, which the design never does.
+struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(ThemeStore.self) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12.5, weight: .semibold))
+            .foregroundStyle(Theme.windowBackground)
+            .padding(.horizontal, 13)
+            .frame(height: 29)
+            .background(theme.base, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4)
+    }
+}
+
 /// The design's 38×22 pill switch. `Toggle` restyled rather than rebuilt so
 /// bindings, accessibility and keyboard behaviour stay native.
 struct ThemeToggleStyle: ToggleStyle {

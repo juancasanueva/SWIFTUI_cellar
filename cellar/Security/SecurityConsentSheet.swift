@@ -136,6 +136,7 @@ struct SecurityConsentSheet: View {
                 if !consent.isGranted { consent.grant() }
                 dismiss()
             }
+            .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut(.defaultAction)
             .accessibilityIdentifier("security-consent-grant")
         }

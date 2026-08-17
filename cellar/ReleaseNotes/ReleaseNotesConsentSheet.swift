@@ -137,6 +137,7 @@ struct ReleaseNotesConsentSheet: View {
                 if !consent.isGranted { consent.grant() }
                 dismiss()
             }
+            .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut(.defaultAction)
             .accessibilityIdentifier("release-notes-consent-grant")
         }

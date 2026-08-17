@@ -184,6 +184,7 @@ struct BrewfileImportSheet: View {
                 BrewfileImportAction.apply(store, through: operations)
                 dismiss()
             }
+            .buttonStyle(PrimaryButtonStyle())
             // Driven by the selection, never by the skip count: a file that
             // produced skips imports on exactly the same terms as one that did
             // not.

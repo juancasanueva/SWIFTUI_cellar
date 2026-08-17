@@ -97,6 +97,7 @@ struct BrewfileExportSheet: View {
             Button("Save…") {
                 Task { await store.publish(to: destination) }
             }
+            .buttonStyle(PrimaryButtonStyle())
             // The gate. No preview, no panel.
             .disabled(presentation.canPublish == false)
             .keyboardShortcut(.defaultAction)

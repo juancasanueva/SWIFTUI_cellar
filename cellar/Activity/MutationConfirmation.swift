@@ -107,6 +107,7 @@ private struct MutationConfirmationSheet: View {
                 Button(confirmLabel, role: .destructive) {
                     confirm()
                 }
+                .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
             }
         }
