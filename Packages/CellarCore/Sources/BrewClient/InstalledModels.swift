@@ -122,8 +122,9 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
     ///
     /// The greedy signal without the greedy probe: the same record carries both
     /// numbers, so `brew outdated --greedy` is never spawned. Informational
-    /// only — it feeds a separate section, never the outdated set, the count or
-    /// a badge (installed-inventory II5).
+    /// only — it feeds a separate section and the detail's neutral "Updates
+    /// itself" wording, never the outdated set, the count or the update badge
+    /// (installed-inventory II5).
     public var hasNewerVersion: Bool {
         isSelfUpdating && installedVersion != catalogVersion
     }
