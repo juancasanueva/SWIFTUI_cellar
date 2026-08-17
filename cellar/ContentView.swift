@@ -151,7 +151,7 @@ struct ContentView: View {
     /// shell to exactly two exhaustive switches (content and detail).
     private static let listSections: Set<AppSection> = [
         .browse, .caskCategory, .installed, .favorites, .updates,
-        .taps, .services,
+        .taps,
     ]
 
     var body: some View {
@@ -413,6 +413,7 @@ struct ContentView: View {
             ServicesListView(
                 services: services,
                 refresher: servicesRefresher,
+                operations: operations,
                 selection: $serviceSelection
             )
         case .cleanup:
@@ -487,7 +488,8 @@ struct ContentView: View {
                 )
             )
         case .services:
-            return AnyView(ServiceDetailView(services: services, operations: operations))
+            // No detail column: the dashboard's cards expand in place.
+            return nil
         case .taps:
             return AnyView(
                 TapDetailView(

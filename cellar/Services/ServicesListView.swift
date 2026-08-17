@@ -7,7 +7,9 @@ import BrewClient
 import BrewProcess
 import SwiftUI
 
-/// The background services Homebrew manages.
+/// The background services Homebrew manages, as one full-width surface: a
+/// running/stopped summary, then one card per service with its five verbs on
+/// the card and its detail behind a click.
 ///
 /// The view **reports** visibility; it never decides it. `onAppear` and
 /// `onDisappear` cover selecting another section and closing the window, and
@@ -20,21 +22,39 @@ import SwiftUI
 struct ServicesListView: View {
     let services: ServicesStore
     let refresher: ServicesRefreshCoordinator
+    /// The cards' controls submit through the same guarded path; the list
+    /// itself submits nothing.
+    let operations: OperationCenter
     @Binding var selection: String?
+    /// The seam. `BrewClient` owns the protocol; this target owns the single
+    /// `NSWorkspace` implementation.
+    var opener: any LogFileOpening = WorkspaceLogFileOpener()
 
     var body: some View {
-        List(services.services, selection: $selection) { service in
-            ServiceRow(service: service)
-                .tag(service.id)
-                .themedListSelection(isSelected: selection == service.id)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if !services.services.isEmpty {
+                    summary
+                }
+                ForEach(services.services) { service in
+                    ServiceCard(
+                        service: service,
+                        services: services,
+                        operations: operations,
+                        opener: opener,
+                        selection: $selection
+                    )
+                }
+            }
+            .padding(EdgeInsets(top: 24, leading: 30, bottom: 34, trailing: 30))
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .overlay {
             if services.services.isEmpty {
                 emptyState
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.white.opacity(0.014))
+        .background(Theme.windowBackground)
         .onAppear { refresher.setVisible(true) }
         .onDisappear { refresher.setVisible(false) }
         .onChange(of: selection) { _, name in
@@ -42,6 +62,40 @@ struct ServicesListView: View {
             // poll tick from fetching detail for anything.
             Task { await services.select(name) }
         }
+    }
+
+    /// The counts, from the same projection the cards render. Failed earns its
+    /// own count only when there is one — a permanent zero would read as a
+    /// category this Mac is expected to fill.
+    private var summary: some View {
+        let tones = services.services.map(\.status.tone)
+        let running = tones.filter { $0 == .running }.count
+        let failed = tones.filter { $0 == .failed }.count
+        let stopped = tones.count - running - failed
+        return HStack(spacing: 16) {
+            countLabel(running, "running", dot: Theme.successBase)
+            countLabel(stopped, "stopped", dot: Color.white.opacity(0.3))
+            if failed > 0 {
+                countLabel(failed, "failed", dot: Theme.dangerBase)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, 4)
+    }
+
+    private func countLabel(_ count: Int, _ word: String, dot: Color) -> some View {
+        HStack(spacing: 7) {
+            Circle().fill(dot).frame(width: 8, height: 8)
+            Text("\(count)")
+                .font(.system(size: 14, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.textPrimary)
+            Text(word)
+                .font(.system(size: 12.5))
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(count) \(word)")
     }
 
     /// Why the list is empty, decided by `ServicesLoadState.emptyState` rather
@@ -100,7 +154,9 @@ private struct ServicesEmptyStateView: View {
     return ServicesListView(
         services: ServicesStore(),
         refresher: ServicesRefreshCoordinator(store: ServicesStore()),
-        selection: $selection
+        operations: OperationCenter(),
+        selection: $selection,
+        opener: NoLogFileOpening()
     )
 }
 
