@@ -53,7 +53,7 @@ struct HealthRowView: View {
             Spacer(minLength: 0)
             if let remediate, let title = HealthCopy.remediationTitle(row.remediation) {
                 Button(title, action: remediate)
-                    .buttonStyle(.borderless)
+                    .buttonStyle(ActionPillStyle())
                     .disabled(!isRemediationEnabled)
                     .accessibilityIdentifier("health-remediate-\(row.input.rawValue)")
             }
