@@ -48,6 +48,12 @@ struct ShellTitleBar: View {
     let title: String
     var countLabel: String? = nil
     var shellControls: ShellHeaderControls?
+    /// A section-owned control drawn before the shared pair — the History
+    /// bar's search field.
+    var leadingAccessories: AnyView? = nil
+    /// Section-owned controls drawn after the shared pair — the History bar
+    /// carries its clear chip here.
+    var accessories: AnyView? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -60,12 +66,54 @@ struct ShellTitleBar: View {
                     .foregroundStyle(Theme.textSecondary)
             }
             Spacer(minLength: 0)
+            if let leadingAccessories {
+                leadingAccessories
+            }
             if let shellControls {
                 shellControls
+            }
+            if let accessories {
+                accessories
             }
         }
         .padding(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 12))
         .themeCard(radius: 999)
+    }
+}
+
+/// The shell chip as a button style, so a section's own toolbar buttons (the
+/// Taps Brewfile pair) sit beside `ShellHeaderControls` in the same dress
+/// without duplicating its metrics.
+struct ShellChipButtonStyle: ButtonStyle {
+    var iconOnly: Bool = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .labelStyle(ShellChipLabelStyle(iconOnly: iconOnly))
+            .padding(.horizontal, 11)
+            .frame(height: 26)
+            .background(Theme.controlFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .fixedSize()
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+    }
+}
+
+private struct ShellChipLabelStyle: LabelStyle {
+    let iconOnly: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.icon
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.62))
+            if !iconOnly {
+                configuration.title
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.72))
+            }
+        }
     }
 }
 
