@@ -592,11 +592,20 @@ struct ContentView: View {
 
     /// The section-owned chips the pinned bar carries beside the shared pair —
     /// each one a self-contained accessory view the section's own file defines.
+    ///
+    /// Exhaustive with no `default:`, like every other `AppSection` switch: a
+    /// new section must decide — visibly, at compile time — whether it carries
+    /// a chip of its own.
     private var shellTitleBarAccessories: AnyView? {
         switch section {
         case .history:
             AnyView(HistoryShellAccessories(history: history))
-        default:
+        case .updates:
+            AnyView(UpdatesShellAccessories(operations: operations))
+        case .health, .home, .browse, .installed, .favorites, .taps, .services,
+             .cleanup, .security, .brewfile, .settings,
+             .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
+             .formulaBrowse, .formulaFeatured, .formulaTopCharts:
             nil
         }
     }

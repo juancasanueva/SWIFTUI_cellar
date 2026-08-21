@@ -21,6 +21,27 @@ struct OperationCenterProjectionTests {
 
     /// N terminals produce exactly N re-snapshots — never N−1 (the shipped
     /// `guard isMutating` swallowed the extras) and never 2N (design D7).
+    /// The rule the Updates bar's chip reads, proven here so the view owns
+    /// none: in flight from submission until the terminal, and decided by the
+    /// verb rather than by whichever item happens to be running.
+    @Test("A Homebrew update is in flight from submit to terminal, and only one at a time reads busy")
+    func aHomebrewUpdateIsInFlightFromSubmitToTerminal() async throws {
+        let harness = CenterHarness()
+        #expect(harness.center.isHomebrewUpdateInFlight == false)
+
+        // Another command in flight is not a Homebrew update.
+        _ = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
+        #expect(harness.center.isHomebrewUpdateInFlight == false)
+
+        let update = harness.center.submit(.update)
+        #expect(harness.center.isHomebrewUpdateInFlight)
+
+        try await harness.finish(call: 0)
+        try await harness.finish(call: 1)
+        #expect(update.isTerminal)
+        #expect(harness.center.isHomebrewUpdateInFlight == false)
+    }
+
     @Test("N terminals produce exactly N re-snapshots and the gate covers the batch")
     func nTerminalsProduceNReSnapshots() async throws {
         let harness = CenterHarness()

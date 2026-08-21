@@ -151,8 +151,8 @@ struct AppSectionPlacementTests {
         #expect(switches.contains { $0.file == "ContentView.swift" })
         #expect(switches.contains { $0.file == "AppSection.swift" })
         #expect(
-            switches.filter { $0.file == "ContentView.swift" }.count == 2,
-            "ContentView's content and detail switches are both meant to be found"
+            switches.filter { $0.file == "ContentView.swift" }.count == 3,
+            "ContentView's content, detail and title-bar-accessory switches are all meant to be found"
         )
 
         for found in switches {

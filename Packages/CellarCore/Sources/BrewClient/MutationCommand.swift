@@ -150,6 +150,14 @@ public enum MutationCommand: Sendable, Equatable {
     /// Plain `brew upgrade`: no name, no kind flag, brew's own defaults
     /// (product Q3).
     case upgradeAll
+    /// Plain `brew update`: advances what the local brew *knows* — its cached
+    /// API data and tap clones — and installs nothing. On the mutation spine
+    /// rather than beside it because that knowledge is exactly what
+    /// `brew info --installed` answers from, so a terminal must pay the same
+    /// inventory re-snapshot every other case pays. The pinned
+    /// `HOMEBREW_NO_AUTO_UPDATE=1` suppresses only the *implicit* update other
+    /// verbs would run; it does not touch this explicit one.
+    case update
     case pin(FormulaID)
     case unpin(FormulaID)
 
@@ -221,7 +229,7 @@ public enum MutationCommand: Sendable, Equatable {
             cask.id
         case .pin(let formula), .unpin(let formula):
             formula.id
-        case .upgradeAll:
+        case .upgradeAll, .update:
             nil
         }
     }
@@ -241,6 +249,7 @@ public enum MutationCommand: Sendable, Equatable {
         case .upgrade: Verb.upgrade.rawValue
         case .zap: "zap"
         case .upgradeAll: "upgradeAll"
+        case .update: Verb.update.rawValue
         case .pin: Verb.pin.rawValue
         case .unpin: Verb.unpin.rawValue
         }
@@ -261,6 +270,8 @@ public enum MutationCommand: Sendable, Equatable {
             [Verb.uninstall.rawValue, Flag.cask.rawValue, Flag.zap.rawValue, cask.name]
         case .upgradeAll:
             [Verb.upgrade.rawValue]
+        case .update:
+            [Verb.update.rawValue]
         case .pin(let formula):
             [Verb.pin.rawValue] + Self.vector(naming: formula.id)
         case .unpin(let formula):
@@ -280,7 +291,7 @@ public enum MutationCommand: Sendable, Equatable {
     public var requiresConfirmation: Bool {
         switch self {
         case .uninstall, .zap: true
-        case .install, .reinstall, .upgrade, .upgradeAll, .pin, .unpin: false
+        case .install, .reinstall, .upgrade, .upgradeAll, .update, .pin, .unpin: false
         }
     }
 
@@ -302,6 +313,7 @@ public enum MutationCommand: Sendable, Equatable {
         case uninstall
         case reinstall
         case upgrade
+        case update
         case pin
         case unpin
     }
