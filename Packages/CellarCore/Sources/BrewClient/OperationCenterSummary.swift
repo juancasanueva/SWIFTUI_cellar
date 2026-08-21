@@ -33,4 +33,17 @@ extension OperationCenter {
             pendingCount: items.count(where: \.isPending)
         )
     }
+
+    /// Whether a `brew update` is pending or running, for the chip that submits
+    /// one. Read off the same items the listing shows, so the chip cannot offer
+    /// a second update while the first is still deciding what is outdated —
+    /// and comes back the moment the first one settles.
+    ///
+    /// Matched by erased-command equality — equality of *what will run* —
+    /// rather than by inspecting a verb string, which the mutation spine's own
+    /// structural scan forbids.
+    public var isHomebrewUpdateInFlight: Bool {
+        let update = AnyBrewMutation(MutationCommand.update)
+        return items.contains { $0.command == update && !$0.isTerminal }
+    }
 }

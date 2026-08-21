@@ -88,6 +88,9 @@ extension HistoryRecord {
         guard name.isEmpty else { return .package(name) }
         return switch verb {
         case MutationCommand.upgradeAll.verb: .everyPackage
+        // Homebrew itself is the subject: not one package and — unlike the
+        // grouped upgrade — not every package either.
+        case MutationCommand.update.verb: .operationScope("Homebrew")
         default:
             CleanupAction(rawValue: verb).map { .operationScope($0.label) } ?? .noPackage
         }

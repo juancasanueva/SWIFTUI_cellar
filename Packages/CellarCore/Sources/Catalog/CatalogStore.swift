@@ -20,6 +20,12 @@ public final class CatalogStore {
     public private(set) var syncStatus: CatalogSyncStatus = .idle
     /// How many packages the loaded snapshot holds, regardless of the query.
     public private(set) var packageCount = 0
+    /// When the installed snapshot's answers were fetched, for the consumers
+    /// that must weigh them against another clock — the Home page's staleness
+    /// gate compares this to brew's own fetch marker. `nil` until a snapshot
+    /// is adopted; assigned in the same main-actor turn as the index it dates,
+    /// so the two can never describe different snapshots.
+    public private(set) var snapshotGeneratedAt: Date?
     /// Whether the store can answer queries at all.
     ///
     /// Becomes true as soon as the cache has been consulted — with or without a
@@ -254,6 +260,7 @@ public final class CatalogStore {
             // which the store is between indexes.
             index = built
             packageCount = built.recordCount
+            snapshotGeneratedAt = snapshot.generatedAt
             discover = projected
             caskBrowse = browse
             formulaBrowse = formulaContent

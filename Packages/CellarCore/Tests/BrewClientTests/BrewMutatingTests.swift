@@ -33,6 +33,7 @@ struct BrewMutatingTests {
         case .upgrade: "upgrade"
         case .zap: "zap"
         case .upgradeAll: "upgradeAll"
+        case .update: "update"
         case .pin: "pin"
         case .unpin: "unpin"
         }
@@ -45,6 +46,7 @@ struct BrewMutatingTests {
         .upgrade(PackageTarget(PackageID(kind: .cask, name: "iterm2"))!),
         .zap(CaskID(PackageID(kind: .cask, name: "iterm2"))!),
         .upgradeAll,
+        .update,
         .pin(FormulaID(PackageID(kind: .formula, name: "git"))!),
         .unpin(FormulaID(PackageID(kind: .formula, name: "git"))!)
     ]
@@ -74,10 +76,10 @@ struct BrewMutatingTests {
         #expect(
             Set(verbs) == [
                 "install", "uninstall", "reinstall", "upgrade",
-                "zap", "upgradeAll", "pin", "unpin"
+                "zap", "upgradeAll", "update", "pin", "unpin"
             ]
         )
-        #expect(verbs.count == 8, "the package vocabulary changed size")
+        #expect(verbs.count == 9, "the package vocabulary changed size")
         #expect(Self.everyShippedCommand.map(\.verb) == verbs, "a case's verb drifted from its name")
         #expect(
             verbs.contains(probe.verb) == false,
@@ -90,7 +92,7 @@ struct BrewMutatingTests {
     /// wearing a new name (PM6).
     @Test("Every package command declares installed inventory and disk usage")
     func everyPackageCommandDeclaresTheInstalledSet() {
-        for command in Self.everyShippedCommand {
+        for command in Self.everyShippedCommand where command != .update {
             #expect(
                 command.invalidates == [.installedInventory, .diskUsage],
                 "\(command.verb) declared \(command.invalidates)"
@@ -99,6 +101,17 @@ struct BrewMutatingTests {
         }
         #expect(ProbeMutation().invalidates == .services)
         #expect(InvalidationScope.services != InvalidationScope.installedInventory)
+    }
+
+    /// `brew update` changes what brew *knows*, not what is installed on disk:
+    /// the outdated set can move (which is the whole point of offering it), and
+    /// tap revisions advance, but no keg or cask is touched. Declaring disk
+    /// usage would force a remeasure that provably cannot observe a change.
+    @Test("Update declares the installed inventory and taps, and no disk area")
+    func updateDeclaresInventoryAndTapsOnly() {
+        #expect(MutationCommand.update.invalidates == [.installedInventory, .taps])
+        #expect(MutationCommand.update.diskAreas.isEmpty)
+        #expect(MutationCommand.update.packageID == nil)
     }
 
     // MARK: - The erased value (D1)

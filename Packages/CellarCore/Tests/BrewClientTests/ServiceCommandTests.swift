@@ -215,7 +215,10 @@ struct ServiceCommandTests {
         #expect(verbs == ["serviceStart", "serviceRun", "serviceStop", "serviceRestart"])
         #expect(Set(verbs).count == 4, "two verbs record under the same name")
         // And none collides with a package verb.
-        let packageVerbs = ["install", "uninstall", "reinstall", "upgrade", "zap", "upgradeAll", "pin", "unpin"]
+        let packageVerbs = [
+            "install", "uninstall", "reinstall", "upgrade",
+            "zap", "upgradeAll", "update", "pin", "unpin"
+        ]
         #expect(Set(verbs).isDisjoint(with: packageVerbs))
     }
 }

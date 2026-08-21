@@ -31,7 +31,8 @@ nonisolated enum HealthFixtures {
         offering: String = "1.0.0",
         outdated: Bool = false,
         pinned: Bool = false,
-        extraVersions: [String] = []
+        extraVersions: [String] = [],
+        tap: String = "homebrew/core"
     ) -> InstalledPackage {
         let kegs = ([installed] + extraVersions).map(keg)
         return InstalledPackage(
@@ -40,7 +41,7 @@ nonisolated enum HealthFixtures {
             displayName: name,
             desc: nil,
             homepage: nil,
-            tap: "homebrew/core",
+            tap: tap,
             catalogVersion: offering,
             kegs: kegs,
             primaryKeg: kegs[0],

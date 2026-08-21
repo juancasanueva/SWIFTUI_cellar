@@ -28,6 +28,10 @@ struct HomeView: View {
     let services: ServicesStore
     let history: HistoryStore
     let operations: OperationCenter
+    /// Read for one value: the fetch-marker reading behind the Update Homebrew
+    /// card's fallback signal. The store is populated by the app's own
+    /// launch-and-activation refresh; this view still acquires nothing.
+    let health: HealthStore
     /// The cask artwork pipeline, for the favorites column's cask rows;
     /// `nil` — a preview, say — keeps the letter tile (see `PackageIconTile`).
     var assets: CaskBrowseAssets?
@@ -54,6 +58,9 @@ struct HomeView: View {
                 } else {
                     VStack(spacing: 9) {
                         ForEach(attention) { item in
+                            AttentionCard(item: item)
+                        }
+                        ForEach(maintenance) { item in
                             AttentionCard(item: item)
                         }
                     }
@@ -189,6 +196,40 @@ struct HomeView: View {
             )
         }
         return items
+    }
+
+    /// Maintenance affordances in the attention cards' dress, deliberately
+    /// **not** in `attention`: the sentence above counts things that want
+    /// attention, and `brew update` is maintenance rather than a problem to
+    /// report — counting it would make "everything is current" unreachable.
+    ///
+    /// The card appears only on evidence — `HomebrewUpdateNeed.isBehind`, the
+    /// pure rule proven in the test suite — or while its own operation is in
+    /// flight, so a just-clicked button cannot vanish and reflow the layout
+    /// under the cursor. Once the post-update inventory re-read clears the
+    /// disagreement, the card leaves on its own.
+    private var maintenance: [AttentionItem] {
+        let behind = HomebrewUpdateNeed.isBehind(
+            packages: installed.inventory.packages,
+            catalogVersion: { catalog.package($0)?.version },
+            catalogDownloadedAt: catalog.snapshotGeneratedAt,
+            lastUpdate: health.lastUpdate,
+            now: Date()
+        )
+        guard behind || operations.isHomebrewUpdateInFlight else { return [] }
+        return [
+            AttentionItem(
+                id: "homebrew-update",
+                title: "Homebrew learns about new versions from brew update",
+                sub: "Refreshes available versions and taps · installs nothing",
+                systemImage: "arrow.triangle.2.circlepath",
+                tone: .neutral,
+                buttonLabel: "Update Homebrew",
+                buttonAction: { operations.submit(.update) },
+                isButtonEnabled: operations.isAvailable && !operations.isHomebrewUpdateInFlight,
+                open: { section = .updates }
+            )
+        ]
     }
 
     // MARK: - Snapshot

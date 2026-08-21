@@ -108,6 +108,24 @@ struct HistorySubjectTests {
         #expect(MutationCommand.upgradeAll.verb == "upgradeAll")
     }
 
+    /// `brew update` acts on Homebrew itself: not one package, and — unlike the
+    /// grouped upgrade — not every package either. Its subject names the scope,
+    /// the same way a cleanup entry names its own.
+    @Test("A Homebrew update names Homebrew, never a package or every package")
+    func aHomebrewUpdateNamesHomebrew() {
+        let record = Self.record(name: "", verb: MutationCommand.update.verb)
+
+        #expect(record.subject == .operationScope("Homebrew"))
+        #expect(record.subject.label == "Homebrew")
+        #expect(record.subject != .everyPackage)
+    }
+
+    /// Pinned like `upgradeAll`'s: stored rows are found again by this spelling.
+    @Test("The update verb's durable spelling is update")
+    func theUpdateVerbsDurableSpellingIsPinned() {
+        #expect(MutationCommand.update.verb == "update")
+    }
+
     // MARK: - CRITICAL — a null package identity is not "every package"
 
     @Test("Each service verb records an entry that names no package, and never every package")

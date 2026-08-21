@@ -282,9 +282,21 @@ public final class MutationGates {
 extension MutationCommand: BrewMutating {
     /// Every package mutation changes what is installed — including `pin` and
     /// `unpin`, which change the record `brew info --installed` publishes.
-    public var invalidates: InvalidationScope { [.installedInventory, .diskUsage] }
+    ///
+    /// `update` is the one exception in each direction: it advances what brew
+    /// *knows* — which moves `versions.stable` and therefore the outdated set
+    /// the inventory reports, and pulls the tap clones `tap-info` answers for —
+    /// while touching no keg or cask, so declaring disk usage would force a
+    /// remeasure that provably cannot observe a change.
+    public var invalidates: InvalidationScope {
+        switch self {
+        case .update: [.installedInventory, .taps]
+        default: [.installedInventory, .diskUsage]
+        }
+    }
 
     public var diskAreas: Set<DiskArea> {
+        if case .update = self { return [] }
         guard let packageID else { return [.cellar, .caskroom] }
         return packageID.kind == .formula ? [.cellar] : [.caskroom]
     }

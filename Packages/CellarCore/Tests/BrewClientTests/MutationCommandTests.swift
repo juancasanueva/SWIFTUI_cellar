@@ -44,7 +44,8 @@ struct MutationCommandTests {
         ),
         ArgvCase(command: .pin(FormulaID(git)!), argv: ["pin", "--formula", "git"]),
         ArgvCase(command: .unpin(FormulaID(git)!), argv: ["unpin", "--formula", "git"]),
-        ArgvCase(command: .upgradeAll, argv: ["upgrade"])
+        ArgvCase(command: .upgradeAll, argv: ["upgrade"]),
+        ArgvCase(command: .update, argv: ["update"])
     ]
 
     @Test("Every command lowers to exactly its documented vector", arguments: argvCases)
@@ -90,6 +91,19 @@ struct MutationCommandTests {
             "--greedy-auto-updates", "--force", "wget", "iterm2"
         ] {
             #expect(argv.contains(forbidden) == false, "upgradeAll carried \(forbidden)")
+        }
+    }
+
+    /// `update` refreshes what brew knows, never what is installed, so its
+    /// vector is the bare verb: no `--force`, no `--auto-update`, and no name —
+    /// there is nothing it could correctly name.
+    @Test("Update is a bare brew update with nothing added")
+    func updateIsBare() {
+        let argv = MutationCommand.update.arguments
+
+        #expect(argv == ["update"])
+        for forbidden in ["--force", "--auto-update", "--merge", "wget", "iterm2"] {
+            #expect(argv.contains(forbidden) == false, "update carried \(forbidden)")
         }
     }
 
@@ -189,13 +203,13 @@ struct MutationCommandTests {
         #expect(testCase.command.requiresConfirmation == isDestructive)
     }
 
-    @Test("Install, reinstall, upgrade, upgrade-all, pin and unpin never confirm")
+    @Test("Install, reinstall, upgrade, upgrade-all, update, pin and unpin never confirm")
     func nonDestructiveCommandsNeverConfirm() {
         let safe: [MutationCommand] = [
             .install(PackageTarget(Self.wget)!),
             .reinstall(PackageTarget(Self.git)!),
             .upgrade(PackageTarget(Self.iterm)!),
-            .upgradeAll, .pin(FormulaID(Self.git)!), .unpin(FormulaID(Self.git)!)
+            .upgradeAll, .update, .pin(FormulaID(Self.git)!), .unpin(FormulaID(Self.git)!)
         ]
 
         #expect(safe.allSatisfy { $0.requiresConfirmation == false })
