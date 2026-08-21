@@ -581,27 +581,38 @@ struct BrewfilePlacementTests {
         #expect(AppSection.allCases.count == 21)
     }
 
-    @Test("Both affordances are wired into the Taps list and the Brewfile section, and nowhere else")
-    func bothAffordancesAreWiredIntoTheTapsList() throws {
-        let taps = try BrewfileCompositionTests.appSource("TapsListView.swift")
+    @Test("Both affordances live in the Brewfile section, and the sheets are presented nowhere else")
+    func bothAffordancesLiveInTheBrewfileSection() throws {
+        let sources = try AppSecuritySources.load()
+        let section = try #require(
+            sources.first { $0.name == "BrewfileSectionView.swift" },
+            "the Brewfile section view is missing from the app target"
+        )
 
-        #expect(taps.stripped.contains("BrewfileImportSheet"))
-        #expect(taps.stripped.contains("BrewfileExportSheet"))
-        #expect(taps.stripped.contains("BrewfileSourcePanel"))
-        #expect(taps.stripped.contains(".toolbar"))
-        #expect(taps.stripped.contains("brewfile-import-affordance"))
-        #expect(taps.stripped.contains("brewfile-export-affordance"))
+        #expect(section.code.contains("BrewfileImportSheet"))
+        #expect(section.code.contains("BrewfileExportSheet"))
+        #expect(section.code.contains("BrewfileSourcePanel"))
+        #expect(section.code.contains("brewfile-section-import"))
+        #expect(section.code.contains("brewfile-section-export"))
         // Not a destination. A sheet, over the section the user is already in.
         #expect(
-            taps.stripped.contains("navigationDestination") == false,
+            section.code.contains("navigationDestination") == false,
             "the Brewfile affordances added a navigation destination"
         )
 
-        // The sheets are presented from the Taps list and the Brewfile section,
-        // and from no other view — both flows stay on the one store that owns
-        // the DD3/DD4 ordering guarantees.
-        let presenters = ["TapsListView.swift", "BrewfileSectionView.swift"]
-        for other in try AppSecuritySources.load() where !presenters.contains(other.name) {
+        // The design port moved both flows out of the Taps list and into the
+        // Brewfile section. This seals the move: a chip drifting back into Taps
+        // would revive the two-surface split the section was created to end.
+        let taps = try BrewfileCompositionTests.appSource("TapsListView.swift")
+        #expect(
+            taps.stripped.contains("Brewfile") == false,
+            "the Taps list grew a Brewfile affordance back"
+        )
+
+        // The sheets are presented from the Brewfile section and from no other
+        // view — both flows stay on the one store that owns the DD3/DD4
+        // ordering guarantees.
+        for other in sources where other.name != "BrewfileSectionView.swift" {
             #expect(
                 other.code.contains("BrewfileImportSheet(") == false,
                 "\(other.name) also presents the import sheet"
