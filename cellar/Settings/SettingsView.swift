@@ -72,6 +72,10 @@ struct SettingsView: View {
                     }
                 }
 
+                // Above the free card, and additive: the free-app copy below is
+                // byte-identical to what shipped before this existed. It renders
+                // itself away entirely when the catalog produced no product.
+                TipJarCard()
                 freeCard
             }
             .frame(maxWidth: 760, alignment: .topLeading)

@@ -73,14 +73,14 @@ required and no decision blocks apply.
 
 ## Phase 6: Wiring and surfaces (spec req 8)
 
-- [ ] 6.1 `cellar/cellarApp.swift`: `@State private var tips: TipStore`, seams constructed in `init()`, `.environment(tips)` on the main scene **and** on `Window(id: "about")`, `.task { loops.start("tips") { await tips.start() } }`.
-- [ ] 6.2 `cellar/AppTestFixtures.swift`: `AppTestTipSource` conforming to all three seams — no StoreKit, no egress, fixed `description`, sentinel non-currency `displayPrice`.
-- [ ] 6.3 **RED** in `TipCompositionTests`: exactly one file invokes the purchasing seam, and `AboutView.swift` invokes neither it nor any navigation.
-- [ ] 6.4 **GREEN** `cellar/Support/TipJarCard.swift` + `cellar/Settings/SettingsView.swift`: `@Environment(TipStore.self)`, card above `freeCard`, identifiers `tip-jar-card` / `tip-jar-purchase`, rendered only when `showsTipSurface`, price is `product.displayPrice` verbatim. `freeCard` copy stays byte-identical. Placeholder gratitude copy — no nag, no countdown, no feature claim; flag the wording for maintainer review in the PR body.
-- [ ] 6.5 **GREEN** `cellar/Shell/AboutView.swift`: one **static** `linksCard` row naming Settings as where tipping lives (D-E) — no `Link`, no button, no action — gated on the same `tips.showsTipSurface` value Settings consumes, so both surfaces read one availability answer.
+- [x] 6.1 `cellar/cellarApp.swift`: `@State private var tips: TipStore`, seams constructed in `init()`, `.environment(tips)` on the main scene **and** on `Window(id: "about")`, `.task { loops.start("tips") { await tips.start() } }`.
+- [x] 6.2 `cellar/AppTestFixtures.swift`: `AppTestTipSource` conforming to all three seams — no StoreKit, no egress, fixed `description`, sentinel non-currency `displayPrice`.
+- [x] 6.3 **RED** in `TipCompositionTests`: exactly one file invokes the purchasing seam, and `AboutView.swift` invokes neither it nor any navigation.
+- [x] 6.4 **GREEN** `cellar/Support/TipJarCard.swift` + `cellar/Settings/SettingsView.swift`: `@Environment(TipStore.self)`, card above `freeCard`, identifiers `tip-jar-card` / `tip-jar-purchase`, rendered only when `showsTipSurface`, price is `product.displayPrice` verbatim. `freeCard` copy stays byte-identical. Placeholder gratitude copy — no nag, no countdown, no feature claim; flag the wording for maintainer review in the PR body.
+- [x] 6.5 **GREEN** `cellar/Shell/AboutView.swift`: one **static** `linksCard` row naming Settings as where tipping lives (D-E) — no `Link`, no button, no action — gated on the same `tips.showsTipSurface` value Settings consumes, so both surfaces read one availability answer.
 
 ## Phase 7: Documentation and verification
 
-- [ ] 7.1 `PRD.md` :9, :10, :186, :234 — rewrite in place with the reason recorded (StoreKit supersedes external links), and state that the MAS ship path is unproven (U22 is an M6 follow-up).
-- [ ] 7.2 Confirm 0-line diffs on `AppSection.swift`, `ContentView.swift`, `AppSectionPlacementTests.swift`, `cellar.xcscheme`, `project.pbxproj`; report any deviation before merge rather than absorbing it.
-- [ ] 7.3 Full verification: `swift test --package-path Packages/CellarCore` **and** `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`. Assert **executed test counts** (baseline 171 + the new tests), never `TEST SUCCEEDED` alone; any `-only-testing` function identifier needs its trailing `()` or zero tests run and the build still reports success.
+- [x] 7.1 `PRD.md` :9, :10, :186, :234 — rewrite in place with the reason recorded (StoreKit supersedes external links), and state that the MAS ship path is unproven (U22 is an M6 follow-up).
+- [x] 7.2 Confirm 0-line diffs on `AppSection.swift`, `ContentView.swift`, `AppSectionPlacementTests.swift`, `cellar.xcscheme`, `project.pbxproj`; report any deviation before merge rather than absorbing it.
+- [x] 7.3 Full verification: `swift test --package-path Packages/CellarCore` **and** `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`. Assert **executed test counts** (baseline 171 + the new tests), never `TEST SUCCEEDED` alone; any `-only-testing` function identifier needs its trailing `()` or zero tests run and the build still reports success.

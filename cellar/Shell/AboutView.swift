@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import TipJar
 
 /// The app's user-facing name, read from the bundle so the About window, its
 /// title and the menu item can never drift from the Info.plist display name.
@@ -20,6 +21,11 @@ enum AppIdentity {
 /// dark cards, replacing the system About panel via `AboutCommands`.
 struct AboutView: View {
     @Environment(ThemeStore.self) private var theme
+    /// Read for one thing only: whether there is anything to point at. The same
+    /// store Settings consumes, injected into both scenes from the composition
+    /// root, so the two surfaces can never disagree about whether this build can
+    /// be tipped.
+    @Environment(TipStore.self) private var tips
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -84,7 +90,29 @@ struct AboutView: View {
             HairlineDivider()
             linkRow("Email", label: "juancasanueva@gmail.com",
                     url: URL(string: "mailto:juancasanueva@gmail.com")!)
+            if tips.showsTipSurface {
+                HairlineDivider()
+                tipSignpostRow
+            }
         }
+    }
+
+    /// A signpost, not a control.
+    ///
+    /// It names where tipping lives and does nothing else: no `Link`, no
+    /// `Button`, no tap gesture, no navigation. That is not a simplification —
+    /// the selected section is private state inside the root content view, which
+    /// this change may not diff, and a row that *looked* tappable while doing
+    /// nothing would be exactly the present-but-inert control Cellar refuses to
+    /// ship. Keeping it inert also keeps the purchase call site singular: there
+    /// is one place a tip can be given, and it is the card in Settings.
+    ///
+    /// Rendered only when the tip surface is available, so it never points at
+    /// something that is not there.
+    ///
+    /// **Copy status: placeholder awaiting the maintainer's wording.**
+    private var tipSignpostRow: some View {
+        row("Support", value: "In Settings")
     }
 
     private var footer: some View {
@@ -159,5 +187,10 @@ struct AboutCommands: Commands {
 }
 
 #Preview {
-    AboutView().environment(ThemeStore())
+    let fixture = AppTestTipSource()
+    AboutView()
+        .environment(ThemeStore())
+        // The fixture seam, never the real conformer: a preview must not talk
+        // to the StoreKit agent.
+        .environment(TipStore(catalog: fixture, purchases: fixture, gratitude: fixture))
 }

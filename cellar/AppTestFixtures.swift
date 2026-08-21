@@ -5,6 +5,7 @@ import DiskUsage
 import Foundation
 import ReleaseNotes
 import SecurityKit
+import TipJar
 
 /// Deterministic, process-free app dependencies used only by the XCUITest launch mode.
 enum AppTestFixtures {
@@ -505,6 +506,53 @@ struct AppTestProcessLauncher: ProcessLaunching {
     func launch(_ spec: ProcessSpec) throws -> any LaunchedProcess {
         AppTestLaunchedProcess()
     }
+}
+
+/// All three tip seams, answered without StoreKit and without egress.
+///
+/// This exists so a UI-test launch keeps costing **zero** StoreKit requests and
+/// zero network — the `CaskIconLoader(isDisabled:)` and
+/// `AppTestCaskChartsSource` rule, restated for payments. A launch that reached
+/// the real conformer would talk to the StoreKit agent, and a UI test is not a
+/// place to find out what a storefront feels like answering today.
+///
+/// The price is a **sentinel, never a currency string**: the shipped source may
+/// not carry a price literal, and a fixture that carried one would be a price
+/// literal in the app target with extra steps.
+///
+/// Purchasing answers `cancelled`, which is the one outcome that changes
+/// nothing at all: a UI test may tap the button and still leave no thank-you
+/// recorded and no state moved.
+struct AppTestTipSource: TipCatalogLoading, TipPurchasing, TipGratitudeRecording, Sendable {
+    private let stream: AsyncStream<TipPurchaseOutcome>
+    private let continuation: AsyncStream<TipPurchaseOutcome>.Continuation
+
+    init() {
+        (stream, continuation) = AsyncStream.makeStream()
+    }
+
+    func loadTips() async -> TipCatalogLoad {
+        .loaded([
+            TipProduct(
+                id: TipProductIDs.tip,
+                displayName: "Tip",
+                description: "A thank-you to the developer.",
+                displayPrice: "TIP"
+            )
+        ])
+    }
+
+    func purchase(_ product: TipProduct) async -> TipPurchaseOutcome { .cancelled }
+
+    func drainUnfinished() async {}
+
+    /// Never finishes, exactly like the real one, and never yields: nothing in a
+    /// UI-test launch may deliver a transaction.
+    func transactionOutcomes() -> AsyncStream<TipPurchaseOutcome> { stream }
+
+    func hasTipped() async -> Bool { false }
+
+    func recordTip() async {}
 }
 
 actor AppTestCleanupPreviewSource: CleanupPreviewSourcing {

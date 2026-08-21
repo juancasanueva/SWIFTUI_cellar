@@ -6,8 +6,8 @@
 |---|---|
 | **Platform** | macOS 26 Tahoe+, Apple Silicon only (arm64) |
 | **Stack** | Swift 6.x, SwiftUI (Liquid Glass design system), SwiftData, local SPM core package (`CellarCore`) |
-| **Distribution** | Direct download (Developer ID + notarized, Sparkle updates) **and** Homebrew cask |
-| **Monetization** | Free, ad-free, external tip jar |
+| **Distribution** | Direct download (Developer ID + notarized, Sparkle updates) **and** Homebrew cask. **Amended at M6 (StoreKit tip jar):** a StoreKit consumable only transacts in a Mac App Store build, so the tip jar needs a MAS channel in addition to these two. That channel is **unproven** — sandbox and App Review feasibility (U22) is an M6 follow-up, not something this milestone demonstrated. Outside a MAS build the product list comes back empty and the tip surface is simply absent, which is the same code path as a missing App Store Connect record. |
+| **Monetization** | Free, ad-free, **in-app** tip jar (StoreKit 2 consumable). **Amended at M6:** this row originally said *external* tip jar. It was superseded because a binary that transacts StoreKit may not also carry an external payment link or language (App Store Review Guideline 3.1.1) — the two are mutually exclusive, so choosing StoreKit removes the external route rather than adding to it. |
 | **Backend** | None. Talks only to the local `brew` binary, formulae.brew.sh, GitHub API, and OSV/NVD CVE feeds |
 | **Reference product** | TapHouse 1.5 (feature parity target, brew-only scope) |
 
@@ -183,7 +183,7 @@ Failure of any external service degrades gracefully (feature shows cached/empty 
 
 ## 6. Monetization & distribution
 
-- **Tip jar**: StoreKit is unavailable outside the App Store, so tips are external links (GitHub Sponsors / Ko-fi / Stripe Payment Link — pick at M6) opened in the browser from a Support screen. Copy is gratitude-based, never nagging; a single subtle "Support" sidebar item.
+- **Tip jar**: a **StoreKit 2 consumable**, bought from one card in Settings, with a static signpost in About naming where it lives. **Amended at M6.** This bullet used to read "StoreKit is unavailable outside the App Store, so tips are external links (GitHub Sponsors / Ko-fi / Stripe Payment Link — pick at M6) opened in the browser from a Support screen". Superseded for two reasons: guideline 3.1.1 makes StoreKit and an external payment link mutually exclusive in one binary, and the premise was half-right — StoreKit is not *unavailable* outside the App Store, it simply returns an **empty product list**, which the app treats as a settled state and renders no tip surface at all. The cost of the choice is stated rather than hidden: the MAS ship path is **unproven** (U22, an M6 follow-up), so today the surface is reachable in local StoreKit testing and absent in a Developer ID build. Copy is gratitude-based, never nagging; nothing is shown at launch; there is no new sidebar section, because a whole navigable page for one button exceeds this document's own "single subtle" instruction.
 - **Signing**: Developer ID Application cert, hardened runtime, notarization via `notarytool` in CI (GitHub Actions on tags).
 - **Sparkle 2**: EdDSA-signed appcast hosted on GitHub Pages; delta updates later. In-app "Check for updates".
 - **Cask channel**: submit to homebrew-cask once the app meets notability requirements (GitHub stars/press); until then, self-hosted tap `juan/tap` so `brew install --cask cellar` works day one. Sparkle auto-update disabled-by-prompt when installed via cask? No — casks and Sparkle coexist fine; mark cask `auto_updates true` so `brew upgrade` skips it by default.
@@ -231,7 +231,7 @@ Menu bar extra; background checks + notifications (SMAppService); Settings; Span
 ## 9. Open questions
 
 1. Final name + icon direction (Cellar! proposed; verify no trademark/App-name conflicts at registration time).
-2. Tip jar provider (GitHub Sponsors vs Ko-fi vs Stripe Payment Link).
+2. ~~Tip jar provider (GitHub Sponsors vs Ko-fi vs Stripe Payment Link).~~ **Closed at M6**: none of them. The tip jar is a StoreKit 2 consumable, `com.juancasanueva.cellar.tip`, and guideline 3.1.1 forbids shipping an external payment route alongside it. The question that replaces it is **not** which provider but whether the Mac App Store channel is viable at all — tracked as U22, an M6 follow-up.
 3. Whether M4's CVE scanner should also cover casks (OSV coverage for GUI apps is sparse — likely formulae-only in v1, casks later).
 4. Treemap visualization for disk usage — v1 stretch or v1.1.
 5. `brew doctor` parsing depth: raw output vs structured grouping (start raw, iterate).

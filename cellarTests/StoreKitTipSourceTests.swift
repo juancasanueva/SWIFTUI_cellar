@@ -96,6 +96,29 @@ struct StoreKitTipSourceTests {
         return session
     }
 
+    /// The unfinished tip transactions, once the agent has caught up.
+    ///
+    /// `buyProduct` and `finish()` both return before `Transaction.unfinished`
+    /// reflects them, and on a machine running the whole suite that gap is wide
+    /// enough to read the queue as it was a moment ago. Measured: the drain test
+    /// passed in isolation and failed inside the full run at 0.03 s, which is an
+    /// arrangement that had not landed yet rather than a drain that did not work.
+    ///
+    /// Bounded, and it returns whatever it last saw rather than throwing, so a
+    /// genuine failure still fails on its own assertion with the real value
+    /// attached instead of on a timeout with none.
+    private static func unfinishedTipIDs(
+        until satisfied: ([String]) -> Bool
+    ) async -> [String] {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        var ids = await StoreKitTipSource.unfinishedTipIDs()
+        while satisfied(ids) == false, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+            ids = await StoreKitTipSource.unfinishedTipIDs()
+        }
+        return ids
+    }
+
     // MARK: - The product resolves, and every field comes from the store
 
     @Test("The configured consumable resolves with a display price the store supplied")
@@ -151,7 +174,7 @@ struct StoreKitTipSourceTests {
         // itself, so an empty answer here is the effect of `finish()` rather
         // than a property of a store that happened to start out clean.
         #expect(
-            await StoreKitTipSource.unfinishedTipIDs().isEmpty,
+            await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty,
             "the consumable was left unfinished, so it will replay at every launch"
         )
         }
@@ -178,7 +201,7 @@ struct StoreKitTipSourceTests {
 
         #expect(first == .completed)
         #expect(second == .completed, "a second tip was refused, as if the consumable were owned")
-        #expect(await StoreKitTipSource.unfinishedTipIDs().isEmpty)
+        #expect(await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty)
         }
     }
 
@@ -201,7 +224,7 @@ struct StoreKitTipSourceTests {
         }
         _ = try await session.buyProduct(productIdentifier: product.id)
 
-        let seeded = await StoreKitTipSource.unfinishedTipIDs()
+        let seeded = await Self.unfinishedTipIDs { $0.contains(TipProductIDs.tip) }
         #expect(
             seeded.contains(TipProductIDs.tip),
             "the arrangement never produced an unfinished transaction, so the drain proves nothing"
@@ -210,7 +233,7 @@ struct StoreKitTipSourceTests {
         await source.drainUnfinished()
 
         #expect(
-            await StoreKitTipSource.unfinishedTipIDs().isEmpty,
+            await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty,
             "a leftover consumable survived the launch drain, so it replays forever"
         )
         }

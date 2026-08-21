@@ -325,6 +325,102 @@ struct TipCompositionTests {
         #expect(contents.contains { $0.pathExtension == "storekit" } == false)
     }
 
+    // MARK: - Exactly one purchase call site exists
+
+    /// Requirement 8. One place a purchase can be initiated is one place to
+    /// prove correct — and the reason About is a signpost rather than a second
+    /// button.
+    @Test("Exactly one file invokes the purchasing seam")
+    func exactlyOneFileInvokesThePurchasingSeam() throws {
+        let sources = try AppSecuritySources.load()
+
+        let callers = sources
+            .filter { Self.matches(#"\.tip\(\)"#, in: $0.code) }
+            .map(\.name)
+
+        #expect(callers == ["TipJarCard.swift"], "the tip is purchasable from more than one place")
+    }
+
+    @Test("The composition root wires the tip store into both scenes and one loop slot")
+    func theCompositionRootWiresTheTipStoreIntoBothScenesAndOneLoopSlot() throws {
+        let sources = try AppSecuritySources.load()
+        let root = try #require(sources.first { $0.name == "cellarApp.swift" })
+
+        #expect(root.code.contains("StoreKitTipSource("), "the real conformer is never constructed")
+        #expect(root.code.contains("AppTestTipSource("), "a UI-test launch would reach StoreKit")
+        #expect(root.code.contains("TipThankYouPreference("))
+        // Both scenes, so the two surfaces read one availability answer.
+        #expect(
+            root.code.components(separatedBy: ".environment(tips)").count == 3,
+            "the tip store reaches one scene only, so About and Settings could disagree"
+        )
+        #expect(
+            root.code.contains(#"loops.start("tips")"#),
+            "the observation is not owned by the idempotent loop, so a second window doubles it"
+        )
+    }
+
+    // MARK: - The About row is a signpost, and carries no action
+
+    /// The row is extracted and read on its own. Asserting over the whole file
+    /// would prove nothing: `AboutCommands` legitimately owns a `Button` and an
+    /// `openWindow`, and the two existing link rows legitimately own a `Link`.
+    /// What must carry no action is this row.
+    private static func aboutSignpostSource() throws -> String {
+        let source = try #require(
+            try AppSecuritySources.load().first { $0.name == "AboutView.swift" }
+        )
+        let marker = "private var tipSignpostRow"
+        guard let start = source.code.range(of: marker) else {
+            Issue.record("AboutView carries no tip signpost row")
+            return ""
+        }
+        let rest = source.code[start.upperBound...]
+        guard let end = rest.range(of: "\n    private ") ?? rest.range(of: "\n    var ") else {
+            return String(rest)
+        }
+        return String(rest[..<end.lowerBound])
+    }
+
+    @Test("The About signpost carries no action of any kind")
+    func theAboutSignpostCarriesNoActionOfAnyKind() throws {
+        let row = try Self.aboutSignpostSource()
+
+        #expect(row.isEmpty == false, "the row was not found, so its silence means nothing")
+        // The positive anchor: it really does name Settings as the location, so
+        // the absences below are over a row that exists and says something.
+        #expect(row.contains("Settings"), "the signpost does not name where tipping lives")
+
+        for action in ["Link(", "Button(", "onTapGesture", "openWindow", "NavigationLink", "AppSection"] {
+            #expect(row.contains(action) == false, "the About signpost carries an action: \(action)")
+        }
+    }
+
+    @Test("The About surface never purchases and never selects a section")
+    func theAboutSurfaceNeverPurchasesAndNeverSelectsASection() throws {
+        let sources = try AppSecuritySources.load()
+        let about = try #require(sources.first { $0.name == "AboutView.swift" })
+
+        #expect(Self.matches(#"\.tip\(\)"#, in: about.code) == false, "About purchases the tip")
+        #expect(about.code.contains("AppSection") == false, "About navigates to a section")
+        #expect(about.code.contains("NavigationLink") == false)
+    }
+
+    /// Requirement 8's last scenario, structurally: the existing free-app card's
+    /// copy is untouched and the tip card is an addition beside it.
+    @Test("The free-app card's copy is unchanged and the tip card sits above it")
+    func theFreeAppCardsCopyIsUnchangedAndTheTipCardSitsAboveIt() throws {
+        let sources = try AppSecuritySources.load()
+        let settings = try #require(sources.first { $0.name == "SettingsView.swift" })
+
+        #expect(settings.code.contains(#"Text("Cellar is free, and stays free")"#))
+        #expect(settings.code.contains(#"Text("No accounts, no telemetry, no paid tier.")"#))
+
+        let card = try #require(settings.code.range(of: "TipJarCard()"))
+        let free = try #require(settings.code.range(of: "freeCard"))
+        #expect(card.lowerBound < free.lowerBound, "the tip card was placed below the free card")
+    }
+
     // MARK: - The tip target depends on nothing
 
     @Test("The TipJar target declares an empty dependency list and imports no StoreKit")
