@@ -40,7 +40,7 @@ struct AboutView: View {
         HStack(alignment: .top, spacing: 13) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .frame(width: 56, height: 56)
+                .frame(width: 96, height: 96)
             VStack(alignment: .leading, spacing: 4) {
                 Text(AppIdentity.name)
                     .font(.system(size: 17, weight: .semibold))

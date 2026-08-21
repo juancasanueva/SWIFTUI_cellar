@@ -167,6 +167,48 @@ struct AppSectionPlacementTests {
         }
     }
 
+    /// Settings leads with the same pinned capsule card as every other
+    /// section: the shell's `ShellTitleBar` with the title and the shared
+    /// Refresh/Activity pair. Membership in **both** sets is what produces
+    /// that: `shellTitleBarSections` pins the bar, and `pinnedHeaderSections`
+    /// keeps the toolbar row from saying it all twice above it.
+    ///
+    /// With Settings in, the pinned-header set covers the whole vocabulary —
+    /// asserted as full coverage rather than one membership, so a section
+    /// added later cannot quietly ship with toolbar-row chrome nobody chose.
+    @MainActor
+    @Test("Settings leads with the shell title bar, and every section pins a capsule header")
+    func settingsLeadsWithTheShellTitleBar() throws {
+        let source = AppSecuritySources.stripComments(
+            from: try AppSectionSourceScan.rawSource(named: "ContentView.swift")
+        )
+        let pinned = try #require(
+            Self.setLiteral(named: "pinnedHeaderSections", in: source),
+            "ContentView no longer declares the pinned-header set"
+        )
+        let titleBar = try #require(
+            Self.setLiteral(named: "shellTitleBarSections", in: source),
+            "ContentView no longer declares the shell-title-bar set"
+        )
+
+        #expect(titleBar.contains(".settings"), "Settings does not pin the shell title bar")
+        for section in AppSection.allCases {
+            #expect(
+                pinned.contains(".\(section.rawValue)"),
+                "\(section.rawValue) still draws toolbar-row chrome instead of a pinned header"
+            )
+        }
+    }
+
+    /// The `[...]` literal assigned to the named set, or `nil` when absent.
+    private static func setLiteral(named name: String, in source: String) -> String? {
+        guard let declaration = source.range(of: "let \(name): Set<AppSection> = [") else {
+            return nil
+        }
+        guard let close = source[declaration.upperBound...].firstIndex(of: "]") else { return nil }
+        return String(source[declaration.upperBound..<close])
+    }
+
     /// The violation control. Without it the sweep above passes just as happily
     /// against a detector that recognises nothing at all.
     @MainActor

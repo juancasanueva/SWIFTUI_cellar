@@ -569,7 +569,7 @@ struct ContentView: View {
     /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
         .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
-        .cleanup, .taps, .brewfile, .history,
+        .cleanup, .taps, .brewfile, .history, .settings,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
@@ -578,7 +578,7 @@ struct ContentView: View {
     /// collection controls of their own.
     private static let shellTitleBarSections: Set<AppSection> = [
         .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
-        .cleanup, .taps, .brewfile, .history,
+        .cleanup, .taps, .brewfile, .history, .settings,
     ]
 
     /// The section-owned control the pinned bar draws before the shared pair.
