@@ -289,6 +289,7 @@ struct ContentView: View {
                 services: services,
                 history: history,
                 operations: operations,
+                health: health,
                 assets: caskAssets,
                 iconLoader: caskIcons,
                 section: $section,
