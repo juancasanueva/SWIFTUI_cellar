@@ -56,6 +56,9 @@ struct HomeView: View {
                         ForEach(attention) { item in
                             AttentionCard(item: item)
                         }
+                        ForEach(maintenance) { item in
+                            AttentionCard(item: item)
+                        }
                     }
                     .padding(.top, 24)
 
@@ -189,6 +192,29 @@ struct HomeView: View {
             )
         }
         return items
+    }
+
+    /// Standing affordances in the attention cards' dress, deliberately **not**
+    /// in `attention`: the sentence above counts things that want attention,
+    /// and `brew update` is maintenance rather than a problem to report —
+    /// counting it would make "everything is current" unreachable.
+    ///
+    /// The button's whole eligibility is the centre's own pair of projections,
+    /// so this view decides nothing the package suite has not already proven.
+    private var maintenance: [AttentionItem] {
+        [
+            AttentionItem(
+                id: "homebrew-update",
+                title: "Homebrew learns about new versions from brew update",
+                sub: "Refreshes available versions and taps · installs nothing",
+                systemImage: "arrow.triangle.2.circlepath",
+                tone: .neutral,
+                buttonLabel: "Update Homebrew",
+                buttonAction: { operations.submit(.update) },
+                isButtonEnabled: operations.isAvailable && !operations.isHomebrewUpdateInFlight,
+                open: { section = .updates }
+            )
+        ]
     }
 
     // MARK: - Snapshot
