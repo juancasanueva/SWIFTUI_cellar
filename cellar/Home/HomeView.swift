@@ -212,6 +212,7 @@ struct HomeView: View {
         let behind = HomebrewUpdateNeed.isBehind(
             packages: installed.inventory.packages,
             catalogVersion: { catalog.package($0)?.version },
+            catalogDownloadedAt: catalog.snapshotGeneratedAt,
             lastUpdate: health.lastUpdate,
             now: Date()
         )

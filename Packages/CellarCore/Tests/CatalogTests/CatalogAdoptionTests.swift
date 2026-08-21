@@ -47,6 +47,26 @@ struct CatalogAdoptionTests {
         #expect(during > 0, "no main-actor turn completed while the snapshot was adopted")
     }
 
+    /// The generation date rides along with the index it describes, for the
+    /// consumers that must know *when* the catalog's answers were fetched —
+    /// the Home page's staleness gate compares it against brew's own marker.
+    @Test("Adoption exposes the installed snapshot's generation date")
+    func adoptionExposesTheSnapshotsGenerationDate() async throws {
+        let harness = try SyncHarness()
+        let store = CatalogStore(engine: harness.engine)
+        #expect(store.snapshotGeneratedAt == nil, "a date appeared before any snapshot")
+
+        let generated = Date(timeIntervalSince1970: 1_700_000_000)
+        let snapshot = CatalogSnapshot(
+            generatedAt: generated,
+            skippedRecordCount: 0,
+            packages: [CatalogPackage.stub(kind: .formula, name: "wget")]
+        )
+        await store.adopt(snapshot)
+
+        #expect(store.snapshotGeneratedAt == generated)
+    }
+
     @Test("Every query issued during an adoption is answered from the last good index", .heavyFixture)
     func queriesNeverBlankWhileASnapshotIsAdopted() async throws {
         let harness = try SyncHarness()

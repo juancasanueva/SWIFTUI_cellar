@@ -23,11 +23,12 @@ struct HomebrewUpdateNeedTests {
     private static let day = HealthThresholds.lastUpdateFreshSeconds
 
     /// One comparable formula whose offered version differs from the catalog's.
-    @Test("A formula the catalog knows a different version for shows the card")
+    @Test("A core formula the catalog knows a different version for shows the card")
     func aDisagreeingFormulaShowsTheCard() {
         let behind = HomebrewUpdateNeed.isBehind(
             packages: [HealthFixtures.package("go", offering: "1.26.6")],
             catalogVersion: { _ in "1.27.0" },
+            catalogDownloadedAt: Self.now,
             lastUpdate: .read(Self.now),
             now: Self.now
         )
@@ -39,9 +40,10 @@ struct HomebrewUpdateNeedTests {
         let behind = HomebrewUpdateNeed.isBehind(
             packages: [
                 HealthFixtures.package("go", offering: "1.27.0"),
-                HealthFixtures.package("iterm2", kind: .cask, offering: "3.5.0"),
+                HealthFixtures.package("iterm2", kind: .cask, offering: "3.5.0", tap: "homebrew/cask"),
             ],
             catalogVersion: { $0.kind == .formula ? "1.27.0" : "3.5.0" },
+            catalogDownloadedAt: Self.now,
             // The marker is ancient, and it must not matter: the primary
             // signal answered.
             lastUpdate: .read(Self.now.addingTimeInterval(-30 * Self.day)),
@@ -50,28 +52,92 @@ struct HomebrewUpdateNeedTests {
         #expect(behind == false)
     }
 
+    /// The live collision: `hunk` from modem-dev/tap versus homebrew/core's own
+    /// `hunk`. `brew update` can never reconcile a tap's version with core's,
+    /// so a tap package must contribute no evidence at all.
+    @Test("A tap formula disagreeing with a same-named core formula never shows the card")
+    func aTapFormulaCollisionNeverShowsTheCard() {
+        let behind = HomebrewUpdateNeed.isBehind(
+            packages: [
+                HealthFixtures.package("hunk", offering: "0.17.0", tap: "modem-dev/tap"),
+                HealthFixtures.package("tuicr", offering: "0.19.1", tap: "agavra/tap"),
+            ],
+            catalogVersion: { $0.name == "hunk" ? "0.19.0" : "0.23.1" },
+            catalogDownloadedAt: Self.now,
+            lastUpdate: .read(Self.now),
+            now: Self.now
+        )
+        #expect(behind == false)
+    }
+
+    /// The catalog snapshot was downloaded *before* brew last fetched, so a
+    /// disagreement may mean the snapshot is behind — not brew. Backwards
+    /// evidence is no evidence.
+    @Test("A snapshot older than the fetch marker turns disagreement into no evidence")
+    func aStaleSnapshotInvalidatesTheDisagreement() {
+        let behind = HomebrewUpdateNeed.isBehind(
+            packages: [HealthFixtures.package("go", offering: "1.27.0")],
+            catalogVersion: { _ in "1.26.6" },
+            catalogDownloadedAt: Self.now.addingTimeInterval(-3_600),
+            lastUpdate: .read(Self.now),
+            now: Self.now
+        )
+        #expect(behind == false)
+    }
+
+    @Test("A snapshot at least as recent as the fetch marker keeps disagreement as evidence")
+    func aCurrentSnapshotKeepsTheDisagreement() {
+        let behind = HomebrewUpdateNeed.isBehind(
+            packages: [HealthFixtures.package("go", offering: "1.26.6")],
+            catalogVersion: { _ in "1.27.0" },
+            // The boundary case: downloaded in the same instant the marker
+            // reads. "At least as recent" includes equality.
+            catalogDownloadedAt: Self.now,
+            lastUpdate: .read(Self.now),
+            now: Self.now
+        )
+        #expect(behind)
+    }
+
+    /// A marker that answers nothing cannot invalidate the snapshot: the
+    /// primary signal stays usable exactly as before.
+    @Test("A non-answer marker leaves the primary signal usable")
+    func aNonAnswerMarkerLeavesThePrimarySignalUsable() {
+        let behind = HomebrewUpdateNeed.isBehind(
+            packages: [HealthFixtures.package("go", offering: "1.26.6")],
+            catalogVersion: { _ in "1.27.0" },
+            catalogDownloadedAt: Self.now.addingTimeInterval(-2 * Self.day),
+            lastUpdate: .absent,
+            now: Self.now
+        )
+        #expect(behind)
+    }
+
     /// A self-updating cask legitimately runs ahead of both catalogs.
     @Test("A self-updating cask's disagreement alone never shows the card")
     func aSelfUpdatingCaskAloneNeverShowsTheCard() {
-        var cask = HealthFixtures.package("raycast", kind: .cask, offering: "1.0.0")
-        cask = InstalledPackage(
-            kind: cask.kind,
-            name: cask.name,
-            displayName: cask.displayName,
-            desc: cask.desc,
-            homepage: cask.homepage,
-            tap: cask.tap,
-            catalogVersion: cask.catalogVersion,
-            kegs: cask.kegs,
-            primaryKeg: cask.primaryKeg,
-            snapshotOutdated: cask.snapshotOutdated,
-            isPinned: cask.isPinned,
-            pinnedVersion: cask.pinnedVersion,
+        let base = HealthFixtures.package(
+            "raycast", kind: .cask, offering: "1.0.0", tap: "homebrew/cask"
+        )
+        let cask = InstalledPackage(
+            kind: base.kind,
+            name: base.name,
+            displayName: base.displayName,
+            desc: base.desc,
+            homepage: base.homepage,
+            tap: base.tap,
+            catalogVersion: base.catalogVersion,
+            kegs: base.kegs,
+            primaryKeg: base.primaryKeg,
+            snapshotOutdated: base.snapshotOutdated,
+            isPinned: base.isPinned,
+            pinnedVersion: base.pinnedVersion,
             declaresAutoUpdates: true
         )
         let behind = HomebrewUpdateNeed.isBehind(
             packages: [cask],
             catalogVersion: { _ in "2.0.0" },
+            catalogDownloadedAt: Self.now,
             lastUpdate: .read(Self.now),
             now: Self.now
         )
@@ -83,6 +149,7 @@ struct HomebrewUpdateNeedTests {
         let behind = HomebrewUpdateNeed.isBehind(
             packages: [HealthFixtures.package("go", offering: "1.26.6")],
             catalogVersion: { _ in nil },
+            catalogDownloadedAt: nil,
             lastUpdate: .read(Self.now.addingTimeInterval(-2 * Self.day)),
             now: Self.now
         )
@@ -94,6 +161,7 @@ struct HomebrewUpdateNeedTests {
         let behind = HomebrewUpdateNeed.isBehind(
             packages: [HealthFixtures.package("go", offering: "1.26.6")],
             catalogVersion: { _ in nil },
+            catalogDownloadedAt: nil,
             lastUpdate: .read(Self.now.addingTimeInterval(-Self.day / 2)),
             now: Self.now
         )
@@ -115,6 +183,7 @@ struct HomebrewUpdateNeedTests {
         let behind = HomebrewUpdateNeed.isBehind(
             packages: [HealthFixtures.package("go", offering: "1.26.6")],
             catalogVersion: { _ in nil },
+            catalogDownloadedAt: nil,
             lastUpdate: reading,
             now: Self.now
         )
@@ -186,6 +255,10 @@ struct HomeCompositionTests {
         #expect(
             maintenance.contains("operations.isHomebrewUpdateInFlight"),
             "an in-flight update no longer holds its own card on screen"
+        )
+        #expect(
+            maintenance.contains("catalog.snapshotGeneratedAt"),
+            "the projection is not told when the catalog's answers were fetched"
         )
     }
 
