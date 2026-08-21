@@ -34,6 +34,7 @@ struct SidebarView: View {
             // column's toolbar strip; the top safe area already covers it.
             ScrollView {
                 VStack(spacing: 14) {
+                    brandHeader
                     ForEach(AppSection.sidebarGroups, id: \.title) { group in
                         VStack(spacing: 1) {
                             groupHeader(group.title)
@@ -43,8 +44,12 @@ struct SidebarView: View {
                         }
                     }
                 }
-                .padding(EdgeInsets(top: 8, leading: 10, bottom: 14, trailing: 10))
+                .padding(EdgeInsets(top: 0, leading: 10, bottom: 14, trailing: 10))
             }
+            // The brand header climbs into the toolbar strip the top safe area
+            // reserves. The traffic lights render above the sidebar material,
+            // so the centered icon shares the zone without covering them.
+            .ignoresSafeArea(edges: .top)
             VStack(spacing: 1) {
                 ForEach(AppSection.sidebarFooter) { item in
                     row(item)
@@ -55,6 +60,25 @@ struct SidebarView: View {
                 Rectangle().fill(Theme.separator).frame(height: 0.5)
             }
         }
+    }
+
+    /// The app's own face at the top of the column, above the first group.
+    /// Not a row: it selects nothing, so it carries no capsule, no tap target
+    /// and no button trait.
+    private var brandHeader: some View {
+        VStack(spacing: 6) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+            Text(AppIdentity.name)
+                .font(.system(size: 17, weight: .semibold))
+                .kerning(-0.3)
+                .foregroundStyle(Theme.textPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(EdgeInsets(top: 22, leading: 8, bottom: 4, trailing: 8))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sidebar-brand")
     }
 
     private func groupHeader(_ title: String) -> some View {
