@@ -67,9 +67,9 @@ required and no decision blocks apply.
 
 ## Phase 5: Structural sweep (spec reqs 7–9)
 
-- [ ] 5.1 **RED** `cellarTests/TipCompositionTests.swift` reusing the comment-stripping `Source`/`load()` idiom in `cellarTests/SecurityCompositionSupport.swift`: `import StoreKit` appears in exactly one file under `cellar/` and it is `Support/StoreKitTipSource.swift`; no other file references `Product`, `Transaction`, `AppStore`, `canMakePayments`, `currentEntitlements` or `appAccountToken`; no `#if`/`#available` decides availability.
-- [ ] 5.2 **RED** same file: no currency literal in any **`.swift`** under `cellar/` or `cellarTests/` — scope the sweep to `.swift` so `Tip.storekit`'s tier value cannot trip it; no external payment or donation URL; `Tip.storekit` present in `cellarTests/`, absent from `cellar/` and from the app target's bundled resources; the `TipJar` target's manifest dependency list is empty and `Sources/TipJar/` contains no `import StoreKit`.
-- [ ] 5.3 **GREEN** fix any violation the sweep reports (expected: none if 4.5 held).
+- [x] 5.1 **RED** `cellarTests/TipCompositionTests.swift` reusing the comment-stripping `Source`/`load()` idiom in `cellarTests/SecurityCompositionSupport.swift`: `import StoreKit` appears in exactly one file under `cellar/` and it is `Support/StoreKitTipSource.swift`; no other file references `Product`, `Transaction`, `AppStore`, `canMakePayments`, `currentEntitlements` or `appAccountToken`; no `#if`/`#available` decides availability.
+- [x] 5.2 **RED** same file: no currency literal in any **`.swift`** under `cellar/` or `cellarTests/` — scope the sweep to `.swift` so `Tip.storekit`'s tier value cannot trip it; no external payment or donation URL; `Tip.storekit` present in `cellarTests/`, absent from `cellar/` and from the app target's bundled resources; the `TipJar` target's manifest dependency list is empty and `Sources/TipJar/` contains no `import StoreKit`.
+- [x] 5.3 **GREEN** fix any violation the sweep reports (expected: none if 4.5 held).
 
 ## Phase 6: Wiring and surfaces (spec req 8)
 
