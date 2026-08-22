@@ -34,6 +34,7 @@ nonisolated enum ReleasePipelineSources {
     }
 
     static let projectFile = "cellar.xcodeproj/project.pbxproj"
+    static let workflowPath = ".github/workflows/release.yml"
 
     /// Every `XCBuildConfiguration` body in the project file, as text.
     ///
@@ -91,6 +92,77 @@ nonisolated enum ReleasePipelineSources {
     static func appTargetBuildConfigurationBlocks() throws -> [String] {
         try buildConfigurationBlocks()
             .filter { $0.contains("PRODUCT_BUNDLE_IDENTIFIER = com.juancasanueva.cellar;") }
+    }
+
+    /// A workflow cut into steps at its `- name:` boundaries.
+    ///
+    /// The properties worth asserting about a workflow are per-step — "the step
+    /// that deletes the keychain also runs unconditionally", "the private-repo
+    /// gate runs before any step that builds". Asserting that two substrings
+    /// both appear somewhere in the file would pass for a workflow where they
+    /// sit in different steps, which is precisely the failure being guarded
+    /// against.
+    static func workflowSteps(in workflow: String) -> [String] {
+        var steps: [String] = []
+        var current: [String]?
+
+        for line in workflow.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("- name:") {
+                if let started = current { steps.append(started.joined(separator: "\n")) }
+                current = [String(line)]
+            } else {
+                current?.append(String(line))
+            }
+        }
+        if let last = current { steps.append(last.joined(separator: "\n")) }
+        return steps
+    }
+
+    /// A top-level YAML block, from its column-zero key to the next column-zero
+    /// key.
+    static func topLevelBlock(named key: String, in yaml: String) -> String? {
+        let lines = yaml.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard let start = lines.firstIndex(where: { $0 == "\(key):" || $0.hasPrefix("\(key):") && !$0.hasPrefix(" ") })
+        else { return nil }
+
+        var block = [lines[start]]
+        for line in lines[(start + 1)...] {
+            let isNewTopLevelKey = !line.isEmpty
+                && !line.hasPrefix(" ")
+                && !line.hasPrefix("\t")
+                && !line.hasPrefix("#")
+            if isNewTopLevelKey { break }
+            block.append(line)
+        }
+        return block.joined(separator: "\n")
+    }
+
+    /// Directories that are not "the repository": version-control internals,
+    /// build output, and local tool state. Everything else is scanned.
+    static let uncheckedDirectories: Set<String> = [
+        ".git", ".build", "build", ".swiftpm", "DerivedData", ".codegraph", ".atl"
+    ]
+
+    /// Every file in the repository, excluding the directories above.
+    static func repositoryFiles(under relativePath: String = "") -> [URL] {
+        let root = relativePath.isEmpty ? repositoryRoot : url(relativePath)
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ) else { return [] }
+
+        var files: [URL] = []
+        while let candidate = enumerator.nextObject() as? URL {
+            let isDirectory = (try? candidate.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            if isDirectory {
+                if uncheckedDirectories.contains(candidate.lastPathComponent) {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
+            files.append(candidate)
+        }
+        return files
     }
 }
 
@@ -268,6 +340,76 @@ struct ReleasePipelinePlacementTests {
             )
         )
     }
+
+    // MARK: - 4.1 T2 — the workflow exists
+
+    /// S21: the pipeline definition lives under `.github/`, outside the
+    /// synchronized root group that would otherwise ship it to users.
+    @Test("The release workflow exists under .github/workflows")
+    func releaseWorkflowExists() {
+        #expect(ReleasePipelineSources.exists(ReleasePipelineSources.workflowPath))
+    }
+
+    // MARK: - 4.10 T12 — nothing release-shaped inside the synchronized group
+
+    /// S21: `cellar/` joins the app target wholesale.
+    ///
+    /// GREEN on arrival, deliberately: the trap is a *future* mistake, and a pin
+    /// that only arrives after someone falls into it has never prevented
+    /// anything. The extensions listed are exactly the shapes this slice adds.
+    @Test("No plist, yml, yaml or sh file lives inside the app's synchronized group")
+    func appSourcesCarryNoReleaseInfrastructure() {
+        let files = ReleasePipelineSources.repositoryFiles(under: "cellar")
+        let offenders = files.filter { ["plist", "yml", "yaml", "sh"].contains($0.pathExtension) }
+
+        #expect(offenders.map(\.lastPathComponent) == [])
+        // The scan is only meaningful if it saw the group at all.
+        #expect(files.count > 10)
+    }
+
+    // MARK: - 4.10 T13 — no credential material, and no entitlements file
+
+    /// S24 and S11, in one sweep of the tree.
+    ///
+    /// A committed key is unrecoverable once pushed, and a `.entitlements` file
+    /// appearing later would make `ENABLE_USER_SELECTED_FILES` and
+    /// `REGISTER_APP_GROUPS` live — re-activating the export-write trap recorded
+    /// in the archived tip-jar slice. Both hold today; both are pinned so they
+    /// keep holding.
+    ///
+    /// The PEM check matches a *complete* header — `-----BEGIN <TYPE>-----` —
+    /// rather than the bare prefix. Release documentation legitimately quotes
+    /// the prefix when describing this very check, and a guard that fires on
+    /// prose about itself is a guard someone eventually deletes.
+    @Test("The repository carries no key material, certificate blob, or entitlements file")
+    func repositoryCarriesNoCredentialMaterial() throws {
+        let pemHeader = try NSRegularExpression(pattern: "-----BEGIN [A-Z0-9 ]+-----")
+        let credentialExtensions = ["p12", "p8", "cer", "mobileprovision", "entitlements"]
+
+        var offenders: [String] = []
+        var scanned = 0
+
+        for file in ReleasePipelineSources.repositoryFiles() {
+            if credentialExtensions.contains(file.pathExtension) {
+                offenders.append(file.lastPathComponent)
+                continue
+            }
+            guard let data = try? Data(contentsOf: file) else { continue }
+            scanned += 1
+            let text = String(decoding: data, as: UTF8.self)
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            if pemHeader.firstMatch(in: text, range: range) != nil {
+                offenders.append(file.lastPathComponent)
+            }
+        }
+
+        #expect(offenders == [])
+        // An absence is only proof if something counted the presences.
+        #expect(scanned > 100)
+
+        let project = try ReleasePipelineSources.text(ReleasePipelineSources.projectFile)
+        #expect(!project.contains("CODE_SIGN_ENTITLEMENTS"))
+    }
 }
 
 /// What the release workflow and the release script are allowed to say.
@@ -385,6 +527,188 @@ struct ReleaseWorkflowContractTests {
 
         #expect(!script.contains("set -x"))
         #expect(!script.contains("set -eux"))
+    }
+
+    // MARK: - 4.2 T3 — only a version tag can trigger a release
+
+    /// S3: the trigger surface is the whole security boundary of this workflow.
+    ///
+    /// It holds a Developer ID certificate and an App Store Connect key, so a
+    /// `pull_request:` trigger would hand both to anyone who could open a pull
+    /// request. The negatives are therefore asserted as hard as the positives.
+    /// The runner, the Xcode pin and `concurrency:` are design-owned pins rather
+    /// than spec coverage, kept here because nothing else would notice them
+    /// drifting.
+    @Test("The workflow is triggered only by a pushed v* tag")
+    func onlyAVersionTagTriggersTheWorkflow() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+        let triggers = try #require(ReleasePipelineSources.topLevelBlock(named: "on", in: workflow))
+
+        #expect(triggers.contains("push:"))
+        #expect(triggers.contains("tags:"))
+        #expect(triggers.contains("'v*'"))
+
+        // `branches:` is only meaningful inside the trigger block; the other
+        // three are triggers wherever they appear, so both scopes are checked.
+        for forbidden in ["pull_request:", "schedule:", "workflow_dispatch:", "branches:"] {
+            #expect(!triggers.contains(forbidden), "the trigger block must not declare \(forbidden)")
+        }
+        for forbidden in ["pull_request:", "schedule:", "workflow_dispatch:"] {
+            #expect(!workflow.contains(forbidden), "the workflow must not declare \(forbidden)")
+        }
+
+        // R7: this is a release workflow, not the project's test CI.
+        #expect(!workflow.contains("xcodebuild test"))
+
+        #expect(workflow.contains("runs-on: macos-26"))
+        #expect(workflow.contains("contents: write"))
+        #expect(workflow.contains("concurrency:"))
+        #expect(workflow.contains("xcode-select -s /Applications/Xcode_26.6.app"))
+    }
+
+    // MARK: - 4.3 T19 — the private-repository fail-fast
+
+    /// S4: an asset nobody can download is not a release.
+    ///
+    /// Pinned structurally because it can never be exercised by a real run: the
+    /// dry run happens on a public repository, so the only proof that the gate
+    /// exists — and that it runs *before* anything is signed or submitted — is
+    /// its position among the steps.
+    @Test("A private repository fails the run before any build step")
+    func privateRepositoryFailsFastBeforeAnyBuildStep() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+        let steps = ReleasePipelineSources.workflowSteps(in: workflow)
+
+        let gate = try #require(
+            steps.firstIndex { $0.contains("github.event.repository.private") && $0.contains("exit 1") }
+        )
+        let building = steps.indices.filter { steps[$0].contains("scripts/release.sh") }
+
+        #expect(!building.isEmpty)
+        #expect(building.allSatisfy { gate < $0 })
+    }
+
+    // MARK: - 4.4 T4 — credential cleanup cannot be skipped by a failure
+
+    /// S25: injected credentials must die with the run, including when the run
+    /// dies first.
+    ///
+    /// Asserted on the step that actually deletes the keychain, not on the file
+    /// as a whole: `if: always()` appearing somewhere and `security
+    /// delete-keychain` appearing somewhere is exactly the shape a broken
+    /// workflow takes.
+    @Test("The keychain deletion step is declared to run unconditionally")
+    func keychainDeletionRunsUnconditionally() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+        let steps = ReleasePipelineSources.workflowSteps(in: workflow)
+        let cleanup = steps.filter { $0.contains("security delete-keychain") }
+
+        #expect(cleanup.count == 1)
+        #expect(cleanup.allSatisfy { $0.contains("if: always()") })
+        // The API key leaves with it: a `.p8` outliving the run is the same leak.
+        #expect(cleanup.allSatisfy { $0.contains("asc.p8") })
+    }
+
+    // MARK: - 4.5 T5 — secrets appear only as env bindings
+
+    /// S26: a secret interpolated into a `run:` line is echoed into the step
+    /// header of every job log, before the runner has a chance to mask it.
+    ///
+    /// So the shape is pinned, not just the count: every reference must be a
+    /// bare `NAME: ${{ secrets.NAME }}` binding and nothing else.
+    @Test("Every secret reference is the right-hand side of an env binding")
+    func secretsAppearOnlyAsEnvironmentBindings() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+        let binding = try NSRegularExpression(
+            pattern: "^[A-Z0-9_]+: \\$\\{\\{ secrets\\.[A-Z0-9_]+ \\}\\}$"
+        )
+
+        let referencing = workflow
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.contains("secrets.") }
+
+        // Non-vacuity, not an exact count: the App Store Connect bindings are
+        // repeated once per step that needs them, deliberately, because YAML
+        // anchors are not reliable across workflow contexts. Which *names* may
+        // appear is the next test's job.
+        #expect(referencing.count >= 6)
+        for line in referencing {
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            #expect(
+                binding.firstMatch(in: line, range: range) != nil,
+                "secret reference is not a plain env binding: \(line)"
+            )
+        }
+    }
+
+    // MARK: - 4.6 T6 — exactly the six declared secrets
+
+    /// S26: set equality, so a seventh secret fails too.
+    ///
+    /// A release pipeline that quietly grows a new credential is a release
+    /// pipeline whose blast radius nobody re-reviewed. Adding one is allowed;
+    /// adding one without touching this list is not.
+    @Test("The workflow references exactly the six expected secrets")
+    func workflowReferencesExactlyTheExpectedSecrets() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+        let reference = try NSRegularExpression(pattern: "secrets\\.([A-Z0-9_]+)")
+        let range = NSRange(workflow.startIndex..<workflow.endIndex, in: workflow)
+
+        let referenced = Set(
+            reference.matches(in: workflow, range: range).compactMap { match -> String? in
+                guard let name = Range(match.range(at: 1), in: workflow) else { return nil }
+                return String(workflow[name])
+            }
+        )
+
+        #expect(referenced == [
+            "BUILD_CERTIFICATE_BASE64",
+            "P12_PASSWORD",
+            "KEYCHAIN_PASSWORD",
+            "APPLE_API_KEY_P8",
+            "APPLE_API_KEY_ID",
+            "APPLE_API_ISSUER_ID"
+        ])
+    }
+
+    // MARK: - 4.7 T15b — nothing in the repository can retract a release
+
+    /// S18, S19: decision 5 — never delete or unflag a prior release.
+    ///
+    /// A future Sparkle appcast will point at published assets; unflagging one
+    /// strands every installed copy that trusted it. Withdrawing a release stays
+    /// a deliberate maintainer action, so the automation is structurally
+    /// incapable of it: the only `gh` invocation is `gh release create`, and
+    /// there is no `git` invocation at all.
+    @Test("The only release-management invocation is gh release create")
+    func theWorkflowCanOnlyEverCreateARelease() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+
+        let gh = ReleasePipelineSources.commandInvocations(of: "gh", in: workflow)
+        #expect(gh.count == 1)
+        #expect(gh.allSatisfy { $0.hasPrefix("gh release create") })
+
+        #expect(ReleasePipelineSources.commandInvocations(of: "git", in: workflow).isEmpty)
+
+        for forbidden in [
+            "gh release delete", "gh release edit", "git push", "git tag", "git commit", "git add"
+        ] {
+            #expect(!workflow.contains(forbidden), "the workflow must not carry: \(forbidden)")
+        }
+    }
+
+    // MARK: - 4.8 T16b — the workflow never traces its own commands
+
+    /// S26: the steps that handle the certificate and the API key are the ones
+    /// `set -x` would betray, so the prohibition is asserted over the whole file
+    /// rather than per step.
+    @Test("The workflow never enables shell command tracing")
+    func workflowNeverTracesCommands() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+
+        #expect(!workflow.contains("set -x"))
+        #expect(!workflow.contains("set -eux"))
     }
 
     /// The body of a shell function, from its opening line to the column-zero
