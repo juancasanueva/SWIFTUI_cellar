@@ -224,8 +224,11 @@ phase_verify() {
 	# succeeds as soon as any one line differs, so it never fails; and a bare
 	# `! pipeline` is exempt from `set -e` by definition, so it cannot fail the
 	# script either. An explicit branch is the only form of this gate that gates.
-	if codesign -d --entitlements :- "$VERIFIED_APP" 2>&1 |
-		grep -q 'com.apple.security.app-sandbox'; then
+	# The output is captured first: under `pipefail`, `grep -q` closing the pipe
+	# early would turn a real match into status 141 and skip the branch.
+	local entitlements
+	entitlements="$(codesign -d --entitlements :- "$VERIFIED_APP" 2>&1)"
+	if printf '%s\n' "$entitlements" | grep -q 'com.apple.security.app-sandbox'; then
 		fail "the delivered bundle carries an app-sandbox entitlement"
 	fi
 

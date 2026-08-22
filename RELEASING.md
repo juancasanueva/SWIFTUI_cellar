@@ -130,7 +130,13 @@ xcodebuild archive -project cellar.xcodeproj -scheme cellar -configuration Relea
 ## 5. Local rehearsal
 
 ```sh
-VERSION=1.0.0 BUILD_NUMBER=1 SIGNING_STYLE=manual scripts/release.sh all
+# `all` includes `notarize`, so the App Store Connect key is required even for a rehearsal.
+VERSION=1.0.0 BUILD_NUMBER=1 \
+ASC_KEY_PATH=~/.private_keys/AuthKey_XXXXXXXXXX.p8 ASC_KEY_ID=XXXXXXXXXX ASC_ISSUER_ID=<issuer-uuid> \
+scripts/release.sh all
+
+# Without the key, rehearse the phases that need none:
+VERSION=1.0.0 BUILD_NUMBER=1 SIGNING_STYLE=manual scripts/release.sh archive
 ```
 
 | Variable | Required for | Meaning |
