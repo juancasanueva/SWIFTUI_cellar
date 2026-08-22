@@ -243,8 +243,9 @@ verify:   ditto -x -k "$BUILD/Home-Cellar-$VERSION.zip" "$BUILD/verify"
             grep -q 'flags=0x10000(runtime)'                              #                       S10
             grep -q 'Authority=Developer ID Application'                  #                       S15
             grep -q 'TeamIdentifier=Z3S5JK8E38'                           #                       S15
-          ! codesign -d --entitlements :- "$V" 2>&1 \
-            | grep -q 'com.apple.security.app-sandbox'                    # sandbox absent        S10 (negated match — never grep -qv)
+          entitlements="$(codesign -d --entitlements :- "$V" 2>&1)"       # capture first: under pipefail an early
+          if printf '%s\n' "$entitlements" \
+            | grep -q 'com.apple.security.app-sandbox'; then fail; fi     # sandbox absent        S10 — see (A) below
           lipo -archs "$V/Contents/MacOS/cellar"                          # == arm64              S9
           plutil -extract CFBundleShortVersionString raw "$V/Contents/Info.plist"  # == $VERSION
           plutil -extract CFBundleVersion raw "$V/Contents/Info.plist"    # == $BUILD_NUMBER      S6
@@ -564,4 +565,4 @@ Measured by the orchestrator after this design was written; Engram topic `sdd/m6
 
 ## Re-validation record (orchestrator, 2026-08-22)
 
-Fresh-context validator: round 1 **FAIL** (CRITICAL pbxproj/copyright drift + orchestrator-introduced `LSApplicationCategoryType`); design re-run once with itemised feedback; round 2 **PASS-WITH-WARNINGS**. Post-round-2 orchestrator edits to this file: (A) the S10 sandbox-absence gate rewritten as `! codesign … | grep -q` (a `grep -qv` never fails); (B) M10's pattern set drops the bare `p12` token (would match the echoed `run:` body on every honest run); (F) T17 additionally pins `ENABLE_APP_SANDBOX = NO` / `ENABLE_HARDENED_RUNTIME = YES`. Validator suggestions C (S1 post-publish `curl -fsSI` reachability gate — optional hardening for tasks), D (S14 offline assessment is M3 only; the CI `spctl` runs online) and E (anchor rationale wording) are recorded here for `sdd-tasks` and not otherwise acted on.
+Fresh-context validator: round 1 **FAIL** (CRITICAL pbxproj/copyright drift + orchestrator-introduced `LSApplicationCategoryType`); design re-run once with itemised feedback; round 2 **PASS-WITH-WARNINGS**. Post-round-2 orchestrator edits to this file: (A) the S10 sandbox-absence gate — first rewritten as `! codesign … | grep -q` (a `grep -qv` never fails), then corrected again after verify (W1): a bare `!`-negated pipeline is exempt from `set -e`, so that form cannot fail the script either; and even a plain pipeline lets `grep -q` close the pipe early under `pipefail` (SIGPIPE → 141 → a real match reads as a pass). The only form that gates is the one shipped in `scripts/release.sh` (`f993ecf`): capture `codesign -d --entitlements :-` output into a variable, then `if printf … | grep -q …; then fail; fi`. The YAML skeleton above now shows that form; (B) M10's pattern set drops the bare `p12` token (would match the echoed `run:` body on every honest run); (F) T17 additionally pins `ENABLE_APP_SANDBOX = NO` / `ENABLE_HARDENED_RUNTIME = YES`. Validator suggestions C (S1 post-publish `curl -fsSI` reachability gate — optional hardening for tasks), D (S14 offline assessment is M3 only; the CI `spctl` runs online) and E (anchor rationale wording) are recorded here for `sdd-tasks` and not otherwise acted on.

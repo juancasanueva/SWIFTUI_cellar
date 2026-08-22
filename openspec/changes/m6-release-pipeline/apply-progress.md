@@ -151,6 +151,13 @@ The most likely explanation is that the probe's count was taken from truncated o
 statement is therefore: **183 distinct green, 0 failures, 23 of them new, no test anywhere went red.**
 The G4 acceptance ("141 + the new cases") is reported as measured rather than reconciled.
 
+> **Reconciled by `sdd-verify` (W2, 2026-08-23):** the U29 probe's 141 was an orchestrator line-range
+> truncation, and the 160/183 above is one short because xcodebuild tore a single
+> `Test case '…' passed` line in half across concurrent output, which a line-oriented `sort -u` drops.
+> Correct figures: **161 pre-existing + 23 new = 184 distinct test functions passed / 0 failed**, over
+> 194 case executions (parameterized cases expand). Every "183"/"160" in this file should be read as
+> 184/161.
+
 CellarCore was **not** re-run: this slice adds no CellarCore code and the 0-line diff above is the
 proof the design asked for. `swift test --package-path Packages/CellarCore` remains at its measured
 1732/1732.

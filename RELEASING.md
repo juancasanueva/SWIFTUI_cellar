@@ -81,7 +81,7 @@ Then watch the run under the repository's Actions tab. The stages, in order:
 | Package | `ditto` into `Home-Cellar-<version>.zip` | — |
 | Notarize | `notarytool submit --wait` | Apple rejects it; the diagnostic log is printed |
 | Staple | Staples the ticket and repackages | Stapling fails |
-| Verify | Eight gates against the copy extracted from the zip | Any gate |
+| Verify | Eight gates against the copy extracted from the zip (the `spctl` assessment runs online here; the offline assessment is manual evidence M3 in §6) | Any gate |
 | Publish | `gh release create --verify-tag --generate-notes` | — |
 | Cleanup | Deletes the keychain and the API key, always | — |
 
