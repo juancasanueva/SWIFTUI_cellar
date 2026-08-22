@@ -101,17 +101,34 @@ struct StoreKitTipSource: TipCatalogLoading, TipPurchasing, Sendable {
     /// Leaving an unverified consumable unfinished is not caution: it replays at
     /// every launch, forever, and the user is the one who notices. Verification
     /// decides whether to say thank you — never whether to finish.
+    ///
+    /// The `switch` below extracts the transaction and *whether it verified*, and
+    /// nothing else: the decision that follows belongs to
+    /// `TipTransactionDisposition` in `TipJar`, where both branches are values a
+    /// test can drive. `SKTestSession` cannot produce a transaction that fails
+    /// verification, so before this split the unverified path was reachable only
+    /// by reading it — and it is the path the spec spends a paragraph on.
+    ///
+    /// What is left here is one `finish()` call on one line, reached from both
+    /// branches, and `TipCompositionTests` asserts that neither branch can leave
+    /// without passing through it.
     private static func finish(
         _ verification: VerificationResult<Transaction>
     ) async -> TipPurchaseOutcome {
+        let transaction: Transaction
+        let isVerified: Bool
         switch verification {
-        case .verified(let transaction):
-            await transaction.finish()
-            return .completed
-        case .unverified(let transaction, _):
-            await transaction.finish()
-            return .unverified
+        case .verified(let value):
+            transaction = value
+            isVerified = true
+        case .unverified(let value, _):
+            transaction = value
+            isVerified = false
         }
+
+        let disposition = TipTransactionDisposition.forTransaction(isVerified: isVerified)
+        if disposition.mustFinish { await transaction.finish() }
+        return disposition.outcome
     }
 
     // MARK: - Transactions this app owns

@@ -132,22 +132,22 @@ struct StoreKitTipSourceTests {
             guard case .loaded(let products) = load else {
                 Issue.record("the catalog did not load: \(load)")
                 return
-        }
-        let product = try #require(products.first { $0.id == TipProductIDs.tip })
-        #expect(products.count == 1, "something other than the one configured consumable resolved")
-        #expect(product.displayName == "Tip", "the display name was not read from the store")
-        #expect(
-            product.description == "A one-off thank-you to the developer.",
-            "the description was composed locally instead of read from the store"
-        )
-        // The **price** is asserted as a property, never as a literal: this app
-        // may not carry a price string, and the configuration's tier is not a
-        // string this test is allowed to know.
-        #expect(product.displayPrice.isEmpty == false, "the surface would render no price at all")
-        #expect(
-            product.displayPrice.contains(TipProductIDs.tip) == false,
-            "the price field was filled with something that is not a price"
-        )
+            }
+            let product = try #require(products.first { $0.id == TipProductIDs.tip })
+            #expect(products.count == 1, "something other than the one configured consumable resolved")
+            #expect(product.displayName == "Tip", "the display name was not read from the store")
+            #expect(
+                product.description == "A one-off thank-you to the developer.",
+                "the description was composed locally instead of read from the store"
+            )
+            // The **price** is asserted as a property, never as a literal: this app
+            // may not carry a price string, and the configuration's tier is not a
+            // string this test is allowed to know.
+            #expect(product.displayPrice.isEmpty == false, "the surface would render no price at all")
+            #expect(
+                product.displayPrice.contains(TipProductIDs.tip) == false,
+                "the price field was filled with something that is not a price"
+            )
         }
     }
 
@@ -164,19 +164,19 @@ struct StoreKitTipSourceTests {
                   let product = products.first else {
                 Issue.record("the catalog did not load, so nothing was bought")
                 return
-        }
+            }
 
-        let outcome = await source.purchase(product)
+            let outcome = await source.purchase(product)
 
-        #expect(outcome == .completed)
-        #expect(outcome.recordsGratitude)
-        // The unfinished set is read **after** a purchase this test performed
-        // itself, so an empty answer here is the effect of `finish()` rather
-        // than a property of a store that happened to start out clean.
-        #expect(
-            await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty,
-            "the consumable was left unfinished, so it will replay at every launch"
-        )
+            #expect(outcome == .completed)
+            #expect(outcome.recordsGratitude)
+            // The unfinished set is read **after** a purchase this test performed
+            // itself, so an empty answer here is the effect of `finish()` rather
+            // than a property of a store that happened to start out clean.
+            #expect(
+                await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty,
+                "the consumable was left unfinished, so it will replay at every launch"
+            )
         }
     }
 
@@ -194,14 +194,14 @@ struct StoreKitTipSourceTests {
                   let product = products.first else {
                 Issue.record("the catalog did not load, so nothing was bought")
                 return
-        }
+            }
 
-        let first = await source.purchase(product)
-        let second = await source.purchase(product)
+            let first = await source.purchase(product)
+            let second = await source.purchase(product)
 
-        #expect(first == .completed)
-        #expect(second == .completed, "a second tip was refused, as if the consumable were owned")
-        #expect(await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty)
+            #expect(first == .completed)
+            #expect(second == .completed, "a second tip was refused, as if the consumable were owned")
+            #expect(await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty)
         }
     }
 
@@ -221,21 +221,21 @@ struct StoreKitTipSourceTests {
                   let product = products.first else {
                 Issue.record("the catalog did not load, so no leftover could be seeded")
                 return
-        }
-        _ = try await session.buyProduct(productIdentifier: product.id)
+            }
+            _ = try await session.buyProduct(productIdentifier: product.id)
 
-        let seeded = await Self.unfinishedTipIDs { $0.contains(TipProductIDs.tip) }
-        #expect(
-            seeded.contains(TipProductIDs.tip),
-            "the arrangement never produced an unfinished transaction, so the drain proves nothing"
-        )
+            let seeded = await Self.unfinishedTipIDs { $0.contains(TipProductIDs.tip) }
+            #expect(
+                seeded.contains(TipProductIDs.tip),
+                "the arrangement never produced an unfinished transaction, so the drain proves nothing"
+            )
 
-        await source.drainUnfinished()
+            await source.drainUnfinished()
 
-        #expect(
-            await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty,
-            "a leftover consumable survived the launch drain, so it replays forever"
-        )
+            #expect(
+                await Self.unfinishedTipIDs { $0.isEmpty }.isEmpty,
+                "a leftover consumable survived the launch drain, so it replays forever"
+            )
         }
     }
 }

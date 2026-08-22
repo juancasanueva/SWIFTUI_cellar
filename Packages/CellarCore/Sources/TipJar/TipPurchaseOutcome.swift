@@ -52,6 +52,40 @@ public enum TipPurchaseOutcome: Sendable, Equatable {
     }
 }
 
+/// What must happen to a transaction the store handed back.
+///
+/// This exists because the rule requirement 3 argues hardest for — *"skipping
+/// `finish()` on the unverified path MUST NOT be treated as a safety measure,
+/// because an unfinished consumable replays forever"* — was, as a `switch`
+/// inside the StoreKit conformer, the one rule in this capability that no test
+/// could execute. `SKTestSession` cannot produce a transaction that fails
+/// verification, so the unverified branch was reachable only by reading it.
+///
+/// Splitting the **decision** out from the call leaves exactly one millimetre
+/// unproven — that `Transaction.finish()` is what actually gets invoked — and
+/// makes everything else a value both branches of a test can drive.
+///
+/// `mustFinish` is a stored property rather than an implied constant on purpose.
+/// The failure this guards against is precisely someone making finishing
+/// conditional on verification at a later date, and a rule that is not
+/// represented cannot be asserted.
+public struct TipTransactionDisposition: Sendable, Equatable {
+    /// Whether the transaction must be finished. **Always true.** Verification
+    /// decides whether to say thank you; it never decides whether to finish.
+    public let mustFinish: Bool
+
+    /// What to report, and therefore whether the thank-you is recorded.
+    public let outcome: TipPurchaseOutcome
+
+    /// The one mapping from "did this verify" to "what happens to it now".
+    public static func forTransaction(isVerified: Bool) -> TipTransactionDisposition {
+        TipTransactionDisposition(
+            mustFinish: true,
+            outcome: isVerified ? .completed : .unverified
+        )
+    }
+}
+
 /// Where one purchase attempt stands.
 public enum TipPurchaseState: Sendable, Equatable {
     case idle

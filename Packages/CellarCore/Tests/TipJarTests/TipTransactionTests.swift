@@ -17,6 +17,62 @@ import TipJar
 @Suite("Tip transactions")
 @MainActor
 struct TipTransactionTests {
+    // MARK: - Every transaction is finished, including the unverified one
+
+    /// The rule requirement 3 argues hardest for, as a value.
+    ///
+    /// It used to live only inside the conformer's `switch`, where the
+    /// unverified branch is unreachable from any test: `SKTestSession` cannot
+    /// produce a transaction that fails verification, so the one clause the spec
+    /// spends a paragraph on was proved by reading it. Moving the **decision**
+    /// here — leaving only the `Transaction.finish()` call itself on the far side
+    /// of StoreKit — makes both branches executable, which is what the rest of
+    /// this capability's rules already are.
+    @Test("An unverified transaction must still be finished, and must not be thanked")
+    func anUnverifiedTransactionMustStillBeFinishedAndMustNotBeThanked() {
+        let disposition = TipTransactionDisposition.forTransaction(isVerified: false)
+
+        #expect(
+            disposition.mustFinish,
+            "an unverified consumable was left unfinished, so it replays at every launch forever"
+        )
+        #expect(disposition.outcome == .unverified)
+        #expect(disposition.outcome.recordsGratitude == false)
+        #expect(
+            disposition.outcome.failureReason == nil,
+            "a verification failure was collapsed into an accusation of failure"
+        )
+    }
+
+    /// Triangulation, and the reason the property is named rather than implied:
+    /// `mustFinish` has to be true for **both** inputs. A mapping that returned
+    /// the verified branch's answer for everything would pass the test above.
+    @Test("A verified transaction is finished too, and it is the one that is thanked")
+    func aVerifiedTransactionIsFinishedTooAndItIsTheOneThatIsThanked() {
+        let disposition = TipTransactionDisposition.forTransaction(isVerified: true)
+
+        #expect(disposition.mustFinish)
+        #expect(disposition.outcome == .completed)
+        #expect(disposition.outcome.recordsGratitude)
+    }
+
+    /// Stated as one assertion over both inputs, so the invariant reads the way
+    /// the spec states it: finishing is **not** conditional on verification.
+    @Test("Finishing is unconditional; only the thank-you depends on verification")
+    func finishingIsUnconditionalOnlyTheThankYouDependsOnVerification() {
+        let dispositions = [true, false].map(TipTransactionDisposition.forTransaction(isVerified:))
+        let finishes = dispositions.map(\.mustFinish)
+        let outcomes = dispositions.map(\.outcome)
+        let gratitude = outcomes.map(\.recordsGratitude)
+
+        #expect(finishes == [true, true], "finishing became conditional on verification")
+        #expect(
+            outcomes == [.completed, .unverified],
+            "verification stopped deciding the thank-you, or started deciding the finish"
+        )
+        #expect(gratitude == [true, false], "the thank-you stopped depending on verification")
+    }
+
     // MARK: - The unfinished queue is drained at launch
 
     @Test("Launch drains the unfinished queue before it starts observing")

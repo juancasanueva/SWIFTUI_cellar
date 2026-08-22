@@ -141,6 +141,218 @@ struct TipCompositionTests {
         }
     }
 
+    // MARK: - Both verification branches reach the one finish()
+
+    /// The structural half of requirement 3's unverified clause.
+    ///
+    /// `TipJarTests` executes the **decision** for both branches — an unverified
+    /// transaction must still be finished — so what is left to prove here is the
+    /// millimetre StoreKit owns: that the conformer's `switch` cannot leave
+    /// without reaching the single `finish()` call the decision gates. That is a
+    /// claim about the shape of one function, which is exactly what this file is
+    /// for. It is asserted rather than described because `SKTestSession` cannot
+    /// produce a transaction that fails verification, so no runtime test can
+    /// walk that branch.
+    /// One member's source, from its declaration to whichever member declaration
+    /// comes next.
+    ///
+    /// The **earliest** boundary, not the first one that happens to match: an
+    /// earlier version of this took `range(of: a) ?? range(of: b)`, which
+    /// silently ran two members past the end and swept up a `return` belonging to
+    /// something else. `??` picks the first non-nil marker, not the nearest one.
+    static func member(named declaration: String, in code: String) -> String {
+        guard let start = code.range(of: declaration) else { return "" }
+        let rest = code[start.upperBound...]
+        let boundaries = ["\n    private ", "\n    func ", "\n    var ", "\n    static "]
+            .compactMap { rest.range(of: $0)?.lowerBound }
+        guard let end = boundaries.min() else { return String(rest) }
+        return String(rest[..<end])
+    }
+
+    private static func conformerFinishSource() throws -> String {
+        let conformer = try #require(
+            try AppSecuritySources.load().first { $0.name == Self.conformerName }
+        )
+        let source = member(named: "private static func finish(", in: conformer.code)
+        if source.isEmpty { Issue.record("the conformer no longer has a finish(_:) function") }
+        return source
+    }
+
+    @Test("Neither verification branch can leave the conformer without finishing")
+    func neitherVerificationBranchCanLeaveTheConformerWithoutFinishing() throws {
+        let finish = try Self.conformerFinishSource()
+        #expect(finish.isEmpty == false, "the function was not found, so its shape proves nothing")
+
+        // Both branches exist, and each one only classifies — it decides nothing
+        // and returns nothing, so neither can short-circuit past the call below.
+        #expect(finish.contains("case .verified("))
+        #expect(finish.contains("case .unverified("))
+        #expect(
+            finish.contains("return") == finish.contains("return disposition.outcome"),
+            "a branch returns early, so it can skip finishing"
+        )
+        #expect(
+            finish.components(separatedBy: "return").count == 2,
+            "there is more than one exit from finish(_:), so one of them may not finish"
+        )
+
+        // Exactly one `finish()` call, and it is gated only on the decision that
+        // `TipJarTests` proves is `true` for a verified and an unverified
+        // transaction alike.
+        #expect(
+            finish.components(separatedBy: "await transaction.finish()").count == 2,
+            "the finishing call was duplicated or removed"
+        )
+        #expect(finish.contains("TipTransactionDisposition.forTransaction(isVerified: isVerified)"))
+        #expect(finish.contains("if disposition.mustFinish { await transaction.finish() }"))
+        #expect(
+            finish.contains("if isVerified") == false,
+            "verification decides the finish again, which is the whole failure mode"
+        )
+    }
+
+    /// The control: the extractor really can tell a short-circuiting shape from
+    /// a converging one, so the assertions above are not passing on an empty
+    /// read.
+    @Test("The finish-shape scanner rejects a branch that returns before finishing")
+    func theFinishShapeScannerRejectsABranchThatReturnsBeforeFinishing() {
+        let shortCircuit = """
+                case .verified(let value):
+                    await value.finish()
+                    return .completed
+                case .unverified:
+                    return .unverified
+            """
+
+        #expect(shortCircuit.components(separatedBy: "return").count > 2)
+        #expect(
+            shortCircuit.contains("if disposition.mustFinish { await transaction.finish() }") == false
+        )
+    }
+
+    // MARK: - Nothing is shown at launch
+
+    /// Requirement 7.2 and the relaunch half of 7.3, which had no automated
+    /// proof at all.
+    ///
+    /// "The surface is entered by the user, never pushed" is an absence across a
+    /// known set of presentation modifiers, which is a scan rather than a UI
+    /// test — and a UI test could not prove the *absence* of a prompt anyway
+    /// without waiting for one that never comes.
+    static let presentationModifiers = [
+        ".sheet(", ".alert(", ".popover(", ".confirmationDialog(",
+        ".fullScreenCover(", ".badge(", ".toast(", "NSAlert", "UNUserNotification"
+    ]
+
+    /// Every file this change introduced or touched on the tip path.
+    static let tipSurfaceFiles = [
+        "TipJarCard.swift", "StoreKitTipSource.swift", "TipThankYouPreference.swift",
+        "AboutView.swift", "SettingsView.swift", "cellarApp.swift"
+    ]
+
+    @Test("No tip surface presents anything at launch or after any outcome")
+    func noTipSurfacePresentsAnythingAtLaunchOrAfterAnyOutcome() throws {
+        let sources = try AppSecuritySources.load()
+
+        for name in Self.tipSurfaceFiles {
+            let source = try #require(
+                sources.first { $0.name == name },
+                "\(name) is not in scope, so its silence means nothing"
+            )
+            for modifier in Self.presentationModifiers {
+                #expect(
+                    source.code.contains(modifier) == false,
+                    "\(name) pushes \(modifier) at the user rather than waiting to be visited"
+                )
+            }
+        }
+
+        // The launch path specifically: the composition root starts the tip loop
+        // and injects the environment, and does nothing else with it.
+        let root = try #require(sources.first { $0.name == "cellarApp.swift" })
+        #expect(
+            Self.matches(#"\btips\.tip\(\)"#, in: root.code) == false,
+            "launch initiates a purchase"
+        )
+    }
+
+    /// The other half of 7.3: a dismissed tip produces no note, so nothing
+    /// escalates on the next visit or the next launch.
+    @Test("A cancelled outcome renders no note, and no outcome renders a follow-up prompt")
+    func aCancelledOutcomeRendersNoNoteAndNoOutcomeRendersAFollowUpPrompt() throws {
+        let card = try #require(
+            try AppSecuritySources.load().first { $0.name == "TipJarCard.swift" }
+        )
+
+        // `.completed` and `.cancelled` share the one silent arm — the completed
+        // case says thank you through the explanation copy, and the cancelled
+        // case says nothing at all.
+        let silentArm = try #require(card.code.range(of: "case .completed, .cancelled:"))
+        let afterArm = card.code[silentArm.upperBound...].prefix(40)
+        #expect(
+            afterArm.contains("return nil"),
+            "a dismissed tip now says something back, which is where a nag starts"
+        )
+        // The control: an arm that *does* speak exists, so the silence above is a
+        // decision rather than a function that returns nothing for everything.
+        #expect(card.code.contains(#"return "Waiting for approval."#))
+        #expect(
+            card.code.contains("case .pending:"),
+            "the note stopped distinguishing outcomes at all"
+        )
+    }
+
+    // MARK: - The About row appears only when there is something to point at
+
+    /// Requirement 8.2's untested half.
+    @Test("The About signpost is gated on the same availability value Settings reads")
+    func theAboutSignpostIsGatedOnTheSameAvailabilityValueSettingsReads() throws {
+        let sources = try AppSecuritySources.load()
+        let about = try #require(sources.first { $0.name == "AboutView.swift" })
+
+        #expect(
+            about.code.contains("if tips.showsTipSurface {"),
+            "the signpost is rendered unconditionally, so it points at nothing in a build that cannot transact"
+        )
+        // The gate has to wrap the row, not merely appear somewhere in the file.
+        let gate = try #require(about.code.range(of: "if tips.showsTipSurface {"))
+        let row = try #require(about.code.range(of: "tipSignpostRow\n"))
+        #expect(gate.lowerBound < row.lowerBound)
+        #expect(
+            about.code.distance(from: gate.upperBound, to: row.lowerBound) < 120,
+            "the gate and the row drifted apart, so the row may no longer be inside it"
+        )
+
+        // One availability answer, read from the injected store — not a second
+        // evaluation that could disagree with the card's.
+        #expect(about.code.contains("@Environment(TipStore.self)"))
+        #expect(
+            Self.matches(#"Product\.products"#, in: about.code) == false,
+            "About asks the storefront a question of its own"
+        )
+    }
+
+    // MARK: - The product id has one home
+
+    /// Requirement 1.5 states a **structural** claim — "no second literal of that
+    /// id exists in shipped source" — which the covering unit test could not make,
+    /// because comparing a constant to its own literal proves only its value.
+    @Test("The product id literal appears exactly once in shipped source")
+    func theProductIDLiteralAppearsExactlyOnceInShippedSource() throws {
+        let identifier = TipProductIDs.tip
+        var occurrences: [String: Int] = [:]
+
+        for source in try Self.shippedSources() {
+            let count = source.code.components(separatedBy: identifier).count - 1
+            if count > 0 { occurrences[source.name] = count }
+        }
+
+        #expect(
+            occurrences == ["TipJar/TipProduct.swift": 1],
+            "the product id is declared or repeated somewhere other than its one constant: \(occurrences)"
+        )
+    }
+
     // MARK: - No price literal exists anywhere
 
     /// A currency symbol followed by an amount. Deliberately requires the
@@ -153,18 +365,29 @@ struct TipCompositionTests {
     /// tier because a StoreKit configuration has to; that is a fixture, not
     /// something this app renders, and a sweep that could not tell the two apart
     /// would have to be deleted rather than obeyed.
-    private static func swiftSources() throws -> [AppSecuritySources.Source] {
+    /// Every Swift file this change is answerable for, read by area.
+    ///
+    /// `Packages/CellarCore/{Sources,Tests}/TipJar*` are in scope because
+    /// requirement 7 says "the change's shipped sources **and its tests**", and
+    /// the core target is both. Leaving the package out was a gap: a price
+    /// literal in `TipProduct.swift` would have passed the sweep.
+    private static func sources(in areas: [(label: String, path: String)]) throws
+        -> [AppSecuritySources.Source] {
         let root = AppSecuritySources.directory.deletingLastPathComponent()
         var sources: [AppSecuritySources.Source] = []
-        for directory in ["cellar", "cellarTests"] {
-            let url = root.appendingPathComponent(directory, isDirectory: true)
+        for area in areas {
+            let url = root.appendingPathComponent(area.path, isDirectory: true)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                Issue.record("the sweep area \(area.path) does not exist, so it reads nothing")
+                continue
+            }
             let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil)
             while let file = enumerator?.nextObject() as? URL {
                 guard file.pathExtension == "swift" else { continue }
                 let text = try String(contentsOf: file, encoding: .utf8)
                 sources.append(
                     AppSecuritySources.Source(
-                        name: "\(directory)/\(file.lastPathComponent)",
+                        name: "\(area.label)/\(file.lastPathComponent)",
                         code: AppSecuritySources.stripComments(from: text)
                     )
                 )
@@ -173,7 +396,26 @@ struct TipCompositionTests {
         return sources
     }
 
-    @Test("No Swift source in the app or its tests carries a price literal")
+    private static func swiftSources() throws -> [AppSecuritySources.Source] {
+        try sources(in: [
+            ("cellar", "cellar"),
+            ("cellarTests", "cellarTests"),
+            ("TipJar", "Packages/CellarCore/Sources/TipJar"),
+            ("TipJarTests", "Packages/CellarCore/Tests/TipJarTests")
+        ])
+    }
+
+    /// What actually ships: the app target and the core target it links. Test
+    /// sources are deliberately absent — a test may pin an id, and requirement
+    /// 1.5's claim is about **shipped** source.
+    private static func shippedSources() throws -> [AppSecuritySources.Source] {
+        try sources(in: [
+            ("cellar", "cellar"),
+            ("TipJar", "Packages/CellarCore/Sources/TipJar")
+        ])
+    }
+
+    @Test("No Swift source in the app, the core target, or their tests carries a price literal")
     func noSwiftSourceInTheAppOrItsTestsCarriesAPriceLiteral() throws {
         let sources = try Self.swiftSources()
         #expect(sources.count > 20, "the sweep read almost nothing, so its silence means nothing")
@@ -181,6 +423,10 @@ struct TipCompositionTests {
             sources.contains { $0.name.hasSuffix("StoreKitTipSourceTests.swift") },
             "the tests are out of scope, and a price literal in a test is forbidden too"
         )
+        // The package halves, named individually: an area that silently read
+        // nothing would leave the sweep passing over files it never opened.
+        #expect(sources.contains { $0.name == "TipJar/TipProduct.swift" })
+        #expect(sources.contains { $0.name == "TipJarTests/TipFakes.swift" })
 
         for source in sources {
             #expect(
@@ -370,16 +616,9 @@ struct TipCompositionTests {
         let source = try #require(
             try AppSecuritySources.load().first { $0.name == "AboutView.swift" }
         )
-        let marker = "private var tipSignpostRow"
-        guard let start = source.code.range(of: marker) else {
-            Issue.record("AboutView carries no tip signpost row")
-            return ""
-        }
-        let rest = source.code[start.upperBound...]
-        guard let end = rest.range(of: "\n    private ") ?? rest.range(of: "\n    var ") else {
-            return String(rest)
-        }
-        return String(rest[..<end.lowerBound])
+        let row = member(named: "private var tipSignpostRow", in: source.code)
+        if row.isEmpty { Issue.record("AboutView carries no tip signpost row") }
+        return row
     }
 
     @Test("The About signpost carries no action of any kind")

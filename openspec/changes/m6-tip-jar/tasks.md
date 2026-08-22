@@ -84,3 +84,22 @@ required and no decision blocks apply.
 - [x] 7.1 `PRD.md` :9, :10, :186, :234 — rewrite in place with the reason recorded (StoreKit supersedes external links), and state that the MAS ship path is unproven (U22 is an M6 follow-up).
 - [x] 7.2 Confirm 0-line diffs on `AppSection.swift`, `ContentView.swift`, `AppSectionPlacementTests.swift`, `cellar.xcscheme`, `project.pbxproj`; report any deviation before merge rather than absorbing it.
 - [x] 7.3 Full verification: `swift test --package-path Packages/CellarCore` **and** `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`. Assert **executed test counts** (baseline 171 + the new tests), never `TEST SUCCEEDED` alone; any `-only-testing` function identifier needs its trailing `()` or zero tests run and the build still reports success.
+
+## Phase 8: Verify remediation (round 1)
+
+Opened by `verify-report.md` (FAIL: 1 CRITICAL, 9 WARNING, 4 SUGGESTION; no functional defect).
+
+- [x] 8.1 **RED** `TipJarTests` — req 3's unverified clause as a value: an unverified transaction must still be finished, a verified one too, and finishing is unconditional while only the thank-you depends on verification (C1, core layer).
+- [x] 8.2 **GREEN** `Sources/TipJar/TipPurchaseOutcome.swift`: `TipTransactionDisposition.forTransaction(isVerified:)` — the finish/thank decision as a pure mapping both branches can drive.
+- [x] 8.3 **GREEN** `cellar/Support/StoreKitTipSource.swift`: the `switch` classifies only; one `finish()` call gated on the proven decision (C1, conformer layer).
+- [x] 8.4 **RED** `TipCompositionTests`: neither `VerificationResult` branch can leave `finish(_:)` without reaching the single `transaction.finish()`, with a short-circuit control (C1, structural layer).
+- [x] 8.5 **RED** `TipCompositionTests`: no tip surface presents a sheet/alert/popover/dialog/badge/toast/notification, launch initiates no purchase, and `.cancelled` renders no note (W3, req 7.2/7.3).
+- [x] 8.6 **RED** `TipCompositionTests`: the About signpost is wrapped by `if tips.showsTipSurface` and asks the storefront nothing of its own (W4, req 8.2).
+- [x] 8.7 **RED** `TipCompositionTests`: the product id literal occurs exactly once across shipped source, `cellar/` **and** `Sources/TipJar/` (W5, req 1.5).
+- [x] 8.8 **GREEN** extend the price sweep to `Packages/CellarCore/{Sources,Tests}/TipJar*`, with per-area anchors so a silently-empty area fails (W6, req 7.1).
+- [x] 8.9 Replace `TipGratitudeTests`' unfailable inert-recorder assertions with an exhaustive per-seam call ledger; delete `ForbiddenSideEffectRecorder` (W1).
+- [x] 8.10 Normalise the indentation drift inside `StoreKitTipSourceTests`' `withLock` closures (S4).
+- [x] 8.11 Re-run both halves with counted executions: CellarCore 1772, cellarTests 194 distinct / 212 lines.
+
+Out of scope for this round: W2 / req 9.5 (UI-automation environment invalidated machine-wide),
+W7/W8 (accepted deviations), S1–S3 (decisions, not defects).

@@ -234,13 +234,29 @@ struct TipGratitudeTests {
 
     // MARK: - The tip path costs no egress and no brew process
 
-    @Test("A whole tip cycle issues no request and spawns no process")
-    func aWholeTipCycleIssuesNoRequestAndSpawnsNoProcess() async {
-        let recorder = ForbiddenSideEffectRecorder()
+    /// A complete ledger of every seam interaction one whole tip cycle produces.
+    ///
+    /// This test used to hand a recording network/process spy to **nothing** and
+    /// then assert its counters were zero — two assertions that could not fail
+    /// whatever the tip path did. The spy is gone: `TipJar` declares no network
+    /// or process seam and, having zero dependencies, could not reach one if it
+    /// wanted to, so there was never anything for a spy to observe.
+    ///
+    /// What can fail, and does the work the old assertions pretended to, is the
+    /// **exhaustive** count below. Every call the cycle makes is enumerated
+    /// exactly, so a fourth interaction, a second catalog fetch or an extra read
+    /// breaks this test — which is the observable shape of "the tip path does
+    /// only these three things". The claim that those three are the *only* seams
+    /// reachable at all is a build-graph fact, asserted in the manifest by
+    /// `TipCompositionTests.theTipJarTargetDeclaresAnEmptyDependencyList…`.
+    @Test("A whole tip cycle touches the three declared seams, exactly this many times")
+    func aWholeTipCycleTouchesTheThreeDeclaredSeamsExactlyThisManyTimes() async {
+        let product = TipFixtures.product()
+        let catalog = FakeTipCatalog(.loaded([product]))
         let gratitude = RecordingTipGratitude()
         let purchases = RecordingTipPurchases(outcome: .completed)
         let (store, running) = await Self.started(
-            catalog: FakeTipCatalog(.loaded([TipFixtures.product()])),
+            catalog: catalog,
             purchases: purchases,
             gratitude: gratitude
         )
@@ -249,14 +265,9 @@ struct TipGratitudeTests {
         await store.tip()
 
         #expect(store.hasTipped, "the cycle under measurement never actually ran")
-        #expect(recorder.requestCount == 0)
-        #expect(recorder.processCount == 0)
-
-        // The control: the counters are live, so the zeroes above are an
-        // observation rather than a property of a recorder nobody wired up.
-        recorder.recordRequest()
-        recorder.recordProcess()
-        #expect(recorder.requestCount == 1)
-        #expect(recorder.processCount == 1)
+        #expect(catalog.callCount == 1, "the catalog was fetched more than once for one launch")
+        #expect(purchases.events == [.drained, .observed, .purchased(product)])
+        #expect(gratitude.readCount == 1, "the flag was re-read outside hydration")
+        #expect(gratitude.writeCount == 1)
     }
 }

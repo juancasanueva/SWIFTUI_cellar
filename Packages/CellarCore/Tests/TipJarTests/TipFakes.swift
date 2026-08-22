@@ -212,23 +212,6 @@ final class RecordingTipGratitude: TipGratitudeRecording, Sendable {
     }
 }
 
-/// A recorder for the two things the tip path must never do.
-///
-/// The spec's "no egress and no brew process" scenario names a network recorder
-/// and a process recorder, and an absence proved by *not writing the code* is not
-/// proved at all. `TipJar` declares no such seam — it has zero dependencies and
-/// cannot reach one — so this stands in for both: the suites hand it to nothing,
-/// and its counters staying at zero after a full purchase cycle is the assertion.
-final class ForbiddenSideEffectRecorder: Sendable {
-    private let counts = Mutex((requests: 0, processes: 0))
-
-    var requestCount: Int { counts.withLock(\.requests) }
-    var processCount: Int { counts.withLock(\.processes) }
-
-    func recordRequest() { counts.withLock { $0.requests += 1 } }
-    func recordProcess() { counts.withLock { $0.processes += 1 } }
-}
-
 /// A main-actor log of the states a store or loader published, in order.
 ///
 /// "Settles exactly once" is an assertion about a *sequence*, so the sequence has
