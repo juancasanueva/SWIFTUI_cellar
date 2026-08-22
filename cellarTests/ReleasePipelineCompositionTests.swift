@@ -56,6 +56,33 @@ nonisolated enum ReleasePipelineSources {
             }
     }
 
+    /// Every invocation of `command` as a **command token**, returned as the
+    /// remainder of the line it starts.
+    ///
+    /// A bare substring search is not good enough here. `gh` occurs inside
+    /// "through" and "enough"; `git` occurs inside "gitignored". A prohibition
+    /// that fires on English prose in a comment is a prohibition someone will
+    /// eventually weaken to shut it up, so it is written to fire only on an
+    /// actual invocation: start of line, or after whitespace, `;`, `|`, `&` or
+    /// `(`, and followed by whitespace or end of line.
+    static func commandInvocations(of command: String, in text: String) -> [String] {
+        let pattern = "(?:^|[\\s;|&(])\(NSRegularExpression.escapedPattern(for: command))(?=\\s|$)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+
+        return text.split(separator: "\n", omittingEmptySubsequences: false).flatMap { line -> [String] in
+            let text = String(line)
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            return regex.matches(in: text, range: range).compactMap { match in
+                guard let matched = Range(match.range, in: text) else { return nil }
+                // Drop the separator the pattern consumed, so the result starts
+                // at the command itself.
+                let start = text[matched].hasPrefix(command) ? matched.lowerBound
+                    : text.index(after: matched.lowerBound)
+                return String(text[start...])
+            }
+        }
+    }
+
     /// The two configurations that build the shipped app.
     ///
     /// The trailing `;` is load-bearing: `com.juancasanueva.cellarTests;` also
@@ -215,4 +242,157 @@ struct ReleaseMetadataTests {
 
     private static let copyright = "Copyright © 2026 Juan Casanueva. All rights reserved."
     private static let catalogFile = "cellar/InfoPlist.xcstrings"
+}
+
+/// Where the release infrastructure lives.
+///
+/// `cellar/` is a `PBXFileSystemSynchronizedRootGroup`: a `.plist`, `.yml` or
+/// `.sh` dropped inside it silently joins the app target and ships **signed
+/// inside the bundle**. That is a future mistake, not a present one, which is
+/// exactly why the guard is a test rather than a comment.
+@Suite("Release pipeline placement")
+struct ReleasePipelinePlacementTests {
+    // MARK: - 3.1 T1 — the script and its export options exist, outside cellar/
+
+    /// S21: `scripts/release.sh` is the one executable file this slice adds, so
+    /// its executable bit is asserted rather than assumed — a release script
+    /// that is not executable is a documentation-like path that fails at the
+    /// worst possible moment.
+    @Test("The release script and its export options exist under scripts/")
+    func releaseScriptAndExportOptionsExist() {
+        #expect(ReleasePipelineSources.exists("scripts/ExportOptions.plist"))
+        #expect(ReleasePipelineSources.exists("scripts/release.sh"))
+        #expect(
+            FileManager.default.isExecutableFile(
+                atPath: ReleasePipelineSources.url("scripts/release.sh").path
+            )
+        )
+    }
+}
+
+/// What the release workflow and the release script are allowed to say.
+///
+/// Structural assertions over text, because the properties that matter here —
+/// "no step traces its own commands", "nothing can retract a release" — are
+/// absences, and an absence in a shell script is only provable by reading it.
+@Suite("Release workflow contract")
+struct ReleaseWorkflowContractTests {
+    private static let scriptPath = "scripts/release.sh"
+    private static let exportOptionsPath = "scripts/ExportOptions.plist"
+
+    // MARK: - 3.2 T7 — the export configuration declares Developer ID
+
+    /// S22: parsed as a property list, not grepped — a malformed plist that
+    /// happens to contain the right words would fail `xcodebuild -exportArchive`
+    /// at release time, and this is the check that would have caught it.
+    @Test("The export options declare developer-id, automatic signing, and the team")
+    func exportOptionsDeclareDeveloperIDDistribution() throws {
+        let data = try Data(contentsOf: ReleasePipelineSources.url(Self.exportOptionsPath))
+        let parsed = try PropertyListSerialization.propertyList(from: data, format: nil)
+        let options = try #require(parsed as? [String: Any])
+
+        #expect(options["method"] as? String == "developer-id")
+        #expect(options["signingStyle"] as? String == "automatic")
+        #expect(options["teamID"] as? String == "Z3S5JK8E38")
+    }
+
+    // MARK: - 3.3 T8 — the script carries the whole sequence
+
+    /// S20: the local path rehearses the real one, so it must carry every stage
+    /// the release run depends on. A rehearsal missing a stage is not a
+    /// rehearsal; it is a different build that happens to succeed.
+    @Test("The release script carries every build, sign, notarize, staple and verify command")
+    func releaseScriptCarriesTheWholeSequence() throws {
+        let script = try ReleasePipelineSources.text(Self.scriptPath)
+
+        #expect(script.contains("set -euo pipefail"))
+
+        for command in [
+            "xcodebuild archive",
+            "-exportArchive",
+            "ditto -c -k --keepParent --sequesterRsrc",
+            "notarytool submit",
+            "--wait",
+            "stapler staple",
+            "stapler validate",
+            "spctl -a -vvv -t install",
+            "codesign -dvvv",
+            "--entitlements :-",
+            "lipo -archs"
+        ] {
+            #expect(script.contains(command), "release.sh must carry: \(command)")
+        }
+
+        // The three keys `verify` reads back off the extracted copy — version,
+        // build number, and the display name the follow-up slices bind against.
+        for key in ["CFBundleShortVersionString", "CFBundleVersion", "CFBundleDisplayName"] {
+            #expect(script.contains("plutil -extract \(key) raw"), "verify must read \(key)")
+        }
+
+        // S23: nothing from scripts/ or .github/ may ship inside the bundle, and
+        // the gate that proves it enumerates the delivered Contents/ directory.
+        #expect(script.contains("\"$VERIFIED_APP/Contents\""))
+        #expect(script.contains("ExportOptions"))
+    }
+
+    /// The published archive can only ever be the post-staple one.
+    ///
+    /// R8: `ditto` into an existing zip path is an in-place add, not a replace,
+    /// so an un-deleted pre-notarization archive would leave the stapled ticket
+    /// out of the asset users download and make first launch require network
+    /// access. The deletion is asserted **by position**, not by presence: the
+    /// order is the whole property.
+    @Test("Stapling deletes the pre-notarization archive before repackaging")
+    func stapleDeletesTheArchiveBeforeRepackaging() throws {
+        let script = try ReleasePipelineSources.text(Self.scriptPath)
+        let body = try #require(Self.functionBody(named: "phase_staple", in: script))
+
+        let staple = try #require(body.range(of: "stapler staple"))
+        let remove = try #require(body.range(of: "rm -f"))
+        let repackage = try #require(body.range(of: "phase_package"))
+
+        #expect(staple.upperBound < remove.lowerBound)
+        #expect(remove.upperBound < repackage.lowerBound)
+    }
+
+    // MARK: - 3.4 T15a — the script cannot publish and cannot pick a repository
+
+    /// S19, S20: publication exists only in the automated workflow.
+    ///
+    /// Threat rows *git repository selection*, *commit state* and *push state*
+    /// all collapse into one assertion: a script that contains no `git` and no
+    /// `gh` invocation cannot select a repository, cannot stage or commit, and
+    /// cannot push or publish — regardless of the `$PWD` it is run from.
+    @Test("The release script contains no git and no gh invocation at all")
+    func releaseScriptCannotPublishOrSelectARepository() throws {
+        let script = try ReleasePipelineSources.text(Self.scriptPath)
+
+        #expect(ReleasePipelineSources.commandInvocations(of: "gh", in: script).isEmpty)
+        #expect(ReleasePipelineSources.commandInvocations(of: "git", in: script).isEmpty)
+        // The helper only proves an absence if it can find a presence: the
+        // script does invoke xcodebuild, and the same matcher sees it.
+        #expect(!ReleasePipelineSources.commandInvocations(of: "xcodebuild", in: script).isEmpty)
+    }
+
+    // MARK: - 3.5 T16a — no step traces its own commands
+
+    /// S26: `set -x` around a credential writes it to the log verbatim. The
+    /// script never handles one, but it is invoked by steps that do, and the
+    /// prohibition is cheaper to keep than to reintroduce.
+    @Test("The release script never enables shell command tracing")
+    func releaseScriptNeverTracesCommands() throws {
+        let script = try ReleasePipelineSources.text(Self.scriptPath)
+
+        #expect(!script.contains("set -x"))
+        #expect(!script.contains("set -eux"))
+    }
+
+    /// The body of a shell function, from its opening line to the column-zero
+    /// `}` that closes it.
+    static func functionBody(named name: String, in script: String) -> String? {
+        guard let start = script.range(of: "\(name)() {") else { return nil }
+        let rest = script[start.upperBound...]
+        guard let end = rest.range(of: "\n}") else { return nil }
+        return String(rest[rest.startIndex..<end.lowerBound])
+    }
 }
