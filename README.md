@@ -29,6 +29,15 @@ Cellar is a full-featured visual layer over the `brew` binary already on your Ma
 - macOS 26 (Tahoe) or later, Apple Silicon
 - [Homebrew](https://brew.sh) installed — Cellar detects it and guides you if it is missing; it never installs Homebrew itself
 
+## Install
+
+Download the latest `Home-Cellar-<version>.zip` from
+[Releases](../../releases), unzip it, and drag `cellar.app` to `/Applications`.
+
+The build is notarized and stapled, so the first launch is a single ordinary
+"Open" confirmation — no right-click workaround, and no network access needed to
+get past Gatekeeper. Apple Silicon and macOS 26 only.
+
 ## Building
 
 Open `cellar.xcodeproj` in Xcode and run the `cellar` scheme, or:
@@ -44,6 +53,16 @@ cd Packages/CellarCore && swift test
 ```
 
 App-level and UI tests live in `cellarTests/` and `cellarUITests/`.
+
+## Releasing
+
+Pushing a `v*` tag is the only thing that publishes a release. CI builds an
+arm64, Developer ID-signed, notarized and stapled `Home-Cellar-<version>.zip`
+and attaches it to a GitHub Release; every gate runs before publication, so a
+failed run publishes nothing.
+
+The runbook, prerequisites, version policy and entitlements rationale live in
+[`RELEASING.md`](RELEASING.md).
 
 ## Architecture
 
