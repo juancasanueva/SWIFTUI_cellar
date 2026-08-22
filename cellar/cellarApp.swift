@@ -14,7 +14,6 @@ import Persistence
 import ReleaseNotes
 import SecurityKit
 import SwiftUI
-import TipJar
 
 @main
 struct cellarApp: App {
@@ -144,21 +143,6 @@ struct cellarApp: App {
     /// Correlates a force-untap terminal with both refreshes it must await.
     private let refreshRegistry: MutationRefreshRegistry
 
-    /// The tip jar: whether this build can be tipped, and whether it ever was.
-    ///
-    /// Owned here like every other store and injected through the environment
-    /// rather than threaded down four view signatures — `SettingsView` is
-    /// constructed inside `ContentView`, which this change may not diff, so
-    /// environment injection is the only route to it (design D-D). Both scenes
-    /// receive it, because About carries a signpost that has to read the same
-    /// availability answer Settings does.
-    ///
-    /// Its three seams are composed here and nowhere else, so "a tip costs no
-    /// egress and no `brew` process" is a wiring fact: the only external
-    /// boundary in the graph is `StoreKitTipSource`, and a UI-test launch does
-    /// not even get that.
-    @State private var tips: TipStore
-
     /// The accent choice every tinted surface derives from.
     @State private var theme = ThemeStore()
 
@@ -250,25 +234,6 @@ struct cellarApp: App {
             : CleanupPreviewSource()
         // One container, opened once, shared by both stores.
         let stores = LocalStores()
-        // One `StoreKitTipSource` instance answers both the catalog and the
-        // purchasing seam, deliberately: it owns the update stream, and the
-        // launch drain publishes onto the very stream the observation later
-        // reads. Two instances would drain into a stream nobody consumes.
-        if isUITesting {
-            let fixture = AppTestTipSource()
-            _tips = State(
-                initialValue: TipStore(catalog: fixture, purchases: fixture, gratitude: fixture)
-            )
-        } else {
-            let source = StoreKitTipSource()
-            _tips = State(
-                initialValue: TipStore(
-                    catalog: source,
-                    purchases: source,
-                    gratitude: TipThankYouPreference()
-                )
-            )
-        }
         _brewDetection = State(initialValue: BrewDetectionStore(locator: locator))
         _installed = State(initialValue: installed)
         _mutations = State(initialValue: mutations)
@@ -498,7 +463,6 @@ struct cellarApp: App {
                 .environment(releaseNotes)
                 .environment(releaseNotesConsent)
                 .environment(\.releaseNotesCredentials, releaseNotesCredentials)
-                .environment(tips)
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
                 // from a terminal while Cellar was in the background.
@@ -519,13 +483,6 @@ struct cellarApp: App {
                 // scene lives. `loadCache` consults no consent, so findings stay
                 // readable offline and after revocation.
                 .task { loops.start("security") { await security.start() } }
-                // Hydrate, load the catalog, drain anything a previous launch
-                // left unfinished, then observe for the rest of the launch. It
-                // never returns, so it takes a `LoopOwner` slot rather than a
-                // scene `.task`: a second window joins the one observation, and
-                // closing this window does not stop Cellar from catching an
-                // Ask-to-Buy approval.
-                .task { loops.start("tips") { await tips.start() } }
                 .task { loops.start("installed") { await refresher.run() } }
                 .task { loops.start("installed-watcher") { await watchInstalledRoots() } }
                 // The **terminals consumer only** — never the poll. A `LoopOwner`
@@ -551,11 +508,6 @@ struct cellarApp: App {
         Window("About \(AppIdentity.name)", id: "about") {
             AboutView()
                 .environment(theme)
-                // The same store the main scene reads, so the About signpost
-                // and the Settings card answer "can this build be tipped" from
-                // one value rather than from two evaluations that could
-                // disagree.
-                .environment(tips)
                 .tint(theme.base)
                 .preferredColorScheme(.dark)
         }

@@ -1,13 +1,13 @@
 # PRD — Cellar! (working title)
 
-**A native Homebrew GUI for macOS** — SwiftUI, no backend, free with tip jar.
+**A native Homebrew GUI for macOS** — SwiftUI, no backend, free. No tip jar (see §6).
 
 | | |
 |---|---|
 | **Platform** | macOS 26 Tahoe+, Apple Silicon only (arm64) |
 | **Stack** | Swift 6.x, SwiftUI (Liquid Glass design system), SwiftData, local SPM core package (`CellarCore`) |
-| **Distribution** | Direct download (Developer ID + notarized, Sparkle updates) **and** Homebrew cask. **Amended at M6 (StoreKit tip jar):** a StoreKit consumable only transacts in a Mac App Store build, so the tip jar needs a MAS channel in addition to these two. That channel is **unproven** — sandbox and App Review feasibility (U22) is an M6 follow-up, not something this milestone demonstrated. Outside a MAS build the product list comes back empty and the tip surface is simply absent, which is the same code path as a missing App Store Connect record. |
-| **Monetization** | Free, ad-free, **in-app** tip jar (StoreKit 2 consumable). **Amended at M6:** this row originally said *external* tip jar. It was superseded because a binary that transacts StoreKit may not also carry an external payment link or language (App Store Review Guideline 3.1.1) — the two are mutually exclusive, so choosing StoreKit removes the external route rather than adding to it. |
+| **Distribution** | Direct download (Developer ID + notarized, Sparkle updates) **and** Homebrew cask |
+| **Monetization** | Free, ad-free, no tip jar (decision at M6 — §6) |
 | **Backend** | None. Talks only to the local `brew` binary, formulae.brew.sh, GitHub API, and OSV/NVD CVE feeds |
 | **Reference product** | TapHouse 1.5 (feature parity target, brew-only scope) |
 
@@ -22,7 +22,7 @@ Cellar! is a full-featured visual layer over the `brew` binary already installed
 1. **Native or nothing.** Pure SwiftUI, feels like part of macOS. No web views, no Electron.
 2. **brew is the source of truth.** Cellar! never manipulates the Cellar/Caskroom directly for mutations; it always shells out to `brew`. The CLI and the GUI can coexist mid-task.
 3. **Local-first, private.** No accounts, no telemetry, no backend. Network calls limited to package metadata, release notes, and CVE feeds.
-4. **Free forever.** All features free (including everything TapHouse gates behind Pro). Optional tip jar.
+4. **Free forever.** All features free (including everything TapHouse gates behind Pro). No tip jar — a StoreKit one was built and removed at M6 (§6).
 
 **Non-goals (v1)**
 
@@ -121,7 +121,7 @@ At-a-glance snapshot combining:
 - **brew detection & onboarding**: on first launch detect brew at `/opt/homebrew/bin/brew` (native), `/usr/local/bin/brew` (an x86_64 install carried over via Migration Assistant/Rosetta — supported, but flagged with a suggestion to migrate to the native prefix), or custom path (validated). If absent: friendly guide linking to brew.sh with the install one-liner (copy button) — Cellar! does not install Homebrew itself in v1.
 - **Localization**: English + Spanish at launch (String Catalogs).
 - **Accessibility**: full keyboard navigation, VoiceOver labels on all controls, Dynamic Type where applicable, respects Reduce Motion.
-- **Settings**: brew path, refresh/scan schedules, notifications, menu bar toggle, appearance, tip jar, Sparkle update channel.
+- **Settings**: brew path, refresh/scan schedules, notifications, menu bar toggle, appearance, Sparkle update channel. (A tip-jar card lived here briefly at M6; removed — §6.)
 
 ---
 
@@ -183,7 +183,7 @@ Failure of any external service degrades gracefully (feature shows cached/empty 
 
 ## 6. Monetization & distribution
 
-- **Tip jar**: a **StoreKit 2 consumable**, bought from one card in Settings, with a static signpost in About naming where it lives. **Amended at M6.** This bullet used to read "StoreKit is unavailable outside the App Store, so tips are external links (GitHub Sponsors / Ko-fi / Stripe Payment Link — pick at M6) opened in the browser from a Support screen". Superseded for two reasons: guideline 3.1.1 makes StoreKit and an external payment link mutually exclusive in one binary, and the premise was half-right — StoreKit is not *unavailable* outside the App Store, it simply returns an **empty product list**, which the app treats as a settled state and renders no tip surface at all. The cost of the choice is stated rather than hidden: the MAS ship path is **unproven** (U22, an M6 follow-up), so today the surface is reachable in local StoreKit testing and absent in a Developer ID build. Copy is gratitude-based, never nagging; nothing is shown at launch; there is no new sidebar section, because a whole navigable page for one button exceeds this document's own "single subtle" instruction.
+- **Tip jar — removed (M6 final decision).** The history, kept because each step was reasoned: this line originally chose external links (GitHub Sponsors / Ko-fi / Stripe) because StoreKit is unavailable outside the App Store — which is true. At M6 a $0.99 StoreKit consumable was built, verified and merged (PR #55) under a Mac App Store pivot. The U22 feasibility spike then *measured* what the original reasoning assumed: MAS is infeasible for Cellar — the App Sandbox denies `file-read-data` on `/opt/homebrew` before brew can exec (kernel-level, not reviewable), Guidelines 2.5.2/2.4.5 forbid installing executable code, and no Homebrew GUI exists on MAS. Offered the external-links fallback, the maintainer chose **no tip jar at all**: Cellar is free, with no payment surface of any kind. The StoreKit implementation was reverted in the same decision; its SDD archive (with the U22 report) remains at `openspec/changes/archive/2026-08-22-m6-tip-jar/`.
 - **Signing**: Developer ID Application cert, hardened runtime, notarization via `notarytool` in CI (GitHub Actions on tags).
 - **Sparkle 2**: EdDSA-signed appcast hosted on GitHub Pages; delta updates later. In-app "Check for updates".
 - **Cask channel**: submit to homebrew-cask once the app meets notability requirements (GitHub stars/press); until then, self-hosted tap `juan/tap` so `brew install --cask cellar` works day one. Sparkle auto-update disabled-by-prompt when installed via cask? No — casks and Sparkle coexist fine; mark cask `auto_updates true` so `brew upgrade` skips it by default.
@@ -209,7 +209,7 @@ OSV/NVD clients + CVE matching engine (fixture-tested); Security view with sever
 Health dashboard + score; pre-install cask inspection; release notes preview; Brewfile import/export; bulk operations polish; Discover tab. *Exit: full TapHouse feature parity (brew-only scope).*
 
 **M6 — Ship**
-Menu bar extra; background checks + notifications (SMAppService); Settings; Spanish localization; accessibility pass; Sparkle integration; CI signing/notarization pipeline; self-hosted tap; landing page; tip jar. *Exit: 1.0 public release.*
+Menu bar extra; background checks + notifications (SMAppService); Settings; Spanish localization; accessibility pass; Sparkle integration; CI signing/notarization pipeline; self-hosted tap; landing page. (Tip jar was M6's first slice — built, then removed by decision; §6.) *Exit: 1.0 public release.*
 
 ---
 
@@ -231,7 +231,7 @@ Menu bar extra; background checks + notifications (SMAppService); Settings; Span
 ## 9. Open questions
 
 1. Final name + icon direction (Cellar! proposed; verify no trademark/App-name conflicts at registration time).
-2. ~~Tip jar provider (GitHub Sponsors vs Ko-fi vs Stripe Payment Link).~~ **Closed at M6**: none of them. The tip jar is a StoreKit 2 consumable, `com.juancasanueva.cellar.tip`, and guideline 3.1.1 forbids shipping an external payment route alongside it. The question that replaces it is **not** which provider but whether the Mac App Store channel is viable at all — tracked as U22, an M6 follow-up.
+2. ~~Tip jar provider~~ — **resolved at M6: none.** StoreKit was built then removed after the U22 spike measured MAS infeasible, and the maintainer declined external links (§6).
 3. Whether M4's CVE scanner should also cover casks (OSV coverage for GUI apps is sparse — likely formulae-only in v1, casks later).
 4. Treemap visualization for disk usage — v1 stretch or v1.1.
 5. `brew doctor` parsing depth: raw output vs structured grouping (start raw, iterate).

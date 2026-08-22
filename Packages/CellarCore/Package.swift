@@ -12,8 +12,7 @@ let package = Package(
         .library(name: "BrewClient", targets: ["BrewClient"]),
         .library(name: "SecurityKit", targets: ["SecurityKit"]),
         .library(name: "ReleaseNotes", targets: ["ReleaseNotes"]),
-        .library(name: "Persistence", targets: ["Persistence"]),
-        .library(name: "TipJar", targets: ["TipJar"])
+        .library(name: "Persistence", targets: ["Persistence"])
     ],
     targets: [
         // Test-only helpers shared by the three test targets (design D9, M2-0 D5).
@@ -133,33 +132,6 @@ let package = Package(
         .testTarget(
             name: "PersistenceTests",
             dependencies: ["Persistence", "CellarTestSupport"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
-        ),
-        // The tip jar, and the one target in this package with **zero
-        // dependencies** stated as a build-graph fact rather than a convention
-        // (design D-A). It cannot see `BrewProcess`, so a tip can never spawn a
-        // `brew` process; it cannot see `Catalog` or `SecurityKit`, so it has no
-        // egress; it cannot see `Persistence`, so it holds no SwiftData and no
-        // container. What it owns is the whole rule set — catalog to
-        // availability, purchase to outcome, outcome to gratitude — behind three
-        // `Sendable` protocol seams the app target conforms.
-        //
-        // StoreKit is deliberately absent: `Product` and `Transaction` never
-        // cross into `CellarCore`, so `swift test` links no payment framework
-        // and every outcome this capability names is reachable from a fake.
-        //
-        // **Nothing depends back on it** (the `ReleaseNotes` precedent), which is
-        // what makes the whole capability one `git revert` away: deleting these
-        // three declarations plus `Sources/TipJar/` and `Tests/TipJarTests/`
-        // changes no other target's dependency list.
-        .target(
-            name: "TipJar",
-            dependencies: [],
-            swiftSettings: [.swiftLanguageMode(.v6)]
-        ),
-        .testTarget(
-            name: "TipJarTests",
-            dependencies: ["TipJar", "CellarTestSupport"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
