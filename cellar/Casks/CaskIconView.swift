@@ -37,6 +37,10 @@ struct CaskIconView: View {
                     .scaledToFit()
                     .frame(width: size * 0.8, height: size * 0.8)
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.18, style: .continuous))
+            } else if !loadsRemote {
+                // Only the formula pages pass `loadsRemote: false`, so this
+                // branch is the formula artwork, not a cask fallback.
+                FormulaIconTile(size: size * 0.8)
             } else {
                 PackageTile(
                     name: token,
@@ -77,6 +81,8 @@ struct PackageIconTile: View {
                 isKnownToken: assets?.isKnownIconToken(id.name) ?? false,
                 iconLoader: iconLoader
             )
+        } else if id.kind == .formula {
+            FormulaIconTile(size: size)
         } else {
             PackageTile(
                 name: id.name,
@@ -85,5 +91,20 @@ struct PackageIconTile: View {
                 cornerRadius: cornerRadius
             )
         }
+    }
+}
+
+/// Every formula wears the same face: the `formula` asset, drawn at the tile's
+/// size. Formulae have no upstream artwork registry — CaskFlow and App-Fair are
+/// cask-app catalogs — so one shared image is the designed answer, not a
+/// placeholder awaiting a pipeline.
+struct FormulaIconTile: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image("formula")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
     }
 }
