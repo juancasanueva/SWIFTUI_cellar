@@ -312,8 +312,57 @@ struct ReleaseMetadataTests {
         #expect(!value.isEmpty)
     }
 
+    // MARK: - 5.1 T17b — the cost of not bumping the project file is written down
+
+    /// S8: the tag is the version, so a local archive reports `1.0.0 (1)`
+    /// forever — and the About window will show exactly that.
+    ///
+    /// That is a deliberate trade, not an oversight, and the spec refuses to let
+    /// it stay an undocumented trap for manual testing: the fact and the exact
+    /// one-line override that corrects it must both be in the repository. The
+    /// assertion is on the override *line*, not on two loose substrings, because
+    /// a reader who has to assemble the command from two paragraphs has not been
+    /// given a command.
+    @Test("The runbook records the 1.0.0 (1) fact and the override that corrects it")
+    func runbookRecordsTheVersionPolicyAndItsOverride() throws {
+        let runbook = try ReleasePipelineSources.text(ReleaseMetadataTests.runbookFile)
+
+        #expect(runbook.contains("1.0.0 (1)"))
+
+        let overrides = runbook
+            .split(separator: "\n")
+            .filter { $0.contains("MARKETING_VERSION=") && $0.contains("CURRENT_PROJECT_VERSION=") }
+        #expect(!overrides.isEmpty, "the runbook must carry a single-line build-time version override")
+    }
+
+    // MARK: - 5.2 T18 — the entitlements rationale names what is absent
+
+    /// S12: the PRD's standing obligation, discharged in the repository.
+    ///
+    /// An absent entitlement leaves no trace anywhere — not in the project file,
+    /// not in the signature, not in a diff — so the only way it can be reviewed
+    /// is if the reason for its absence is written down. All five names are
+    /// asserted literally: the three that must never be added, and the two
+    /// sandbox-era settings that sit inert beside a disabled sandbox and would
+    /// come alive the moment an entitlements file appeared.
+    @Test("The runbook names every entitlement that is deliberately absent")
+    func runbookNamesTheAbsentEntitlements() throws {
+        let runbook = try ReleasePipelineSources.text(ReleaseMetadataTests.runbookFile)
+
+        for name in [
+            "allow-jit",
+            "allow-unsigned-executable-memory",
+            "disable-library-validation",
+            "ENABLE_USER_SELECTED_FILES",
+            "REGISTER_APP_GROUPS"
+        ] {
+            #expect(runbook.contains(name), "the entitlements rationale must name \(name)")
+        }
+    }
+
     private static let copyright = "Copyright © 2026 Juan Casanueva. All rights reserved."
     private static let catalogFile = "cellar/InfoPlist.xcstrings"
+    private static let runbookFile = "RELEASING.md"
 }
 
 /// Where the release infrastructure lives.

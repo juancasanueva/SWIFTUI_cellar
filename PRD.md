@@ -6,7 +6,7 @@
 |---|---|
 | **Platform** | macOS 26 Tahoe+, Apple Silicon only (arm64) |
 | **Stack** | Swift 6.x, SwiftUI (Liquid Glass design system), SwiftData, local SPM core package (`CellarCore`) |
-| **Distribution** | Direct download (Developer ID + notarized, Sparkle updates) **and** Homebrew cask |
+| **Distribution** | Direct download, delivered by CI (`.github/workflows/release.yml`: Developer ID + notarized, on `v*` tags — see [`RELEASING.md`](RELEASING.md)); Sparkle updates pending `m6-sparkle-updates` **and** Homebrew cask |
 | **Monetization** | Free, ad-free, no tip jar (decision at M6 — §6) |
 | **Backend** | None. Talks only to the local `brew` binary, formulae.brew.sh, GitHub API, and OSV/NVD CVE feeds |
 | **Reference product** | TapHouse 1.5 (feature parity target, brew-only scope) |
@@ -154,7 +154,7 @@ Cellar.xcodeproj
 - **Installed state.** `brew info --installed --json=v2` as the authoritative snapshot; refreshed after every mutation and on window focus (debounced). File-system watcher (DispatchSource) on the Cellar/Caskroom to catch CLI-side changes while the app is open.
 - **CVE matching.** OSV batch endpoint with `{package name, version}`; enrich with NVD CVSS where missing. Cache per (name, version) with TTL. All matching logic pure + unit-tested against fixture responses.
 - **Persistence (SwiftData).** Models: `PackageMeta` (favorites, notes), `Snooze`, `HistoryEntry`, `DismissedCVE`, `Settings`. No CloudKit in v1 (data is machine-specific).
-- **Sandbox: off.** Hardened runtime on, sandbox off (required to exec brew). Entitlements kept minimal; document why in-repo for notarization sanity.
+- **Sandbox: off.** Hardened runtime on, sandbox off (required to exec brew). Entitlements kept minimal; document why in-repo for notarization sanity. **Obligation discharged (M6):** the rationale lives in [`RELEASING.md`](RELEASING.md) §6 — no `.entitlements` file exists in the repository, `allow-jit` / `allow-unsigned-executable-memory` / `disable-library-validation` are deliberately absent because brew is spawned as a separate process, and the section quotes real `codesign` output rather than asserting a belief.
 - **Concurrency.** Swift 6 language mode with strict concurrency; `@Observable` view models; all Process and disk-size work off the main actor. macOS 26 minimum means the latest SwiftUI/SwiftData APIs can be used unconditionally — no `#available` branches anywhere.
 
 ### 4.3 External services (all optional to core operation)
@@ -165,7 +165,7 @@ Cellar.xcodeproj
 | api.osv.dev | CVE data (primary) | none |
 | services.nvd.nist.gov | CVSS enrichment, advisory links | none (rate-limited; API key optional in Settings) |
 | api.github.com | Release notes | none (60 req/h unauthenticated; optional PAT in Settings) |
-| Cellar! update feed | Sparkle appcast (static XML on GitHub Pages/Releases) | none |
+| Cellar! update feed | Sparkle appcast (static XML on GitHub Pages/Releases) — the release **asset URL scheme** now exists (`RELEASING.md` §7); the appcast host decision moves to `m6-sparkle-updates` | none |
 
 Failure of any external service degrades gracefully (feature shows cached/empty state; core brew operations unaffected).
 
@@ -184,7 +184,7 @@ Failure of any external service degrades gracefully (feature shows cached/empty 
 ## 6. Monetization & distribution
 
 - **Tip jar — removed (M6 final decision).** The history, kept because each step was reasoned: this line originally chose external links (GitHub Sponsors / Ko-fi / Stripe) because StoreKit is unavailable outside the App Store — which is true. At M6 a $0.99 StoreKit consumable was built, verified and merged (PR #55) under a Mac App Store pivot. The U22 feasibility spike then *measured* what the original reasoning assumed: MAS is infeasible for Cellar — the App Sandbox denies `file-read-data` on `/opt/homebrew` before brew can exec (kernel-level, not reviewable), Guidelines 2.5.2/2.4.5 forbid installing executable code, and no Homebrew GUI exists on MAS. Offered the external-links fallback, the maintainer chose **no tip jar at all**: Cellar is free, with no payment surface of any kind. The StoreKit implementation was reverted in the same decision; its SDD archive (with the U22 report) remains at `openspec/changes/archive/2026-08-22-m6-tip-jar/`.
-- **Signing**: Developer ID Application cert, hardened runtime, notarization via `notarytool` in CI (GitHub Actions on tags).
+- **Signing — implemented (M6).** Developer ID Application certificate, hardened runtime, notarization via `notarytool` with an App Store Connect API key, from GitHub Actions on `v*` tags. arm64-only, published as `Home-Cellar-<version>.zip`. Runbook, prerequisites and version policy: [`RELEASING.md`](RELEASING.md).
 - **Sparkle 2**: EdDSA-signed appcast hosted on GitHub Pages; delta updates later. In-app "Check for updates".
 - **Cask channel**: submit to homebrew-cask once the app meets notability requirements (GitHub stars/press); until then, self-hosted tap `juan/tap` so `brew install --cask cellar` works day one. Sparkle auto-update disabled-by-prompt when installed via cask? No — casks and Sparkle coexist fine; mark cask `auto_updates true` so `brew upgrade` skips it by default.
 - **Website**: single static landing page (download, screenshots, privacy). No analytics beyond server logs.
@@ -209,7 +209,7 @@ OSV/NVD clients + CVE matching engine (fixture-tested); Security view with sever
 Health dashboard + score; pre-install cask inspection; release notes preview; Brewfile import/export; bulk operations polish; Discover tab. *Exit: full TapHouse feature parity (brew-only scope).*
 
 **M6 — Ship**
-Menu bar extra; background checks + notifications (SMAppService); Settings; Spanish localization; accessibility pass; Sparkle integration; CI signing/notarization pipeline; self-hosted tap; landing page. (Tip jar was M6's first slice — built, then removed by decision; §6.) *Exit: 1.0 public release.*
+Menu bar extra; background checks + notifications (SMAppService); Settings; Spanish localization; accessibility pass; Sparkle integration; CI signing/notarization pipeline; self-hosted tap; landing page. (Tip jar was M6's first slice — built, then removed by decision; §6. The CI signing/notarization pipeline landed as M6's second slice — `RELEASING.md`.) *Exit: 1.0 public release.*
 
 ---
 
@@ -221,10 +221,10 @@ Menu bar extra; background checks + notifications (SMAppService); Settings; Span
 | CVE false positives (name-based matching) | User distrust | Conservative matching, explicit "reported for" language, per-CVE dismiss, link to source |
 | Long `brew upgrade` runs blocking UX expectations | Perceived hangs | Streaming logs, cancel, queue visibility, notifications on completion |
 | NVD/GitHub rate limits | Missing enrichment | Aggressive caching, optional user API keys, OSV as primary |
-| Notarization + no-sandbox friction | Release delays | Set up CI pipeline in M1, not M6; test notarized builds early |
+| Notarization + no-sandbox friction | Release delays | The "set up CI in M1" mitigation was **not** taken; the debt was absorbed at M6 instead. Residual risk is notarization latency, mitigated by `--wait` and by gating every check before the publish step, so a slow or rejected submission delays a release rather than shipping a broken one |
 | Cask notability rejection | Discoverability | Self-hosted tap from day one; pursue main tap post-traction |
 | TapHouse similarity | Perception | Clone features, not assets/copy/name; original icon, UI layout, and text throughout |
-| macOS 26+ / arm64-only floor excludes Sonoma–Sequoia and all Intel users (TapHouse supports 14+ Universal) | Smaller addressable market at launch | Accepted trade-off for a single modern codebase and simpler CI; brew users skew current hardware; Tahoe's Intel base is ~4 legacy models anyway |
+| macOS 26+ / arm64-only floor excludes Sonoma–Sequoia and all Intel users (TapHouse supports 14+ Universal) | Smaller addressable market at launch | Accepted trade-off for a single modern codebase and simpler CI; brew users skew current hardware; Tahoe's Intel base is ~4 legacy models anyway. **`ARCHS = arm64` is now pinned (M6):** the arm64-only claim was being contradicted by the build — Cellar was shipping universal (`x86_64 arm64`) by accident until the pin landed |
 
 ---
 
