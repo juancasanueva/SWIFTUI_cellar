@@ -152,4 +152,67 @@ struct ReleaseMetadataTests {
             #expect(blocks.filter { $0.contains(setting) }.count == 2, "\(setting) must hold in both blocks")
         }
     }
+
+    // MARK: - 2.1 T9 — the string catalog is the single authority for the copyright
+
+    /// S29: the value lives in the catalog, and the build setting carries no
+    /// competing one.
+    ///
+    /// Two sources for one key drift. `LOCALIZATION_PREFERS_STRING_CATALOGS` is
+    /// already `YES` and the catalog already owns both bundle-name keys, so the
+    /// copyright joins them there. `INFOPLIST_KEY_NSHumanReadableCopyright`
+    /// stays empty — measured, an empty `INFOPLIST_KEY_*` value is dropped from
+    /// the generated Info.plist rather than emitted, so the empty setting is not
+    /// a second, quieter authority.
+    @Test("The string catalog carries the copyright and the build setting does not")
+    func stringCatalogIsTheOnlyCopyrightAuthority() throws {
+        let data = try Data(contentsOf: ReleasePipelineSources.url(ReleaseMetadataTests.catalogFile))
+        let catalog = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let strings = try #require(catalog["strings"] as? [String: Any])
+        let copyright = try #require(strings["NSHumanReadableCopyright"] as? [String: Any])
+        let localizations = try #require(copyright["localizations"] as? [String: Any])
+        let english = try #require(localizations["en"] as? [String: Any])
+        let unit = try #require(english["stringUnit"] as? [String: Any])
+
+        #expect(unit["value"] as? String == ReleaseMetadataTests.copyright)
+        #expect(unit["state"] as? String == "translated")
+
+        // The bundle-name keys the catalog already owned are still there: the
+        // copyright joined them rather than replacing the file's purpose.
+        #expect(strings["CFBundleDisplayName"] != nil)
+        #expect(strings["CFBundleName"] != nil)
+
+        let blocks = try ReleasePipelineSources.appTargetBuildConfigurationBlocks()
+        #expect(blocks.count == 2)
+        for block in blocks {
+            let declared = block
+                .split(separator: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { $0.hasPrefix("INFOPLIST_KEY_NSHumanReadableCopyright") }
+            #expect(declared == ["INFOPLIST_KEY_NSHumanReadableCopyright = \"\";"])
+        }
+    }
+
+    // MARK: - 2.2 T10 — the delivered bundle reports it
+
+    /// S28: what the Finder inspector and the About window actually read.
+    ///
+    /// `localizedInfoDictionary` is pinned deliberately and must never fall back
+    /// to `infoDictionary`: catalog-sourced keys land in the compiled
+    /// `InfoPlist.strings`, and the raw key was measured **absent** from the
+    /// generated Info.plist, so a fallback would assert on a key that does not
+    /// exist and pass for the wrong reason.
+    @Test("The app bundle reports the human-readable copyright")
+    func bundleReportsCopyright() throws {
+        let localized = try #require(Bundle.main.localizedInfoDictionary)
+        let value = try #require(localized["NSHumanReadableCopyright"] as? String)
+
+        #expect(value == ReleaseMetadataTests.copyright)
+        #expect(!value.isEmpty)
+    }
+
+    private static let copyright = "Copyright © 2026 Juan Casanueva. All rights reserved."
+    private static let catalogFile = "cellar/InfoPlist.xcstrings"
 }
