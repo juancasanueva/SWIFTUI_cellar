@@ -331,15 +331,21 @@ struct CaskZapInventoryTests {
 
         // The unambiguous form, because an unqualified token can later be
         // claimed by another tap, and the bundle the install actually places.
+        //
+        // `Home-Cellar.app`, case-sensitively and in full. This must never be
+        // relaxed to a case-insensitive comparison or a shorter substring:
+        // `"Home-Cellar.app"` contains `"Cellar.app"` but not `"cellar.app"`, so
+        // a widened assertion would pass on a README that still documented the
+        // old name. The capital `C` is the assertion.
         #expect(readme.contains("juancasanueva/cellar/home-cellar"))
-        #expect(readme.contains("cellar.app"))
+        #expect(readme.contains("Home-Cellar.app"))
     }
 
-    /// A direct-download copy already sits at `/Applications/cellar.app` for
-    /// every user who installed before the tap existed, and for every user who
-    /// dragged the zip. `brew install --cask home-cellar` refuses to overwrite
-    /// an app it did not place, so the README must hand those users the exact
-    /// adopt command as a whole line, not a flag mentioned in prose.
+    /// A copy dragged out of the downloaded zip already sits at
+    /// `/Applications/Home-Cellar.app`, under the same name the cask installs.
+    /// `brew install --cask home-cellar` refuses to overwrite an app it did not
+    /// place, so the README must hand those users the exact adopt command as a
+    /// whole line, not a flag mentioned in prose.
     @Test("The README tells direct-download users how brew adopts an existing copy")
     func theReadmeCarriesTheAdoptCommandAsAWholeLine() throws {
         let readme = try CaskZapSources.text(CaskZapSources.readmePath)
