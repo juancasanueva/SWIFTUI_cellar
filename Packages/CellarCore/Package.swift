@@ -12,7 +12,8 @@ let package = Package(
         .library(name: "BrewClient", targets: ["BrewClient"]),
         .library(name: "SecurityKit", targets: ["SecurityKit"]),
         .library(name: "ReleaseNotes", targets: ["ReleaseNotes"]),
-        .library(name: "Persistence", targets: ["Persistence"])
+        .library(name: "Persistence", targets: ["Persistence"]),
+        .library(name: "Updates", targets: ["Updates"])
     ],
     targets: [
         // Test-only helpers shared by the three test targets (design D9, M2-0 D5).
@@ -114,6 +115,32 @@ let package = Package(
         .testTarget(
             name: "ReleaseNotesTests",
             dependencies: ["ReleaseNotes", "CellarTestSupport"],
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // What Cellar owns about updating itself: version comparison, appcast
+        // validation, the last-checked wording, the `AppUpdating` seam and the two
+        // launch/menu decisions.
+        //
+        // It declares **no `dependencies:` key at all**, and the absence *is* the
+        // guarantee: "the updater cannot reach Homebrew, the package catalog,
+        // SwiftData or the network" is a fact of the build graph rather than a
+        // review comment, exactly as `ReleaseNotes` buys with `Catalog` alone.
+        // `dependencies: []` would be equally isolated today and would read as an
+        // invitation tomorrow, so the key is absent rather than empty — and
+        // `UpdatePackageManifestTests` fails if it ever arrives.
+        //
+        // Nothing depends back on it either, which is what keeps the whole
+        // capability one `git revert` away.
+        .target(
+            name: "Updates",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // No `CellarTestSupport`: these tests need no clock and no polling helper,
+        // only literal values and hand-authored XML fixtures.
+        .testTarget(
+            name: "UpdatesTests",
+            dependencies: ["Updates"],
             resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
