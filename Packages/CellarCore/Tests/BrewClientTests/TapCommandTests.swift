@@ -112,4 +112,76 @@ struct TapCommandTests {
         #expect(request.command.arguments == ["tap", "acme/tools"])
         #expect(request.displayCommand == "brew tap acme/tools")
     }
+
+    // MARK: - TM13 — trust is granted and revoked only by an explicit answer
+
+    /// TM13 :500-506. Two literal verbs plus the validated tap identity, and
+    /// nothing else: no kind flag, no package position, no interpolation. Trust
+    /// is a property of a **tap**, so `packageID` is `nil` for both — which is
+    /// also what keeps a qualified package token out of these argvs by
+    /// construction rather than by review.
+    @Test("Trust and untrust lower to literal argv and carry no package identity")
+    func trustAndUntrustLowerToLiteralArgv() throws {
+        let trust = try #require(TapCommand.trust("acme/tools"))
+        let untrust = try #require(TapCommand.untrust("acme/tools"))
+
+        #expect(trust.arguments == ["trust", "acme/tools"])
+        #expect(untrust.arguments == ["untrust", "acme/tools"])
+        #expect(trust.verb == "tapTrust")
+        #expect(untrust.verb == "tapUntrust")
+        #expect(trust.packageID == nil)
+        #expect(untrust.packageID == nil)
+        #expect(trust.displayCommand == "brew trust acme/tools")
+        #expect(untrust.displayCommand == "brew untrust acme/tools")
+
+        // No kind flag and no extra token, in either direction.
+        for command in [trust, untrust] {
+            #expect(command.arguments.count == 2)
+            #expect(command.arguments.contains("--formula") == false)
+            #expect(command.arguments.contains("--cask") == false)
+            #expect(command.arguments.dropFirst() == ["acme/tools"])
+        }
+
+        // The same gate every tap target passes; a hostile target builds nothing.
+        for hostile in ["", " acme/tools", "acme/tools/extra", "https://example.com/a.git"] {
+            #expect(TapCommand.trust(hostile) == nil)
+            #expect(TapCommand.untrust(hostile) == nil)
+        }
+    }
+
+    /// TM13 :482-494, PM3 :253-268. A grant lets Homebrew load and run
+    /// third-party code as the user, so it is confirmed. A revocation only
+    /// *reduces* authority, so it is not — and presenting it as destructive
+    /// would teach the user to dismiss the sheet that matters.
+    ///
+    /// Both invalidate installed inventory as well as taps, because a trust
+    /// change is exactly what makes `brew info --installed` start or stop
+    /// reporting a package's `tap` (obs #7724).
+    @Test("Only the grant is confirmed, and both invalidate installed inventory")
+    func onlyTheGrantIsConfirmedAndBothInvalidateInstalledInventory() throws {
+        let tap = try #require(TapName("acme/tools"))
+        let trust = try #require(TapCommand.trust("acme/tools"))
+        let untrust = try #require(TapCommand.untrust("acme/tools"))
+
+        #expect(trust.requiresConfirmation)
+        #expect(untrust.requiresConfirmation == false)
+        // PM3 :253 — the grant carries the typed grant disclosure, not the add's.
+        #expect(trust.disclosure == .tapTrustGrant(tap))
+        #expect(trust.disclosure != .tapAdd(tap))
+        // PM3 :262 — the revocation passes the gate without a confirmation, so
+        // whatever it would have shown is never presented. WU5's `unit 8` pins
+        // that it declares nothing of its own.
+
+        #expect(trust.invalidates == [.taps, .installedInventory])
+        #expect(untrust.invalidates == [.taps, .installedInventory])
+        // Neither touches a keg or a caskroom, so neither remeasures disk.
+        #expect(trust.diskAreas.isEmpty)
+        #expect(untrust.diskAreas.isEmpty)
+
+        // The control: the two commands that do *not* refresh the inventory
+        // still do not, so this is a statement about trust rather than about
+        // every tap command.
+        #expect(try #require(TapCommand.add("acme/tools")).invalidates == .taps)
+        #expect(try #require(TapCommand.untap("acme/tools")).invalidates == .taps)
+    }
 }

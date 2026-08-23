@@ -46,7 +46,7 @@ struct TapsListView: View {
                                 // the detail header also reads, so the two
                                 // surfaces cannot drift (TM12).
                                 if let badge = TapProjection.trust(for: tap).badge {
-                                    TapTrustBadge(text: badge)
+                                    TapTrustBadge(text: badge, identifier: "tap-row-trust-badge")
                                 }
                             }
                             Text(TapProjection.packageSummary(for: tap))

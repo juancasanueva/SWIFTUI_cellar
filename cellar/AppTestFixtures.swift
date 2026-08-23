@@ -29,6 +29,14 @@ enum AppTestFixtures {
             || arguments.contains("--ui-testing-m5-brewfile")
             || arguments.contains("--ui-testing-m5-health")
             || arguments.contains("--ui-testing-m6-updates")
+            || arguments.contains("--ui-testing-m7-tap-trust")
+    }
+
+    /// A launch whose tap snapshot carries one tap in each of TM12's three trust
+    /// states, so the control-visibility rule is reachable from a launch without
+    /// depending on what this Mac has tapped.
+    nonisolated static var isTapTrustEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m7-tap-trust")
     }
 
     // MARK: - M6 Updates
@@ -344,6 +352,13 @@ struct AppTestTapPayloadSource: TapPayloadSourcing {
                 throw .malformedJSON
             }
         case .standard, .absent, .warning:
+            if AppTestFixtures.isTapTrustEnabled {
+                // One tap per trust state, including the tap that reports no
+                // `trusted` key at all — the Homebrew < 6 shape.
+                return Data(
+                    #"[{"name":"acme/untrusted","user":"acme","repo":"untrusted","formula_names":["acme/untrusted/widget"],"cask_tokens":[],"trusted":false},{"name":"acme/trusted","user":"acme","repo":"trusted","formula_names":["acme/trusted/gadget"],"cask_tokens":[],"trusted":true},{"name":"acme/unreported","user":"acme","repo":"unreported","formula_names":["acme/unreported/helper"],"cask_tokens":[]}]"#.utf8
+                )
+            }
             return Data(
                 #"[{"name":"homebrew/core","repo":"homebrew-core","formula_names":[],"cask_tokens":[]},{"name":"homebrew/cask","repo":"homebrew-cask","formula_names":[],"cask_tokens":[]},{"name":"acme/tools","user":"acme","repo":"tools","remote":"https://example.com/acme/tools","formula_names":["acme/tools/widget"],"cask_tokens":["widget-app"],"last_commit":"2026-08-04"}]"#.utf8
             )

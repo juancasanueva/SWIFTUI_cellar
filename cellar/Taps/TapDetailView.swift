@@ -51,7 +51,7 @@ struct TapDetailView: View {
                         .textSelection(.enabled)
                     // Same projection as the list row, by construction (TM12).
                     if let badge = TapProjection.trust(for: tap).badge {
-                        TapTrustBadge(text: badge)
+                        TapTrustBadge(text: badge, identifier: "tap-detail-trust-badge")
                     }
                 }
                 HStack(spacing: 9) {
@@ -66,6 +66,29 @@ struct TapDetailView: View {
             }
             .padding(.top, 3)
             Spacer(minLength: 12)
+            // TM12 :421-430 — badge and controls come from one projection, so
+            // the row and this header cannot drift, and an `unreported` tap
+            // reaches neither branch and therefore builds nothing.
+            if TapProjection.trust(for: tap).canGrant {
+                Button("Trust") { grantTrust(tap) }
+                    .buttonStyle(TapActionButtonStyle(
+                        fill: Theme.controlFillLoud,
+                        text: Theme.textPrimary
+                    ))
+                    .disabled(!operations.isAvailable)
+                    .accessibilityIdentifier("tap-trust-button")
+                    .padding(.top, 6)
+            }
+            if TapProjection.trust(for: tap).canRevoke {
+                Button("Untrust") { revokeTrust(tap) }
+                    .buttonStyle(TapActionButtonStyle(
+                        fill: Theme.controlFill,
+                        text: Theme.textPrimary
+                    ))
+                    .disabled(!operations.isAvailable)
+                    .accessibilityIdentifier("tap-untrust-button")
+                    .padding(.top, 6)
+            }
             Button("Untap") { untap(tap) }
                 .buttonStyle(TapActionButtonStyle(
                     fill: Theme.dangerTint(0.12),
@@ -186,6 +209,14 @@ struct TapDetailView: View {
                         .foregroundStyle(Theme.textMono)
                 }
             }
+            if TapProjection.trust(for: tap).canGrant {
+                Text("Homebrew withholds which packages came from this tap while it is untrusted, so Force Untap is unavailable. Trust the tap to see them, or use Untap.")
+                    .font(.system(size: 11.5))
+                    .lineSpacing(2)
+                    .foregroundStyle(Theme.textBody)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("tap-withheld-footer")
+            }
             Text("Third-party taps are arbitrary code from GitHub, run with your user's permissions. Add ones you trust.")
                 .font(.system(size: 11.5))
                 .lineSpacing(2)
@@ -229,6 +260,19 @@ struct TapDetailView: View {
         )
     }
 
+    /// A grant lets Homebrew load and run this tap's code as the user, so it
+    /// goes through the confirmation gate. A revocation only reduces authority,
+    /// so it does not (TM13 :482-488) — the asymmetry is the requirement.
+    private func grantTrust(_ tap: TapRecord) {
+        guard let command = TapCommand.trust(tap.name) else { return }
+        _ = operations.request(command)
+    }
+
+    private func revokeTrust(_ tap: TapRecord) {
+        guard let command = TapCommand.untrust(tap.name) else { return }
+        operations.submit(command)
+    }
+
     private func untap(_ tap: TapRecord) {
         guard let command = TapCommand.untap(tap.name) else { return }
         operations.submit(command)
@@ -249,12 +293,21 @@ struct TapDetailView: View {
 /// the words would be a second place for them to disagree.
 struct TapTrustBadge: View {
     let text: String
+    /// Distinct per surface. The row and the header render the **same**
+    /// projection, so a single identifier resolves to two elements the moment a
+    /// badged tap is selected — and an assertion that a badge is absent from the
+    /// header would then be answered by the row that is still on screen.
+    let identifier: String
 
     var body: some View {
+        // Deliberately not uppercased. TM12 :422 pins the badge copy exactly,
+        // and `.textCase(.uppercase)` changes what the user reads even though
+        // the projection handed over the pinned string unaltered. The copy
+        // itself is deliberately not repeated here, in a comment or anywhere
+        // else: this view may render the projection and may not restate it.
         Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .kerning(0.5)
-            .textCase(.uppercase)
+            .font(.system(size: 9.5, weight: .semibold))
+            .kerning(0.3)
             .foregroundStyle(Theme.dangerText)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -262,7 +315,7 @@ struct TapTrustBadge: View {
                 Theme.dangerTint(0.18),
                 in: RoundedRectangle(cornerRadius: 4, style: .continuous)
             )
-            .accessibilityIdentifier("tap-trust-badge")
+            .accessibilityIdentifier(identifier)
     }
 }
 

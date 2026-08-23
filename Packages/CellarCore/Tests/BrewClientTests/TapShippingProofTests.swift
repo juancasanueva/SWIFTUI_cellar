@@ -87,29 +87,110 @@ struct TapShippingProofTests {
         let installed = try installedInventory()
         var commands: [TapCommand] = []
 
+        // TM11 :392-398 — the enumerated surface, in the order the requirement
+        // lists it. It grows to eight deliberately (R9): a pinned set that fails
+        // loudly the day a capability appears is the whole point of pinning it.
         #expect(TapManagementAction.allCases.map(\.rawValue) == [
             "refresh", "filter", "Installed handoff", "canonical add", "plain untap",
-            "eligible force untap"
+            "eligible force untap", "trust", "untrust"
         ])
         for action in TapManagementAction.allCases {
-            if let command = try await exercise(action, store: store, installed: installed) {
-                commands.append(command)
-            }
+            commands.append(contentsOf: try await exercise(action, store: store, installed: installed))
         }
 
         #expect(launcher.specs.map(\.arguments) == [["tap-info", "--installed", "--json"]])
         #expect(commands.map(\.arguments) == [
             ["tap", "other/home"],
             ["untap", "acme/tools"],
-            ["untap", "--force", "acme/tools"]
+            ["untap", "--force", "acme/tools"],
+            ["trust", "acme/tools"],
+            ["untrust", "acme/tools"]
         ])
         #expect(commands.map(\.invalidates) == [
             .taps,
             .taps,
-            [.taps, .installedInventory, .diskUsage]
+            [.taps, .installedInventory, .diskUsage],
+            [.taps, .installedInventory],
+            [.taps, .installedInventory]
         ])
         #expect(commands.allSatisfy { $0.packageID == nil })
         try assertBoundedUIControls()
+    }
+
+    // MARK: - TM12 / TM11 — what the trust surface may and may not do
+
+    /// TM12 :444-450. A Homebrew with no trust concept reports nothing, and the
+    /// honest answer to "is this tap trusted?" is then silence — not a badge, not
+    /// a control, and above all not a `brew trust` that such a brew cannot run.
+    ///
+    /// The second half is the amended clause: TM7's revocation before removal is
+    /// **unconditional**, so untapping the very same tap is unaffected. The two
+    /// rules are about different things — a control the user presses, and a
+    /// command an action always submits.
+    @Test("An unreported tap offers no control and spawns nothing")
+    func anUnreportedTapOffersNoControlAndSpawnsNothing() async throws {
+        let launcher = RecordingProcessLauncher()
+        let center = OperationCenter(launcherFactory: { _ in launcher })
+        center.attach(installation: TestInstallation.appleSilicon)
+        // `trust` defaults to `.unreported`, which is exactly what a Homebrew
+        // that never sends the key produces.
+        let record = TapRecord(name: "acme/tools", repository: "tools")
+        let presentation = TapProjection.trust(for: record)
+
+        #expect(record.trust == .unreported)
+        #expect(presentation.badge == nil)
+        #expect(presentation.canGrant == false)
+        #expect(presentation.canRevoke == false)
+
+        // Invoking either control is what the view does when its gate is open:
+        // build the command, submit it. With both gates closed nothing is built,
+        // so nothing can be spawned.
+        var built: [TapCommand] = []
+        if presentation.canGrant, let grant = TapCommand.trust(record.name) { built.append(grant) }
+        if presentation.canRevoke, let revoke = TapCommand.untrust(record.name) { built.append(revoke) }
+        for command in built { _ = center.submit(command) }
+        await settle([])
+
+        #expect(built.isEmpty, "an unreported tap built a trust command")
+        #expect(launcher.specs.isEmpty, "an unreported tap's controls spawned a process")
+
+        // …while untapping the same tap is untouched by any of that.
+        let untap = center.submit(try #require(TapCommand.untap(record.name)))
+        await settle([untap])
+        #expect(launcher.specs.isEmpty == false, "the unconditional removal stopped being submitted")
+        #expect(launcher.specs.map(\.arguments).contains(["untap", "acme/tools"]))
+    }
+
+    /// TM11 :400-406. Showing a reported state and offering brew's own grant is
+    /// not tap security scanning. The line is drawn by vocabulary as much as by
+    /// behaviour: the moment this surface says a tap looks safe, or ranks one
+    /// above another, it has made a judgement it has no evidence for.
+    @Test("Trust is a reported state and a grant, never a verdict")
+    func trustIsAReportedStateAndAGrantNeverAVerdict() throws {
+        let record = TapRecord(name: "acme/tools", repository: "tools", trust: .untrusted)
+
+        // Everything presented is either the state brew reported…
+        let presentation = TapProjection.trust(for: record)
+        #expect(presentation.badge == "Untrusted")
+        // …or a control submitting brew's own grant or revocation, verbatim.
+        #expect(try #require(TapCommand.trust(record.name)).arguments == ["trust", "acme/tools"])
+        #expect(try #require(TapCommand.untrust(record.name)).arguments == ["untrust", "acme/tools"])
+
+        // And nothing anywhere in the surface inspects, scores or recommends.
+        var sources = try tapUISources()
+        sources.append(contentsOf: try coreTrustSources())
+        #expect(sources.count == 4, "the trust surface scan lost a file")
+        for source in sources {
+            for verdict in [
+                "score", "ranking", "recommend", "reputation", "verdict",
+                "suspicious", "malicious", "unsafe", "audit", "vetted", "reviewed"
+            ] {
+                #expect(
+                    source.code.localizedCaseInsensitiveContains(verdict) == false,
+                    "\(source.name) passes judgement on a tap's contents: \(verdict)"
+                )
+            }
+        }
     }
 
     // MARK: - TM12 — one projection, two surfaces
@@ -145,44 +226,61 @@ struct TapShippingProofTests {
         }
     }
 
+    /// Returns every command the action submits, in submission order — a list
+    /// rather than one optional command, because an action is not the same thing
+    /// as a command and TM7's removal is two of them.
     private func exercise(
         _ action: TapManagementAction,
         store: TapStore,
         installed: InstalledInventory
-    ) async throws -> TapCommand? {
+    ) async throws -> [TapCommand] {
         switch action {
         case .refresh:
             await store.refresh(using: TestInstallation.appleSilicon)
             #expect(store.state == .loaded)
-            return nil
+            return []
         case .filter:
             let packages = try packages(store: store, installed: installed)
             #expect(
                 TapProjection.filter(packages, query: "other", kind: .formula)
                     .map(\.displayName) == ["other"]
             )
-            return nil
+            return []
         case .installedHandoff:
             let packages = try packages(store: store, installed: installed)
             #expect(
                 packages.first(where: { $0.displayName == "widget" })?.installedHandoff
                     == PackageID(kind: .formula, name: "widget")
             )
-            return nil
+            return []
         case .canonicalAdd:
             let target = ["other", "home"].joined(separator: "/")
             guard let command = TapCommand.add(target) else {
                 Issue.record("canonical add was unavailable")
-                return nil
+                return []
             }
-            return command
+            return [command]
         case .plainUntap:
             let target = ["acme", "tools"].joined(separator: "/")
             guard let command = TapCommand.untap(target) else {
                 Issue.record("plain untap was unavailable")
-                return nil
+                return []
             }
-            return command
+            return [command]
+        case .trust:
+            let target = ["acme", "tools"].joined(separator: "/")
+            guard let command = TapCommand.trust(target) else {
+                Issue.record("trust was unavailable")
+                return []
+            }
+            return [command]
+        case .untrust:
+            let target = ["acme", "tools"].joined(separator: "/")
+            guard let command = TapCommand.untrust(target) else {
+                Issue.record("untrust was unavailable")
+                return []
+            }
+            return [command]
         case .eligibleForceUntap:
             let tap = try #require(TapName("acme/tools"))
             let affected = Set(
@@ -194,9 +292,9 @@ struct TapShippingProofTests {
                 isComplete: true
             )) else {
                 Issue.record("eligible force untap was unavailable")
-                return nil
+                return []
             }
-            return command
+            return [command]
         }
     }
 
@@ -211,6 +309,22 @@ struct TapShippingProofTests {
     private struct TapUISource {
         let name: String
         let code: String
+    }
+
+    private func coreTrustSources() throws -> [TapUISource] {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try ["TapProjection.swift", "TapCommand.swift"].map { file in
+            TapUISource(
+                name: file,
+                code: try String(
+                    contentsOf: root.appendingPathComponent("Sources/BrewClient/\(file)"),
+                    encoding: .utf8
+                )
+            )
+        }
     }
 
     private func tapUISources() throws -> [TapUISource] {
@@ -248,7 +362,7 @@ struct TapShippingProofTests {
             .joined(separator: "\n")
 
         #expect(try staticButtonLabels(in: tapUI) == [
-            "Add Tap", "Untap", "Force Untap", "Show in Installed"
+            "Add Tap", "Untap", "Force Untap", "Show in Installed", "Trust", "Untrust"
         ])
         #expect(tapUI.contains("Button {") == false, "an unenumerated dynamic tap button exists")
 
@@ -347,4 +461,6 @@ private enum TapManagementAction: String, CaseIterable, Sendable {
     case canonicalAdd = "canonical add"
     case plainUntap = "plain untap"
     case eligibleForceUntap = "eligible force untap"
+    case trust
+    case untrust
 }

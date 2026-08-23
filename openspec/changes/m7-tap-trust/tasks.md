@@ -257,53 +257,53 @@ and `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'plat
 `TapShippingProofTests` lives in `Packages/CellarCore/Tests/BrewClientTests/`, so it runs under
 `swift test`, **not** `xcodebuild`.
 
-- [ ] 4.1 **RED — unit 2a.** `TapCommandTests · trustAndUntrustLowerToLiteralArgv`:
+- [x] 4.1 **RED — unit 2a.** `TapCommandTests · trustAndUntrustLowerToLiteralArgv`:
       `["trust","acme/tools"]` / `["untrust","acme/tools"]`; verbs `tapTrust` / `tapUntrust`;
       `packageID == nil`; no kind flag and no extra token. **RED because** the cases do not exist.
       *(TM13.1)*
-- [ ] 4.2 **RED — unit 2b.** `TapCommandTests ·
+- [x] 4.2 **RED — unit 2b.** `TapCommandTests ·
       onlyTheGrantIsConfirmedAndBothInvalidateInstalledInventory`: `requiresConfirmation` true for
       `.trustTap` and false for `.untrustTap`; `invalidates == [.taps, .installedInventory]` for both.
       *(TM13.2, PM3.8, PM3.9)*
-- [ ] 4.3 **RED — unit 9.** `TapShippingProofTests`, two shipped cases updated deliberately (R9):
+- [x] 4.3 **RED — unit 9.** `TapShippingProofTests`, two shipped cases updated deliberately (R9):
       `:90` `TapManagementAction.allCases` grows **6 → 8** (`…, "trust", "untrust"`, in TM11's order)
       and the flattened argv/invalidation expectations at `:101-110` grow with it; `:194` the pinned
       `staticButtonLabels` set grows **4 → 6** to
       `["Add Tap","Untap","Force Untap","Show in Installed","Trust","Untrust"]`; `:197`'s `Button {`
       ban and the excluded-capability scan stay green untouched. The `exercise(_:store:installed:)`
       helper's return type becomes `[TapCommand]`. *(TM11.1)*
-- [ ] 4.4 **RED — unit 9b.** `TapShippingProofTests · anUnreportedTapOffersNoControlAndSpawnsNothing`:
+- [x] 4.4 **RED — unit 9b.** `TapShippingProofTests · anUnreportedTapOffersNoControlAndSpawnsNothing`:
       invoking both controls for an `unreported` tap builds and spawns nothing
       (`launcher.specs.isEmpty`), **while an untap of the same tap still submits its revocation**
       (the amended TM12 clause — spec amendment #2). *(TM12.2)*
-- [ ] 4.5 **RED — unit 9d.** `TapShippingProofTests · trustIsAReportedStateAndAGrantNeverAVerdict`:
+- [x] 4.5 **RED — unit 9d.** `TapShippingProofTests · trustIsAReportedStateAndAGrantNeverAVerdict`:
       everything the surface presents is either the reported state or a control submitting brew's own
       grant/revocation; no scoring, ranking or recommendation vocabulary appears. *(TM11.2)*
-- [ ] 4.6 **RED — unit 13.** `MutationRefreshReceiptTests ·
+- [x] 4.6 **RED — unit 13.** `MutationRefreshReceiptTests ·
       everyTapTerminalRefreshesItsDeclaredDomainsExactlyOnce`: **5 commands × 4 terminals** (success,
       failure, launch failure, cancellation before spawn) — taps ×1 each; installed inventory ×1 for
       trust, untrust and force untap and ×0 for add and plain untap; catalog ×0 everywhere. **RED
       because** TM9's enumeration is three commands today. *(TM9.2)*
-- [ ] 4.7 **RED — unit 10.** New file `cellarTests/TapCompositionTests.swift` ·
+- [x] 4.7 **RED — unit 10.** New file `cellarTests/TapCompositionTests.swift` ·
       `noPathGrantsTrustWithoutAnExplicitAnswer`: Add Tap raises exactly one `.tapAdd`; Trust exactly
       one `.tapTrustGrant`; **Untrust none**; Untap none; Force Untap exactly one `.forceUntap`. Extend
       `cellarTests/BrewfileCompositionTests.swift`: an import with `trusted:` on tap, brew and cask
       lines raises exactly one `.tapAdd` and submits **no** `trust` argv. `cellarTests/` is a
       `PBXFileSystemSynchronizedRootGroup`, so the new file needs **no** `project.pbxproj` edit.
       *(TM6.4, TM13.2, BF5.1, BF5.3, PM3.7, PM3.8, PM3.9)*
-- [ ] 4.8 **RED — unit 11.** New file `cellarUITests/TapTrustUITests.swift` (XCUITest, not Swift
+- [x] 4.8 **RED — unit 11.** New file `cellarUITests/TapTrustUITests.swift` (XCUITest, not Swift
       Testing) · `theTrustControlAppearsOnlyForAnUntrustedTap`: Trust present only for `.untrusted`,
       Untrust only for `.trusted`, neither for `.unreported`, badge text exactly `Untrusted`. *(TM12.3
       `e2e` half)*
-- [ ] 4.9 **Prove RED** across all three runners, then **GREEN**: `TapCommand.swift` gains
+- [x] 4.9 **Prove RED** across all three runners, then **GREEN**: `TapCommand.swift` gains
       `.trustTap` / `.untrustTap`, the `trust(_:)` / `untrust(_:)` factories, and their `arguments`,
       `verb`, `packageID`, `requiresConfirmation` and `invalidates` arms — design §2 verbatim, every
       argv a literal verb plus `tap.rawValue`.
-- [ ] 4.10 **GREEN.** `TapDetailView.swift`: `Button("Trust")` inline in the header and
+- [x] 4.10 **GREEN.** `TapDetailView.swift`: `Button("Trust")` inline in the header and
       `Button("Untrust")`, both string-literal form (DD-13 — `Button {` is banned at `:197`), gated on
       `TapTrustPresentation.canGrant` / `.canRevoke`. `ContentView.swift`: the two submission closures
       in the shipped `forceEvidence(for:)` `@MainActor` idiom (:538-551).
-- [ ] 4.11 All three runners green; **`MutationCommandTests:289` (unit 12) must still be green** —
+- [x] 4.11 All three runners green; **`MutationCommandTests:289` (unit 12) must still be green** —
       it is a regression guard that never goes red. Commit WU4.
 
 ## Phase 5: WU5 — revoke before removing, without downgrading a disclosure (TM7.2, .3; TM8.2; TM9.3; TM13.4; PM1.7–.10)

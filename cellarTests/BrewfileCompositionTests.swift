@@ -245,6 +245,53 @@ struct BrewfileCompositionTests {
         return store
     }
 
+    /// BF5 :61-85 and TM13 :517-523. `trusted: true` in a Brewfile is a claim
+    /// made by whoever wrote the file, and the importing user is a different
+    /// person. Cellar surfaces the claim and acts on none of it: the import
+    /// raises the ordinary **add** disclosure and submits no grant, on a tap
+    /// line, a brew line or a cask line alike.
+    static let trustClaimingBrewfile = """
+        brew "wget", trusted: true
+        cask "iterm2", trusted: true
+        tap "acme/tap", trusted: true
+        """
+
+    @MainActor
+    @Test("An import carrying trust claims raises one add disclosure and submits no grant")
+    func anImportCarryingTrustClaimsSubmitsNoGrant() async throws {
+        let launcher = CompositionLauncher()
+        let center = OperationCenter(launcherFactory: { _ in launcher })
+        center.attach(installation: AppTestFixtures.installation)
+        let store = try await Self.importedStore(Self.trustClaimingBrewfile)
+
+        let request = try #require(
+            BrewfileImportAction.apply(store, through: center),
+            "a tap-carrying import asked for no confirmation at all"
+        )
+
+        // Exactly one confirmation, and it is the **add** — not a grant.
+        let acme = try #require(TapName("acme/tap"))
+        #expect(request.disclosure == .tapAdd(acme))
+        #expect(request.disclosure != .tapTrustGrant(acme))
+        #expect(center.pendingConfirmation == request)
+
+        _ = center.confirm(request)
+        for _ in 0..<200 { await Task.yield() }
+
+        // The absence, over a real ledger: three lines claimed trust and not one
+        // `trust` argv exists.
+        #expect(launcher.spawned.isEmpty == false, "nothing ran at all — the ledger is vacuous")
+        #expect(launcher.spawned.contains(["tap", "acme/tap"]))
+        #expect(
+            launcher.spawned.contains { $0.first == "trust" } == false,
+            "a Brewfile import granted trust: \(launcher.spawned)"
+        )
+        #expect(
+            launcher.spawned.flatMap(\.self).contains("trusted") == false,
+            "a `trusted:` option reached argv: \(launcher.spawned)"
+        )
+    }
+
     @MainActor
     @Test("A tap-carrying import raises exactly one confirmation, and it is the trust one")
     func aTapCarryingImportRaisesExactlyOneTrustConfirmation() async throws {

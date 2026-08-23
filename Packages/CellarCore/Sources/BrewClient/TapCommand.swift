@@ -80,11 +80,24 @@ public enum ConfirmationDisclosure: Sendable, Hashable {
 
 public enum TapCommand: Sendable, Equatable, BrewMutating {
     case addTap(TapName)
+    /// `brew trust` — the grant, and the only command in this capability that
+    /// *increases* what Homebrew is willing to run.
+    case trustTap(TapName)
+    /// `brew untrust` — the revocation.
+    case untrustTap(TapName)
     case removeTap(TapName)
     case forceRemoveTap(ForceUntapEvidence)
 
     public static func add(_ raw: String) -> TapCommand? {
         TapName(raw).map(TapCommand.addTap)
+    }
+
+    public static func trust(_ raw: String) -> TapCommand? {
+        TapName(raw).map(TapCommand.trustTap)
+    }
+
+    public static func untrust(_ raw: String) -> TapCommand? {
+        TapName(raw).map(TapCommand.untrustTap)
     }
 
     public static func untap(_ raw: String) -> TapCommand? {
@@ -99,6 +112,8 @@ public enum TapCommand: Sendable, Equatable, BrewMutating {
     public var arguments: [String] {
         switch self {
         case .addTap(let tap): ["tap", tap.rawValue]
+        case .trustTap(let tap): ["trust", tap.rawValue]
+        case .untrustTap(let tap): ["untrust", tap.rawValue]
         case .removeTap(let tap): ["untap", tap.rawValue]
         case .forceRemoveTap(let evidence): ["untap", "--force", evidence.tap.rawValue]
         }
@@ -107,23 +122,35 @@ public enum TapCommand: Sendable, Equatable, BrewMutating {
     public var verb: String {
         switch self {
         case .addTap: "tapAdd"
+        case .trustTap: "tapTrust"
+        case .untrustTap: "tapUntrust"
         case .removeTap: "tapUntap"
         case .forceRemoveTap: "tapForceUntap"
         }
     }
 
+    /// Always `nil`: trust is a property of a **tap**, never of a package
+    /// (tap-management TM13 :479-480). This is also what keeps a `/`-qualified
+    /// package token out of every tap argv by construction.
     public var packageID: PackageID? { nil }
 
     public var requiresConfirmation: Bool {
         switch self {
-        case .addTap, .forceRemoveTap: true
-        case .removeTap: false
+        case .addTap, .trustTap, .forceRemoveTap: true
+        // A revocation only *reduces* authority, so asking for it would teach
+        // the user to dismiss the sheet that matters (TM13 :487-488).
+        case .removeTap, .untrustTap: false
         }
     }
 
+    /// A grant and a revocation both change what `brew info --installed`
+    /// reports as a package's `tap` — Homebrew withholds it while the tap is
+    /// untrusted (obs #7724) — so both invalidate installed inventory as well as
+    /// taps (TM9 :344-352). No tap command ever invalidates the catalog.
     public var invalidates: InvalidationScope {
         switch self {
         case .addTap, .removeTap: .taps
+        case .trustTap, .untrustTap: [.taps, .installedInventory]
         case .forceRemoveTap: [.taps, .installedInventory, .diskUsage]
         }
     }
@@ -136,7 +163,8 @@ public enum TapCommand: Sendable, Equatable, BrewMutating {
     public var disclosure: ConfirmationDisclosure {
         switch self {
         case .addTap(let tap): .tapAdd(tap)
-        case .removeTap: .packageRemoval
+        case .trustTap(let tap): .tapTrustGrant(tap)
+        case .removeTap, .untrustTap: .packageRemoval
         case .forceRemoveTap(let evidence):
             .forceUntap(tap: evidence.tap, affected: evidence.affected)
         }
