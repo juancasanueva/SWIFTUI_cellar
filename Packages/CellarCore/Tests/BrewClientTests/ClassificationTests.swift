@@ -363,4 +363,100 @@ struct ClassificationTests {
         #expect(outcomes.count(where: \.isSuccess) == 1)
         #expect(outcomes.count(where: \.isFailure) == 4)
     }
+
+    // MARK: - PM10 — the untrusted-tap refusal
+
+    /// The measured Homebrew 6.0.18 **cask** refusal, byte for byte (obs #7721).
+    private static let refusalStderr = [
+        "Error: Refusing to load cask acme/tools/widget from untrusted tap acme/tools. "
+            + "Run `brew trust --cask acme/tools/widget` or `brew trust acme/tools` to trust it."
+    ]
+
+    /// PM10 :328-341. Bound by exactly the discipline the sudo and busy
+    /// signatures already are: stderr only, non-zero exit only, the shipped tail
+    /// window, structural facts first.
+    ///
+    /// **DD-6.** One phrase, and a specific one. `"Refusing to load"` alone was
+    /// rejected: brew refuses to load things for reasons a trust grant would not
+    /// fix, and a false positive there does not merely show a wrong sentence —
+    /// it offers a **Trust button** for one of them, which is a security-relevant
+    /// misdirection.
+    @Test("An untrusted-tap refusal is its own outcome")
+    func anUntrustedTapRefusalIsItsOwnOutcome() {
+        #expect(Self.classify(status: 1, stderr: Self.refusalStderr) == .refusedUntrustedTap)
+
+        // The same prose on stdout does not classify: a package echoing brew's
+        // words cannot steer the UI.
+        #expect(Self.classify(status: 1, stdout: Self.refusalStderr) == .failed(status: 1))
+
+        // Nor does a success, however it reads.
+        #expect(Self.classify(status: 0, stderr: Self.refusalStderr) == .succeeded)
+
+        // And a refusal to load that names no untrusted tap stays a plain
+        // failure with its verbatim log — the DD-6 rule, stated as a test.
+        #expect(
+            Self.classify(status: 1, stderr: [
+                "Error: Refusing to load cask acme/tools/widget from a directory that is not a tap."
+            ]) == .failed(status: 1)
+        )
+
+        // The structural facts still win over the prose: a cancellation and a
+        // launch fault are decided before a byte of output is examined.
+        #expect(
+            Self.classify(status: 1, reason: .cancelled(signal: 2), stderr: Self.refusalStderr)
+                == .cancelled
+        )
+        #expect(
+            Self.classify(
+                status: 1,
+                fault: .launchFailed(URL(fileURLWithPath: "/opt/homebrew/bin/brew"), code: 2),
+                stderr: Self.refusalStderr
+            ) == .launchFailed
+        )
+    }
+
+    /// PM10 :293-295 is literal: "**nothing extracted from the payload**. No tap
+    /// name, package name, qualified token or suggested command MUST be parsed
+    /// out of the message."
+    ///
+    /// Asserted by **value equality across two refusals naming different taps**,
+    /// which is the only assertion a payload-carrying case could not pass.
+    @Test("Nothing is extracted from the refusal")
+    func nothingIsExtractedFromTheRefusal() {
+        let first = Self.classify(status: 1, stderr: Self.refusalStderr)
+        let second = Self.classify(status: 1, stderr: [
+            "Error: Refusing to load cask stranger/other/gadget from untrusted tap stranger/other. "
+                + "Run `brew trust --cask stranger/other/gadget` or `brew trust stranger/other` to trust it."
+        ])
+
+        #expect(first == .refusedUntrustedTap)
+        #expect(first == second, "the outcome carries something it read out of the payload")
+
+        // The message is the spec's exact sentence, and it names nothing the
+        // payload said (PM10 :351-357).
+        let command = TapCommand.addTap(TapName("acme/tools")!)
+        let message = first.message(for: command)
+        #expect(message == """
+        Homebrew refused to load this package because its tap is not trusted. \
+        Trust the tap in Taps, then try again.
+        """)
+        for extracted in ["acme/tools", "widget", "stranger", "brew trust", "--cask"] {
+            #expect(
+                message.contains(extracted) == false,
+                "the message echoes something parsed out of the refusal: \(extracted)"
+            )
+        }
+        #expect(first.summaryLabel == "Tap not trusted")
+        // The command did not run, so it is a failure.
+        #expect(first.isFailure)
+        #expect(first.isSuccess == false)
+
+        // Classification read no more than the shipped tail window: a refusal
+        // pushed past it stops classifying, which is what proves the bound.
+        let padding = (0..<MutationOutcome.tailLength).map { "noise \($0)" }
+        #expect(
+            Self.classify(status: 1, stderr: Self.refusalStderr + padding) == .failed(status: 1)
+        )
+        #expect(MutationOutcome.tailLength == 20)
+    }
 }

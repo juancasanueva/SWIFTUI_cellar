@@ -210,6 +210,17 @@ public struct TapProjection: Sendable, Equatable {
         return published.hasPrefix(prefix) ? String(published.dropFirst(prefix.count)) : published
     }
 
+    /// Whether this tap's own published set contains that exact `(kind, name)`.
+    ///
+    /// The tap's published names are the only source; nothing else may claim a
+    /// package (TM5 :122-128). The inventory path satisfies this clause by
+    /// construction — `packages(for:installed:)` iterates these very lists — and
+    /// this is the same rule made callable for the refusal recovery (DD-7).
+    public static func publishes(_ id: PackageID, in tap: TapRecord) -> Bool {
+        let published = id.kind == .formula ? tap.formulaNames : tap.caskTokens
+        return published.contains { bareToken($0, publishedBy: tap.name) == id.name }
+    }
+
     /// Which of the three installed states this tap's package is in.
     ///
     /// The middle state is deliberately narrow: it requires **this** tap to be

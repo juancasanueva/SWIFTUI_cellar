@@ -425,4 +425,57 @@ struct MutationCommandTests {
         #expect(rebuilt.displayCommand == rendered)
         #expect(rebuilt.arguments == ["uninstall", "--cask", "iterm2"])
     }
+
+    // MARK: - PM10 :367-373 — an untrusted tap never pre-blocks a mutation
+
+    /// **R7 / obs #7724.** With the tap withheld the inventory cannot prove a
+    /// package's origin, and a **per-package** grant can make brew allow exactly
+    /// what a tap-state gate would refuse. Only brew sees both grant kinds, so
+    /// only brew decides — a pre-launch gate here would block what the user is
+    /// entitled to run and would call a loadable package untrusted.
+    @Test("An untrusted tap never pre-blocks a mutation")
+    func anUntrustedTapNeverPreBlocksAMutation() throws {
+        // A package whose tap brew is withholding, published by an untrusted tap.
+        let widget = PackageID(kind: .cask, name: "widget")
+        let target = try #require(PackageTarget(widget))
+        let untrusted = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            caskTokens: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+        #expect(TapProjection.publishes(widget, in: untrusted))
+
+        // Every mutation for it is built normally, and its argv names the bare
+        // token — the same argv the same command builds for any other package.
+        for command in [
+            MutationCommand.install(target),
+            .uninstall(target),
+            .upgrade(target),
+            .reinstall(target)
+        ] {
+            #expect(command.arguments.contains("widget"))
+            #expect(command.arguments.contains { $0.contains("/") } == false)
+            #expect(command.arguments.first != nil)
+        }
+
+        // And no build path consults a trust state at all. Asserted
+        // structurally, because "the gate is not there yet" is exactly the kind
+        // of absence a later change reintroduces while fixing something else.
+        let files = try Self.commandFiles()
+        #expect(files.isEmpty == false, "the *Command.swift scan matched no files at all")
+        let mutation = try #require(files["MutationCommand.swift"])
+        // The trust *machinery*, not the English word: a shipped comment at
+        // `MutationCommand.swift:104` says "a future reader would trust it",
+        // and banning the bare word would make this guard about prose.
+        for gate in [
+            "TapTrustState", ".untrusted", ".trusted", ".trust", "TapRecord",
+            "TapInventory", "TapProjection", "trustableTap", "UntrustedTapRecovery"
+        ] {
+            #expect(
+                mutation.contains(gate) == false,
+                "the package mutation surface consults tap trust: \(gate)"
+            )
+        }
+    }
 }

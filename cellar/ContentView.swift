@@ -216,7 +216,11 @@ struct ContentView: View {
             // does not yield to a window-wide bottom inset, so a bar there
             // paints over its Settings footer instead of above it.
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                ActivityBar(center: operations, isExpanded: $isActivityExpanded)
+                ActivityBar(
+                    center: operations,
+                    isExpanded: $isActivityExpanded,
+                    trustableTap: trustableTap(for:)
+                )
             }
             .background(Theme.windowBackground)
             // Into the native toolbar row rather than a drawn strip: macOS
@@ -533,6 +537,18 @@ struct ContentView: View {
                 )
             )
         }
+    }
+
+    /// The refusal recovery's candidate, in the same `@MainActor` idiom as
+    /// `forceEvidence(for:)` below: a closure the drawer can call, over stores
+    /// the drawer never sees (design DD-12).
+    ///
+    /// The identity is one Cellar typed itself — `ActivityItem.command.packageID`
+    /// — and the candidate set is the `tap-info` snapshot Cellar already holds,
+    /// so no byte of brew's refusal takes part in the answer.
+    private func trustableTap(for package: PackageID?) -> TapName? {
+        guard case .loaded = taps.state else { return nil }
+        return UntrustedTapRecovery.trustableTap(forRefused: package, in: taps.inventory)
     }
 
     private func forceEvidence(for tap: TapName) -> ForceUntapEvidence? {

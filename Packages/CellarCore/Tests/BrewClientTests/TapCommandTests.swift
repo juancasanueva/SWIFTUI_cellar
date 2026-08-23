@@ -251,4 +251,58 @@ struct TapCommandTests {
         // removal text, and `disclosure` still answers the second question.
         #expect(try #require(TapCommand.untrust("acme/tools")).disclosure == .packageRemoval)
     }
+
+    // MARK: - TM13 :517-523 — no recovery and no retry submits a grant
+
+    /// The **central threat** (design R2). Homebrew 6 treats *naming* a
+    /// qualified package on the command line as the grant
+    /// (`trust.rb#explicitly_allowed?`), so a "helpful" requalified retry after
+    /// an untrusted-tap refusal would convert a refusal into silent execution of
+    /// code the user never consented to run — while looking exactly like a bug
+    /// fix.
+    ///
+    /// The recovery therefore re-runs nothing: it opens the ordinary
+    /// **confirmed** Trust request and stops there.
+    @Test("No recovery or retry path submits a trust command of its own")
+    func noRecoveryOrRetryPathSubmitsATrustCommand() throws {
+        let widget = PackageID(kind: .cask, name: "widget")
+        let untrusted = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            caskTokens: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+        let inventory = TapInventory(taps: [untrusted])
+
+        // The recovery yields a **tap identity**, never a command and never a
+        // retry of the refused mutation.
+        let recovered = try #require(
+            UntrustedTapRecovery.trustableTap(forRefused: widget, in: inventory)
+        )
+        #expect(recovered.rawValue == "acme/tools")
+
+        // What the button then submits is the ordinary confirmed grant, whose
+        // argv is two literal tokens and carries no package position at all.
+        let grant = try #require(TapCommand.trust(recovered.rawValue))
+        #expect(grant.arguments == ["trust", "acme/tools"])
+        #expect(grant.requiresConfirmation, "the recovery's grant skipped the confirmation gate")
+        #expect(grant.packageID == nil)
+        #expect(grant.arguments.contains { $0.contains("/widget") } == false)
+
+        // A retry of the refused mutation is the same command again — argv for
+        // argv — and is not a trust command.
+        let refusedTarget = try #require(PackageTarget(widget))
+        let refused = MutationCommand.upgrade(refusedTarget)
+        #expect(refused.arguments == refused.arguments)
+        #expect(refused.arguments.contains("trust") == false)
+        #expect(refused.arguments.allSatisfy { $0.contains("/") == false })
+
+        // The absence, stated over every argv either path can produce.
+        let everyArgv = [grant.arguments, refused.arguments]
+        #expect(everyArgv.isEmpty == false)
+        #expect(
+            everyArgv.filter { $0.first == "trust" } == [["trust", "acme/tools"]],
+            "a path other than the explicit grant produced a trust argv: \(everyArgv)"
+        )
+    }
 }

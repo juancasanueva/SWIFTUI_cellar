@@ -363,43 +363,43 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'ConfirmationDis
 Runners: `swift test --package-path Packages/CellarCore --filter 'ClassificationTests|TapProjectionTests|MutationCommandTests'`
 and `xcodebuild test … -only-testing:cellarTests/TapCompositionTests`.
 
-- [ ] 6.1 **RED — unit 6a.** `ClassificationTests · anUntrustedTapRefusalIsItsOwnOutcome`: the refusal
+- [x] 6.1 **RED — unit 6a.** `ClassificationTests · anUntrustedTapRefusalIsItsOwnOutcome`: the refusal
       prose on **stderr** with a non-zero exit → `.refusedUntrustedTap`; the same prose on **stdout** →
       `.failed`; exit 0 → `.succeeded`; **`"Refusing to load"` without `"untrusted tap"` → `.failed`**
       (DD-6 — one structural phrase, case-sensitive, so a broad match never offers a Trust button for
       a refusal trust cannot fix). *(PM10.1, PM10.2)*
-- [ ] 6.2 **RED — unit 6b.** `ClassificationTests · nothingIsExtractedFromTheRefusal`: the outcome
+- [x] 6.2 **RED — unit 6b.** `ClassificationTests · nothingIsExtractedFromTheRefusal`: the outcome
       carries no tap, package, token or command — asserted by **value equality across two refusals
       naming different taps** — the message is the spec's exact sentence, and classification read no
       more than `MutationOutcome.tailLength` lines. *(PM10.3, PM10.4)*
-- [ ] 6.3 **RED — unit 6c.** `TapProjectionTests ·
+- [x] 6.3 **RED — unit 6c.** `TapProjectionTests ·
       theRecoveryPicksOnlyAUniquePublisherFromCellarsOwnSnapshot`: `UntrustedTapRecovery.trustableTap`
       returns the tap for exactly one untrusted publisher; `nil` for two publishers, for a trusted or
       unreported publisher, for an official tap, and for `packageID == nil`. *(PM10.4)*
-- [ ] 6.4 **RED — unit 10b.** `cellarTests/TapCompositionTests ·
+- [x] 6.4 **RED — unit 10b.** `cellarTests/TapCompositionTests ·
       theRefusalRecoveryOffersTrustOnlyForAUniquePublisher`: the button appears for one publisher and
       not for zero or two; pressing it opens the ordinary **confirmed** Trust sheet and **retries
       nothing**. *(PM10.4, TM13.3)*
-- [ ] 6.5 **RED — unit 10c.** `MutationCommandTests · anUntrustedTapNeverPreBlocksAMutation`: a
+- [x] 6.5 **RED — unit 10c.** `MutationCommandTests · anUntrustedTapNeverPreBlocksAMutation`: a
       mutation for a package whose tap is withheld and untrusted is built and submitted normally, and
       no build path consults a trust state (obs `#7724` — a per-package grant makes a pre-launch gate
       block what brew would allow). *(PM10.6)*
-- [ ] 6.6 **RED — unit 2d.** `TapCommandTests · noRecoveryOrRetryPathSubmitsATrustCommand`: the refusal
+- [x] 6.6 **RED — unit 2d.** `TapCommandTests · noRecoveryOrRetryPathSubmitsATrustCommand`: the refusal
       recovery and a retry of a failed mutation each submit **no** `trust` argv of their own.
       *(TM13.3)*
-- [ ] 6.7 **Prove RED** (six), then **GREEN**: `MutationOutcome.swift` — `case refusedUntrustedTap`
+- [x] 6.7 **Prove RED** (six), then **GREEN**: `MutationOutcome.swift` — `case refusedUntrustedTap`
       **with no associated value**, `Signature.untrustedTap = "untrusted tap"` +
       `isUntrustedTap(_:)` in the shipped `isLock` / `isPrivilege` idiom, the `classify` arm after the
       lock and privilege checks, and the `message` / `summaryLabel` / `isFailure` arms — design §7
       verbatim, including the comment recording **why** nothing is parsed (R2).
-- [ ] 6.8 **GREEN.** New file
+- [x] 6.8 **GREEN.** New file
       `Packages/CellarCore/Sources/BrewClient/UntrustedTapRecovery.swift` — the one-candidate
       projection from design §7, filtering on `record.trust == .untrusted`, excluding
       `TapProjection.officialNames`, and requiring `TapProjection.publishes(package, in: record)`.
-- [ ] 6.9 **GREEN.** `cellar/Activity/ActivityDrawer.swift`: `Button("Trust")` shown only when the
+- [x] 6.9 **GREEN.** `cellar/Activity/ActivityDrawer.swift`: `Button("Trust")` shown only when the
       injected `@MainActor` closure returns a `TapName`, submitting `operations.request(.trustTap(tap))`.
       `cellar/ContentView.swift`: the `trustableTap(for:)` closure in the `currentForceEvidence` idiom.
-- [ ] 6.10 Both runners green; commit WU6.
+- [x] 6.10 Both runners green; commit WU6.
 
 ## Phase 7: WU7 — D3, the bare token and the argv prohibition (PM10.5; BF5.6; BF7.3)
 

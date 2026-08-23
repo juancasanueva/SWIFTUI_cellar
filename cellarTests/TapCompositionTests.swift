@@ -112,6 +112,69 @@ struct TapCompositionTests {
         #expect(launcher.spawned == [["trust", "acme/tools"]])
     }
 
+    /// PM10 :348-357 and TM13 :517-523. The refusal carries nothing, so the
+    /// recovery's tap comes from Cellar's own snapshot — and it is offered only
+    /// when exactly one untrusted tap publishes that exact `(kind, name)`.
+    ///
+    /// Pressing it opens the **ordinary confirmed** Trust request. It re-runs
+    /// nothing: a requalified retry is the one thing that would turn a refusal
+    /// into silent execution of code nobody consented to (design R2).
+    @Test("The refusal recovery offers Trust only for a unique publisher")
+    func theRefusalRecoveryOffersTrustOnlyForAUniquePublisher() async throws {
+        let widget = PackageID(kind: .cask, name: "widget")
+        let publisher = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            caskTokens: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+        let rival = TapRecord(
+            name: "other/tools",
+            repository: "tools",
+            caskTokens: ["other/tools/widget"],
+            trust: .untrusted
+        )
+
+        // Zero publishers — no button.
+        #expect(
+            UntrustedTapRecovery.trustableTap(forRefused: widget, in: .empty) == nil
+        )
+        // Two publishers — no button, because Cellar does not know which tap
+        // brew meant and guessing grants the wrong capability.
+        #expect(
+            UntrustedTapRecovery.trustableTap(
+                forRefused: widget,
+                in: TapInventory(taps: [publisher, rival])
+            ) == nil
+        )
+        // Exactly one — the button, naming that tap.
+        let tap = try #require(
+            UntrustedTapRecovery.trustableTap(
+                forRefused: widget,
+                in: TapInventory(taps: [publisher])
+            )
+        )
+
+        // Pressing it: the ordinary confirmed grant, and nothing else.
+        let launcher = CompositionLauncher()
+        let center = OperationCenter(launcherFactory: { _ in launcher })
+        center.attach(installation: AppTestFixtures.installation)
+
+        let request = try #require(
+            center.request(TapCommand.trustTap(tap)),
+            "the recovery submitted a grant without a confirmation"
+        )
+        #expect(request.disclosure == .tapTrustGrant(tap))
+        #expect(request.commands.count == 1, "the recovery bundled a retry with the grant")
+        _ = center.confirm(request)
+        await settle(center)
+
+        // One spawn, and it is the grant — the refused mutation was not re-run,
+        // requalified or otherwise.
+        #expect(launcher.spawned == [["trust", "acme/tools"]])
+        #expect(launcher.spawned.allSatisfy { argv in argv.allSatisfy { !$0.contains("/widget") } })
+    }
+
     private func settle(_ center: OperationCenter) async {
         for _ in 0..<200 { await Task.yield() }
     }

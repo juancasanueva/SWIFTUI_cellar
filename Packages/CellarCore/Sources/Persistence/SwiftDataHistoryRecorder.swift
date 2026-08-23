@@ -83,6 +83,10 @@ public final class SwiftDataHistoryRecorder: HistoryRecording {
             ("authorizationDeniedEvidenceChanged", nil)
         case .authorizationDenied(.evidenceUnavailable):
             ("authorizationDeniedEvidenceUnavailable", nil)
+        // The command never ran, so brew reported no status this layer could
+        // record — and the row says what happened without naming a tap, because
+        // the outcome carries none (package-mutation PM10).
+        case .refusedUntrustedTap: ("refusedUntrustedTap", nil)
         }
     }
 }

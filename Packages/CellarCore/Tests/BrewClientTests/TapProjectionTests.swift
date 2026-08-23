@@ -294,6 +294,127 @@ struct TapProjectionTests {
         )
     }
 
+    // MARK: - PM10 :348-357 — the recovery, from Cellar's own snapshot
+
+    /// **DD-7.** The refusal carries nothing, so the tap the recovery offers to
+    /// trust comes from the snapshot Cellar already holds — matched against a
+    /// `PackageID` **Cellar itself typed**, never a token read out of brew's
+    /// message.
+    ///
+    /// Exactly one candidate, or nothing. With two untrusted publishers of the
+    /// same `(kind, name)` Cellar genuinely does not know which tap brew meant,
+    /// and guessing would grant the wrong capability — so the typed message's
+    /// own sentence is the path and no button is shown (R16).
+    @Test("The recovery picks only a unique publisher from Cellar's own snapshot")
+    func theRecoveryPicksOnlyAUniquePublisherFromCellarsOwnSnapshot() throws {
+        let widget = PackageID(kind: .cask, name: "widget")
+        let untrusted = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            caskTokens: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+
+        // One untrusted publisher — the only case that offers a grant.
+        let single = TapInventory(taps: [untrusted])
+        #expect(
+            UntrustedTapRecovery.trustableTap(forRefused: widget, in: single)
+                == TapName("acme/tools")
+        )
+
+        // Two untrusted publishers of the same identity — nothing is offered.
+        let rival = TapRecord(
+            name: "other/tools",
+            repository: "tools",
+            caskTokens: ["other/tools/widget"],
+            trust: .untrusted
+        )
+        #expect(
+            UntrustedTapRecovery.trustableTap(
+                forRefused: widget,
+                in: TapInventory(taps: [untrusted, rival])
+            ) == nil
+        )
+
+        // A trusted or unreported publisher is not a candidate: trusting it
+        // again would answer a refusal trust did not cause.
+        for trust in [TapTrustState.trusted, .unreported] {
+            let record = TapRecord(
+                name: "acme/tools",
+                repository: "tools",
+                caskTokens: ["acme/tools/widget"],
+                trust: trust
+            )
+            #expect(
+                UntrustedTapRecovery.trustableTap(
+                    forRefused: widget,
+                    in: TapInventory(taps: [record])
+                ) == nil
+            )
+        }
+
+        // An official tap never reaches this surface at all (TM4).
+        let official = TapRecord(
+            name: "homebrew/cask",
+            repository: "homebrew-cask",
+            caskTokens: ["widget"],
+            trust: .untrusted
+        )
+        #expect(
+            UntrustedTapRecovery.trustableTap(
+                forRefused: widget,
+                in: TapInventory(taps: [official])
+            ) == nil
+        )
+
+        // A tap that does not publish this exact `(kind, name)` is not a
+        // candidate — kind included, which is why a same-named formula does not
+        // answer for a cask.
+        let formula = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+        #expect(
+            UntrustedTapRecovery.trustableTap(
+                forRefused: widget,
+                in: TapInventory(taps: [formula])
+            ) == nil
+        )
+        #expect(
+            UntrustedTapRecovery.trustableTap(
+                forRefused: PackageID(kind: .formula, name: "widget"),
+                in: TapInventory(taps: [formula])
+            ) == TapName("acme/tools")
+        )
+
+        // And a command with no package identity — `upgradeAll`, every tap
+        // command — offers nothing.
+        #expect(UntrustedTapRecovery.trustableTap(forRefused: nil, in: single) == nil)
+    }
+
+    /// The publication rule the recovery rests on, made callable (TM5 :122-128).
+    @Test("A tap publishes only the exact kind and bare token it names")
+    func publicationIsExactInKindAndToken() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/helper", "other/tap/widget"],
+            caskTokens: ["acme/tools/widget"]
+        )
+
+        #expect(TapProjection.publishes(PackageID(kind: .formula, name: "helper"), in: tap))
+        #expect(TapProjection.publishes(PackageID(kind: .cask, name: "widget"), in: tap))
+        // Kind is part of identity.
+        #expect(TapProjection.publishes(PackageID(kind: .cask, name: "helper"), in: tap) == false)
+        #expect(TapProjection.publishes(PackageID(kind: .formula, name: "widget"), in: tap) == false)
+        // Only the selected tap's own prefix is removed, so a foreign qualified
+        // name is not claimed by its last component.
+        #expect(TapProjection.publishes(PackageID(kind: .formula, name: "other/tap/widget"), in: tap))
+        #expect(TapProjection.publishes(PackageID(kind: .formula, name: "stranger"), in: tap) == false)
+    }
+
     private func tapRecord(trust: TapTrustState) -> TapRecord {
         TapRecord(
             name: "acme/tools",
