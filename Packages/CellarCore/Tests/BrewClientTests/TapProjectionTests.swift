@@ -76,7 +76,34 @@ struct TapProjectionTests {
 
         #expect(packages[0].installedHandoff == PackageID(kind: .formula, name: "widget"))
         #expect(packages[1].installedHandoff == nil)
-        #expect(packages[1].uninstalledExplanation == "Not in Cellar’s core/cask catalog.")
+        #expect(packages[1].uninstalledExplanation == "Not installed.")
+    }
+
+    /// `brew tap-info --json` publishes cask tokens fully qualified —
+    /// `acme/tools/widget` — exactly as it publishes formula names, while the
+    /// installed snapshot keys the same cask by the token brew installs by,
+    /// `widget`. The selected-tap prefix must be removed for casks by the same
+    /// rule as for formulae, or an installed third-party cask can never match.
+    @Test("A fully qualified cask token matches the installed cask by its bare token")
+    func qualifiedCaskTokenMatchesTheInstalledCask() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: [],
+            caskTokens: ["acme/tools/widget", "other/tap/gadget"]
+        )
+        let installed = InstalledInventory(packages: [
+            installedPackage(kind: .cask, name: "widget", tap: "acme/tools")
+        ])
+
+        let packages = TapProjection.packages(for: tap, installed: installed)
+
+        #expect(packages.map(\.displayName) == ["widget", "other/tap/gadget"])
+        #expect(packages.map(\.publishedName) == ["acme/tools/widget", "other/tap/gadget"])
+        #expect(packages[0].id == PackageID(kind: .cask, name: "widget"))
+        #expect(packages[0].installedHandoff == PackageID(kind: .cask, name: "widget"))
+        #expect(packages[0].uninstalledExplanation == nil)
+        #expect(packages[1].installedHandoff == nil)
     }
 
     @Test("Name and kind filters return only matching visible rows from a large inventory")
