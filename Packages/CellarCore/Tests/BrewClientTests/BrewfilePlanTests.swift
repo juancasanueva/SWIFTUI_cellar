@@ -18,7 +18,7 @@ import Testing
 /// Tap ordering is load-bearing **twice**. A package from a newly added tap must
 /// not be attempted before its tap exists — and the shared confirmation gate
 /// derives the batch's disclosure from `commands.first`, so a tap-carrying batch
-/// presents the tapTrust warning only when a tap leads it. Both consequences are
+/// presents the tap-add warning only when a tap leads it. Both consequences are
 /// asserted, not just the ordering.
 @MainActor
 @Suite("Brewfile plan", .timeLimit(.minutes(1)))

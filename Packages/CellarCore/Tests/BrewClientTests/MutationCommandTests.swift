@@ -557,10 +557,24 @@ struct MutationCommandTests {
             BrewfileEntry(kind: .tap(tap, url: nil), lineNumber: 3)
         ])
 
+        // 4. Every `ServiceCommand` verb and every `CleanupCommand` scope (W1):
+        // both carry a package position built from the same `PackageTarget`
+        // gate, so the enumeration has to walk them too.
+        let service = try #require(ServiceTarget(name: "thing"))
+        let serviceCommands = ServiceCommand.allVerbs(for: service)
+        let cleanupCommands: [CleanupCommand] = [
+            CleanupCommand(scope: .global),
+            CleanupCommand(scope: .autoremove),
+            try #require(CleanupCommand.package(kind: .formula, name: "thing")),
+            try #require(CleanupCommand.package(kind: .cask, name: "app"))
+        ]
+
         // Positive anchors first — a scan that matched nothing would make every
         // expectation below pass for the wrong reason.
         #expect(mutations.count >= 11, "the mutation fixture set collapsed")
         #expect(tapCommands.count == 5)
+        #expect(serviceCommands.count == 4, "the service verb set collapsed")
+        #expect(cleanupCommands.count == 4)
         #expect(qualified.installs.isEmpty == false, "the qualified plan produced no install")
         #expect(qualified.taps.map(\.arguments) == [["tap", "acme/tap"]])
         #expect(
@@ -577,6 +591,11 @@ struct MutationCommandTests {
                     element.contains("/") == false,
                     "\(command.verb) carries a slash in argv: \(element)"
                 )
+            }
+        }
+        for arguments in serviceCommands.map(\.arguments) + cleanupCommands.map(\.arguments) {
+            for element in arguments {
+                #expect(element.contains("/") == false, "a service or cleanup argv carries a slash: \(element)")
             }
         }
 

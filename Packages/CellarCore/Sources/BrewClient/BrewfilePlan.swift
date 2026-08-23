@@ -18,7 +18,7 @@ import Foundation
 /// **Taps lead, always.** That is load-bearing twice: a package from a newly
 /// added tap must not be attempted before its tap exists, and the shared
 /// confirmation gate derives a batch's disclosure from `commands.first`
-/// (`OperationCenterBulk.request(_:)`), so a mixed batch presents the tapTrust
+/// (`OperationCenterBulk.request(_:)`), so a mixed batch presents the tapAdd
 /// warning only when a tap is at the head of it (design DD1). Reordering this
 /// would silently downgrade a security warning, not merely reorder work.
 public struct BrewfilePlan: Sendable, Equatable {

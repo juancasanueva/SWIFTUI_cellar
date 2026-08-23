@@ -3,7 +3,7 @@
 **Mode**: Strict TDD (`strict_tdd: true`) — RED proven by runner output before every GREEN.
 **Branch**: `feat/m7-tap-trust` from `main` at `349a47f`.
 **Artifact store**: hybrid — this file plus Engram `sdd/m7-tap-trust/apply-progress` (project `swiftui_cellar`).
-**Delivery**: `single-pr`, no `size:exception`. Phases 0–8 and Phase 10 done; **Phase 9 is the maintainer's**.
+**Delivery**: `single-pr` with **`size:exception`** (maintainer decision 2026-08-23 after the ledger flagged 6,555 changed lines vs the 5,000 budget: 2,680 code+tests, 3,760 SDD artifacts). Phases 0–8 and Phase 10 done; **Phase 9 is the maintainer's**.
 
 ## Baselines (task 0.1, re-measured at `349a47f`)
 
@@ -199,3 +199,7 @@ and the header render the **same** projection. The identifiers are now `tap-row-
   `feat(taps): make tap trust visible, explicit and revocable`, exactly one `type:feature` label.
 
 Everything in Phases 0–8 (except 8.7) and Phase 10 is checked in `tasks.md`.
+
+### D-8 — `cellar/AppTestFixtures.swift` (+15), recorded at verify
+
+Changed but absent from the design's *File Changes* table and from D-1…D-7: the shared app-target fixture gained the `trust`/optional-`tap` fields the new `TapRecord`/`InstalledPackage` shapes require, the same kind of undocumented reader D-6 recorded. Conventional and correct; recorded so the archive file list is complete.

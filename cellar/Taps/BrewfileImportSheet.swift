@@ -204,7 +204,7 @@ struct BrewfileImportSheet: View {
 /// Submitting an import, as one function over the two stores.
 ///
 /// Extracted from `body` so the composition guard can assert it without
-/// rendering anything — and so "exactly one confirmation, carrying the tapTrust
+/// rendering anything — and so "exactly one confirmation, carrying the tapAdd
 /// disclosure" is provable against a real `OperationCenter`.
 ///
 /// It mirrors `submitBulk`'s shape exactly: ask first, and treat "no request" as

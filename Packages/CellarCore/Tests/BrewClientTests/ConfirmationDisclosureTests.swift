@@ -10,7 +10,7 @@ import Testing
 /// DD1).
 ///
 /// Design verified the proposal's claim — "a mixed batch raises exactly one
-/// confirmation carrying the `tapTrust` disclosure" — against shipped source and
+/// confirmation carrying the `tapAdd` disclosure" — against shipped source and
 /// found it false. `OperationCenterBulk.request(_:)` resolved the disclosure by
 /// downcasting, `(first as? TapCommand)?.disclosure ?? .packageRemoval`, and
 /// `AnyBrewMutation` carried seven projections with `disclosure` not among them.

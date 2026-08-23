@@ -200,9 +200,12 @@ carried, including a `/`-qualified one.)
 - **No `## Verification classes` table exists in this spec**, so there is **no class table to
   hand-update at archive**. This delta is the first to annotate `brewfile-management` scenarios with an
   inline `- Verification:` line; the untouched requirements deliberately keep none.
-- **Confirm no other occurrence of `tapTrust` survives.** The proposal enumerates the case name at
-  `brewfile-management` :231, :239, :322, :330 and :353. After promotion, `rg 'tapTrust'` across
-  `openspec/specs/` MUST return zero hits — a surviving one means a block was promoted partially.
+- **Confirm no other occurrence of `tapTrust` survives — with two known out-of-block hits.** The
+  proposal enumerates the case name inside the MODIFIED blocks. Verify (W2) found two further mentions
+  that sit **outside** both blocks and therefore survive a *correct* promotion: the main spec's header
+  prose (~:7) and the Provenance D4 entry (~:510). `sdd-archive` MUST hand-edit both; after that,
+  `rg 'tapTrust'` across `openspec/specs/` MUST return zero hits. A hit at those two places is not a
+  partial promotion; a hit anywhere else is.
 - Record in the provenance section that the rename is **D2** and that **D3** is the one new rule:
   `trusted:` remains informational, and a `/`-qualified package entry is applied by its bare token so
   the file's author cannot grant per-package trust through argv. **`BrewfilePlan.swift` does change**

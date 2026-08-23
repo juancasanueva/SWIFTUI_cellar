@@ -97,7 +97,7 @@ Chain strategy: pending
 
 `400-line budget risk` is the literal guard value against the 400 **default**; that default does not
 govern this repository. Against the governing 5,000-line budget the risk is **Low**, so `single-pr`
-holds with **no `size:exception`** and no decision blocks apply — the `m6-release-pipeline` /
+held at forecast time with no `size:exception`; **after apply the measured total (6,555) exceeded the budget and the maintainer recorded `size:exception` (row above)** — unlike the `m6-release-pipeline` /
 `m6-cask-tap` precedent.
 
 **Branch**: `feat/m7-tap-trust` (`^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)/[a-z0-9._-]+$` ✓).
