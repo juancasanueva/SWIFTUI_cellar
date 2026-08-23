@@ -14,7 +14,7 @@ that no test or gate could ever check:
 | Class | Meaning | Count |
 |---|---|---|
 | `unit` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom (reads the repository or the test host's bundle information off disk), run by `xcodebuild test … -only-testing:cellarTests` in **this** repository | **18** |
-| `ci-gate` | a hard gate whose failure fails its job and commits or publishes nothing. The runner is named per scenario: the release run in `.github/workflows/release.yml` **here**, or `ci.yml` / `bump.yml` in **`juancasanueva/homebrew-cellar`** on `macos-26` for the cask channel | **17** |
+| `ci-gate` | a hard gate whose failure fails its job and commits or publishes nothing. The runner is named per scenario: the release run in `.github/workflows/release.yml` **here**, or `ci.yml` / `bump.yml` in **`juancasanueva/homebrew-cellar`** on `macos-26` for the cask channel | **18** |
 | `manual-evidence` | no harness can exist — no runner may install into a real `/Applications` or observe a self-updated app — so the maintainer's observed output is recorded verbatim in `design.md` and the verify report | **6** |
 
 What stays **design-owned and is deliberately absent here**: the runner image and Xcode pinning, the
@@ -31,7 +31,13 @@ push and the published asset**. A published release for tag `vX.Y.Z` MUST carry 
 downloadable asset, named **`Home-Cellar-<version>.zip`**, where `<version>` is the tag with its
 leading `v` removed. The asset MUST be reachable at
 `https://github.com/<owner>/<repo>/releases/download/v<version>/Home-Cellar-<version>.zip`, and the
-bundle inside it MUST be **`cellar.app`** with display name **`Home-Cellar`**.
+bundle inside it MUST be **`Home-Cellar.app`** with display name **`Home-Cellar`** and main executable
+**`Contents/MacOS/Home-Cellar`**.
+
+The delivered bundle's identifier MUST remain **`com.juancasanueva.cellar`**. The name a person reads
+changes; the identity the machine binds to does not. Every application-support root, cache root,
+Keychain item and update host-match already derives from that identifier and from no product name, so
+renaming the bundle MUST move no user data and MUST require no migration of any kind.
 
 An asset nobody can download is not a release: a run against a repository that is not anonymously
 readable MUST fail fast, with an explicit message, **before** any signing or notarization work, and
@@ -46,7 +52,9 @@ release; it MUST reuse the run's already-published asset URL. A run for a **prer
 version contains a hyphen — MUST publish the release and MUST NOT publish any feed entry for it, so that
 an installed copy of the app is never offered a prerelease.
 (Previously: the requirement covered only the single downloadable release asset and its reachability; a
-stable tag published no update feed, and prereleases had no stated feed consequence.)
+stable tag published no update feed, and prereleases had no stated feed consequence; and the bundle
+inside the asset was `cellar.app`, with neither the executable name nor the bundle identifier stated
+here.)
 
 #### Scenario: A tag produces one correctly named, anonymously reachable asset
 
@@ -60,8 +68,9 @@ stable tag published no update feed, and prereleases had no stated feed conseque
 
 - GIVEN the published `Home-Cellar-<version>.zip`
 - WHEN it is extracted
-- THEN it contains exactly one application bundle, named `cellar.app`
-- AND that bundle's display name is `Home-Cellar`
+- THEN it contains exactly one application bundle, named `Home-Cellar.app`
+- AND that bundle's display name is `Home-Cellar` and its main executable is `Contents/MacOS/Home-Cellar`
+- AND its bundle identifier is `com.juancasanueva.cellar`
 - Verification: `ci-gate`
 
 #### Scenario: Nothing but a version tag can trigger a release
@@ -412,10 +421,32 @@ through Homebrew and not only by dragging a downloaded zip. The project MUST pub
 whose cask installs **the same published asset this capability already specifies** — no second artifact,
 no separately built binary, and no mirrored copy.
 
-Adding the tap and installing the cask MUST place the delivered bundle at **`/Applications/cellar.app`**,
-whose `CFBundleShortVersionString` equals the released version. The installed bundle name is the one the
-zip already carries; this change MUST NOT rename it, so the cask channel and the direct-download channel
-install the same path.
+Adding the tap and installing the cask MUST place the delivered bundle at
+**`/Applications/Home-Cellar.app`**, whose `CFBundleShortVersionString` equals the released version and
+whose bundle identifier is `com.juancasanueva.cellar`. The installed bundle name is the one the zip
+already carries, so the cask channel and the direct-download channel install **the same path under the
+same name**. The cask MUST NOT rename what it installs and MUST NOT declare a `target:`, because a
+`target:` would make the two channels disagree again.
+
+The rename of the delivered bundle is **update-safe, not update-migrating**, and MUST stay that way. A
+fresh install through either channel MUST produce `Home-Cellar.app`. An update delivered to an
+already-installed copy MUST be installed at that copy's **existing** bundle path — located by display
+name or, failing that, by bundle identifier — so no update ever fails because the delivered bundle's
+name changed, and the app MUST NOT declare an update-time bundle-name override to force a different
+path. Because there is no installed base at the time of this change, **no migration mechanism MUST
+exist anywhere**: no `target:` stanza, no `/Applications/cellar.app` entry in the cask's zap inventory,
+no `uninstall delete:` naming it, and no migration instruction in the repository or in the app. A zap
+MUST NOT delete a bundle the cask never placed.
+
+A cask's `app` artifact MUST name the bundle that the version it declares actually contains. The
+automated bump path gates only on style and audit, and **neither extracts the archive nor resolves the
+`app` artifact**, so a cask naming a bundle its declared asset does not contain audits clean and
+installs broken. A change to the delivered bundle's name MUST therefore reach the tap in **one atomic
+commit that moves `version`, `sha256` and the `app` artifact together**, applied **after** the first
+release whose published asset actually contains the renamed bundle — never ahead of that release, since
+a cask naming a bundle its already-declared version lacks is the same violation in the other direction.
+Across that window the automated bump MUST be paused, or its open pull request superseded, until that
+commit lands: it moves `version` and `sha256` without the `app` artifact, re-opening the same mismatch.
 
 The cask MUST declare that the app **updates itself**, because Sparkle replaces the bundle in place: a
 self-updated copy MUST NOT cause `brew` to report a mismatch or to reinstall over the newer app. The
@@ -428,30 +459,45 @@ Keeping the cask current MUST NOT require a manual step and MUST be **idempotent
 version** — an update attempt against a release the cask already declares MUST change nothing. The
 channel therefore cannot manufacture a second commit, or a second release, from one published release,
 which is what keeps it compatible with "one stable release per commit".
+(Previously: the installed bundle was `/Applications/cellar.app` and the requirement forbade renaming
+it; the update-continuity, no-migration-mechanism and atomic-tap-commit ordering clauses did not exist.)
 
 #### Scenario: A tap and an install put the released build in `/Applications`
 
 - GIVEN a Mac with Homebrew that has never had Cellar installed
 - WHEN the project's tap is added and its cask is installed
-- THEN `/Applications/cellar.app` exists and reports the released version
+- THEN `/Applications/Home-Cellar.app` exists and reports the released version
 - AND the app launches without a Gatekeeper refusal
 - Verification: `manual-evidence`
 
 #### Scenario: The cask is style-clean, audit-clean, and survives a real install/uninstall round trip
 
-- GIVEN the cask as published in the tap repository
+- GIVEN a cask commit that moves `version`, `sha256` and the `app` artifact together, against a release
+  that is already published
 - WHEN the tap's CI runs style, offline audit, and online strict audit, then installs the cask and
   uninstalls it with a zap
 - THEN every gate passes, the online audit confirms the declared checksum against the downloaded
   published asset, and the round trip completes
+- AND the install resolves the cask's `app` artifact against a bundle the downloaded asset actually
+  contains, rather than passing on audit alone
 - AND a failing gate leaves nothing committed and nothing published
-- Verification: `ci-gate`
+- Verification: `ci-gate` — `ci.yml` in `juancasanueva/homebrew-cellar`
+
+#### Scenario: The rename ships no migration mechanism
+
+- GIVEN the cask as published in the tap repository
+- WHEN its artifact stanzas are inspected
+- THEN its `app` artifact names `Home-Cellar.app` and declares no `target:`
+- AND neither its zap inventory nor any `uninstall delete:` names `/Applications/cellar.app`, so a zap
+  can only remove what the cask itself placed
+- Verification: `ci-gate` — `ci.yml` in `juancasanueva/homebrew-cellar`
 
 #### Scenario: A self-updated app does not fight `brew upgrade`
 
 - GIVEN a cask-installed copy that has since updated itself in place to a newer version
 - WHEN an upgrade is requested through Homebrew
 - THEN Homebrew does not report the installed copy as outdated or reinstall over it
+- AND the self-update replaced the bundle at its existing path rather than creating a second bundle
 - Verification: `manual-evidence`
 
 #### Scenario: A prerelease never becomes an installable cask version
@@ -479,6 +525,11 @@ cache file added by a later change fails a test in the repository where the writ
 than silently outliving the app on a user's disk. The inventory MUST list only paths that have been
 observed on a real machine; a path nobody has seen MUST NOT be guessed into it.
 
+Renaming the delivered bundle MUST NOT change that inventory. Every documented write root derives from
+the bundle identifier `com.juancasanueva.cellar` or from a literal the sources already carry, and none
+derives from the product name, so no data root moves and no inventory entry is added, removed, or
+repointed by this change.
+
 The repository MUST also state what a full uninstall **cannot** remove: Homebrew's uninstall has no
 Keychain facility, so the two generic-password items Cellar creates —
 `com.juancasanueva.cellar.nvd-api-key` and `com.juancasanueva.cellar.github-pat` — survive it. Naming
@@ -486,12 +537,16 @@ them is the whole obligation; this change MUST NOT add code to delete them.
 
 The install and uninstall instructions MUST be documented **in this repository** as whole,
 copy-pasteable lines rather than as fragments a reader must assemble, and MUST state that the installed
-bundle is `cellar.app`. The short install form is canonical, and the fully-qualified form MUST also be
-documented as the unambiguous one, because an unqualified token can later be claimed elsewhere.
+bundle is `Home-Cellar.app`. Exactly one bundle name MUST appear across those instructions: no
+alternative name, no "formerly known as" caveat, and no migration guidance. The short install form is
+canonical, and the fully-qualified form MUST also be documented as the unambiguous one, because an
+unqualified token can later be claimed elsewhere.
 
 Adding this second channel MUST NOT widen what the release run reaches: the release workflow MUST NOT
 declare a cross-repository dispatch and MUST NOT name any repository other than the one it runs in.
 A channel documented here MUST NOT become a write target there.
+(Previously: the documented installed bundle was `cellar.app`, one name was documented without an
+exclusivity clause, and the inventory's independence from the bundle name was unstated.)
 
 #### Scenario: The documented inventory covers every write root the source declares
 
@@ -514,7 +569,8 @@ A channel documented here MUST NOT become a write target there.
 - GIVEN the repository's README
 - WHEN its install section is read
 - THEN it carries each brew command as a complete line a reader can copy and run
-- AND it states that the installed bundle is `cellar.app` and gives the fully-qualified form
+- AND it states that the installed bundle is `Home-Cellar.app` and gives the fully-qualified form
+- AND no other bundle name and no migration instruction appears in that section
 - Verification: `unit`
 
 #### Scenario: The release run gains no cross-repository reach
@@ -565,7 +621,9 @@ A channel documented here MUST NOT become a write target there.
   - **D4 / D7** → the artifact-identity clauses: a zip produced by
     `ditto -c -k --keepParent --sequesterRsrc`, named `Home-Cellar-<version>.zip`, containing
     `cellar.app` with display name `Home-Cellar`. **Rejected/deferred:** a DMG, to the landing-page
-    follow-up.
+    follow-up. *(Historical: that is what D4/D7 decided and what shipped through `v1.1.0`. Since
+    `m8-bundle-rename` (`v1.2.0`) the bundle inside the zip is `Home-Cellar.app`; the zip's own name
+    and the display name are unchanged.)*
   - **D5 / D9** → "Gatekeeper accepts the artifact users actually download, offline" and "No credential
     material in the repository". Notarization authenticates with an App Store Connect API key, which
     also serves `-allowProvisioningUpdates`, so `CODE_SIGN_STYLE` stays `Automatic` and the Debug and
@@ -598,9 +656,13 @@ A channel documented here MUST NOT become a write target there.
 - **Contract inherited by the follow-up slices.** `m6-sparkle-updates` binds its `<enclosure url>` and
   `m6-cask-tap` binds its cask `url` to
   `https://github.com/juancasanueva/SWIFTUI_cellar/releases/download/v<version>/Home-Cellar-<version>.zip`;
-  the cask's `app` stanza must name `cellar.app` exactly, its token is `home-cellar`, and the arm64 pin
-  plus the macOS 26.0 floor become `depends_on arch: :arm64` and `depends_on macos: ">= :tahoe"`.
+  the cask's `app` stanza must name `Home-Cellar.app` exactly, its token is `home-cellar`, and the
+  arm64 pin plus the macOS 26.0 floor become `depends_on arch: :arm64` and
+  `depends_on macos: ">= :tahoe"`.
   Those slices inherit these facts from this spec rather than re-deriving them.
+  *(Superseded in part by `m8-bundle-rename`: this clause read `cellar.app` when it was written, and
+  it states a **live** requirement rather than a historical measurement, so it was updated in place
+  to match the merged requirement. Everything else in this paragraph is unchanged.)*
 - **Amended by change `m6-sparkle-updates`** (archived `2026-08-23`, PRD milestone **M6 "Ship"**,
   slice 3 of 3 — Sparkle 2 in-app updates), MODIFIED-only delta — **3 requirements replaced in full,
   0 added, 0 removed, 0 renamed**, taking the capability from **8 requirements / 29 scenarios** to
@@ -617,6 +679,9 @@ A channel documented here MUST NOT become a write target there.
     prebuilt framework to carry additional slices (decision **D2**). This is the honest wording for
     what the `lipo` gate has always read, not a weakening: probe `U31` measured
     `Sparkle.framework` as `x86_64 arm64` while `Contents/MacOS/cellar` stayed `arm64`.
+    *(The `U31` measurement is preserved exactly as taken. Since `m8-bundle-rename` that same
+    executable is at `Contents/MacOS/Home-Cellar`; the architecture finding is unaffected by the
+    rename, which moved names and no bits.)*
     **Rejected:** `lipo -thin`, which needs a sandboxed build phase or a post-export re-sign that
     takes signing ownership away from `-exportArchive`. 0 scenarios added; the architecture scenario
     was reworded to follow.
@@ -686,6 +751,11 @@ A channel documented here MUST NOT become a write target there.
     rename it". The cask declares `app "cellar.app"` with no `target:`. **Rejected:**
     `target: "Home-Cellar.app"`, which splits the two install channels and perturbs Sparkle's
     in-place self-replacement. The `Home-Cellar.app` rename is logged as its own slice.
+    *(That slice is `m8-bundle-rename`, landed 2026-08-23 in `v1.2.0`: it performed the rename D3
+    deferred, so the cask now declares `app "Home-Cellar.app"`. **D3's rejection of `target:` still
+    stands** and was not reopened — the cask names the new bundle **directly**, which is the
+    opposite of the rejected alternative: both channels still install the same path under the same
+    name, and Sparkle's in-place self-replacement is untouched.)*
   - **D4** → the checksum and audit clauses. `homepage` is the GitHub repository, so **no
     `verified:`** parameter is declared. **Rejected:** a landing-page homepage, which would make
     `verified:` mandatory; with matching domains `brew audit` raises *"the `verified` parameter is
@@ -706,6 +776,9 @@ A channel documented here MUST NOT become a write target there.
   its `app` stanza to `cellar.app`, its token to `home-cellar`, and its `depends_on` to
   `arch: :arm64` plus `macos: :tahoe` — exactly as that paragraph anticipated, re-deriving none of
   them. Both follow-up slices named there have now landed.
+  *(Historical: `cellar.app` is what `m6-cask-tap` bound at the time. Since `m8-bundle-rename` the
+  `app` stanza names `Home-Cellar.app`; the `url`, the token and the `depends_on` bindings recorded
+  here are unchanged.)*
 - **Execution status at the amendment (2026-08-23).** Of the nine scenarios this delta adds, **four
   `unit` are runtime-proven** in `cellarTests` with an independently re-proven RED→GREEN transition,
   **three `ci-gate` are run-proven** by `juancasanueva/homebrew-cellar` workflow runs on `macos-26`
@@ -715,9 +788,55 @@ A channel documented here MUST NOT become a write target there.
   Mac that has never had Cellar) is WAIVED** by maintainer decision 2026-08-23, with the tap CI's
   install/zap round trip on a clean `macos-26` runner standing as the clean-machine evidence. That
   waiver is recorded in the archive report, not smoothed away here.
-- **Deferred, recorded so they are not re-derived**: the `Home-Cellar.app` rename (its own slice —
+- **Deferred, recorded so they are not re-derived**: ~~the `Home-Cellar.app` rename (its own slice —
   `PRODUCT_NAME`, four `release.sh` gates, this spec's bundle-name scenario, and update continuity
-  for every installed 1.0.0 copy); moving `~/Library/Caches/Cellar` under the bundle id (a
-  migration); and submission to `homebrew/cask` (notability requirements unmet — the self-hosted tap
-  is the channel).
+  for every installed 1.0.0 copy)~~ — **LANDED** as `m8-bundle-rename` (2026-08-23, `v1.2.0`); its
+  "update continuity for every installed 1.0.0 copy" clause is **closed by D1**, because the
+  installed base was empty at the time of the rename, so no continuity work was ever owed and **no
+  migration mechanism was built**. Still deferred: moving `~/Library/Caches/Cellar` under the bundle
+  id (a migration); and submission to `homebrew/cask` (notability requirements unmet — the
+  self-hosted tap is the channel).
+- **Amended by change `m8-bundle-rename`** (archived `2026-08-23`, PRD milestone **M6 "Ship"**,
+  specifically its cask-channel line `PRD.md:194`), MODIFIED-only delta — **3 requirements replaced
+  in full, 0 added, 0 removed, 0 renamed**, taking the capability from **10 requirements / 41
+  scenarios** to **10 requirements / 42 scenarios**, promoted from
+  `openspec/changes/archive/2026-08-23-m8-bundle-rename/specs/release-distribution/spec.md`. The
+  three replaced blocks are *A pushed tag is the only thing that produces a downloadable release*,
+  *The delivered build is installable through the project's Homebrew tap*, and *Uninstalling states
+  exactly what it removes, and what it cannot*. Because nothing is added, removed or renamed at the
+  requirement level, `rules.archive`'s destructive-delta warning does not fire and **no capability
+  count in any other spec changes**.
+  - **What moved.** One user-visible name, everywhere a person can see it: the bundle inside the
+    published zip, the installed path, the main executable and the cask's `app` artifact all became
+    `Home-Cellar.app` / `Contents/MacOS/Home-Cellar`. The zip name `Home-Cellar-<version>.zip`, the
+    cask token `home-cellar` and the display name `Home-Cellar` were already correct and did not
+    move.
+  - **What deliberately did not move, and is now requirement text rather than prose.** The bundle
+    identifier `com.juancasanueva.cellar`. Every application-support root, cache root, Keychain item
+    and update host-match derives from that identifier and from no product name, so **the rename
+    moved no user data and required no migration**. `PRODUCT_MODULE_NAME` was pinned to `cellar`
+    (**DD-1**) so the Swift module never became `Home_Cellar` and all 22 `@testable import cellar`
+    files compiled with zero source edits; the product/module divergence is deliberate, and asserted
+    in one test so it stays discoverable.
+  - **D1 (binding, maintainer 2026-08-23)** — the app had no installed base beyond the maintainer's
+    own Mac. **Rejected in consequence:** every migration mechanism (`target:`, a
+    `/Applications/cellar.app` zap entry, `uninstall delete:`, `SUBundleName`), all old-name user
+    guidance, and an in-app notice. A zap must not delete a bundle the cask never placed.
+  - **D2** — all three proposal defaults accepted. `cellar.xcarchive` stays (**DD-4**, a build
+    intermediate no user sees); the Xcode target and the `cellar/` source folder are **never**
+    renamed (**rejected:** explore Approach 1, largest blast radius for the smallest visible gain);
+    the product/module divergence is accepted and documented (**rejected:** 22 mechanical import
+    edits to align them).
+  - **+1 scenario** — *The rename ships no migration mechanism*, `ci-gate`, run by `ci.yml` in
+    `juancasanueva/homebrew-cellar`. It asserts the **absence** of every migration mechanism rather
+    than behaviour for an installed base of zero. This is the one deliberate divergence from the
+    proposal's "counts are unchanged" line: the scenario count moves by one while the binding
+    Capabilities contract — **zero ADDED requirements** — is honoured exactly.
+  - **The ordering constraint is requirement text, not a note (R4).** A cask naming a bundle its
+    declared asset does not contain **audits clean and installs broken**, because the automated bump
+    path gates only on `brew style` and `brew audit` and neither extracts the archive nor resolves
+    the `app` artifact. Both naive orderings break: tap-first misnames the already-published
+    `v1.1.0` asset, and tag-first lets a scheduled bump land the new `version`/`sha256` against the
+    old `app` stanza. Only **one atomic post-release commit** works. That is what shipped — see the
+    archive report for the executed evidence.
 - The archived delta specs are the verbatim audit trail.
