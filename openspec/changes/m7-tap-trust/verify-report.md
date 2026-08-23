@@ -482,3 +482,89 @@ The five warnings are record-keeping and breadth issues, not defects in shipped 
 archive; W2 in particular will actively mislead `sdd-archive` if not read first. The four
 `manual-evidence` scenarios remain the maintainer's, and PM10.7's gate is held — nothing in the
 codebase claims formula coverage, so no claim must be retracted when that transcript arrives.
+
+## Addendum — Phase 9 manual evidence captured (2026-08-23, 20:11–20:48, maintainer's Mac, Homebrew 6.0.18-167)
+
+Captured with the Xcode Debug build of `main` at `3018fe4` (PR #68) and, for A below, of
+`fix/untap-remove-then-revoke` (PR #69). `/Applications/cellar.app` was never touched; no `brew upgrade`
+ran without `--dry-run`. Transcripts and screenshots were supplied in the session; the verbatim text is
+reproduced here.
+
+### 9.5 — withheld tap (supporting evidence)
+
+`brew untrust juancasanueva/cellar` → `brew trust --json v1` shows `"taps": []`. Cellar, after Refresh:
+list row and detail header carry the **Untrusted** badge; the `home-cellar` row reads exactly
+*"Installed. Homebrew withholds its tap while this tap is untrusted."*; **Show in Installed** lands on
+`home-cellar 1.0.0 · Cask (GUI app)`. Footer: *"Homebrew withholds which packages came from this tap
+while it is untrusted, so Force Untap is unavailable. …"* **PASS.**
+
+### 9.2 — ME2 / PM10.8 — refusal classified from inside Cellar
+
+Installed → `home-cellar` → ⊖ → **Reinstall** (chosen over Upgrade because the cask is `auto_updates`;
+the refusal is load-time, proven first with `brew info --cask home-cellar` and `brew fetch --cask
+home-cellar`, both refused). Activity item `brew reinstall --cask home-cellar`: classified summary
+*"Homebrew refused to load this package because its tap is not trusted. Trust the tap in Taps, then
+try again."*, label **Tap not trusted**, recovery button **Trust**. The expanded Activity log carries
+brew's own lines verbatim (`Run \`brew trust --cask juancasanueva/cellar/home-cellar\` or \`brew trust
+juancasanueva/cellar\` to trust it.`). **PASS.**
+
+### 9.1 — ME1 / TM13.5 — the grant is an explicit answer
+
+**Trust** → sheet *"Trust this tap?"* / *"This will run: brew trust juancasanueva/cellar"* /
+*"Trusting juancasanueva/cellar lets Homebrew load and run its formulae and casks. That is third-party
+code running as you, with your permissions."* (the `.tapTrustGrant` copy, verbatim) → confirm →
+Activity `brew trust juancasanueva/cellar` Done → badge gone and **Untrust** offered **without
+Refresh** → `brew trust --json v1` shows `"taps": ["juancasanueva/cellar"]`. Before/after captured.
+**PASS.**
+
+### 9.3 — ME3 / TM13.6 — revoke on removal, re-tap comes back untrusted
+
+First attempt (build `3018fe4`): **Untap** ran `brew untrust` (Done) then `brew untap` **Failed**,
+status 1: `Error: Refusing to untap juancasanueva/cellar because it contains the following installed
+casks: juancasanueva/cellar/home-cellar`. The grant was gone (`"taps": []`) but the tap remained,
+untrusted, with Force Untap hidden — **finding → maintainer decision D4 → PR #69** (removal first;
+revocation only after a successful removal; measured that `brew untrust` after `brew untap` exits 0).
+
+Second attempt (build `fix/untap-remove-then-revoke`):
+- **A.** Untap on the trusted `juancasanueva/cellar` (installed cask): `brew untap` Failed with brew's
+  reason in the log, **no** `brew untrust` item followed, tap still trusted (Untrust offered, no
+  badge), Force Untap available. The loop is gone.
+- **B.** Full cycle on a tap with nothing installed: Add Tap `oven-sh/bun` → sheet *"Adding
+  oven-sh/bun clones a third-party repository. Homebrew will not load its formulae or casks until you
+  trust it, and Cellar does not trust it for you."* (the `.tapAdd` copy, verbatim) → tap listed
+  **Untrusted**, 167 formulae → **Trust** (sheet as in 9.1) → badge gone → **Untap** → Activity
+  `brew untap oven-sh/bun` Done **then** `brew untrust oven-sh/bun` Done → `brew trust --json v1`
+  `"taps": ["juancasanueva/cellar"]` (no `oven-sh/bun`) → `brew tap oven-sh/bun` from Terminal →
+  `brew tap-info --json oven-sh/bun` → `trusted=false`; Cellar lists it Untrusted. Cleaned up with
+  `brew untap oven-sh/bun`. **PASS.**
+
+### 9.4 — ME5 / PM10.7 — the formula refusal wording
+
+`agavra/tap` untrusted, `tuicr` installed with no per-package grant:
+
+```
+$ brew upgrade --dry-run tuicr
+Error: Refusing to load formula agavra/tap/tuicr from untrusted tap agavra/tap.
+Run `brew trust --formula agavra/tap/tuicr` or `brew trust agavra/tap` to trust it.
+```
+
+Contains the structural phrase `untrusted tap`; `brew info tuicr` prints the identical first line.
+**The classifier covers formulae; R6 is closed and the PM10.7 claim gate is discharged.**
+
+### 9.6 — Homebrew < 6
+
+Not reproducible on this machine (6.0.18). Covered by unit 1's `.unreported` decode and unit 9b;
+recorded as a limitation (R5): on such a Homebrew every untap attempts `untrust` only after a
+successful untap (D4) and shows that item failing visibly.
+
+### Two observations for the archive
+
+- **Per-package grants are invisible in v1.** All 8 of the maintainer's other third-party taps show
+  **Untrusted** while their installed packages keep working through per-package grants recorded by
+  fully-qualified CLI installs (`brew trust --json v1`: 9 formulae, 4 casks). Accurate, and the
+  proposal's declared non-goal — but a user reads "Untrusted" next to a tap whose packages upgrade
+  fine. Follow-up: surface "N packages trusted individually" from `brew trust --json v1`.
+- **Untap of a tap with installed packages is always refused by brew.** Pre-existing behaviour; with D4
+  it now fails cleanly and points at Force Untap.
+
+Phase 9 tasks 9.1–9.6 are checked. All 89 scenarios are now discharged at their declared class.

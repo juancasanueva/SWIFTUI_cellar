@@ -463,24 +463,24 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'MutationCommand
 Each transcript is captured **verbatim into the verify report** — the artifact that carries evidence
 in this repository (spec amendment #7; a design written before execution cannot contain it).
 
-- [ ] 9.1 **ME1 — TM13.5.** `brew tap juancasanueva/cellar` → Cellar shows **Untrusted** → in-app
+- [x] 9.1 **ME1 — TM13.5.** `brew tap juancasanueva/cellar` → Cellar shows **Untrusted** → in-app
       **Trust** → the sheet shows `.tapTrustGrant`'s exact text → `brew trust --json v1` lists the tap
       → the badge flips with **no manual reload**. Capture `brew trust --json v1` before and after.
-- [ ] 9.2 **ME2 — PM10.8.** A bare-token upgrade (`--dry-run`) of a package from an untrusted tap,
+- [x] 9.2 **ME2 — PM10.8.** A bare-token upgrade (`--dry-run`) of a package from an untrusted tap,
       launched **from inside Cellar**, renders `.refusedUntrustedTap` with brew's own `brew trust …`
       line visible in the untruncated log, and the recovery **Trust** button opens the ordinary
       confirmation.
-- [ ] 9.3 **ME3 — TM13.6.** **Untap** a trusted tap from Cellar → `brew trust --json v1` no longer
+- [x] 9.3 **ME3 — TM13.6.** **Untap** a trusted tap from Cellar → `brew trust --json v1` no longer
       lists it → re-tap it → it comes back untrusted. This is the whole stale-grant fix (R3).
-- [ ] 9.4 **ME5 — PM10.7, blocking a claim rather than the merge.** Capture the **formula** refusal
+- [x] 9.4 **ME5 — PM10.7, blocking a claim rather than the merge.** Capture the **formula** refusal
       stderr verbatim (R6 — only the cask wording was ever measured). **The classifier MUST NOT be
       described as covering formulae until this transcript exists.** If the wording lacks
       `"untrusted tap"`, that is a `.failed` degradation with the verbatim log, and widening the
       phrase needs no design change.
-- [ ] 9.5 **Supporting evidence (not a spec scenario).** With the tap untrusted, an installed package
+- [x] 9.5 **Supporting evidence (not a spec scenario).** With the tap untrusted, an installed package
       from it reads *"Installed. Homebrew withholds its tap while this tap is untrusted."* and **Show
       in Installed** still lands on the right record.
-- [ ] 9.6 Record that **Homebrew < 6 degradation is not reproducible here**; it is covered by unit 1's
+- [x] 9.6 Record that **Homebrew < 6 degradation is not reproducible here**; it is covered by unit 1's
       `.unreported` decode plus unit 9b, and documented as a limitation (R5).
 
 ## Phase 10: Archive obligations (recorded now so they are not re-derived at `sdd-archive`)
