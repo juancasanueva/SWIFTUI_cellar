@@ -13,9 +13,9 @@ that no test or gate could ever check:
 
 | Class | Meaning | Count |
 |---|---|---|
-| `unit` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom (reads the repository or the test host's bundle information off disk) | **14** |
-| `ci-gate` | a hard gate inside the release run; failing it fails the job and publishes nothing | **14** |
-| `manual-evidence` | no harness can exist; the maintainer's observed output is recorded in `design.md` | **4** |
+| `unit` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom (reads the repository or the test host's bundle information off disk), run by `xcodebuild test … -only-testing:cellarTests` in **this** repository | **18** |
+| `ci-gate` | a hard gate whose failure fails its job and commits or publishes nothing. The runner is named per scenario: the release run in `.github/workflows/release.yml` **here**, or `ci.yml` / `bump.yml` in **`juancasanueva/homebrew-cellar`** on `macos-26` for the cask channel | **17** |
+| `manual-evidence` | no harness can exist — no runner may install into a real `/Applications` or observe a self-updated app — so the maintainer's observed output is recorded verbatim in `design.md` and the verify report | **6** |
 
 What stays **design-owned and is deliberately absent here**: the runner image and Xcode pinning, the
 export/notarize/staple command sequence and its ordering rationale, the ephemeral-keychain mechanics,
@@ -405,6 +405,126 @@ it already owns; the build setting MUST NOT be used to carry it, because two sou
 - AND the corresponding build setting carries no competing value
 - Verification: `unit`
 
+### Requirement: The delivered build is installable through the project's Homebrew tap
+
+Cellar tells its users that Homebrew is the source of truth, so the delivered build MUST be installable
+through Homebrew and not only by dragging a downloaded zip. The project MUST publish a Homebrew tap
+whose cask installs **the same published asset this capability already specifies** — no second artifact,
+no separately built binary, and no mirrored copy.
+
+Adding the tap and installing the cask MUST place the delivered bundle at **`/Applications/cellar.app`**,
+whose `CFBundleShortVersionString` equals the released version. The installed bundle name is the one the
+zip already carries; this change MUST NOT rename it, so the cask channel and the direct-download channel
+install the same path.
+
+The cask MUST declare that the app **updates itself**, because Sparkle replaces the bundle in place: a
+self-updated copy MUST NOT cause `brew` to report a mismatch or to reinstall over the newer app. The
+declared checksum MUST equal the digest of the **published** asset, established by downloading that
+asset rather than by trusting a value computed while building it. The cask MUST NOT offer a prerelease
+version: only a release that the project publishes as its latest stable release MUST become an
+installable cask version.
+
+Keeping the cask current MUST NOT require a manual step and MUST be **idempotent on the declared
+version** — an update attempt against a release the cask already declares MUST change nothing. The
+channel therefore cannot manufacture a second commit, or a second release, from one published release,
+which is what keeps it compatible with "one stable release per commit".
+
+#### Scenario: A tap and an install put the released build in `/Applications`
+
+- GIVEN a Mac with Homebrew that has never had Cellar installed
+- WHEN the project's tap is added and its cask is installed
+- THEN `/Applications/cellar.app` exists and reports the released version
+- AND the app launches without a Gatekeeper refusal
+- Verification: `manual-evidence`
+
+#### Scenario: The cask is style-clean, audit-clean, and survives a real install/uninstall round trip
+
+- GIVEN the cask as published in the tap repository
+- WHEN the tap's CI runs style, offline audit, and online strict audit, then installs the cask and
+  uninstalls it with a zap
+- THEN every gate passes, the online audit confirms the declared checksum against the downloaded
+  published asset, and the round trip completes
+- AND a failing gate leaves nothing committed and nothing published
+- Verification: `ci-gate`
+
+#### Scenario: A self-updated app does not fight `brew upgrade`
+
+- GIVEN a cask-installed copy that has since updated itself in place to a newer version
+- WHEN an upgrade is requested through Homebrew
+- THEN Homebrew does not report the installed copy as outdated or reinstall over it
+- Verification: `manual-evidence`
+
+#### Scenario: A prerelease never becomes an installable cask version
+
+- GIVEN a published prerelease tag that is newer than the latest stable release
+- WHEN the cask's version source is resolved
+- THEN the cask still declares the latest **stable** released version
+- AND no prerelease version is ever offered to a cask user
+- Verification: `ci-gate`
+
+#### Scenario: Keeping the cask current is idempotent on the declared version
+
+- GIVEN a cask that already declares the latest published stable version
+- WHEN the update mechanism runs again against that unchanged release
+- THEN it exits successfully and produces no commit and no version change
+- AND running it repeatedly produces at most one commit per published release
+- Verification: `ci-gate`
+
+### Requirement: Uninstalling states exactly what it removes, and what it cannot
+
+An uninstall story that is quietly incomplete is worse than none. The repository MUST document the full
+set of write roots a full uninstall removes, and that documented inventory MUST be **bound to the
+source**: every application-support and cache root the shipped sources declare MUST appear in it, so a
+cache file added by a later change fails a test in the repository where the write was introduced rather
+than silently outliving the app on a user's disk. The inventory MUST list only paths that have been
+observed on a real machine; a path nobody has seen MUST NOT be guessed into it.
+
+The repository MUST also state what a full uninstall **cannot** remove: Homebrew's uninstall has no
+Keychain facility, so the two generic-password items Cellar creates —
+`com.juancasanueva.cellar.nvd-api-key` and `com.juancasanueva.cellar.github-pat` — survive it. Naming
+them is the whole obligation; this change MUST NOT add code to delete them.
+
+The install and uninstall instructions MUST be documented **in this repository** as whole,
+copy-pasteable lines rather than as fragments a reader must assemble, and MUST state that the installed
+bundle is `cellar.app`. The short install form is canonical, and the fully-qualified form MUST also be
+documented as the unambiguous one, because an unqualified token can later be claimed elsewhere.
+
+Adding this second channel MUST NOT widen what the release run reaches: the release workflow MUST NOT
+declare a cross-repository dispatch and MUST NOT name any repository other than the one it runs in.
+A channel documented here MUST NOT become a write target there.
+
+#### Scenario: The documented inventory covers every write root the source declares
+
+- GIVEN the shipped app and core sources
+- WHEN every application-support and cache write root they declare is enumerated
+- THEN each enumerated root appears in the uninstall inventory documented in the repository
+- AND the enumeration is non-vacuous: the scan finds every root the source declares, and the documented inventory additionally lists every root measured on a real machine, including framework-written roots that no source file declares
+- Verification: `unit`
+
+#### Scenario: The two Keychain items are documented as surviving a full uninstall
+
+- GIVEN the release documentation in the repository
+- WHEN it is read
+- THEN it names `com.juancasanueva.cellar.nvd-api-key` and `com.juancasanueva.cellar.github-pat` as
+  items a full uninstall does not remove
+- Verification: `unit`
+
+#### Scenario: The install commands are documented as whole lines
+
+- GIVEN the repository's README
+- WHEN its install section is read
+- THEN it carries each brew command as a complete line a reader can copy and run
+- AND it states that the installed bundle is `cellar.app` and gives the fully-qualified form
+- Verification: `unit`
+
+#### Scenario: The release run gains no cross-repository reach
+
+- GIVEN the release workflow
+- WHEN it is inspected structurally
+- THEN it declares no cross-repository dispatch
+- AND it names no repository other than the one it runs in
+- Verification: `unit`
+
 ## Provenance
 
 - Established by change `m6-release-pipeline` (archived `2026-08-23`, PRD milestone **M6 "Ship"**,
@@ -526,4 +646,78 @@ it already owns; the build setting MUST NOT be used to carry it, because two sou
 - **The inherited-contract paragraph above is now enforced from the release side.** `RD-a1` requires
   the feed entry's enclosure to be the run's own published `https` asset URL, so
   `m6-sparkle-updates`'s binding is a gate rather than a note.
+- **Amended by change `m6-cask-tap`** (archived `2026-08-23`, PRD milestone **M6 "Ship"**, slice 4 of
+  4 — the Homebrew tap and cask), ADDED-only delta — **2 requirements / 9 scenarios added, 0
+  modified, 0 removed, 0 renamed**, taking the capability from **8 requirements / 32 scenarios** to
+  **10 requirements / 41 scenarios**, promoted from
+  `openspec/changes/archive/2026-08-23-m6-cask-tap/specs/release-distribution/spec.md`. Every one of
+  the eight existing requirements is byte-identical to its prior text and no existing scenario was
+  edited or deleted, so `rules.archive`'s destructive-delta warning did not fire. The two appended
+  requirements are *The delivered build is installable through the project's Homebrew tap* (**+5
+  scenarios**: 3 `ci-gate`, 2 `manual-evidence`) and *Uninstalling states exactly what it removes,
+  and what it cannot* (**+4 scenarios**, all `unit`).
+- **A tap is a second channel for the same delivered build, never a second artifact.** The cask
+  installs the asset this capability already specifies; it authors no URL, no bundle name, no
+  architecture pin and no OS floor. That is why `m6-cask-tap` added no capability of its own.
+- **The `## Verification classes` table was hand-updated at archive**, from `unit` 14 / `ci-gate` 14
+  / `manual-evidence` 4 (total 32) to `unit` **18** / `ci-gate` **17** / `manual-evidence` **6**
+  (total **41**). Two edits were required, not one: the counts, **and** the `ci-gate` meaning, which
+  read "a hard gate inside **the release run**" and is now "a hard gate whose failure fails its job
+  and commits or publishes nothing". Three of the delta's `ci-gate` scenarios execute in
+  `juancasanueva/homebrew-cellar` rather than in this repository's release run, so updating the
+  counts alone would have left the table stating something false. The runner is now named per class.
+  The arithmetic was confirmed against the merged file by counting `- Verification:` lines
+  (18 / 17 / 6 = 41), not by trusting the delta's note.
+- Traceability to `m6-cask-tap`'s binding decisions (proposal Engram `#7703`, **D1–D5**
+  user-approved 2026-08-23). Each names what was rejected, so a later change cannot reintroduce a
+  rejected alternative as a fresh idea:
+  - **D1** → "Keeping the cask current MUST NOT require a manual step and MUST be idempotent on the
+    declared version". The bump is a **pull** from a workflow in the tap repository, on a schedule
+    plus `workflow_dispatch`, reading `releases/latest` anonymously. **Rejected:** a cross-repository
+    `repository_dispatch` from the release job (which would put a cross-repo write PAT beside the
+    Developer ID `.p12` and grow the closed seven-secret set to eight); a second workflow in this
+    repository, unconstrained by `release.yml`'s file-scoped invariants; and manual-only bumping,
+    kept only as the documented fallback. A missed dispatch is lost forever; a missed scheduled run
+    is corrected by the next one.
+  - **D2** → "The release run gains no cross-repository reach". The extension-point comment at
+    `release.yml:175-176` was **deleted**, and its absence is asserted by a test. **Rejected:**
+    leaving a promise the design declined, and deleting it without a test.
+  - **D3** → "the installed bundle name is the one the zip already carries; this change MUST NOT
+    rename it". The cask declares `app "cellar.app"` with no `target:`. **Rejected:**
+    `target: "Home-Cellar.app"`, which splits the two install channels and perturbs Sparkle's
+    in-place self-replacement. The `Home-Cellar.app` rename is logged as its own slice.
+  - **D4** → the checksum and audit clauses. `homepage` is the GitHub repository, so **no
+    `verified:`** parameter is declared. **Rejected:** a landing-page homepage, which would make
+    `verified:` mandatory; with matching domains `brew audit` raises *"the `verified` parameter is
+    unnecessary"* as an **error**, not a courtesy.
+  - **D5** → the user-facing half of "The install and uninstall instructions MUST be documented".
+    The tap repository carries its own README. **Rejected:** a bare `Casks/` repository — `brew tap`
+    users land on that page.
+  - **DD-13** (MIT `LICENSE` in **both** repositories, maintainer decision 2026-08-23) is a process
+    decision with no property of a delivered build behind it, so it is carried by the change's
+    `design.md` and deliberately not by a requirement here. Recorded so a later reader does not read
+    its absence as a gap. The same applies to the three accepted apply deviations **D-1**
+    (`depends_on macos: :tahoe`, the current-syntax form of the same macOS 26.0 floor), **D-2** (the
+    canonical documented install is **three** whole lines — `brew tap`, `brew trust`, `brew install
+    --cask home-cellar` — because Homebrew 6 refuses short cask names from untrusted taps), and
+    **D-3** (the test joined the `Release workflow contract` suite).
+- **The inherited-contract paragraph above is now CONSUMED.** `m6-cask-tap` binds its cask `url` to
+  `https://github.com/juancasanueva/SWIFTUI_cellar/releases/download/v<version>/Home-Cellar-<version>.zip`,
+  its `app` stanza to `cellar.app`, its token to `home-cellar`, and its `depends_on` to
+  `arch: :arm64` plus `macos: :tahoe` — exactly as that paragraph anticipated, re-deriving none of
+  them. Both follow-up slices named there have now landed.
+- **Execution status at the amendment (2026-08-23).** Of the nine scenarios this delta adds, **four
+  `unit` are runtime-proven** in `cellarTests` with an independently re-proven RED→GREEN transition,
+  **three `ci-gate` are run-proven** by `juancasanueva/homebrew-cellar` workflow runs on `macos-26`
+  (`32642667011` style + both audits + a real install/zap round trip; `32642223493` and
+  `32642400685` bump idempotence, zero commits), **one `manual-evidence` (a self-updated app does not
+  fight `brew upgrade`) is observed and passing**, and **one `manual-evidence` (first install on a
+  Mac that has never had Cellar) is WAIVED** by maintainer decision 2026-08-23, with the tap CI's
+  install/zap round trip on a clean `macos-26` runner standing as the clean-machine evidence. That
+  waiver is recorded in the archive report, not smoothed away here.
+- **Deferred, recorded so they are not re-derived**: the `Home-Cellar.app` rename (its own slice —
+  `PRODUCT_NAME`, four `release.sh` gates, this spec's bundle-name scenario, and update continuity
+  for every installed 1.0.0 copy); moving `~/Library/Caches/Cellar` under the bundle id (a
+  migration); and submission to `homebrew/cask` (notability requirements unmet — the self-hosted tap
+  is the channel).
 - The archived delta specs are the verbatim audit trail.
