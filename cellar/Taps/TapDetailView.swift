@@ -210,7 +210,7 @@ struct TapDetailView: View {
                 }
             }
             if TapProjection.trust(for: tap).canGrant {
-                Text("Homebrew withholds which packages came from this tap while it is untrusted, so Force Untap is unavailable. Trust the tap to see them, or use Untap.")
+                Text("Homebrew withholds which packages came from this tap while it is untrusted, so Force Untap is unavailable. Trust the tap to see them. Untap succeeds only when none of its packages is installed; Homebrew refuses it otherwise.")
                     .font(.system(size: 11.5))
                     .lineSpacing(2)
                     .foregroundStyle(Theme.textBody)
@@ -273,19 +273,25 @@ struct TapDetailView: View {
         operations.submit(command)
     }
 
-    /// Both removals submit the whole **action**, not one command: revoke the
-    /// grant, then remove the tap. One request covers the sequence, so declining
-    /// a force untap submits none of it (TM7 :216-231, TM8 :281-283).
+    /// Both removals submit the whole **action**, not one command: remove the
+    /// tap, then revoke the grant it owned. One request covers the sequence, so
+    /// declining a force untap submits none of it (TM7 :216-231, TM8 :281-283).
+    ///
+    /// Dependent, not a fan-out (D4, 2026-08-23): Homebrew refuses to untap a tap
+    /// whose packages are still installed, and a revocation submitted anyway
+    /// would leave the grant gone, the tap present, and Force Untap hidden — the
+    /// exact dead end the footer above now states plainly rather than pointing
+    /// the user into.
     private func untap(_ tap: TapRecord) {
         guard let commands = TapCommand.removal(of: tap.name) else { return }
-        operations.submitSequence(commands)
+        operations.submitDependentSequence(commands)
     }
 
     private func requestForceUntap(_ name: TapName) {
         guard let evidence = currentForceEvidence(name),
               let commands = TapCommand.forcedRemoval(evidence: evidence)
         else { return }
-        operations.submitSequence(commands)
+        operations.submitDependentSequence(commands)
     }
 }
 

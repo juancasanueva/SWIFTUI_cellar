@@ -176,6 +176,36 @@ public final class ActivityItem: Identifiable {
         isCancellable ? [.cancel, .copyCommand] : [.copyCommand]
     }
 
+    // MARK: - Settlement observers, from the centre only
+
+    /// What to run the moment this item reaches its terminal outcome.
+    ///
+    /// `@ObservationIgnored` for the reason `operation` is: it is plumbing, no
+    /// view reads it, and publishing it would wake every observer twice per
+    /// registration. The handlers are `@MainActor` closures held by a
+    /// `@MainActor` type, so no `Sendable` promise is made or needed — nothing
+    /// here ever crosses an isolation boundary.
+    @ObservationIgnored private var settlementHandlers: [@MainActor (MutationOutcome) -> Void] = []
+
+    /// Registers `handler` to run **once**, with this item's terminal outcome.
+    ///
+    /// Once-only is not defended here: `settle(_:)` is guarded by its own
+    /// `outcome == nil` check and `OperationCenter.finish` guards again, so an
+    /// item settles exactly once however a cancel and a terminal exit race
+    /// (design D3, D7).
+    ///
+    /// An item that has **already** settled runs the handler immediately rather
+    /// than never. A submission with no runner attached is terminal before
+    /// `submit` returns, and a dependent sequence registering on it would
+    /// otherwise wait forever for a settlement that has been and gone.
+    func onSettle(_ handler: @escaping @MainActor (MutationOutcome) -> Void) {
+        if let outcome {
+            handler(outcome)
+            return
+        }
+        settlementHandlers.append(handler)
+    }
+
     // MARK: - Mutation, from the centre only
 
     /// Appends one line, evicting the oldest when the ring is full.
@@ -194,5 +224,11 @@ public final class ActivityItem: Identifiable {
         // runner about it: releasing here is what makes the execution layer's
         // record removable at all (design D6 R3).
         operation = nil
+        // Drained before running, so a handler that registers another one — the
+        // recursive shape a dependent sequence uses — appends to an empty list
+        // instead of one being iterated, and so nothing can be run twice.
+        let handlers = settlementHandlers
+        settlementHandlers = []
+        for handler in handlers { handler(outcome) }
     }
 }
