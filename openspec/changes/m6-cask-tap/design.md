@@ -561,7 +561,7 @@ at the same `Home-Cellar-<version>.zip` §7 specifies.
 | Tap repository | `juancasanueva/homebrew-cellar` (public) |
 | Tap name | `juancasanueva/cellar` |
 | Cask token | `home-cellar` |
-| Canonical install | `brew tap juancasanueva/cellar` then `brew install --cask home-cellar` |
+| Canonical install | `brew tap juancasanueva/cellar`, then `brew trust juancasanueva/cellar`, then `brew install --cask home-cellar` (D-2: Homebrew 6 refuses short cask names from untrusted taps; accepted by the maintainer 2026-08-23) |
 | Unambiguous form | `brew install --cask juancasanueva/cellar/home-cellar` |
 | Installed path | `/Applications/cellar.app` — the same bundle name the zip carries |
 
