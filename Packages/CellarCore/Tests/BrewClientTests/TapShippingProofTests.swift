@@ -112,6 +112,39 @@ struct TapShippingProofTests {
         try assertBoundedUIControls()
     }
 
+    // MARK: - TM12 — one projection, two surfaces
+
+    /// TM12 :460-465 — exactly one projection supplies the trust presentation
+    /// the list row and the detail header consume, "so the two cannot drift".
+    /// Asserted structurally rather than by rendering: two views computing the
+    /// same badge independently is precisely the drift the requirement forbids,
+    /// and it would still pass a per-view rendering test on the day they
+    /// disagree.
+    @Test("The list row and the detail header read one trust projection")
+    func listRowAndDetailHeaderReadOneTrustProjection() throws {
+        let sources = try tapUISources()
+
+        // Positively anchored: the scan really did find both files.
+        #expect(sources.map(\.name).sorted() == ["TapDetailView.swift", "TapsListView.swift"])
+
+        for source in sources {
+            #expect(
+                source.code.contains("TapProjection.trust(for:"),
+                "\(source.name) does not read the shared trust projection"
+            )
+            #expect(
+                source.code.contains("\"Untrusted\"") == false,
+                "\(source.name) composes the badge string locally instead of reading the projection"
+            )
+            for local in [".trust ==", ".trust !=", "case .untrusted", "case .trusted", "case .unreported"] {
+                #expect(
+                    source.code.contains(local) == false,
+                    "\(source.name) derives a trust condition locally: \(local)"
+                )
+            }
+        }
+    }
+
     private func exercise(
         _ action: TapManagementAction,
         store: TapStore,
@@ -173,6 +206,29 @@ struct TapShippingProofTests {
     ) throws -> [TapPackage] {
         let tap = try #require(store.inventory.taps.first)
         return TapProjection.packages(for: tap, installed: installed)
+    }
+
+    private struct TapUISource {
+        let name: String
+        let code: String
+    }
+
+    private func tapUISources() throws -> [TapUISource] {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try ["TapsListView.swift", "TapDetailView.swift"].map { file in
+            TapUISource(
+                name: file,
+                code: try String(
+                    contentsOf: root.appendingPathComponent("cellar/Taps/\(file)"),
+                    encoding: .utf8
+                )
+            )
+        }
     }
 
     private func assertBoundedUIControls() throws {

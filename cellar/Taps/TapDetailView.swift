@@ -43,11 +43,17 @@ struct TapDetailView: View {
         HStack(alignment: .top, spacing: 18) {
             PackageTile(name: tap.name, size: 72, fontSize: 27, cornerRadius: 17)
             VStack(alignment: .leading, spacing: 7) {
-                Text(tap.name)
-                    .font(.system(size: 23, weight: .semibold))
-                    .kerning(-0.5)
-                    .foregroundStyle(Theme.textPrimary)
-                    .textSelection(.enabled)
+                HStack(spacing: 9) {
+                    Text(tap.name)
+                        .font(.system(size: 23, weight: .semibold))
+                        .kerning(-0.5)
+                        .foregroundStyle(Theme.textPrimary)
+                        .textSelection(.enabled)
+                    // Same projection as the list row, by construction (TM12).
+                    if let badge = TapProjection.trust(for: tap).badge {
+                        TapTrustBadge(text: badge)
+                    }
+                }
                 HStack(spacing: 9) {
                     Text(TapProjection.packageSummary(for: tap))
                         .font(.system(size: 12))
@@ -233,6 +239,30 @@ struct TapDetailView: View {
               let command = TapCommand.forceUntap(evidence: evidence)
         else { return }
         _ = operations.request(command)
+    }
+}
+
+/// The tap-scoped trust badge both tap surfaces render.
+///
+/// It takes its text rather than composing one, because TM12 requires the list
+/// row and the detail header to read exactly one projection; a badge that knew
+/// the words would be a second place for them to disagree.
+struct TapTrustBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: .semibold))
+            .kerning(0.5)
+            .textCase(.uppercase)
+            .foregroundStyle(Theme.dangerText)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Theme.dangerTint(0.18),
+                in: RoundedRectangle(cornerRadius: 4, style: .continuous)
+            )
+            .accessibilityIdentifier("tap-trust-badge")
     }
 }
 

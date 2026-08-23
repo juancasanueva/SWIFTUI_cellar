@@ -139,12 +139,12 @@ Plus one artifact commit, **first on the branch** so the reviewed diff opens wit
 
 ## Phase 0: Preflight (sequential; no behaviour changes)
 
-- [ ] 0.1 Measure and record the green baseline; do not re-derive it later. Expected
+- [x] 0.1 Measure and record the green baseline; do not re-derive it later. Expected
       `swift test --package-path Packages/CellarCore` → **1754 tests / 209 suites, 1 known issue,
       0 failures**, and `xcodebuild test … -only-testing:cellarTests` → **238 passed / 0 failed**.
       Count **distinct** passing test ids; `Executed 0 tests` is meaningless for Swift Testing bundles.
       A different number is the new baseline, not a defect — record it and move on.
-- [ ] 0.2 Confirm every anchor the design pins is still where it says (all were at `349a47f`):
+- [x] 0.2 Confirm every anchor the design pins is still where it says (all were at `349a47f`):
       `ConfirmationDisclosureTests.swift` :161-178 / :203 / :216 / :223-227 ·
       `BrewMutatingTests.swift` :231-240 / :257-264 / :279 / :292 ·
       `TapShippingProofTests.swift` :90 / :194-197 / :219-226 · `MutationCommandTests.swift:289` ·
@@ -154,42 +154,42 @@ Plus one artifact commit, **first on the branch** so the reviewed diff opens wit
       `TapDetailView.swift:183` · `MutationConfirmation.swift` :153 / :168 ·
       `BrewfilePlan.swift` :34-43 · `BrewfileEntryTests.swift` :80-87. A moved anchor is a deviation
       to report, not to absorb.
-- [ ] 0.3 `git checkout -b feat/m7-tap-trust main`, then commit the SDD artifacts
+- [x] 0.3 `git checkout -b feat/m7-tap-trust main`, then commit the SDD artifacts
       (`docs(sdd): record the m7-tap-trust proposal, spec deltas, design and tasks`).
 
 ## Phase 1: WU1 — read and show the trust state (TM12.1, .3, .4, .5)
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TapDecodeTests|TapProjectionTests|TapShippingProofTests'`
 
-- [ ] 1.1 **RED — unit 1.** `TapDecodeTests · tapTrustIsThreeValuedAndAbsenceIsNotFalse`:
+- [x] 1.1 **RED — unit 1.** `TapDecodeTests · tapTrustIsThreeValuedAndAbsenceIsNotFalse`:
       `trusted` `true` / `false` / **`null`** / **absent** → `.trusted` / `.untrusted` /
       `.unreported` / `.unreported`. The fixture MUST mirror the real `tap-info --installed --json`
       object shape (PR #67 lesson). **RED because** `TapWire` names no `trusted` key. *(TM12.1)*
-- [ ] 1.2 **RED — unit 4a.** `TapProjectionTests · unreportedTrustShowsNoBadgeAndNoControl`:
+- [x] 1.2 **RED — unit 4a.** `TapProjectionTests · unreportedTrustShowsNoBadgeAndNoControl`:
       `TapProjection.trust(for:)` over all three states; badge text exactly `"Untrusted"` for
       `.untrusted`, `nil` otherwise; `canGrant` / `canRevoke` per DD-13. **RED because** no trust
       projection exists. *(TM12.3)*
-- [ ] 1.3 **RED — unit 4e.** `TapProjectionTests · everyTrustStringIsScopedToTheTap`: every string the
+- [x] 1.3 **RED — unit 4e.** `TapProjectionTests · everyTrustStringIsScopedToTheTap`: every string the
       trust surface presents names the tap and none states or implies that a *package* is untrusted
       (R7 — a per-package grant would make that false). **RED because** no trust strings exist.
       *(TM12.5)*
-- [ ] 1.4 **RED — unit 9c.** `TapShippingProofTests · listRowAndDetailHeaderReadOneTrustProjection`:
+- [x] 1.4 **RED — unit 9c.** `TapShippingProofTests · listRowAndDetailHeaderReadOneTrustProjection`:
       both `TapsListView.swift` and `TapDetailView.swift` call `TapProjection.trust(for:)` and neither
       computes a badge string or a control condition locally. **RED because** nothing prevents the two
       drifting. *(TM12.4)*
-- [ ] 1.5 **Prove RED.** Run the focused command; 1.1–1.4 MUST fail, each for its stated reason. A
+- [x] 1.5 **Prove RED.** Run the focused command; 1.1–1.4 MUST fail, each for its stated reason. A
       green test here is a defect in the test.
-- [ ] 1.6 **GREEN.** `TapWire.swift`: add `TapTrustState { trusted, untrusted, unreported }`,
+- [x] 1.6 **GREEN.** `TapWire.swift`: add `TapTrustState { trusted, untrusted, unreported }`,
       `case trusted` in `CodingKeys`, `decodeIfPresent(Bool.self, forKey: .trusted)`, and
       `TapRecord.trust` **after `lastCommit` with an initialiser default of `.unreported`** so every
       shipped fixture keeps compiling. `TapDecoder.inventory(from:)` maps
       `wire.trusted.map { $0 ? .trusted : .untrusted } ?? .unreported` — design §1, verbatim.
-- [ ] 1.7 **GREEN.** `TapProjection.swift`: add `TapTrustPresentation { badge, canGrant, canRevoke }`
+- [x] 1.7 **GREEN.** `TapProjection.swift`: add `TapTrustPresentation { badge, canGrant, canRevoke }`
       and `static func trust(for:)` exactly as design §6 states.
-- [ ] 1.8 **GREEN.** `cellar/Taps/TapsListView.swift` (badge beside the tap name, **no button**) and
+- [x] 1.8 **GREEN.** `cellar/Taps/TapsListView.swift` (badge beside the tap name, **no button**) and
       `cellar/Taps/TapDetailView.swift` (badge in the header), both reading `trust(for:)` and nothing
       else.
-- [ ] 1.9 Re-run the focused command → green; commit WU1.
+- [x] 1.9 Re-run the focused command → green; commit WU1.
 
 ## Phase 2: WU2 — the copy stops lying (TM6.3, PM3.7)
 

@@ -63,6 +63,43 @@ public struct TapProjection: Sendable, Equatable {
         canAddTap = isAvailable
     }
 
+    /// Badge and controls as **one** value, so the three facts cannot disagree
+    /// and the list row, the detail header and the tests all read the same
+    /// projection (tap-management TM12).
+    public struct TapTrustPresentation: Sendable, Equatable {
+        /// The badge text, or `nil` when nothing may be claimed.
+        public let badge: String?
+        /// Whether the **Trust** control is offered.
+        public let canGrant: Bool
+        /// Whether the **Untrust** control is offered.
+        public let canRevoke: Bool
+
+        public init(badge: String?, canGrant: Bool, canRevoke: Bool) {
+            self.badge = badge
+            self.canGrant = canGrant
+            self.canRevoke = canRevoke
+        }
+    }
+
+    /// The one projection both tap surfaces consume.
+    ///
+    /// Every string here is about the **tap**. A per-package grant is
+    /// independent of a tap grant and can make a package loadable while its tap
+    /// is untrusted, so copy claiming a *package* is untrusted would be false
+    /// (TM12; design R7).
+    public static func trust(for tap: TapRecord) -> TapTrustPresentation {
+        switch tap.trust {
+        case .untrusted:
+            TapTrustPresentation(badge: "Untrusted", canGrant: true, canRevoke: false)
+        case .trusted:
+            TapTrustPresentation(badge: nil, canGrant: false, canRevoke: true)
+        // A Homebrew that reports nothing gets no badge and neither control, and
+        // neither control ever builds or spawns a process for it.
+        case .unreported:
+            TapTrustPresentation(badge: nil, canGrant: false, canRevoke: false)
+        }
+    }
+
     public static func packages(
         for tap: TapRecord,
         installed: InstalledInventory

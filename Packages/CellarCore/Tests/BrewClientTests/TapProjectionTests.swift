@@ -143,6 +143,62 @@ struct TapProjectionTests {
         )
     }
 
+    // MARK: - TM12 — the trust presentation
+
+    /// One projection supplies the badge and both controls, so the three facts
+    /// cannot disagree. `unreported` is the Homebrew-with-no-trust-concept case:
+    /// it claims nothing and offers nothing, because a control that cannot
+    /// succeed is worse than no control.
+    @Test("The badge and controls follow the reported state, and an unreported tap offers neither")
+    func unreportedTrustShowsNoBadgeAndNoControl() {
+        let untrusted = TapProjection.trust(for: tapRecord(trust: .untrusted))
+        #expect(untrusted.badge == "Untrusted")
+        #expect(untrusted.canGrant)
+        #expect(untrusted.canRevoke == false)
+
+        let trusted = TapProjection.trust(for: tapRecord(trust: .trusted))
+        #expect(trusted.badge == nil)
+        #expect(trusted.canGrant == false)
+        #expect(trusted.canRevoke)
+
+        let unreported = TapProjection.trust(for: tapRecord(trust: .unreported))
+        #expect(unreported.badge == nil)
+        #expect(unreported.canGrant == false)
+        #expect(unreported.canRevoke == false)
+    }
+
+    /// R7 — a package individually granted under an untrusted tap is loadable,
+    /// so any string claiming *the package* is untrusted would be a false
+    /// statement about this Mac. Every string this surface presents is about
+    /// the tap (TM12 :467-473).
+    @Test("Every trust string is scoped to the tap and none claims a package is untrusted")
+    func everyTrustStringIsScopedToTheTap() {
+        let strings = [TapTrustState.trusted, .untrusted, .unreported]
+            .compactMap { TapProjection.trust(for: tapRecord(trust: $0)).badge }
+
+        // Positively anchored: the enumeration is non-empty and is exactly the
+        // copy this surface presents, so the prohibition below is not vacuous.
+        #expect(strings == ["Untrusted"])
+        for string in strings {
+            for packageWord in ["package", "formula", "cask", "app "] {
+                #expect(
+                    string.localizedCaseInsensitiveContains(packageWord) == false,
+                    "trust copy speaks about a package rather than the tap: \(string)"
+                )
+            }
+        }
+    }
+
+    private func tapRecord(trust: TapTrustState) -> TapRecord {
+        TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"],
+            caskTokens: ["acme/tools/desk"],
+            trust: trust
+        )
+    }
+
     private func installedPackage(kind: PackageKind, name: String, tap: String) -> InstalledPackage {
         let keg = InstalledKeg(
             version: "1.0",
