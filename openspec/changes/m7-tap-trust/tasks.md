@@ -447,7 +447,7 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'MutationCommand
 - [x] 8.6 Confirm the regression guards that must never have moved: `ConfirmationDisclosureTests`
       `:161-178` and `:203`, `BrewMutatingTests:231-240`, `MutationCommandTests:289`,
       `TapShippingProofTests:197`. Confirm `rg '\.tapTrust\('` is still zero (task 2.5's rule).
-- [ ] 8.7 Open the PR from `feat/m7-tap-trust`: title
+- [x] 8.7 Open the PR from `feat/m7-tap-trust`: title
       `feat(taps): make tap trust visible, explicit and revocable`, exactly one `type:feature` label,
       and a body that states up front (a) **reverting Cellar does not revoke a grant already written
       to `~/.homebrew/trust.json`** — `brew untrust <tap>` in Terminal remains the exit; and (b) **R5**
