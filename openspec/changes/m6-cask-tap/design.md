@@ -138,7 +138,7 @@ cask "home-cellar" do
   end
 
   auto_updates true
-  depends_on macos: ">= :tahoe"
+  depends_on macos: :tahoe
   depends_on arch: :arm64
 
   app "cellar.app"
@@ -162,7 +162,7 @@ end
 | `desc` | 43 characters, does not start with an article or the token, and names no platform — the three things `brew audit` checks |
 | `livecheck :github_latest` | `releases/latest` never points at a prerelease, so the `v*-rc.*` tags this pipeline can publish are skipped for free — the same guard `appcast.sh` applies to the feed |
 | `auto_updates true` | **The whole mitigation for archive design risk 11.** Sparkle replaces the bundle in place; without this, every `brew upgrade` reports a mismatch and offers to reinstall over a newer app |
-| `depends_on macos: ">= :tahoe"` | `:tahoe` → `"26"`, matching `MACOSX_DEPLOYMENT_TARGET = 26.0` |
+| `depends_on macos: :tahoe` | `:tahoe` → `"26"`, matching `MACOSX_DEPLOYMENT_TARGET = 26.0`. The symbol form **is** the minimum-version claim; Homebrew 6 rejects the older `">= :tahoe"` string with a `Homebrew/OSDependsOn` style offense (finding 1 below) |
 | `depends_on arch: :arm64` | Matches the `ARCHS = arm64` pin, and is what makes a single flat `sha256` correct with no `on_arm` block |
 | `app "cellar.app"` | DD-3, and `cellar.app` sits at the zip root (`ditto --keepParent`, measured) |
 | `zap trash:` | The **five measured** paths (obs `#7701`). `…savedState` is dropped: explore §9's rule is that what a real machine does not show is removed, never guessed in |
@@ -427,6 +427,7 @@ for Homebrew.
 
 ```sh
 brew tap juancasanueva/cellar
+brew trust juancasanueva/cellar
 brew install --cask home-cellar
 ```
 
@@ -434,7 +435,12 @@ That installs `/Applications/cellar.app` — the same notarized, stapled build t
 [Releases](https://github.com/juancasanueva/SWIFTUI_cellar/releases) page serves. The bundle is named
 `cellar.app` in both channels; the app presents itself as **Home-Cellar**.
 
-If another tap ever claims the `home-cellar` token, this fully-qualified form is unambiguous:
+Homebrew 6 refuses to load a cask from a non-official tap until the tap is trusted, which is what the
+middle line does. It grants nothing beyond this tap, and you can undo it with
+`brew untrust juancasanueva/cellar`.
+
+If another tap ever claims the `home-cellar` token, this fully-qualified form is unambiguous — and
+naming the tap on the command line is itself the grant, so it needs no `brew trust` at all:
 
 ```sh
 brew install --cask juancasanueva/cellar/home-cellar
@@ -493,6 +499,13 @@ MIT, the same licence as the app. A cask is a build recipe, not the application.
 # This repository — exact replacement text
 
 ## `README.md` — replace the `## Install` section (~:32-39)
+
+> **Amended at apply.** The shipped section carries one extra line,
+> `brew trust juancasanueva/cellar`, and one sentence explaining it. Homebrew 6
+> refuses to load a cask from a non-official tap until the tap is trusted, so the
+> two-line form below fails on a current install — see *finding 2* under
+> *§ Evidence to capture*. Everything else is as written here, and T4 is
+> unaffected because both quoted commands remain whole lines.
 
 ````markdown
 ## Install
@@ -940,12 +953,117 @@ No open question blocks `sdd-tasks`.
 
 ## Evidence to capture at apply/verify
 
-Placeholders, not results. **No probe outcome is invented here.**
+Measured at apply on 2026-08-23. **No probe outcome is invented here**; the two
+`manual-evidence` rows remain open because no harness may install into a real
+`/Applications`, and the maintainer's Mac carries an unrelated 0.0.4 build.
 
-| Evidence | Class | Where it lands |
+Tap repository: `https://github.com/juancasanueva/homebrew-cellar`, `main` at
+`1441d27d185c2411b2bd4ae42da4d1d24c169c23`.
+
+| Evidence | Class | Result |
 |---|---|---|
-| `ci.yml` run URL + exit status (style, both audits, install, zap) | `ci-gate` | this section + verify report |
-| `bump.yml` run twice against an unchanged `releases/latest` → zero commits the second time | `ci-gate` | same |
-| `bump.yml` `workflow_dispatch` run log showing `releases/latest` resolving to the stable tag (never a `v*-rc.*` tag), or the `*-*` prerelease refusal branch exiting 0 with no commit | `ci-gate` | same (scenario S4) |
-| `brew tap juancasanueva/cellar && brew install --cask home-cellar` transcript showing `/Applications/cellar.app` at the released version | `manual-evidence` | verbatim transcript, this section |
-| `brew upgrade` against a Sparkle-self-updated copy, showing no reinstall | `manual-evidence` | verbatim transcript, this section |
+| `ci.yml` run URL + exit status (style, both audits, install, zap) | `ci-gate` | **PASS** — [run 32642667011](https://github.com/juancasanueva/homebrew-cellar/actions/runs/32642667011), conclusion `success`, 42s, every step exit 0 |
+| `bump.yml` run twice against an unchanged `releases/latest` → zero commits the second time | `ci-gate` | **PASS** — runs [32642223493](https://github.com/juancasanueva/homebrew-cellar/actions/runs/32642223493) and [32642400685](https://github.com/juancasanueva/homebrew-cellar/actions/runs/32642400685), both `success`; `git log origin/main` still shows **1 commit** |
+| `bump.yml` `workflow_dispatch` log showing `releases/latest` resolving to the stable tag | `ci-gate` | **PASS** — both runs resolve `VERSION: 1.0.0`; the `*-*` prerelease refusal branch is never taken |
+| `brew tap` + `brew install --cask` transcript showing `/Applications/cellar.app` at the released version | `manual-evidence` | **PENDING** — maintainer's own step (task 2.7 / S1) |
+| `brew upgrade` against a Sparkle-self-updated copy, showing no reinstall | `manual-evidence` | **PENDING** — maintainer's own step (task 2.8 / S3) |
+
+### `ci.yml` run 32642667011 — the round trip, verbatim
+
+```
+cask  Audit, online and strict  ==> Downloading https://github.com/juancasanueva/SWIFTUI_cellar/releases/download/v1.0.0/Home-Cellar-1.0.0.zip
+cask  Install                   ✔︎ Cask home-cellar (1.0.0)
+cask  Install                   ==> Moving App 'cellar.app' to '/Applications/cellar.app'
+cask  Install                   🍺  home-cellar was successfully installed!
+cask  Install                   1.0.0
+cask  Uninstall with a zap      ==> Removing App '/Applications/cellar.app'
+cask  Uninstall with a zap      ==> Removing all staged versions of Cask 'home-cellar'
+```
+
+The `1.0.0` line is `/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString"`
+reading the installed bundle, so the install step proves the version, not just
+the path.
+
+### `bump.yml` idempotence, verbatim
+
+```
+Exit if the cask already declares that version   env:
+Exit if the cask already declares that version     VERSION: 1.0.0
+Exit if the cask already declares that version   the cask already declares 1.0.0; nothing to do
+```
+
+Identical in both successful runs; `bump=no`, no later step ran, and the tap's
+`main` still holds exactly one commit.
+
+### Local gates on the maintainer's Mac (Homebrew 6.0.18-157-gaad366f)
+
+```
+### brew style juancasanueva/cellar
+Inspecting 2 files
+..
+
+2 files inspected, no offenses detected
+STYLE_EXIT=0
+
+### brew audit --cask juancasanueva/cellar/home-cellar
+AUDIT_EXIT=0
+
+### brew audit --cask --online --strict juancasanueva/cellar/home-cellar
+==> Downloading and extracting artifacts
+==> Downloading https://github.com/juancasanueva/SWIFTUI_cellar/releases/download/v1.0.0/Home-Cellar-1.0.0.zip
+STRICT_EXIT=0
+```
+
+`--strict` raised **no** `homebrew/cask`-submission-only rule, so **R13 did not
+fire** and `--online` was never weakened.
+
+### Two Homebrew 6 findings the design predates
+
+**Finding 1 — `depends_on macos: ">= :tahoe"` is now a style offense.** Both the
+`macos-26` runner and the maintainer's Mac reported:
+
+```
+Taps/juancasanueva/homebrew-cellar/Casks/home-cellar.rb:17:21: C: [Correctable] Homebrew/OSDependsOn: Use depends_on macos: :tahoe.
+  depends_on macos: ">= :tahoe"
+```
+
+`rubocops/os_depends_on.rb#autocorrect_macos_comparison_strings` maps `>=` to
+`macos:` and `<=` to `maximum_macos:`, so `depends_on macos: :tahoe` is the same
+minimum-version claim in current syntax. The cask carries the corrected form; the
+macOS 26.0 floor is unchanged.
+
+**Finding 2 — Homebrew 6 requires tap trust, so the short install form fails.**
+Measured, both forms, same machine:
+
+```
+$ brew info --cask home-cellar
+Error: Refusing to load cask juancasanueva/cellar/home-cellar from untrusted tap juancasanueva/cellar.
+Run `brew trust --cask juancasanueva/cellar/home-cellar` or `brew trust juancasanueva/cellar` to trust it.
+
+$ brew info --cask juancasanueva/cellar/home-cellar
+==> home-cellar (Home-Cellar, Cellar): 1.0.0 (auto_updates)
+```
+
+`trust.rb#explicitly_allowed?` grants the load when the tap name or the
+fully-qualified cask appears in `ARGV`, which is why every command in `ci.yml`,
+`bump.yml` and the runbook already works and why the **short** form does not. The
+documented install therefore gains `brew trust juancasanueva/cellar` as a third
+line in both READMEs and in `RELEASING.md` §8. Verified after the change:
+
+```
+$ brew trust juancasanueva/cellar
+Trusted tap: juancasanueva/cellar
+$ brew info --cask home-cellar
+==> home-cellar (Home-Cellar, Cellar): 1.0.0 (auto_updates)
+Not installed
+From: https://github.com/juancasanueva/homebrew-cellar/blob/HEAD/Casks/home-cellar.rb
+```
+
+**Finding 3 (recorded, not acted on) — the anonymous `releases/latest` read is
+rate-limited.** A second `workflow_dispatch` fired 17 seconds after the first
+failed with `curl: (56) The requested URL returned error: 403`
+([run 32642235551](https://github.com/juancasanueva/homebrew-cellar/actions/runs/32642235551)).
+At `17 */6 * * *` this is unreachable, and the failure is inert — nothing is
+committed and the next run recomputes the same answer — so `bump.yml` is left
+anonymous exactly as DD-1 decided. It is documented in `RELEASING.md` §8 rather
+than fixed.
