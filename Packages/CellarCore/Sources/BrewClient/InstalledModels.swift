@@ -36,7 +36,15 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
     public let displayName: String
     public let desc: String?
     public let homepage: URL?
-    public let tap: String
+    /// The tap the record came from. `nil` when Homebrew **withheld** it, which
+    /// it does for every package published by an untrusted tap (obs #7721).
+    ///
+    /// Absence is preserved rather than collapsed to `""`, on exactly the terms
+    /// II2 already states for a cask's tri-state `auto_updates`: "not reported"
+    /// is not "reported as nothing". It compares equal to no tap name at all,
+    /// which is what makes every reader's exact-tap match correct by promotion
+    /// rather than by a sentinel each of them has to remember.
+    public let tap: String?
     /// The version the published record currently offers.
     public let catalogVersion: String
     /// Every installed keg, newest last. Never empty.
@@ -62,7 +70,7 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
         displayName: String,
         desc: String?,
         homepage: URL?,
-        tap: String,
+        tap: String?,
         catalogVersion: String,
         kegs: [InstalledKeg],
         primaryKeg: InstalledKeg,

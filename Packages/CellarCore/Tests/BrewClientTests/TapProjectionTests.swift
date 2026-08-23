@@ -76,7 +76,7 @@ struct TapProjectionTests {
 
         #expect(packages[0].installedHandoff == PackageID(kind: .formula, name: "widget"))
         #expect(packages[1].installedHandoff == nil)
-        #expect(packages[1].uninstalledExplanation == "Not installed.")
+        #expect(packages[1].statusExplanation == "Not installed.")
     }
 
     /// `brew tap-info --json` publishes cask tokens fully qualified —
@@ -102,7 +102,7 @@ struct TapProjectionTests {
         #expect(packages.map(\.publishedName) == ["acme/tools/widget", "other/tap/gadget"])
         #expect(packages[0].id == PackageID(kind: .cask, name: "widget"))
         #expect(packages[0].installedHandoff == PackageID(kind: .cask, name: "widget"))
-        #expect(packages[0].uninstalledExplanation == nil)
+        #expect(packages[0].statusExplanation == nil)
         #expect(packages[1].installedHandoff == nil)
     }
 
@@ -189,6 +189,111 @@ struct TapProjectionTests {
         }
     }
 
+    // MARK: - TM5 — the three installed states
+
+    /// TM5 :113-120. Homebrew withholds the `tap` of a package published by a
+    /// tap it will not load, so the exact-tap cross-reference finds nothing and
+    /// the shipped projection was *required* to say "Not installed." — a false
+    /// statement about this Mac. The middle state is the fix, and it is a third
+    /// value rather than a second boolean because the package **is** installed.
+    @Test("A withheld tap under an untrusted tap reads as installed, not as absent")
+    func aWithheldTapIsInstalledNotMissing() throws {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/helper"],
+            caskTokens: ["acme/tools/widget", "acme/tools/gadget"],
+            trust: .untrusted
+        )
+        let installed = InstalledInventory(packages: [
+            installedPackage(kind: .cask, name: "widget", tap: nil),
+            installedPackage(kind: .formula, name: "helper", tap: "acme/tools")
+        ])
+
+        let packages = TapProjection.packages(for: tap, installed: installed)
+        let widget = try #require(packages.first { $0.id == PackageID(kind: .cask, name: "widget") })
+        let helper = try #require(packages.first { $0.id == PackageID(kind: .formula, name: "helper") })
+        let gadget = try #require(packages.first { $0.id == PackageID(kind: .cask, name: "gadget") })
+
+        // The middle state: installed, and brew is withholding which tap.
+        #expect(widget.state == .installedTapWithheld(PackageID(kind: .cask, name: "widget")))
+        #expect(widget.isInstalled)
+        #expect(
+            widget.statusExplanation
+                == "Installed. Homebrew withholds its tap while this tap is untrusted."
+        )
+        // TM5 :62-63 — the handoff selects by exact `PackageID`, and that
+        // identity is exact whatever brew withholds.
+        #expect(widget.installedHandoff == PackageID(kind: .cask, name: "widget"))
+
+        // The two states that already existed are unchanged.
+        #expect(helper.state == .installed(PackageID(kind: .formula, name: "helper")))
+        #expect(helper.statusExplanation == nil)
+        #expect(helper.installedHandoff == PackageID(kind: .formula, name: "helper"))
+        #expect(gadget.state == .notInstalled)
+        #expect(gadget.isInstalled == false)
+        #expect(gadget.statusExplanation == "Not installed.")
+        #expect(gadget.installedHandoff == nil)
+    }
+
+    /// TM5 :122-128. The publication clause runs in both directions: a record
+    /// with no tap that this tap does not publish is not this tap's package, and
+    /// claiming it would be the same false statement pointed the other way.
+    @Test("A withheld tap is not claimed by a tap that does not publish it")
+    func aWithheldTapIsNotClaimedByATapThatDoesNotPublishIt() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            caskTokens: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+        let installed = InstalledInventory(packages: [
+            installedPackage(kind: .cask, name: "stranger", tap: nil)
+        ])
+
+        let packages = TapProjection.packages(for: tap, installed: installed)
+
+        // Positively anchored: the tap really does project its own package.
+        #expect(packages.map(\.displayName) == ["widget"])
+        #expect(packages.contains { $0.displayName == "stranger" } == false)
+        #expect(packages.contains { $0.state == .installedTapWithheld(PackageID(kind: .cask, name: "stranger")) } == false)
+        // And its own published package, with nothing installed under it, is
+        // plainly not installed rather than withheld.
+        #expect(packages[0].state == .notInstalled)
+    }
+
+    /// TM5 :130-137. Only an `untrusted` tap has anything withheld. Under a
+    /// trusted tap brew reports the tap, and under an unreported one there is no
+    /// trust concept to withhold for — so in both cases an absent tap is simply
+    /// a package that did not come from here.
+    @Test(
+        "A withheld tap under a trusted or unreported tap is still not installed",
+        arguments: [TapTrustState.trusted, .unreported]
+    )
+    func aWithheldTapUnderATrustedOrUnreportedTapIsStillNotInstalled(
+        trust: TapTrustState
+    ) throws {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            caskTokens: ["acme/tools/widget"],
+            trust: trust
+        )
+        let installed = InstalledInventory(packages: [
+            installedPackage(kind: .cask, name: "widget", tap: nil)
+        ])
+
+        let widget = try #require(TapProjection.packages(for: tap, installed: installed).first)
+
+        #expect(widget.state == .notInstalled)
+        #expect(widget.statusExplanation == "Not installed.")
+        #expect(widget.installedHandoff == nil)
+        #expect(
+            widget.statusExplanation?.contains("withholds") == false,
+            "the withheld copy escaped to a tap with nothing withheld"
+        )
+    }
+
     private func tapRecord(trust: TapTrustState) -> TapRecord {
         TapRecord(
             name: "acme/tools",
@@ -199,7 +304,7 @@ struct TapProjectionTests {
         )
     }
 
-    private func installedPackage(kind: PackageKind, name: String, tap: String) -> InstalledPackage {
+    private func installedPackage(kind: PackageKind, name: String, tap: String?) -> InstalledPackage {
         let keg = InstalledKeg(
             version: "1.0",
             installedAt: Date(timeIntervalSince1970: 1_700_000_000),

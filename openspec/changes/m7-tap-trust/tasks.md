@@ -221,34 +221,34 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'ConfirmationDis
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'InstalledDecodeTests|InstalledDeriveTests|TapProjectionTests'`
 
-- [ ] 3.1 **RED — unit 5a.** `InstalledDecodeTests · aNullTapIsAbsentNotEmpty`: `tap: null` → `nil`;
+- [x] 3.1 **RED — unit 5a.** `InstalledDecodeTests · aNullTapIsAbsentNotEmpty`: `tap: null` → `nil`;
       `"acme/tools"` → that value; the key absent → `nil`; the record still decodes with version and
       kind intact and still enters the inventory. **RED because** `?? ""` collapses null.
       *(II2.6, II2.7)*
-- [ ] 3.2 **RED — unit 5b.** `InstalledDeriveTests · everyTapReaderTreatsAbsenceAsNoMatch`: the three
+- [x] 3.2 **RED — unit 5b.** `InstalledDeriveTests · everyTapReaderTreatsAbsenceAsNoMatch`: the three
       readers — `TapProjection.swift:146` no-match, `ContentView.forceEvidence` excludes the record,
       `HomebrewUpdateNeed` treats it as incomparable — and absence matches neither a tap name nor `""`.
       **RED because** (DD-11) the migration is **not** compiler-enforced; nothing else pins these
       sites. *(II2.8)*
-- [ ] 3.3 **RED — unit 4b.** `TapProjectionTests · aWithheldTapIsInstalledNotMissing`: withheld +
+- [x] 3.3 **RED — unit 4b.** `TapProjectionTests · aWithheldTapIsInstalledNotMissing`: withheld +
       untrusted + published here → `.installedTapWithheld(id)`, copy exactly
       `"Installed. Homebrew withholds its tap while this tap is untrusted."`, `installedHandoff`
       non-`nil`; exact-match and not-installed paths unchanged. **RED because** `exactInstalled` has
       two states. *(TM5.5)*
-- [ ] 3.4 **RED — unit 4c.** `TapProjectionTests · aWithheldTapIsNotClaimedByATapThatDoesNotPublishIt`:
+- [x] 3.4 **RED — unit 4c.** `TapProjectionTests · aWithheldTapIsNotClaimedByATapThatDoesNotPublishIt`:
       a `tap: nil` record the selected tap does not publish makes no middle-state claim. **RED
       because** nothing enforces the publication clause for the withheld path. *(TM5.6)*
-- [ ] 3.5 **RED — unit 4d.** `TapProjectionTests ·
+- [x] 3.5 **RED — unit 4d.** `TapProjectionTests ·
       aWithheldTapUnderATrustedOrUnreportedTapIsStillNotInstalled`, parameterized over `.trusted` and
       `.unreported`: exact copy `"Not installed."`, no withheld copy. *(TM5.7)*
-- [ ] 3.6 **Prove RED** (all five), then **GREEN**: `InstalledModels.swift` :39 / :65 / :80 →
+- [x] 3.6 **Prove RED** (all five), then **GREEN**: `InstalledModels.swift` :39 / :65 / :80 →
       `tap: String?` with the design's doc comment; `InstalledDecoder.swift` :76 / :108 → drop both
       `?? ""`.
-- [ ] 3.7 **GREEN.** `TapProjection.swift`: add `bareToken(_:publishedBy:)`, `publishes(_:in:)`,
+- [x] 3.7 **GREEN.** `TapProjection.swift`: add `bareToken(_:publishedBy:)`, `publishes(_:in:)`,
       `TapPackageInstallState`, the private `installState(_:tap:inventory:)`, `TapPackage.state`,
       `isInstalled`, `installedHandoff`, and rename `uninstalledExplanation` → `statusExplanation`
       (DD-10). Follow the rename into its view readers in the same commit.
-- [ ] 3.8 Focused command green; commit WU3.
+- [x] 3.8 Focused command green; commit WU3.
 
 ## Phase 4: WU4 — grant and revoke as explicit answers (TM13.1, .2; TM11.1, .2; TM12.2; TM9.2; TM6.4; PM3.8, .9; BF5.1, .3)
 

@@ -136,7 +136,7 @@ struct TapDetailView: View {
                             .foregroundStyle(Theme.textPrimary)
                         kindBadge(package.id.kind)
                     }
-                    if let explanation = package.uninstalledExplanation {
+                    if let explanation = package.statusExplanation {
                         Text(explanation)
                             .font(.system(size: 11))
                             .foregroundStyle(Color.white.opacity(0.38))
