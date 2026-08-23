@@ -50,14 +50,29 @@ payloads) and MUST be preserved as "declared" versus "not declared" at decode ti
 folded into a plain boolean. A formula's optional linked-keg value MUST be preserved exactly: a
 present value identifies the linked version, while absence means unlinked and MUST NOT be replaced
 with the newest installed keg. This observable state MUST remain available for disk attribution.
+
+A record's **tap is optional on exactly the same terms**. Homebrew reports `tap: null` for a package
+whose tap it withholds — the tap exists but is untrusted, so brew declines to name it. That absence
+MUST be preserved as absence: it MUST NOT be collapsed into the empty string, into a placeholder, or
+into any other sentinel value, because "brew reported no tap" and "the tap is the empty string" are two
+different facts and no single value may stand for both. A record whose tap is absent MUST still decode
+and MUST still appear in the inventory; only the tap is unknown, and no other field is affected.
+
+An absent tap MUST NOT compare equal to any tap name. Every consumer that matches a package against a
+selected tap MUST treat absence as "no answer" rather than as a match or as an empty-string match, so a
+withheld tap can never be silently attributed to a tap that did not publish it. What a consumer *shows*
+for an absent tap belongs to that consumer — `tap-management` TM5 owns the tap-inventory reading — but
+this capability MUST make the distinction available rather than resolving it at decode time.
 (Previously: decoding preserved every installed keg but collapsed an absent linked-keg value to the
-newest keg, losing the distinction between linked and unlinked formulae.)
+newest keg, losing the distinction between linked and unlinked formulae; and a null `tap` was collapsed
+into the empty string, losing the distinction between a withheld tap and an unset one.)
 
 #### Scenario: A single-keg formula decodes
 
 - GIVEN a formula record whose installed array holds one keg
 - WHEN the payload is decoded
 - THEN the formula appears in the inventory with that keg's version and install time
+- Verification: `unit`
 
 #### Scenario: A multi-keg formula keeps every keg
 
@@ -65,12 +80,14 @@ newest keg, losing the distinction between linked and unlinked formulae.)
 - WHEN the payload is decoded
 - THEN the formula appears once with both installed versions represented
 - AND neither keg is dropped
+- Verification: `unit`
 
 #### Scenario: A cask's string installed version decodes
 
 - GIVEN a cask record whose installed field is the string `1.2.3`
 - WHEN the payload is decoded
 - THEN the cask appears in the inventory with installed version `1.2.3`
+- Verification: `unit`
 
 #### Scenario: An undeclared auto-update flag is distinguishable from a declared one
 
@@ -78,6 +95,7 @@ newest keg, losing the distinction between linked and unlinked formulae.)
 - WHEN both are decoded
 - THEN the first is classified as self-updating and the second is not
 - AND the null value is recorded as "not declared", not as an explicit false
+- Verification: `unit`
 
 #### Scenario: Linked-keg absence remains unlinked
 
@@ -85,6 +103,31 @@ newest keg, losing the distinction between linked and unlinked formulae.)
 - WHEN both are decoded for disk attribution
 - THEN the first is unlinked and the second names that older keg as linked
 - AND neither is inferred from the newest installed keg
+- Verification: `unit`
+
+#### Scenario: A withheld tap decodes as absent, not as empty
+
+- GIVEN formula and cask records whose `tap` is in turn `null`, absent, and `"acme/tools"`
+- WHEN each is decoded
+- THEN the first two report no tap and the third reports `acme/tools`
+- AND neither of the first two reports the empty string or any other placeholder
+- Verification: `unit`
+
+#### Scenario: A record with a withheld tap still enters the inventory
+
+- GIVEN an installed cask record with a valid version and `tap: null`
+- WHEN the payload is decoded
+- THEN that cask appears in the inventory with its version, kind and install data intact
+- AND only its tap is unknown
+- Verification: `unit`
+
+#### Scenario: An absent tap never matches a selected tap
+
+- GIVEN an inventory holding one package with no tap and one with tap `acme/tools`
+- WHEN each is matched against the selected tap `acme/tools`, and separately against the empty string
+- THEN only the second matches `acme/tools`
+- AND the first matches neither
+- Verification: `unit`
 
 ### Requirement: On-request and dependency-only are derived, and the default view is on-request
 
@@ -879,3 +922,32 @@ be impossible for the control to announce one number and submit a different set.
   - **II14 "A bulk action's label counts exactly the set it submits" is a strict superset**:
     requirement text byte-identical, one scenario added so the new verbs' announced counts (pin 2/2,
     unpin 1/1, snooze 4/4) are covered by the same one-projection rule.
+- **Amended by change `m7-tap-trust`** (archived `2026-08-23` —
+  `openspec/changes/archive/2026-08-23-m7-tap-trust/`), **1 MODIFIED, 0 added, 0 removed, 0 renamed**
+  — **14 req / 64 sc → 14 req / 67 sc**. II2 carried 5 scenarios and was replaced by 8; the other
+  thirteen requirements are byte-identical to their prior text, and the destructive-delta warning did
+  not fire.
+  - **One fact, one value.** `brew info --installed --json=v2` reports `tap: null` for a package whose
+    tap Homebrew withholds — the tap exists and is untrusted, so brew declines to name it (obs
+    `#7721`). The shipped decoder collapsed that null into the empty string, which made "brew did not
+    report a tap" indistinguishable from "the tap is empty" and forced every such package to read
+    “Not installed.” in the tap inventory. `InstalledPackage.tap` is now `String?` and the absence is
+    preserved, on **exactly the terms this requirement already stated** for a cask's tri-state
+    `auto_updates`: not reported is not reported-as-something-else.
+  - **The optional is not a compile-error migration, and the change's own framing was corrected to say
+    so.** Swift promotes the non-optional operand of `==`, so all three shipped readers keep compiling
+    *and* stay semantically correct (`nil` equals nothing). Only the declaration and the two decoder
+    sites changed; the readers are pinned by `InstalledDeriveTests ·
+    everyTapReaderTreatsAbsenceAsNoMatch` — a test, not the compiler. Anyone reintroducing a `tap ?? ""`
+    collapse is caught there and by that test's targeted source scan.
+  - **`CatalogPackage.tap` is a different, unchanged property that happens to share the name** (the
+    change's risk R8). It was not touched.
+  - **II2's `(Previously:)` annotation was extended, not replaced.** The `m5`-era linked-keg note stays
+    and the tap clause is appended to it, because both describe the same block's history and neither
+    supersedes the other.
+  - **No `## Verification classes` table exists in this spec**, so none was hand-updated at archive.
+    This change is the first to annotate these scenarios with an inline `- Verification:` line;
+    untouched requirements deliberately keep none.
+  - **This requirement is independent of the trust surface.** It is a strict honesty improvement, and
+    the change's rollback plan lets it stay even if every other piece of `m7-tap-trust` is reverted.
+  - The archived delta spec is the verbatim audit trail.

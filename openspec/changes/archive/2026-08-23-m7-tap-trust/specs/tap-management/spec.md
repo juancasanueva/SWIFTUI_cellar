@@ -396,7 +396,7 @@ what makes the inventory's `tap` field change.)
 
 #### Scenario: An untap action's inventory refresh comes from its revocation
 
-- GIVEN an untap action submitting `untrust acme/tools` then `untap acme/tools`
+- GIVEN an untap action submitting `untap acme/tools` then `untrust acme/tools`
 - WHEN both reach their terminal outcomes and refreshes are counted
 - THEN installed inventory is refreshed exactly once, by the revocation
 - AND the untap command's own declared domains still exclude installed inventory
