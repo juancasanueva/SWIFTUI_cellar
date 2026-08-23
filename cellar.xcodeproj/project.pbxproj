@@ -431,7 +431,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Resources/Cellar-Info.plist;
+				INFOPLIST_FILE = "Resources/Cellar-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Home-Cellar";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -467,7 +467,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Resources/Cellar-Info.plist;
+				INFOPLIST_FILE = "Resources/Cellar-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Home-Cellar";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -628,6 +628,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A20DCB6D1023E7EE7541990D /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C051CFB329FBA460DC2F0A85 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		BC0000010000000000000003 /* BrewProcess */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BrewProcess;
@@ -651,11 +656,6 @@
 		BC0000010000000000000013 /* ReleaseNotes */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ReleaseNotes;
-		};
-		A20DCB6D1023E7EE7541990D /* Sparkle */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C051CFB329FBA460DC2F0A85 /* XCRemoteSwiftPackageReference "Sparkle" */;
-			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -127,7 +127,11 @@ nonisolated enum UpdateProjectSources {
 struct UpdateProjectFileTests {
     static let applicationCategory =
         "INFOPLIST_KEY_LSApplicationCategoryType = \"public.app-category.developer-tools\";"
-    static let partialInfoPlist = "INFOPLIST_FILE = Resources/Cellar-Info.plist;"
+    /// Quoted, because that is how Xcode serialises it. The value contains a
+    /// hyphen, and the project-file writer quotes any value that is not a bare
+    /// identifier. Pinning the unquoted form would pass exactly once — until the
+    /// next time any tool rewrites the file.
+    static let partialInfoPlist = "INFOPLIST_FILE = \"Resources/Cellar-Info.plist\";"
 
     // MARK: - T12(a) — pbxproj item 6, the application category
 
