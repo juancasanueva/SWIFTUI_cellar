@@ -105,7 +105,7 @@ At-a-glance snapshot combining:
 
 ### 3.7 Taps & Brewfile
 
-- **Taps manager**: list taps, add (`brew tap user/repo`), remove, show packages per tap. Warning copy when adding third-party taps (untrusted code).
+- **Taps manager**: list taps, add (`brew tap user/repo`), trust (`brew trust user/repo`), untrust, remove — which revokes the grant before removing the tap — and show packages per tap. Adding a tap and trusting it are different acts, and the copy says so: adding clones a third-party repository and grants nothing, Homebrew will not load its formulae or casks until the tap is trusted, and Cellar never grants that trust on the user's behalf. Trusting is a separate, explicitly confirmed answer; untrusting only reduces authority and is not.
 - **Brewfile import/export**: generate a Brewfile from current state (`brew bundle dump` semantics — taps, formulae, casks; MAS entries excluded in v1), export to file/share sheet; import a Brewfile with a diff preview (what would be installed/missing) and selective apply via `brew bundle --file`.
 
 ### 3.8 Menu bar & background

@@ -38,9 +38,17 @@ struct TapsListView: View {
                 Section {
                     ForEach(projection.thirdPartyTaps) { tap in
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(tap.name)
-                                .font(Theme.mono(12.5, weight: .medium))
-                                .foregroundStyle(Theme.textPrimary)
+                            HStack(spacing: 7) {
+                                Text(tap.name)
+                                    .font(Theme.mono(12.5, weight: .medium))
+                                    .foregroundStyle(Theme.textPrimary)
+                                // The badge text comes from the one projection
+                                // the detail header also reads, so the two
+                                // surfaces cannot drift (TM12).
+                                if let badge = TapProjection.trust(for: tap).badge {
+                                    TapTrustBadge(text: badge, identifier: "tap-row-trust-badge")
+                                }
+                            }
                             Text(TapProjection.packageSummary(for: tap))
                                 .font(.system(size: 11))
                                 .foregroundStyle(Color.white.opacity(0.38))

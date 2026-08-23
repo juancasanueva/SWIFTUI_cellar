@@ -18,7 +18,7 @@ import Foundation
 /// **Taps lead, always.** That is load-bearing twice: a package from a newly
 /// added tap must not be attempted before its tap exists, and the shared
 /// confirmation gate derives a batch's disclosure from `commands.first`
-/// (`OperationCenterBulk.request(_:)`), so a mixed batch presents the tapTrust
+/// (`OperationCenterBulk.request(_:)`), so a mixed batch presents the tapAdd
 /// warning only when a tap is at the head of it (design DD1). Reordering this
 /// would silently downgrade a security warning, not merely reorder work.
 public struct BrewfilePlan: Sendable, Equatable {
@@ -35,10 +35,11 @@ public struct BrewfilePlan: Sendable, Equatable {
             switch entry.kind {
             case .tap(let name, _):
                 taps.append(.addTap(name))
-            case .formula(let formula):
-                installs.append(.install(formula.target))
-            case .cask(let cask):
-                installs.append(.install(cask.target))
+            case .formula, .cask:
+                // The entry's own projection, not a string this type composed
+                // (**D3**). An entry whose bare token cannot construct produces
+                // no command, and the import must not present it as applied.
+                if let target = entry.installTarget { installs.append(.install(target)) }
             }
         }
 

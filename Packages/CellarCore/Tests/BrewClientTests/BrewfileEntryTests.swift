@@ -191,4 +191,67 @@ struct BrewfileEntryTests {
         #expect(BrewfileTrustClaim.attribution.lowercased().contains("cellar grants no trust"))
         #expect(BrewfileTrustClaim.attribution.lowercased().contains("homebrew") == false)
     }
+
+    // MARK: - BF5 :115 / DD-8 — the qualifier is stripped at the projection
+
+    /// **DD-8.** The gate stays exactly where it is. `FormulaID(name:
+    /// "acme/tap/thing")` still constructs — the case above pins it as a name a
+    /// real dump actually contains — and `PackageTarget.init?` and
+    /// `MutationName.isSafe` are byte-identical after this change. What changes
+    /// is a **projection** on the entry: the identity that will actually be
+    /// installed.
+    ///
+    /// The alternative, a `/` ban on the gate, breaks both ends: `TapName.init?`
+    /// is expressed over it and a tap name *is* `owner/repo`, and every
+    /// qualified Brewfile line becomes an unrepresentable entry, contradicting
+    /// BF5's "no skip counted".
+    @Test("Qualified names still construct and project a bare target")
+    func qualifiedNamesStillConstructAndProjectABareTarget() throws {
+        let formula = BrewfileEntry(
+            kind: .formula(try #require(FormulaID(name: "acme/tap/thing"))),
+            lineNumber: 1
+        )
+        let cask = BrewfileEntry(
+            kind: .cask(try #require(CaskID(name: "acme/tap/app"))),
+            lineNumber: 2
+        )
+        let bare = BrewfileEntry(
+            kind: .formula(try #require(FormulaID(name: "wget"))),
+            lineNumber: 3
+        )
+        let tap = BrewfileEntry(
+            kind: .tap(try #require(TapName("acme/tap")), url: nil),
+            lineNumber: 4
+        )
+
+        // The identity the file named is retained, whole.
+        #expect(formula.packageID == PackageID(kind: .formula, name: "acme/tap/thing"))
+        #expect(cask.packageID == PackageID(kind: .cask, name: "acme/tap/app"))
+
+        // …while the install target is the bare token brew installs by.
+        #expect(formula.installTarget?.name == "thing")
+        #expect(formula.installTarget?.kind == .formula)
+        #expect(cask.installTarget?.name == "app")
+        #expect(cask.installTarget?.kind == .cask)
+        #expect(formula.installName == "thing")
+        #expect(cask.installName == "app")
+
+        // A bare name projects to itself — the strip is about the qualifier.
+        #expect(bare.installTarget?.name == "wget")
+        #expect(bare.installName == "wget")
+
+        // A tap entry installs nothing, so it names no install target.
+        #expect(tap.installTarget == nil)
+        #expect(tap.installName == nil)
+
+        // A degenerate qualified name yields `""`, which does not construct —
+        // rather than yielding `tap`, which would install the wrong package.
+        let degenerate = BrewfileEntry(
+            kind: .formula(try #require(FormulaID(name: "acme/tap/"))),
+            lineNumber: 5
+        )
+        #expect(degenerate.packageID == PackageID(kind: .formula, name: "acme/tap/"))
+        #expect(degenerate.installTarget == nil)
+        #expect(degenerate.installName == nil)
+    }
 }

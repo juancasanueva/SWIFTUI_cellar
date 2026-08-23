@@ -123,6 +123,24 @@ extension OperationCenter {
         return nil
     }
 
+    /// Submits an ordered sequence of commands as **one** user action, asking
+    /// once when any member requires it.
+    ///
+    /// The same shape as `submitBulk`, and for the same reason: one request
+    /// covers the whole sequence, so confirming submits every command it listed
+    /// and declining submits none of them — never a partial subset
+    /// (package-mutation PM3 :238-243).
+    ///
+    /// Each member still gets its own queue item, log, copy-command, cancel and
+    /// terminal outcome, which is what makes a failed revocation visible instead
+    /// of swallowed into the removal that succeeded (TM7 :228-231).
+    @discardableResult
+    public func submitSequence(_ commands: [some BrewMutating]) -> ConfirmationRequest? {
+        if let request = request(commands) { return request }
+        for command in commands { submit(command) }
+        return nil
+    }
+
     // MARK: - Confirmation (design D6, D8)
 
     /// Asks for confirmation, when this command needs one.
@@ -166,7 +184,7 @@ extension OperationCenter {
             id: UUID(),
             command: AnyBrewMutation(first),
             additional: commands.dropFirst().map(AnyBrewMutation.init),
-            disclosure: first.disclosure
+            disclosure: commands.leadDisclosure
         )
         setPendingConfirmation(request)
         return request
@@ -254,7 +272,7 @@ extension OperationCenter {
 
         public var tapIdentity: TapName? {
             switch disclosure {
-            case .tapTrust(let tap), .forceUntap(let tap, _): tap
+            case .tapAdd(let tap), .tapTrustGrant(let tap), .forceUntap(let tap, _): tap
             case .packageRemoval: nil
             }
         }

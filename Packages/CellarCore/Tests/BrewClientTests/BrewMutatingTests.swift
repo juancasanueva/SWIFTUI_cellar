@@ -260,7 +260,11 @@ struct BrewMutatingTests {
         var packageID: PackageID?
         var requiresConfirmation = true
         var invalidates: InvalidationScope = .taps
-        var disclosure: ConfirmationDisclosure = .packageRemoval
+        /// The **declaration**, not the presentation. A probe that varied
+        /// `disclosure` directly could no longer tell "declares nothing" from
+        /// "shows the ordinary removal text", which is the distinction the batch
+        /// rule rests on (design DD-3).
+        var declaredDisclosure: ConfirmationDisclosure? = .packageRemoval
     }
 
     /// The guard above, extended deliberately once DD1 landed.
@@ -276,7 +280,7 @@ struct BrewMutatingTests {
         let tap = try #require(TapName("acme/tap"))
         let plain = DisclosingProbe()
         var warning = plain
-        warning.disclosure = .tapTrust(tap)
+        warning.declaredDisclosure = .tapAdd(tap)
 
         // Same argv, same verb, same scope, same everything else.
         #expect(plain.arguments == warning.arguments)
@@ -289,7 +293,7 @@ struct BrewMutatingTests {
 
         // And it is still equality *of what will run plus what it warns about*:
         // two independently built values that agree on both are the same value.
-        #expect(AnyBrewMutation(warning) == AnyBrewMutation(DisclosingProbe(disclosure: .tapTrust(tap))))
+        #expect(AnyBrewMutation(warning) == AnyBrewMutation(DisclosingProbe(declaredDisclosure: .tapAdd(tap))))
     }
 
     /// `confirm` and `decline` are gated by `pendingConfirmation == request`,

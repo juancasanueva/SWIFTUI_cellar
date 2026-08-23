@@ -4,6 +4,7 @@
 //
 
 import BrewClient
+import Catalog
 import SwiftUI
 
 /// The always-visible activity strip.
@@ -18,6 +19,8 @@ import SwiftUI
 struct ActivityBar: View {
     let center: OperationCenter
     @Binding var isExpanded: Bool
+    /// Forwarded to the drawer unchanged; the bar owns no rule about it.
+    let trustableTap: @MainActor (PackageID?) -> TapName?
 
     var body: some View {
         if center.items.isEmpty {
@@ -26,7 +29,7 @@ struct ActivityBar: View {
             VStack(spacing: 0) {
                 Rectangle().fill(Color.white.opacity(0.09)).frame(height: 0.5)
                 if isExpanded {
-                    ActivityDrawer(center: center)
+                    ActivityDrawer(center: center, trustableTap: trustableTap)
                         .background(Theme.logWell)
                     HairlineDivider()
                 }
@@ -106,6 +109,6 @@ struct ActivityBar: View {
 }
 
 #Preview("Idle — the bar is absent") {
-    ActivityBar(center: OperationCenter(), isExpanded: .constant(false))
+    ActivityBar(center: OperationCenter(), isExpanded: .constant(false), trustableTap: { _ in nil })
         .frame(width: 640)
 }

@@ -18,7 +18,7 @@ import Testing
 /// Tap ordering is load-bearing **twice**. A package from a newly added tap must
 /// not be attempted before its tap exists — and the shared confirmation gate
 /// derives the batch's disclosure from `commands.first`, so a tap-carrying batch
-/// presents the tapTrust warning only when a tap leads it. Both consequences are
+/// presents the tap-add warning only when a tap leads it. Both consequences are
 /// asserted, not just the ordering.
 @MainActor
 @Suite("Brewfile plan", .timeLimit(.minutes(1)))
@@ -144,7 +144,7 @@ struct BrewfilePlanTests {
         // ordering is what makes the tap warning reachable at all.
         let harness = CenterHarness()
         let request = try #require(harness.center.request(plan.commands))
-        #expect(request.disclosure == .tapTrust(TapName("acme/tap")!))
+        #expect(request.disclosure == .tapAdd(TapName("acme/tap")!))
     }
 
     @Test("Relative order inside each group follows the file")
@@ -188,7 +188,7 @@ struct BrewfilePlanTests {
 
         let request = try #require(harness.center.request(plan.commands))
         #expect(request.commands.count == 3, "the confirmation covered less than the whole batch")
-        #expect(request.disclosure == .tapTrust(TapName("acme/tap")!))
+        #expect(request.disclosure == .tapAdd(TapName("acme/tap")!))
         #expect(harness.launcher.launchCount == 0, "something was enqueued before the yes")
 
         // Declining submits none of it, never a partial subset.
@@ -246,7 +246,7 @@ struct BrewfilePlanTests {
 
         #expect(claimedRequest.disclosure == plainRequest.disclosure)
         #expect(claimedRequest.warningText == plainRequest.warningText)
-        #expect(claimedRequest.disclosure == .tapTrust(TapName("acme/tap")!))
+        #expect(claimedRequest.disclosure == .tapAdd(TapName("acme/tap")!))
 
         // And nothing derived from the option reaches argv.
         #expect(claimedRequest.commands.map(\.arguments) == [["tap", "acme/tap"]])
@@ -343,5 +343,53 @@ struct BrewfilePlanTests {
         let install = MutationCommand.install(PackageTarget(kind: .formula, name: "wget")!)
         #expect(AnyBrewMutation(tap).invalidates == .taps)
         #expect(AnyBrewMutation(install).invalidates == [.installedInventory, .diskUsage])
+    }
+
+    // MARK: - BF5 :115 — a qualified entry installs the bare token
+
+    /// **D3.** Homebrew 6 treats naming a qualified package on the command line
+    /// as a **per-package grant**, so forwarding a file's `brew
+    /// "acme/tap/thing"` as argv would let the file's author grant trust on the
+    /// importing user's Mac — exactly the delegation BF5 refuses.
+    ///
+    /// The line still parses as an ordinary entry and is still counted; what
+    /// runs is `install --formula thing`. If `acme/tap` is untrusted brew
+    /// refuses, and PM10's typed outcome offers the grant as an explicit answer.
+    @Test("A qualified entry installs the bare token")
+    func aQualifiedEntryInstallsTheBareToken() throws {
+        let formula = try #require(FormulaID(name: "acme/tap/thing"))
+        let cask = try #require(CaskID(name: "acme/tap/app"))
+        let plan = BrewfilePlan(selecting: [
+            BrewfileEntry(kind: .formula(formula), lineNumber: 1),
+            BrewfileEntry(kind: .cask(cask), lineNumber: 2)
+        ])
+
+        #expect(plan.installs.map(\.arguments) == [
+            ["install", "--formula", "thing"],
+            ["install", "--cask", "app"]
+        ])
+
+        // The entry itself is unchanged: it parses, it keeps its qualified
+        // identity for display and diffing, and no skip is counted for it.
+        #expect(formula.name == "acme/tap/thing")
+        #expect(cask.name == "acme/tap/app")
+
+        // A degenerate qualified name whose last component is empty produces
+        // **no** command rather than installing the component before it — which
+        // would be the wrong package, silently.
+        let degenerate = try #require(FormulaID(name: "acme/tap/"))
+        let degeneratePlan = BrewfilePlan(selecting: [
+            BrewfileEntry(kind: .formula(degenerate), lineNumber: 1)
+        ])
+        #expect(degeneratePlan.installs.isEmpty)
+        #expect(degeneratePlan.isEmpty)
+
+        // Positively anchored: an ordinary bare entry is untouched by all of
+        // this, so the strip is about the qualifier and nothing else.
+        let bare = try #require(FormulaID(name: "wget"))
+        let barePlan = BrewfilePlan(selecting: [
+            BrewfileEntry(kind: .formula(bare), lineNumber: 1)
+        ])
+        #expect(barePlan.installs.map(\.arguments) == [["install", "--formula", "wget"]])
     }
 }

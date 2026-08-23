@@ -4,6 +4,7 @@
 //
 
 import BrewClient
+import Catalog
 import SwiftUI
 
 /// The expanded activity list: every operation this session, with its state, the
@@ -13,6 +14,14 @@ import SwiftUI
 /// (operation-activity OA1); persistence across launches is M2-3.
 struct ActivityDrawer: View {
     let center: OperationCenter
+    /// Which tap Cellar may offer to trust after an untrusted-tap refusal, for
+    /// a given refused package identity.
+    ///
+    /// A closure rather than a `TapStore`, in the shipped `currentForceEvidence`
+    /// idiom: the drawer stays ignorant of tap storage, and this is the only
+    /// thing that can turn a refused `PackageID` into a typed command
+    /// (design DD-12).
+    let trustableTap: @MainActor (PackageID?) -> TapName?
 
     @State private var expandedID: UUID?
 
@@ -23,8 +32,15 @@ struct ActivityDrawer: View {
                     ActivityRow(
                         item: item,
                         isExpanded: expandedID == item.id,
+                        // The refusal carries no tap — nothing is parsed out of
+                        // it — so the candidate comes from Cellar's own
+                        // snapshot, keyed by an identity Cellar typed itself.
+                        recoverableTap: item.outcome == .refusedUntrustedTap
+                            ? trustableTap(item.command.packageID)
+                            : nil,
                         onToggle: { expandedID = expandedID == item.id ? nil : item.id },
-                        onCancel: { center.cancel(item) }
+                        onCancel: { center.cancel(item) },
+                        onTrust: { tap in _ = center.request(TapCommand.trustTap(tap)) }
                     )
                     Divider()
                 }
@@ -38,8 +54,14 @@ struct ActivityDrawer: View {
 private struct ActivityRow: View {
     let item: ActivityItem
     let isExpanded: Bool
+    /// Non-`nil` only for a refusal with exactly one untrusted publisher. With
+    /// zero or two, the typed message's own sentence is the path and no button
+    /// is shown, because Cellar will not guess which capability to grant
+    /// (design DD-7, R16).
+    let recoverableTap: TapName?
     let onToggle: () -> Void
     let onCancel: () -> Void
+    let onTrust: (TapName) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -72,6 +94,15 @@ private struct ActivityRow: View {
                 if item.isCancellable {
                     Button("Cancel", action: onCancel)
                         .buttonStyle(.borderless)
+                }
+
+                // Opens the ordinary **confirmed** Trust request. It retries
+                // nothing: a requalified retry is precisely what would turn a
+                // refusal into silent execution of unconsented code.
+                if let recoverableTap {
+                    Button("Trust") { onTrust(recoverableTap) }
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("activity-trust-recovery")
                 }
             }
 

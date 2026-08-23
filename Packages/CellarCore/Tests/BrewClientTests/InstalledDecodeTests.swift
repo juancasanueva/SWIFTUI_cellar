@@ -219,4 +219,54 @@ struct InstalledDecodeTests {
         // timing one.
         #expect(during > 0, "no main-actor turn completed while the snapshot was decoded")
     }
+
+    // MARK: - II2 — a withheld tap is absent, not empty
+
+    /// Homebrew withholds the `tap` of every package published by a tap it will
+    /// not load, so `tap` arrives as `null` (obs #7721). Collapsing that to `""`
+    /// destroys the only fact that separates "brew is withholding this" from
+    /// "brew told us the tap" — and it is the same rule II2 already applies to a
+    /// cask's tri-state `auto_updates`: not declared is not declared false.
+    @Test("A null or absent tap decodes as absent, not as an empty string")
+    func aNullTapIsAbsentNotEmpty() throws {
+        let payload = Data(#"""
+        {"formulae":[
+          {"name":"widget","tap":null,"versions":{"stable":"2.0"},"installed":[
+            {"version":"2.0","time":100,"installed_on_request":true}]},
+          {"name":"named","tap":"acme/tools","versions":{"stable":"1.0"},"installed":[
+            {"version":"1.0","time":100,"installed_on_request":true}]},
+          {"name":"missing","versions":{"stable":"3.0"},"installed":[
+            {"version":"3.0","time":100,"installed_on_request":true}]}
+        ],"casks":[
+          {"token":"desk","tap":null,"version":"4.0","installed":"4.0","installed_time":100}
+        ]}
+        """#.utf8)
+
+        let inventory = try InstalledDecoder.inventory(from: payload)
+
+        // II2 :108 — a record with a withheld tap still enters the inventory,
+        // whole. Absence is a missing tap, not a missing package.
+        #expect(inventory.packages.count == 4)
+
+        let withheld = try #require(inventory.package(PackageID(kind: .formula, name: "widget")))
+        let named = try #require(inventory.package(PackageID(kind: .formula, name: "named")))
+        let absent = try #require(inventory.package(PackageID(kind: .formula, name: "missing")))
+        let cask = try #require(inventory.package(PackageID(kind: .cask, name: "desk")))
+
+        #expect(withheld.tap == nil)
+        #expect(named.tap == "acme/tools")
+        #expect(absent.tap == nil)
+        #expect(cask.tap == nil)
+
+        // The sentinel is gone: absence is not the empty string.
+        #expect(withheld.tap != "")
+        #expect(cask.tap != "")
+
+        // And the rest of each record survives the missing key untouched.
+        #expect(withheld.installedVersion == "2.0")
+        #expect(withheld.kind == .formula)
+        #expect(withheld.catalogVersion == "2.0")
+        #expect(cask.kind == .cask)
+        #expect(cask.installedVersion == "4.0")
+    }
 }

@@ -56,6 +56,19 @@ public enum MutationOutcome: Sendable, Equatable {
     case launchFailed
     /// Queue-front evidence rejected the mutation before process launch.
     case authorizationDenied(MutationLaunchDenial.Code)
+    /// Homebrew refused to load the package because the tap publishing it is
+    /// not trusted. Nothing ran.
+    ///
+    /// **No associated value, deliberately.** Not one byte of the refusal is
+    /// parsed, captured or echoed — no tap name, package name, qualified token
+    /// or suggested command (package-mutation PM10 :293-295). The recovery
+    /// finds its tap in Cellar's own snapshot instead
+    /// (`UntrustedTapRecovery`), so the only thing brew's message does here is
+    /// answer "was this a trust refusal?".
+    ///
+    /// A parsed-then-validated tap name was rejected as "strictly stronger": it
+    /// is not, it is an extraction, and PM10 asserts its absence.
+    case refusedUntrustedTap
 
     // MARK: - Classification
 
@@ -101,6 +114,7 @@ public enum MutationOutcome: Sendable, Equatable {
 
         if tail.contains(where: Signature.isLock) { return .busy }
         if tail.contains(where: Signature.isPrivilege) { return .needsPrivileges }
+        if tail.contains(where: Signature.isUntrustedTap) { return .refusedUntrustedTap }
 
         return .failed(status: exit.status)
     }
@@ -129,8 +143,24 @@ public enum MutationOutcome: Sendable, Equatable {
             lock.contains { line.contains($0) }
         }
 
+        /// One phrase, not two (design DD-6). `"untrusted tap"` is the
+        /// substring of the measured Homebrew 6.0.18 cask refusal (obs #7721)
+        /// and of any plausible formula wording, and it cannot collide with the
+        /// lock or privilege phrases above.
+        ///
+        /// `"Refusing to load"` alone was rejected: brew refuses to load things
+        /// for reasons a trust grant would not fix, and a false positive here
+        /// does not merely show a wrong sentence — it offers a **Trust button**
+        /// for one of them. A miss degrades to `.failed` with the verbatim log,
+        /// and widening later needs no structural change.
+        static let untrustedTap = "untrusted tap"
+
         static func isPrivilege(_ line: String) -> Bool {
             privilege.contains { line.contains($0) }
+        }
+
+        static func isUntrustedTap(_ line: String) -> Bool {
+            line.contains(untrustedTap)
         }
     }
 
@@ -142,7 +172,8 @@ public enum MutationOutcome: Sendable, Equatable {
     /// them, and reporting them as errors would be a lie about their own action.
     public var isFailure: Bool {
         switch self {
-        case .failed, .busy, .needsPrivileges, .launchFailed: true
+        // The command did not run, so the refusal is a failure.
+        case .failed, .busy, .needsPrivileges, .launchFailed, .refusedUntrustedTap: true
         case .succeeded, .noChange, .cancelled, .abandoned, .authorizationDenied: false
         }
     }
@@ -198,6 +229,15 @@ public enum MutationOutcome: Sendable, Equatable {
             "The affected packages changed. Review them and confirm again."
         case .authorizationDenied(.evidenceUnavailable):
             "Cellar could not verify the current affected packages. Refresh and try again."
+        // Tap-scoped and tap-agnostic: it names no tap, because nothing was read
+        // out of the refusal to name one with, and it says nothing about the
+        // *package* being untrusted, because a per-package grant is independent
+        // of a tap grant (PM10 :309-314).
+        case .refusedUntrustedTap:
+            """
+            Homebrew refused to load this package because its tap is not \
+            trusted. Trust the tap in Taps, then try again.
+            """
         }
     }
 
@@ -214,6 +254,7 @@ public enum MutationOutcome: Sendable, Equatable {
         case .launchFailed: "Could not start"
         case .authorizationDenied(.evidenceChanged): "Needs fresh confirmation"
         case .authorizationDenied(.evidenceUnavailable): "Could not verify current packages"
+        case .refusedUntrustedTap: "Tap not trusted"
         }
     }
 }

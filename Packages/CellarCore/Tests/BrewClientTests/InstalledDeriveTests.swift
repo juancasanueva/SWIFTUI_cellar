@@ -319,4 +319,87 @@ struct InstalledDeriveTests {
             declaresAutoUpdates: nil
         )
     }
+
+    // MARK: - II2 :116 — every reader of an installed tap treats absence as no match
+
+    /// **DD-11.** This migration is *not* compiler-enforced. Swift promotes the
+    /// non-optional operand of `==`, so all three shipped readers keep compiling
+    /// and stay semantically correct — which means nothing but this test pins
+    /// them. Each predicate below is the exact expression its reader evaluates.
+    @Test("Every reader of an installed tap treats absence as no match")
+    func everyTapReaderTreatsAbsenceAsNoMatch() throws {
+        let payload = Data(#"""
+        {"formulae":[
+          {"name":"widget","tap":null,"versions":{"stable":"2.0"},"installed":[
+            {"version":"2.0","time":100,"installed_on_request":true}]},
+          {"name":"named","tap":"acme/tools","versions":{"stable":"1.0"},"installed":[
+            {"version":"1.0","time":100,"installed_on_request":true}]},
+          {"name":"core","tap":"homebrew/core","versions":{"stable":"1.0"},"installed":[
+            {"version":"1.0","time":100,"installed_on_request":true}]}
+        ],"casks":[]}
+        """#.utf8)
+
+        let inventory = try InstalledDecoder.inventory(from: payload)
+        let withheld = try #require(inventory.package(PackageID(kind: .formula, name: "widget")))
+        let named = try #require(inventory.package(PackageID(kind: .formula, name: "named")))
+        let core = try #require(inventory.package(PackageID(kind: .formula, name: "core")))
+
+        // Absence matches neither a tap name nor the sentinel it used to become.
+        #expect(withheld.tap == nil)
+        #expect((withheld.tap == "acme/tools") == false)
+        #expect((withheld.tap == "") == false)
+
+        // Reader 1 — `TapProjection`'s exact-tap cross-reference (:146).
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget", "acme/tools/named"]
+        )
+        let projected = TapProjection.packages(for: tap, installed: inventory)
+        let widgetRow = try #require(projected.first { $0.displayName == "widget" })
+        let namedRow = try #require(projected.first { $0.displayName == "named" })
+        #expect(widgetRow.installedHandoff == nil, "a withheld tap matched the selected tap exactly")
+        #expect(namedRow.installedHandoff == PackageID(kind: .formula, name: "named"))
+
+        // Reader 2 — `ContentView.forceEvidence`'s affected-set filter, the same
+        // predicate it applies. A withheld record is excluded, so force untap
+        // stays hidden while a tap is untrusted (DD-14, fail-closed).
+        let affected = Set(inventory.packages.lazy.filter { $0.tap == "acme/tools" }.map(\.id))
+        #expect(affected == [PackageID(kind: .formula, name: "named")])
+
+        // Reader 3 — `HomebrewUpdateNeed.isComparable`, the same predicate.
+        #expect((withheld.tap == "homebrew/core") == false)
+        #expect((withheld.tap == "homebrew/cask") == false)
+        #expect(core.tap == "homebrew/core")
+        #expect(named.tap == "acme/tools")
+
+        // And the sentinel may not come back in either app-target reader, which
+        // is the one way this migration could be silently undone.
+        for source in try Self.appTapReaderSources() {
+            #expect(
+                source.code.contains("tap ?? \"\"") == false,
+                "\(source.name) reintroduced the empty-string tap sentinel"
+            )
+        }
+    }
+
+    private struct AppSource {
+        let name: String
+        let code: String
+    }
+
+    private static func appTapReaderSources() throws -> [AppSource] {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try ["cellar/ContentView.swift", "cellar/Home/HomebrewUpdateNeed.swift"].map { path in
+            AppSource(
+                name: path,
+                code: try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+            )
+        }
+    }
 }
