@@ -417,4 +417,4 @@ sees both grant kinds, so only brew decides.
   over the argv surface, together with **D3**'s bare-token strip on the Brewfile path.
 - Record the measured facts this requirement consumes so they are not re-derived: the cask refusal's
   exact stderr (obs `#7721`), that a per-package grant restores the `tap` field and unblocks bare-token
-  argv (obs `#7724`), and that the formula refusal wording remains **unmeasured** (risk R6).
+  argv (obs `#7724`), and the formula refusal wording, **measured 2026-08-23** (obs `#7738`): `Error: Refusing to load formula agavra/tap/tuicr from untrusted tap agavra/tap.` — it carries the same structural phrase, so the classifier covers formulae and risk R6 is closed.

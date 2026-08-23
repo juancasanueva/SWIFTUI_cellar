@@ -978,7 +978,7 @@ so.
 | **R3** | Stale grants — untap leaves the entry in `trust.json`, and a Brewfile import silently re-arms it | **High** | DD-4's unconditional revoke-first sequence; units 2c, 13b; manual evidence 3 |
 | **R4** | The batch-disclosure downgrade the prepend introduces would defeat the force-untap disclosure — the exact defect PM1 was written to fix | **High** | DD-3 + DD-9; units 8 and 8b; the shipped `?.disclosure ??` ban stays green |
 | **R5** | Homebrew version drift — a brew with no trust concept | Med | `.unreported` shows no badge and neither control, and neither control spawns anything (unit 9b). **Consequence, accepted:** because DD-5's revocation is unconditional, every untap on such a brew shows a *failed* `untrust` item beside a succeeding `untap`. That is TM7's own choice — a visible failed operation beats a silently retained grant — and it is documented in the PR body rather than discovered. **Narrowed by D4 (2026-08-23):** the failed `untrust` now appears only behind an `untap` such a brew accepted, so a refused removal shows one failed item instead of two |
-| **R6** | Refusal-prose drift; the **formula** wording is unmeasured | Med | DD-6's single specific phrase; a miss degrades to `.failed` with the verbatim log. Widening needs no structural change. **Obligation before release: capture the formula wording (manual evidence 5)** |
+| **R6** | Refusal-prose drift; the **formula** wording was unmeasured until Phase 9 — **measured 2026-08-23, contains `untrusted tap` (obs #7738), closed** | Low | DD-6's single specific phrase; a miss degrades to `.failed` with the verbatim log. Widening needs no structural change. **Obligation before release: capture the formula wording (manual evidence 5)** |
 | **R7** | Per-package grants — a package individually trusted under an untrusted tap must never be described as untrusted, nor blocked | Med | No pre-launch gate anywhere (unit 10c); every string is tap-scoped (unit 4e); the withheld state requires an actual `tap: nil` record, and a per-package grant restores `tap` (obs `#7724`), so such a package projects as plainly `.installed` |
 | **R8** | The `tap` optional migration is **not** compiler-enforced at its readers, contrary to the proposal's and the installed-inventory delta's framing | Med | DD-11; the three readers are enumerated and pinned by unit 5b; Spec Amendments #5 and #6 correct both documents |
 | **R9** | Shipping-proof drift — the pinned action enum and button set fail loudly | Low | Desired behaviour; unit 9 updates 6→8 actions and 4→6 labels deliberately, and the helper's return type with them |
@@ -1031,8 +1031,7 @@ and PM1's lead disclosure = the first command's **own declared** disclosure (**D
 
 Two items are obligations rather than questions:
 
-- [ ] **Formula refusal wording** — unmeasured (R6). Capture as manual evidence 5 before release; it
-      needs no design change either way.
+- [x] **Formula refusal wording** — measured 2026-08-23 as manual evidence 5 (verify-report Phase 9 §9.4, obs #7738): `Refusing to load formula agavra/tap/tuicr from untrusted tap agavra/tap.` Same phrase; no design change needed.
 - [x] **Spec amendments** — the eight above were applied on 2026-08-23 before `sdd-tasks`
       writes tasks against these deltas.
 
