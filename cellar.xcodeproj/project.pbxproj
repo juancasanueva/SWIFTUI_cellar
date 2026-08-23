@@ -35,7 +35,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		BCDBE97B301E2D410013A38D /* cellar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = cellar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BCDBE97B301E2D410013A38D /* Home-Cellar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Home-Cellar.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCDBE98A301E2D420013A38D /* cellarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = cellarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCDBE994301E2D420013A38D /* cellarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = cellarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -104,7 +104,7 @@
 		BCDBE97C301E2D410013A38D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				BCDBE97B301E2D410013A38D /* cellar.app */,
+				BCDBE97B301E2D410013A38D /* Home-Cellar.app */,
 				BCDBE98A301E2D420013A38D /* cellarTests.xctest */,
 				BCDBE994301E2D420013A38D /* cellarUITests.xctest */,
 			);
@@ -139,7 +139,7 @@
 				BC0000010000000000000013 /* ReleaseNotes */,
 			);
 			productName = cellar;
-			productReference = BCDBE97B301E2D410013A38D /* cellar.app */;
+			productReference = BCDBE97B301E2D410013A38D /* Home-Cellar.app */;
 			productType = "com.apple.product-type.application";
 		};
 		BCDBE989301E2D420013A38D /* cellarTests */ = {
@@ -443,7 +443,8 @@
 				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.juancasanueva.cellar;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = cellar;
+				PRODUCT_NAME = "Home-Cellar";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -479,7 +480,8 @@
 				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.juancasanueva.cellar;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = cellar;
+				PRODUCT_NAME = "Home-Cellar";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -507,7 +509,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/cellar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/cellar";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Home-Cellar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Home-Cellar";
 			};
 			name = Debug;
 		};
@@ -528,7 +530,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/cellar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/cellar";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Home-Cellar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Home-Cellar";
 			};
 			name = Release;
 		};
