@@ -39,16 +39,16 @@ brew trust juancasanueva/cellar
 brew install --cask home-cellar
 ```
 
-That installs `/Applications/cellar.app`, the same notarized build the releases
+That installs `/Applications/Home-Cellar.app`, the same notarized build the releases
 page serves. Homebrew 6 refuses to load a cask from a third-party tap until the
 tap is trusted, which is what the middle line does; it grants nothing beyond
 this tap. If another tap ever claims the `home-cellar` token, the
 fully-qualified `brew install --cask juancasanueva/cellar/home-cellar` is the
 unambiguous form.
 
-**Already have `cellar.app` in `/Applications`?** Homebrew refuses to overwrite
-an app it did not place (`It seems there is already an App at
-'/Applications/cellar.app'`). Let it adopt the existing copy instead:
+**Already have `Home-Cellar.app` in `/Applications`?** Homebrew refuses to
+overwrite an app it did not place (`It seems there is already an App at
+'/Applications/Home-Cellar.app'`). Let it adopt the existing copy instead:
 
 ```sh
 brew install --cask --adopt home-cellar
@@ -60,7 +60,8 @@ versions before adopting: the copy you have, whatever Sparkle has updated it
 to, is the one it takes over.
 
 Or download the latest `Home-Cellar-<version>.zip` from
-[Releases](../../releases), unzip it, and drag `cellar.app` to `/Applications`.
+[Releases](../../releases), unzip it, and drag `Home-Cellar.app` to
+`/Applications`.
 
 The build is notarized and stapled, so the first launch is a single ordinary
 "Open" confirmation — no right-click workaround, and no network access needed to

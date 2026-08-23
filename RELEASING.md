@@ -262,7 +262,7 @@ fallback was needed. Notarization submission
 and the Gatekeeper assessment of the bundle extracted from the zip was:
 
 ```
-cellar.app: accepted
+Home-Cellar.app: accepted
 source=Notarized Developer ID
 origin=Developer ID Application: Juan Casanueva (Z3S5JK8E38)
 ```
@@ -300,7 +300,7 @@ change without a coordinated change there:
 |---|---|
 | Asset URL | `https://github.com/<owner>/<repo>/releases/download/v<version>/Home-Cellar-<version>.zip` |
 | Asset name | `Home-Cellar-<version>.zip`, exactly one per release |
-| Bundle inside it | `cellar.app`, display name `Home-Cellar` |
+| Bundle inside it | `Home-Cellar.app`, display name `Home-Cellar` |
 | Version stamping | `CFBundleShortVersionString` = tag minus `v`; `CFBundleVersion` = run number, strictly increasing |
 | Signature | Developer ID Application, team `Z3S5JK8E38`, hardened runtime, notarized and stapled |
 | Floor | Apple Silicon (`arm64` only) for the app executable; the embedded `Sparkle.framework` is universal, which does not change the floor |
@@ -333,7 +333,7 @@ at the same `Home-Cellar-<version>.zip` §7 specifies.
 | Cask token | `home-cellar` |
 | Canonical install | `brew tap juancasanueva/cellar`, then `brew trust juancasanueva/cellar`, then `brew install --cask home-cellar` |
 | Unambiguous form | `brew install --cask juancasanueva/cellar/home-cellar` |
-| Installed path | `/Applications/cellar.app` — the same bundle name the zip carries |
+| Installed path | `/Applications/Home-Cellar.app` — the same bundle name the zip carries |
 
 Four files plus a `LICENSE` live there: `Casks/home-cellar.rb`,
 `.github/workflows/ci.yml`, `.github/workflows/bump.yml`, and a user-facing
@@ -345,11 +345,11 @@ juancasanueva/cellar` first. Naming the tap or the fully-qualified cask on the
 command line is itself the grant, which is why every command in this section and
 in both tap workflows is fully qualified and needs no stored trust entry.
 
-**A direct-download copy blocks a plain install.** Every user who installed
-before the tap existed, or who dragged the zip, already has
-`/Applications/cellar.app`, and `brew install --cask home-cellar` stops with
-`It seems there is already an App at '/Applications/cellar.app'` rather than
-overwrite an app it did not place. The documented answer is
+**A direct-download copy blocks a plain install.** A user who dragged the zip
+already has `/Applications/Home-Cellar.app` — the same path and the same bundle
+name the cask installs — and `brew install --cask home-cellar` stops with
+`It seems there is already an App at '/Applications/Home-Cellar.app'` rather
+than overwrite an app it did not place. The documented answer is
 `brew install --cask --adopt home-cellar`. Adoption moves nothing and compares
 nothing: Homebrew skips the bundle-version check for casks that declare
 `auto_updates` (`cask/artifact/moved.rb`, the `unless auto_updates` branch), so a

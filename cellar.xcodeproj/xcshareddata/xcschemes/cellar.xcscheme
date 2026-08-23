@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "BCDBE97A301E2D410013A38D"
-               BuildableName = "cellar.app"
+               BuildableName = "Home-Cellar.app"
                BlueprintName = "cellar"
                ReferencedContainer = "container:cellar.xcodeproj">
             </BuildableReference>
@@ -70,7 +70,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "BCDBE97A301E2D410013A38D"
-            BuildableName = "cellar.app"
+            BuildableName = "Home-Cellar.app"
             BlueprintName = "cellar"
             ReferencedContainer = "container:cellar.xcodeproj">
          </BuildableReference>
@@ -101,7 +101,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "BCDBE97A301E2D410013A38D"
-            BuildableName = "cellar.app"
+            BuildableName = "Home-Cellar.app"
             BlueprintName = "cellar"
             ReferencedContainer = "container:cellar.xcodeproj">
          </BuildableReference>
