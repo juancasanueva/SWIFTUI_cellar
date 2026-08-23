@@ -167,7 +167,7 @@ None of the tasks below is a `cellarTests` task and none can be discharged by a 
       `CFBundleShortVersionString` equals the released version, and first launch is a single ordinary
       "Open" (no Gatekeeper refusal). Paste it into `design.md` *§ Evidence to capture* and the verify
       report. No harness may install into a real `/Applications`; this cannot become a test task.
-- [ ] 2.8 **`manual-evidence` — S3.** After Sparkle has self-updated an installed cask copy in place,
+- [x] 2.8 **`manual-evidence` — S3.** After Sparkle has self-updated an installed cask copy in place,
       run `brew upgrade`. **Accepted evidence**: a verbatim transcript showing Homebrew neither
       reports the copy as outdated nor reinstalls over it (`auto_updates true`, **R3**, the whole
       mitigation for archive design risk 11). Same capture destinations.
@@ -289,7 +289,7 @@ Placeholders until measured. **No probe outcome is invented.** Each row lands in
       refusal branch → **S4** (from 2.5).
 - [ ] 6.4 Verbatim `brew tap` + `brew install --cask` transcript showing `/Applications/cellar.app` at
       the released version → **S1** (from 2.7).
-- [ ] 6.5 Verbatim `brew upgrade` transcript against a Sparkle-self-updated copy showing no reinstall →
+- [x] 6.5 Verbatim `brew upgrade` transcript against a Sparkle-self-updated copy showing no reinstall →
       **S3** (from 2.8).
 - [x] 6.6 Archive obligation, recorded now so it is not re-derived: the main spec's
       `## Verification classes` table needs a **hand update** — counts to `unit` **18** / `ci-gate`

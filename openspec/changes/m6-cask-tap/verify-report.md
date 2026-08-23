@@ -536,3 +536,51 @@ holds, the `release.yml` change is exactly the two declared comment lines, all f
 declared stanza, and commit hygiene is clean in both repositories. `S1` and `S3` remain **pending** by
 maintainer decision and by the spec's own `manual-evidence` class — not failing. Four warnings are
 recorded, none of them blocking; **W1** is a cheap artifact fix best made before archive.
+
+## Addendum — S3 manual evidence captured (2026-08-23, after PR #64 merged)
+
+Captured on the maintainer's Mac (Homebrew 6.0.18, macOS 26), against a copy that Sparkle had already
+self-updated in place from 0.0.4 to 1.0.0 (`CFBundleVersion` 7) before brew ever managed it. This is
+the exact S3 situation: a Sparkle-updated bundle, then `brew` asked to take over and to upgrade.
+
+First attempt, before the `--adopt` guidance existed (the finding that became PR #65):
+
+```
+$ brew install --cask home-cellar
+==> Installing Cask home-cellar
+==> Purging files for version 1.0.0 of Cask home-cellar
+Error: juancasanueva/cellar/home-cellar: It seems there is already an App at '/Applications/cellar.app'.
+```
+
+Adoption, then the S3 upgrade check:
+
+```
+$ brew install --cask --adopt home-cellar
+Warning: Not upgrading home-cellar, the latest version is already installed
+$ brew upgrade
+$ brew upgrade --cask home-cellar
+Warning: Not upgrading home-cellar, the latest version is already installed
+$ brew outdated --cask --greedy | grep -i cellar
+(no output)
+$ brew list --cask --versions home-cellar
+home-cellar 1.0.0
+$ ls -la /opt/homebrew/Caskroom/home-cellar/1.0.0
+cellar.app -> /Applications/cellar.app
+$ /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' -c 'Print CFBundleVersion' /Applications/cellar.app/Contents/Info.plist
+1.0.0
+7
+$ codesign -dv /Applications/cellar.app
+Identifier=com.juancasanueva.cellar
+TeamIdentifier=Z3S5JK8E38
+```
+
+**Verdict: S3 PASS.** Homebrew records the Sparkle-updated copy as `home-cellar 1.0.0` through the
+adoption symlink, neither lists it as outdated (even with `--greedy`) nor reinstalls over it on
+`brew upgrade`, and the bundle on disk is untouched (same version, build, and Developer ID signature).
+That is the `auto_updates true` mitigation for archive design risk 11 (**R3**) observed, not inferred.
+Tasks `2.8` and `6.5` are now checked. `S1` (install on a Mac that never had Cellar) remains the only
+pending scenario.
+
+Side finding, recorded separately (Engram `cellar/tap-clone-conflict-gotcha`): the force-pushed tap
+root commit during apply left the maintainer's brew-managed tap clone with conflict markers; fixed by
+`git reset --hard origin/main` inside the tap directory. Never rewrite a tap's history once tapped.
