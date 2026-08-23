@@ -35,10 +35,11 @@ public struct BrewfilePlan: Sendable, Equatable {
             switch entry.kind {
             case .tap(let name, _):
                 taps.append(.addTap(name))
-            case .formula(let formula):
-                installs.append(.install(formula.target))
-            case .cask(let cask):
-                installs.append(.install(cask.target))
+            case .formula, .cask:
+                // The entry's own projection, not a string this type composed
+                // (**D3**). An entry whose bare token cannot construct produces
+                // no command, and the import must not present it as applied.
+                if let target = entry.installTarget { installs.append(.install(target)) }
             }
         }
 

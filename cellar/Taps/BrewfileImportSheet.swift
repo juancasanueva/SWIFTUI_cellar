@@ -133,6 +133,12 @@ struct BrewfileImportSheet: View {
                     Text(row.detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if let fileToken = row.fileToken {
+                        Text("In the file as \(fileToken)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("brewfile-import-file-token")
+                    }
                     if let claim = row.trustClaim {
                         Text(claim)
                             .font(.caption)
@@ -222,9 +228,14 @@ enum BrewfileImportAction {
 struct BrewfileImportRow: Identifiable, Equatable {
     let id: Int
     let state: BrewfileDiff.State
-    /// The entry's name, or a skipped line exactly as it was read.
+    /// The token that will actually be installed, or a skipped line exactly as
+    /// it was read.
     let title: String
     let detail: String
+    /// The file's own token, shown only when it differs from what will run —
+    /// which happens when a `/`-qualified entry is installed by its bare token
+    /// (**D3**). Nothing here claims anything about trust.
+    let fileToken: String?
     let isSelectable: Bool
     /// The attribution sentence, when the line carried a `trusted:` option.
     let trustClaim: String?
@@ -240,11 +251,15 @@ struct BrewfileImportRow: Identifiable, Equatable {
 
         switch row {
         case .missing(let entry), .present(let entry):
-            title = entry.displayName
+            // The row's title is the token that will appear in argv, so what the
+            // user reads before applying is what will run.
+            title = entry.installName ?? entry.displayName
+            fileToken = title == entry.displayName ? nil : entry.displayName
             detail = "\(Self.kind(of: entry)) · \(Self.status(of: entry, state: row.state))"
             trustClaim = entry.trustedClaim == nil ? nil : BrewfileTrustClaim.attribution
         case .skipped(let skip):
             title = skip.rawLine
+            fileToken = nil
             detail = "Line \(skip.lineNumber) · \(BrewfileSkipCopy.reason(for: skip.reason.category))"
             trustClaim = nil
         }

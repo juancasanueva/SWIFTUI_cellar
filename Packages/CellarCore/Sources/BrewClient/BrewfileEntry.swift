@@ -70,14 +70,51 @@ public struct BrewfileEntry: Sendable, Hashable, Identifiable {
         return name
     }
 
-    /// The name as it will appear in argv — which is the same token the file
-    /// contained, because it survived the typed identity unchanged.
+    /// The token **the file contained**, exactly as it was read.
+    ///
+    /// No longer the same thing as the token that will appear in argv: a
+    /// `/`-qualified package name is displayed as written and installed by its
+    /// bare token (**D3**, `installName` below).
     public var displayName: String {
         switch kind {
         case .tap(let name, _): name.rawValue
         case .formula(let formula): formula.name
         case .cask(let cask): cask.name
         }
+    }
+
+    /// The identity that will actually be installed: the bare token brew
+    /// installs by, with any `owner/tap/` qualifier removed (**D3**).
+    ///
+    /// Homebrew 6 treats *naming* a qualified package on the command line as a
+    /// **per-package trust grant** (`trust.rb#explicitly_allowed?`), so a file's
+    /// `brew "acme/tap/thing"` must not be forwarded as argv: that would let the
+    /// file's author grant trust on the importing user's Mac — exactly the party
+    /// `brewfile-management` BF5 refuses to delegate a trust decision to.
+    ///
+    /// The line still parses as an ordinary entry and is still counted; what
+    /// runs is `install --formula thing`, and if `acme/tap` is untrusted brew
+    /// refuses and `package-mutation` PM10's typed outcome offers Trust as an
+    /// explicit answer.
+    ///
+    /// `nil` for a tap entry, which installs nothing, and for a degenerate
+    /// qualified name whose last component is empty — `PackageTarget` refuses
+    /// that rather than silently installing the component before it.
+    public var installTarget: PackageTarget? {
+        guard let id = packageID else { return nil }
+        return PackageTarget(PackageID(kind: id.kind, name: Self.bareToken(id.name)))
+    }
+
+    /// The token that will appear in argv, for the import row to show.
+    public var installName: String? { installTarget?.name }
+
+    /// Empty components included on purpose: `acme/tap/` yields `""`, which does
+    /// not construct, instead of yielding `tap`, which would install the wrong
+    /// package.
+    static func bareToken(_ name: String) -> String {
+        guard let last = name.split(separator: "/", omittingEmptySubsequences: false).last
+        else { return name }
+        return String(last)
     }
 }
 

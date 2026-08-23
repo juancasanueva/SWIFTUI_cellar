@@ -478,4 +478,118 @@ struct MutationCommandTests {
             )
         }
     }
+
+    // MARK: - PM10 :359-365 — the argv prohibition, as an absence over the surface
+
+    /// **The central threat (D1, D3, design R2).** Homebrew 6 treats *naming* a
+    /// `owner/tap/token` on the command line as a **per-package trust grant**
+    /// (`trust.rb#explicitly_allowed?`). So a qualified token reaching argv — a
+    /// "helpful" retry, or a Brewfile line the importing user never wrote —
+    /// would silently execute code nobody consented to run, while looking
+    /// exactly like a bug fix.
+    ///
+    /// The shipped name gate deliberately permits `/`: `TapName.init?` is
+    /// expressed over the same gate and a tap name *is* `owner/repo`, so
+    /// narrowing it would make every tap unconstructible. The prohibition is
+    /// therefore an **absence over the whole argv surface**, asserted here.
+    ///
+    /// **Positively anchored**, because a vacuous version of this test is worse
+    /// than none: the fixture set is asserted non-empty, `addTap` really does
+    /// produce exactly one `/`, and the qualified Brewfile entry really does
+    /// produce `install --formula thing`.
+    @Test("No package position anywhere ever carries a qualified token")
+    func noPackagePositionEverCarriesAQualifiedToken() throws {
+        // 1. Every `MutationCommand` factory, over both kinds.
+        let formula = try #require(PackageTarget(PackageID(kind: .formula, name: "wget")))
+        let cask = try #require(PackageTarget(PackageID(kind: .cask, name: "iterm2")))
+        var mutations: [MutationCommand] = [.update, .upgradeAll]
+        for target in [formula, cask] {
+            mutations.append(contentsOf: [
+                .install(target), .uninstall(target), .upgrade(target), .reinstall(target)
+            ])
+        }
+        mutations.append(.zap(try #require(CaskID(cask.id))))
+        mutations.append(.pin(try #require(FormulaID(formula.id))))
+        mutations.append(.unpin(try #require(FormulaID(formula.id))))
+        // …and the `naming(_:_:)` build, over the identities Cellar actually
+        // types: catalog and installed identities, which are bare tokens.
+        //
+        // A synthetic qualified `PackageID` is deliberately **not** fed in here.
+        // `naming` is a lift over `PackageTarget.init?`, and **DD-8** forbids
+        // narrowing that gate — `TapName.init?` is expressed over it and a tap
+        // name *is* `owner/repo`, so a `/` ban there makes every tap
+        // unconstructible and every qualified Brewfile line an unrepresentable
+        // entry. The one place a qualified name can enter is a Brewfile, and
+        // that is where **D3** strips it — asserted by the plan fixture below.
+        for id in [formula.id, cask.id] {
+            let builds: [(PackageTarget) -> MutationCommand] = [
+                { MutationCommand.install($0) },
+                { MutationCommand.uninstall($0) },
+                { MutationCommand.upgrade($0) },
+                { MutationCommand.reinstall($0) }
+            ]
+            for build in builds {
+                if let built = MutationCommand.naming(id, build) { mutations.append(built) }
+            }
+        }
+
+        // 2. Every `TapCommand` case.
+        let tap = try #require(TapName("acme/tap"))
+        let tapCommands: [TapCommand] = [
+            .addTap(tap), .trustTap(tap), .untrustTap(tap), .removeTap(tap),
+            .forceRemoveTap(ForceUntapEvidence(
+                tap: tap,
+                affected: [PackageID(kind: .formula, name: "thing")],
+                isComplete: true
+            ))
+        ]
+
+        // 3. Every command a plan built from a **qualified** fixture emits.
+        let qualified = BrewfilePlan(selecting: [
+            BrewfileEntry(
+                kind: .formula(try #require(FormulaID(name: "acme/tap/thing"))),
+                lineNumber: 1
+            ),
+            BrewfileEntry(
+                kind: .cask(try #require(CaskID(name: "acme/tap/app"))),
+                lineNumber: 2
+            ),
+            BrewfileEntry(kind: .tap(tap, url: nil), lineNumber: 3)
+        ])
+
+        // Positive anchors first — a scan that matched nothing would make every
+        // expectation below pass for the wrong reason.
+        #expect(mutations.count >= 11, "the mutation fixture set collapsed")
+        #expect(tapCommands.count == 5)
+        #expect(qualified.installs.isEmpty == false, "the qualified plan produced no install")
+        #expect(qualified.taps.map(\.arguments) == [["tap", "acme/tap"]])
+        #expect(
+            TapCommand.addTap(tap).arguments.filter { $0.contains("/") } == ["acme/tap"],
+            "the tap add stopped producing the one legitimate slash"
+        )
+        #expect(qualified.installs.first?.arguments == ["install", "--formula", "thing"])
+
+        // **No `MutationCommand` argv element contains a slash at all** — the
+        // package families have no legitimate use for one.
+        for command in mutations + qualified.installs {
+            for element in command.arguments {
+                #expect(
+                    element.contains("/") == false,
+                    "\(command.verb) carries a slash in argv: \(element)"
+                )
+            }
+        }
+
+        // And **no argv element of any family carries two or more** — one is a
+        // tap name, two is a qualified package token and therefore a grant.
+        for arguments in (mutations + qualified.installs).map(\.arguments)
+            + tapCommands.map(\.arguments) {
+            for element in arguments {
+                #expect(
+                    element.filter { $0 == "/" }.count <= 1,
+                    "a qualified token reached argv: \(element)"
+                )
+            }
+        }
+    }
 }

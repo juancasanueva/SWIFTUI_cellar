@@ -405,29 +405,29 @@ and `xcodebuild test … -only-testing:cellarTests/TapCompositionTests`.
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'MutationCommandTests|BrewfilePlanTests|BrewfileEntryTests'`
 
-- [ ] 7.1 **RED — unit 7.** `MutationCommandTests · noPackagePositionEverCarriesAQualifiedToken`: over
+- [x] 7.1 **RED — unit 7.** `MutationCommandTests · noPackagePositionEverCarriesAQualifiedToken`: over
       every `MutationCommand` factory and `naming(_:)` build, every `TapCommand` case, and every
       command a `BrewfilePlan` built from a qualified-name fixture emits — **no `MutationCommand` argv
       element contains `/`**, and no argv element of any family contains two or more `/`. Positively
       anchored: the fixture set is asserted non-empty, `TapCommand.addTap` really does produce exactly
       one `/`, and the qualified Brewfile entry really does produce `install --formula thing`. A
       vacuous version of this test is worse than none. *(PM10.5)*
-- [ ] 7.2 **RED — unit 7b.** `BrewfilePlanTests · aQualifiedEntryInstallsTheBareToken`:
+- [x] 7.2 **RED — unit 7b.** `BrewfilePlanTests · aQualifiedEntryInstallsTheBareToken`:
       `brew "acme/tap/thing"` → `["install","--formula","thing"]`; `cask "acme/tap/app"` →
       `["install","--cask","app"]`; the entry still parses with **no skip counted**; a degenerate
       `acme/tap/` produces **no** command and is not presented as applied. *(BF5.6, BF5.5)*
-- [ ] 7.3 **RED — unit 7c.** `BrewfileEntryTests · qualifiedNamesStillConstructAndProjectABareTarget`:
+- [x] 7.3 **RED — unit 7c.** `BrewfileEntryTests · qualifiedNamesStillConstructAndProjectABareTarget`:
       `FormulaID(name: "acme/tap/thing")` **still** succeeds — `BrewfileEntryTests.swift:80-87` stays
       green — while `installTarget?.name == "thing"`. **DD-8: no `/` gate is added to
       `PackageTarget.init?` or `MutationName.isSafe`; both stay byte-identical.** *(BF5.6)*
-- [ ] 7.4 **Prove RED** (three), then **GREEN**: `BrewfileEntry.swift` — `installTarget`,
+- [x] 7.4 **Prove RED** (three), then **GREEN**: `BrewfileEntry.swift` — `installTarget`,
       `installName` and `bareToken(_:)` (splitting with `omittingEmptySubsequences: false` so
       `acme/tap/` yields `""`, which does not construct, instead of installing the wrong package), and
       correct `displayName`'s now-false doc comment in the same commit.
-- [ ] 7.5 **GREEN.** `BrewfilePlan.swift` :34-43 — the install arm builds from `entry.installTarget`;
+- [x] 7.5 **GREEN.** `BrewfilePlan.swift` :34-43 — the install arm builds from `entry.installTarget`;
       an entry with no constructible bare token produces no command. The Brewfile import row shows
       `installName` as its title and the file's qualified token as secondary detail when they differ.
-- [ ] 7.6 Focused command green; **`MutationCommandTests:289` still green**; commit WU7.
+- [x] 7.6 Focused command green; **`MutationCommandTests:289` still green**; commit WU7.
 
 ## Phase 8: Verification and bindings
 
