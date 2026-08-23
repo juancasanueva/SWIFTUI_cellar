@@ -14,6 +14,7 @@
 		BC0000010000000000000010 /* DiskUsage in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000011 /* DiskUsage */; };
 		BC0000010000000000000012 /* ReleaseNotes in Frameworks */ = {isa = PBXBuildFile; productRef = BC0000010000000000000013 /* ReleaseNotes */; };
 		D6A63F49439D7A381FD77F4B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A20DCB6D1023E7EE7541990D /* Sparkle */; };
+		FE7AFD59D0453669A254D40D /* Updates in Frameworks */ = {isa = PBXBuildFile; productRef = F027ABEA4C60DA5B6FB63820 /* Updates */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 				BC0000010000000000000010 /* DiskUsage in Frameworks */,
 				BC0000010000000000000012 /* ReleaseNotes in Frameworks */,
 				D6A63F49439D7A381FD77F4B /* Sparkle in Frameworks */,
+				FE7AFD59D0453669A254D40D /* Updates in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -656,6 +658,10 @@
 		BC0000010000000000000013 /* ReleaseNotes */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ReleaseNotes;
+		};
+		F027ABEA4C60DA5B6FB63820 /* Updates */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Updates;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

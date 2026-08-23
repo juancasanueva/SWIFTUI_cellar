@@ -219,4 +219,37 @@ struct UpdateProjectFileTests {
 
         #expect(UpdateProjectSources.occurrences(of: "PBXCopyFilesBuildPhase", in: project) == 0)
     }
+
+    // MARK: - T12(c) — pbxproj items 8 to 10, the Updates product linkage
+
+    /// The `Updates` library is linked explicitly, because nothing pulls it in.
+    ///
+    /// Six of CellarCore's products are linked by name and `SecurityKit` reaches
+    /// the app only transitively, through `Persistence`. `Updates` is
+    /// dependency-free by design, so it has no such path: without these three
+    /// entries `import Updates` does not resolve, and the obvious "fix" — giving
+    /// an already-linked target a dependency on it — would invert the graph and
+    /// destroy the isolation the target exists for.
+    @Test("The project links the CellarCore Updates product explicitly")
+    func projectLinksTheUpdatesProduct() throws {
+        let project = try UpdateProjectSources.projectText()
+
+        let buildFiles = UpdateProjectSources.section("PBXBuildFile", in: project)
+        let updatesBuildFile = "/* Updates in Frameworks */ = {isa = PBXBuildFile;"
+        #expect(UpdateProjectSources.occurrences(of: updatesBuildFile, in: buildFiles) == 1)
+
+        let phase = try UpdateProjectSources.appTargetFrameworksBuildPhase(in: project)
+        #expect(UpdateProjectSources.occurrences(of: "/* Updates in Frameworks */,", in: phase) == 1)
+
+        let products = UpdateProjectSources.objectBlocks(
+            inSection: "XCSwiftPackageProductDependency",
+            of: project
+        )
+        #expect(products.filter { $0.contains("productName = Updates;") }.count == 1)
+
+        // The `Updates` dependency is local, so unlike Sparkle it carries no
+        // `package` back-reference. Asserted so the two are never conflated.
+        let updates = try #require(products.first { $0.contains("productName = Updates;") })
+        #expect(!updates.contains("package = "))
+    }
 }
