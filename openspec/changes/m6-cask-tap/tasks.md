@@ -272,7 +272,7 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
       → **empty output**. Any line here is a deviation to report before merge, not to absorb.
 - [x] 5.4 Re-read `RELEASING.md` §8 end to end as a runbook and copy-paste both `README.md` install
       lines into a shell to confirm they are whole, runnable commands (S8's whole point).
-- [ ] 5.5 Open the PR from `feat/m6-cask-tap`: title
+- [x] 5.5 Open the PR from `feat/m6-cask-tap`: title
       `feat(release): Homebrew tap and cask for home-cellar`, exactly one `type:feature` label, and a
       body that states **R7 up front** — most of the change lives in `juancasanueva/homebrew-cellar`
       and is readable in `design.md` *§ The tap repository*, quoted verbatim, without leaving the PR.
