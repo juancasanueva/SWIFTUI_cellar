@@ -1,17 +1,17 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:05d2c0fc91310aabbe3b762bfa157aabf3f9b2533e398c516c119921d82155d1
+evidence_revision: sha256:79417b7745a350e282b57c31a4e0f6f4af357b0ea96b107b1ebd1a36c33ab82e
 verdict: pass_with_warnings
 blockers: 0
 critical_findings: 0
 requirements: 14/14
-scenarios: 89/89
+scenarios: 90/90
 test_command: swift test --package-path Packages/CellarCore
 test_exit_code: 0
-test_output_hash: sha256:9c0f9779cf8c74b325679fdb365a686973c2eef30976ea83a64b4d5d871ac6ff
+test_output_hash: sha256:b525a1e45cdab29744138588e7c7b801c2ef4b67f316e5c1917aee5ae51d9fea
 build_command: xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests
 build_exit_code: 0
-build_output_hash: sha256:ee58d485be9655e466baaac9f1d759bce3ceb6d581c5e06bf6cf6fc98eb2e733
+build_output_hash: sha256:bd66f1e2ca200b64aa124fc5af1076ab3225730f2b69ffab6d28affad35dca3c
 ```
 
 ## Verification Report
@@ -19,9 +19,9 @@ build_output_hash: sha256:ee58d485be9655e466baaac9f1d759bce3ceb6d581c5e06bf6cf6f
 **Change**: `m7-tap-trust`
 **Version**: four capability deltas — `tap-management` (6 MODIFIED / 2 ADDED), `package-mutation`
 (2 MODIFIED / 1 ADDED), `brewfile-management` (2 MODIFIED), `installed-inventory` (1 MODIFIED) —
-**14 requirement blocks / 89 scenarios** (40 / 30 / 11 / 8)
+**14 requirement blocks / 90 scenarios** (41 / 30 / 11 / 8) — 89 at the first verdict; **D4** added one TM7 scenario
 **Mode**: Strict TDD
-**Branch**: `feat/m7-tap-trust` @ `3307241` · base `main` `349a47f` · 10 commits, unpushed, no PR
+**Branch**: first verdict on `feat/m7-tap-trust` @ `3307241` · base `main` `349a47f`. **Final state: `main` @ `5fffb89`** (PR #68 merged at `3018fe4`, PR #69 / **D4** merged at `5fffb89`) — see *Re-verification at `5fffb89`* at the end
 **Verifier**: independent — no product file, test or doc was edited; only this report and no task
 checkbox needed reconciliation. No review started, no receipt created, nothing committed or pushed.
 RDD disabled.
@@ -32,7 +32,7 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 
 ### What the envelope counts mean
 
-`requirements: 14/14` and `scenarios: 89/89` mean **every scenario is discharged at the verification
+`requirements: 14/14` and `scenarios: 90/90` mean **every scenario is discharged at the verification
 class the spec itself declares for it** — *not* that every scenario has been executed. This is the
 house convention set by `2026-08-23-m6-release-pipeline`'s `29/29` and followed by
 `2026-08-23-m6-cask-tap`, both of which likewise counted `manual-evidence` scenarios as
@@ -41,8 +41,8 @@ counts, so the honest split is stated here rather than hidden in the denominator
 
 | Class | Count | What "discharged" means here | Result |
 |---|---|---|---|
-| `unit` / `e2e` | **85** | a covering test passed at runtime in one of the three runners | **85/85 runtime-proven; RED independently re-proven for WU1, WU5, WU6, WU7** |
-| `manual-evidence` | **4** | the spec declares no harness can exist; the scenario is specified and its acceptance criteria are pinned | **4/4 specified — 0/4 transcribed. Phase 9 is PENDING by maintainer decision** |
+| `unit` / `e2e` | **86** | a covering test passed at runtime in one of the three runners | **86/86 runtime-proven; RED independently re-proven for WU1, WU5, WU6, WU7 and for D4** |
+| `manual-evidence` | **4** | the spec declares no harness can exist; the scenario is specified and its acceptance criteria are pinned | **4/4 specified and — as of the Phase 9 addendum — 4/4 transcribed** |
 
 **Read plainly: TM13.5, TM13.6, PM10.7 and PM10.8 have no maintainer transcript yet.** They are not
 merge blockers and not a test gap — the specs themselves declare no harness can exist for them — but
@@ -568,3 +568,230 @@ successful untap (D4) and shows that item failing visibly.
   it now fails cleanly and points at Force Untap.
 
 Phase 9 tasks 9.1–9.6 are checked. All 89 scenarios are now discharged at their declared class.
+
+---
+
+## Re-verification at `5fffb89` (after D4)
+
+**Date**: 2026-08-23 · **Commit**: `main` @ `5fffb89db4b7d5af1e08eb076a7d3fcab9d5807d`, clean tree ·
+**Scope**: scoped second verify run covering only the post-verify correction **D4** and the arithmetic
+it moved. The first verdict (`pass_with_warnings` at `3307241`) and the Phase 9 addendum above are
+preserved verbatim as the record of what was true then.
+
+`3018fe4` merged PR #68 (`feat/m7-tap-trust`); `5fffb89` merged PR #69 (`fix/untap-remove-then-revoke`,
+commits `34d6736` RED → `bc087b1` GREEN → `bdff5c8` Phase 9 evidence).
+
+**Supersedes, in the sections above:** the header envelope (`scenarios: 89/89` → `90/90`); the
+`### What the envelope counts mean` split (`unit` 85 → **86**, and `manual-evidence` **4/4 transcribed**
+rather than 0/4, per the Phase 9 addendum); the `#### tap-management — 40 scenarios (38 unit, 2
+manual-evidence)` matrix heading → **41 scenarios (39 `unit`, 2 `manual-evidence`)**; and the archive
+row `tap-management … 13 / 54` → **13 / 55**. Nothing else above changes.
+
+### 1. Runners re-run at `5fffb89` — verbatim summary lines
+
+| Runner | Exact output | Exit |
+|---|---|---|
+| `swift test --package-path Packages/CellarCore` | `Test run with 1793 tests in 210 suites passed after 16.913 seconds with 1 known issue.` | 0 |
+| `xcodebuild test … -only-testing:cellarTests` | `** TEST SUCCEEDED **` — xcresult summary: `"passedTests" : 242, "failedTests" : 0, "skippedTests" : 0, "expectedFailures" : 0` | 0 |
+| `xcodebuild test … -only-testing:cellarUITests/TapTrustUITests` | `Executed 1 test, with 0 failures (0 unexpected) in 13.503 (13.504) seconds` · `** TEST SUCCEEDED **` | 0 |
+
+All three match the expected baselines (1793/210/1 known issue, 242/0, 1/0). The CellarCore count moved
+`1785/209` → `1793/210` exactly as PR #69 claims: `OperationCenterDependentSequenceTests` is the +1
+suite and contributes 8 of the +8 tests.
+
+> The `cellarTests` runner emits no per-test count line under `xcodebuild`; the count above is read
+> from the run's own `.xcresult` via `xcrun xcresulttool get test-results summary`. Its
+> `devicesAndConfigurations[0]` block reports 242 passed while the top-level rollup reports 232 — the
+> two count parameterized cases differently. The pass/fail verdict is identical in both (`"result" :
+> "Passed"`, 0 failed), and 242 is the figure the apply phase recorded, so it is the one used here.
+
+### 2. RED re-proof for the D4 fix — independently reconstructed
+
+A detached worktree at the RED commit `34d6736` under
+`/Users/juancasanueva/programming/swiftUI/cellar-worktrees/verify-red-d4` (never `/tmp`), then:
+
+```
+swift test --package-path <worktree>/Packages/CellarCore \
+  --filter 'TapCommandTests|OperationCenterDependentSequenceTests|ConfirmationDisclosureTests'
+```
+
+**FAILS — and fails at compile time, which is the strongest form of RED available here.** The test
+target does not build; the errors are the missing seam itself, not a weak assertion:
+
+```
+OperationCenterDependentSequenceTests.swift:51:32: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+OperationCenterDependentSequenceTests.swift:75:32: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+OperationCenterDependentSequenceTests.swift:103:32: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+OperationCenterDependentSequenceTests.swift:131:28: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+OperationCenterDependentSequenceTests.swift:135:38: error: cannot infer key path type from context; consider explicitly specifying a root type
+OperationCenterDependentSequenceTests.swift:140:40: error: cannot infer contextual base in reference to member 'forceUntap'
+OperationCenterDependentSequenceTests.swift:160:51: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+OperationCenterDependentSequenceTests.swift:186:51: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+TapIntegrationTests.swift:188:20:  error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+TapIntegrationTests.swift:231:20:  error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+TapShippingProofTests.swift:171:20: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+MutationRefreshReceiptTests.swift:244:16: error: value of type 'OperationCenter' has no member 'submitDependentSequence'
+```
+
+The same filter at `5fffb89`:
+
+```
+Test run with 27 tests in 3 suites passed after 0.077 seconds.
+  Suite "Tap commands" passed after 0.001 seconds.
+  Suite "Confirmation disclosure survives erasure" passed after 0.070 seconds.
+  Suite "Dependent sequences" passed after 0.077 seconds.
+```
+
+RED → GREEN proven by execution, not read off `apply-progress`. Worktree removed afterwards
+(`git worktree remove --force`; `git worktree list` shows only the primary checkout).
+
+### 3. Spec ↔ test map for the scenarios D4 changed or added
+
+TM7 is `openspec/changes/m7-tap-trust/specs/tap-management/spec.md:215-296` — "Plain untap is primary
+and force availability is fail-closed". Its D4 rewrite states the order at `:217-221`, the reason at
+`:223-228`, the dependency and the no-phantom-item rule at `:230-234`, unconditionality-behind-success
+at `:236-240`, and carries a two-stage `(Previously:)` note at `:246-248`.
+
+| Scenario (delta line) | Covering test | Asserts | Result |
+|---|---|---|---|
+| `Untap removes before it revokes` :259 *(renamed + rewritten)* | `TapCommandTests · untapRevokesOnlyAfterRemovalAccordingToD4` (`TapCommandTests.swift:206`, parameterized over `.trusted`/`.untrusted`/`.unreported`) | `removal == [.removeTap, .untrustTap]` and `forced == [.forceRemoveTap, .untrustTap]`; argv `[["untap","acme/tools"],["untrust","acme/tools"]]`; `removal.last == .untrustTap`; `count == 2`; no `--force`; no confirmation on the plain pair | ✅ PASS |
+| `A refused removal submits no revocation` :267 **(NEW — the +1 scenario)** | `OperationCenterDependentSequenceTests · aFailedLeadNeverSubmitsItsFollower` (`:47`) | `items.count == 1`; the one item's argv is `["untap","acme/tools"]` with outcome `.failed(status: 1)`; `launchCount == 1`; **no** recorded spec contains `"untrust"` | ✅ PASS |
+| …reinforced for the confirmed force path | `… · aConfirmedDependentSequenceStillStopsAtARefusedLead` (`:182`) | after `confirm` + refused lead: `items.count == 1`, `launchCount == 1` | ✅ PASS |
+| …and for cancellation, which is not success | `… · aCancelledLeadNeverSubmitsItsFollower` (`:99`) | `outcome == .cancelled`; `items.count == 1`; no `"untrust"` spawned | ✅ PASS |
+| `A successful removal is followed by the idempotent revocation` :275 | `… · aSuccessfulLeadSubmitsItsFollowerOnlyOnceItHasSettled` (`:71`) | while the lead runs: 1 item / 1 launch; after it settles: 2 items and `items[0].isTerminal`; final argv order `untap` → `untrust`; both `.succeeded` | ✅ PASS |
+| TM7/PM3 all-or-nothing confirmation (unchanged rule, new path) | `… · decliningADependentSequenceSubmitsNothingAtAll` (`:125`) | `request.dependsOnLead`; request argv `[["untap","--force",…],["untrust",…]]`; `disclosure == .forceUntap(tap:affected:)`; `items.isEmpty` before **and** after decline; `launchCount == 0`; `pendingConfirmation == nil` | ✅ PASS |
+| TM8 force sequence order (`:298-302`) | `… · confirmingADependentSequenceRunsTheDependentPath` (`:156`) | confirming returns **only** the lead; second item appears only after the first finishes; argv `untap --force` → `untrust` | ✅ PASS |
+| Non-regression: every other caller keeps the fan-out | `… · submitSequenceStillFansOutUnconditionally` (`:200`) | `submitSequence` still enqueues **2** items at submission; a `.failed(status: 1)` lead is followed by a `.succeeded` second | ✅ PASS |
+
+**Recount of all four deltas — counted from the files, not asserted:**
+
+| Delta | `### Requirement` | `#### Scenario` | `- Verification: \`unit\`` | `- Verification: \`manual-evidence\`` |
+|---|---|---|---|---|
+| `tap-management` | 8 | **41** (was 40) | 39 | 2 |
+| `package-mutation` | 3 | 30 | 28 | 2 |
+| `brewfile-management` | 2 | 11 | 11 | 0 |
+| `installed-inventory` | 1 | 8 | 8 | 0 |
+| **Total** | **14** | **90** | **86** | **4** |
+
+`86 + 4 = 90` = the `#### Scenario` count, and every scenario still carries exactly one
+`- Verification:` class. The envelope moves `89/89` → **`90/90`**; the `unit` row moves `85` → **`86`**.
+With Phase 9 complete, the four `manual-evidence` scenarios are **4/4 transcribed**, so `90/90` is now
+fully discharged rather than partly deferred.
+
+### 4. D4 honoured in source
+
+| Claim | Evidence | Verdict |
+|---|---|---|
+| Removal leads the plain sequence | `TapCommand.swift:209-212` — `removal(of:)` returns `[.removeTap(tap), .untrustTap(tap)]` | ✅ |
+| Removal leads the forced sequence | `TapCommand.swift:219-222` — `forcedRemoval(evidence:)` returns `[forced, .untrustTap(evidence.tap)]` | ✅ |
+| Follower armed **only** on success | `OperationCenterBulk.swift:193-199` — `arm(_:followedBy:)` registers `item.onSettle { guard let self, outcome.isSuccess else { return } … }`. `isSuccess` and nothing weaker, so cancelled / refused / launch-failed / abandoned all stop the chain | ✅ |
+| Recursion cannot double-run or lose a handler | `ActivityItem.swift:220-233` — `settle(_:)` drains `settlementHandlers` into a local **before** running them and clears the field first; `onSettle` (`:201-207`) fires immediately when the item already has an outcome, so a submission that is terminal before `submit` returns still advances the chain | ✅ |
+| Declining submits none of it | `OperationCenterBulk.swift:278-281` — `decline` only consumes the request; no `submit` call on that path. Proven at runtime by `decliningADependentSequenceSubmitsNothingAtAll` | ✅ |
+| Confirming submits only the lead | `OperationCenterBulk.swift:270-275` — `confirm` branches on `request.dependsOnLead` to `submitDependent(request.commands)` | ✅ |
+| `submitSequence` untouched | `OperationCenterBulk.swift:137-142` — still `for command in commands { submit(command) }`, unconditional. Public `request(_:)` (`:235-237`) forwards `dependsOnLead: false`, so no existing caller changes behaviour | ✅ |
+| Lead-disclosure rule intact | `request(_:dependsOnLead:)` (`:242-259`) still takes `commands.leadDisclosure`; with the removal leading, a forced sequence's lead disclosure **is** `.forceUntap(tap:affected:)`. Asserted at `OperationCenterDependentSequenceTests.swift:140-143` | ✅ |
+| Footer copy exact | `cellar/Taps/TapDetailView.swift:213` — byte-for-byte: `"Homebrew withholds which packages came from this tap while it is untrusted, so Force Untap is unavailable. Trust the tap to see them. Untap succeeds only when none of its packages is installed; Homebrew refuses it otherwise."` | ✅ |
+| The dependent path is the one the view uses | `cellar/Taps/TapDetailView.swift:287` and `:294` both call `operations.submitDependentSequence(commands)`; no `submitSequence` call remains in the tap surface | ✅ |
+
+### 5. Bindings still empty
+
+```
+git diff --stat 349a47f...5fffb89 -- \
+  Packages/CellarCore/Sources/BrewClient/MutationCommand.swift scripts .github \
+  Packages/CellarCore/Sources/Catalog cellar.xcodeproj/project.pbxproj
+```
+
+→ **no output**. `MutationCommand.swift` remains byte-identical across the whole change including the
+D4 correction: **DD-8 held, D3 not violated**, and no release, CI or project-file surface was touched.
+
+### 6. Phase 9 addendum reconciled against the code
+
+- `tasks.md` — **79 checked, 0 unchecked**. Matches the addendum's `79/79`.
+- The addendum's copy claims are the strings actually in source: the footer sentence at
+  `TapDetailView.swift:213` (§4 above) and `.tapTrustGrant` / `.tapAdd` at `TapCommand.swift:63-74`.
+- The addendum's command-order claim (A: "untap refused → no untrust") is exactly what
+  `aFailedLeadNeverSubmitsItsFollower` proves, and B's full cycle is `…SubmitsItsFollowerOnlyOnce…`.
+- **PM10.7 is discharged** by addendum §9.4 (obs `#7738`): the measured formula refusal contains
+  `untrusted tap`, so `Signature.isUntrustedTap` covers formulae. Nothing in `Packages/` or `cellar/`
+  claims otherwise — the `unmeasured` hits there are the unrelated `HealthComposition` /
+  `HealthCopy` reason vocabulary and a `DiscoverProjectionTests` fixture name. **Four stale claims
+  remain in the SDD artifacts only** — see W6 / W7 below.
+
+### 7. Commit hygiene — PR #69
+
+| Commit | Subject | Verdict |
+|---|---|---|
+| `34d6736` | `test(taps): require untap to remove first and revoke only after a successful removal` | ✅ conventional, RED-first, scope `taps` |
+| `bc087b1` | `fix(taps): remove the tap before revoking its trust, and only after brew accepts the removal` | ✅ conventional; body states brew's exit-1 refusal, the dead end it caused, D4, and why `submitSequence` was kept |
+| `bdff5c8` | `docs(sdd): record the m7-tap-trust Phase 9 manual evidence and close the formula-refusal gate` | ✅ conventional |
+
+No `Co-Authored-By` and no AI attribution on any of the three. `D-8` (`cellar/AppTestFixtures.swift`,
++15) is recorded at `apply-progress.md:203` as a deviation found at verify. ✅
+
+### 8. Archive readiness — recomputed at `5fffb89`
+
+| Capability | Main today | MODIFIED / ADDED | Replaced → new | Post-merge |
+|---|---|---|---|---|
+| `tap-management` | 11 req / 34 sc | 6 / 2 | 20 → **30** (+10), ADDED +11 | **13 / 55** *(was 13 / 54 — D4 adds one TM7 scenario)* |
+| `package-mutation` | 9 req / 48 sc | 2 / 1 | 18 → 22, +8 | **10 / 60** *(unchanged)* |
+| `brewfile-management` | 9 req / 38 sc | 2 / 0 | 9 → 11 | **9 / 40** *(unchanged)* |
+| `installed-inventory` | 14 req / 64 sc | 1 / 0 | 5 → 8 | **14 / 67** *(unchanged)* |
+
+**⚠️ The `tap-management` delta header still claims `13 / 54`.** It must read **`13 / 55`** — see W8.
+
+Hand-updates for `sdd-archive`, re-confirmed against the files today:
+
+1. **No `## Verification classes` table exists in any of the four target specs** — `rg -c` returns no
+   match for each. Still nothing to hand-update; the asymmetry should be recorded, not "fixed".
+2. **`openspec/specs/tap-management/spec.md:355`** records `m3-taps` as "**11 requirements / 33
+   scenarios**"; the file carries **34** `#### Scenario:` headings. Pre-existing defect, still present.
+3. **`openspec/specs/brewfile-management/spec.md`** — the out-of-block `tapTrust` mentions are still at
+   **`:7`** and **`:510`**. (`:231`, `:239`, `:322`, `:330`, `:353` are inside blocks the delta
+   replaces and need no hand-edit.)
+4. Everything else in the original list (items 4 and 5 above) stands unchanged.
+
+### 9. Issues found by this run
+
+No CRITICAL. The two warnings are both *stale prose that will be promoted into a main spec or kept as
+the change's record*, not defects in shipped behaviour.
+
+| # | Severity | Location | Finding | Fix |
+|---|---|---|---|---|
+| **W6** | **WARNING** | `openspec/changes/m7-tap-trust/specs/package-mutation/spec.md:420` | The delta still states "the formula refusal wording remains **unmeasured** (risk R6)". PM10.7 was measured and discharged (addendum §9.4, obs `#7738`). This sentence is inside a delta block, so **archive would promote a false statement into `openspec/specs/package-mutation/spec.md`.** | Reword to record the measured wording before archive |
+| **W7** | **WARNING** | `design.md:981`, `design.md:1034`, `proposal.md:309` | R6 still reads "the **formula** wording is unmeasured", and `design.md:1034` is an **unchecked** obligation box `- [ ] Formula refusal wording — unmeasured (R6). Capture as manual evidence 5 before release`. The obligation is met; `tasks.md` is 79/79 but this box is in `design.md`, so it is not covered by that count. | Mark discharged and cite obs `#7738` at archive |
+| **W8** | **WARNING** | `specs/tap-management/spec.md` delta header | Claims `13 / 54` post-merge; D4's added scenario makes it **`13 / 55`**. | Correct the header at archive |
+| **S1** | SUGGESTION | `TapCommandTests.swift:218` (`TM7 :249-255`), `:236` (`TM7 :240-247`), `TapCommand.swift:206` (`TM7 :216-231`), `OperationCenterBulk.swift:136` (`TM7 :228-231`), `design.md:56` DD-4 (`TM7 :219-220`), `:57` DD-5 (`TM7 :221-231`) | Line citations into TM7 drifted when D4 rewrote the block (TM7 is now `:215-296`; the argv-order rule is `:217-221`, the no-force-flag scenario `:250-257`, the order scenario `:259-265`). The *claims* are all still correct — only the line anchors are stale. | Refresh or drop the line anchors; not blocking |
+| **S2** | SUGGESTION | `Packages/CellarCore/Sources/BrewClient/{ActivityItem,OperationCenterBulk}.swift` | CodeGraph reports "no covering tests found" for `onSettle` and `submitDependentSequence` because both are reached through a `@MainActor` closure it cannot trace. Coverage is real — `OperationCenterDependentSequenceTests` exercises both — so this is an index artifact, noted so a future reader does not read it as a gap. | None |
+
+### 10. Assertion quality — D4 tests
+
+`OperationCenterDependentSequenceTests.swift` (8 tests) and the amended `TapCommandTests ·
+untapRevokesOnlyAfterRemovalAccordingToD4` were audited line by line. **No tautologies, no
+assertion that never calls production code, no ghost loops, no smoke-only tests, no
+implementation-detail coupling, no mock-heavy imbalance.** Every test asserts observable behaviour —
+argv actually recorded by the launcher, item counts, terminal `MutationOutcome` values — and the
+negative cases are asserted twice over, once on the queue (`items.count`) and once on the process
+boundary (`launchCount`, `recordedSpecs.contains { … "untrust" } == false`), which is what makes "no
+phantom queue item" and "nothing was spawned" separable facts. Triangulation is genuine: the lead's
+outcome is varied across refused, cancelled and succeeded, and the trust state across
+`trusted`/`untrusted`/`unreported`. **Assertion quality: ✅ all assertions verify real behaviour.**
+
+### Final verdict — re-verification at `5fffb89`
+
+**PASS WITH WARNINGS.** 0 CRITICAL · 3 WARNING (W6, W7, W8) · 2 SUGGESTION (S1, S2).
+
+D4 is implemented as decided and proven at runtime: the removal leads both sequences, the revocation is
+armed only on `outcome.isSuccess`, a refused removal produces exactly one queue item carrying brew's own
+reason and spawns no `untrust`, declining submits nothing, and `submitSequence` keeps its unconditional
+fan-out for every other caller. RED was independently reconstructed at `34d6736` and fails to compile;
+the same filter is green at `5fffb89`. All three runners are green (1793/210 with the one known issue,
+242/0, 1/0), bindings are still byte-empty, and `tasks.md` is 79/79 with Phase 9's four
+`manual-evidence` scenarios now transcribed — so `90/90` is fully discharged rather than partly
+deferred.
+
+The three warnings are all stale text asserting that the formula refusal wording is unmeasured, or the
+pre-D4 scenario total. **W6 is the one that matters**: it sits inside a delta block and would be
+promoted verbatim into `openspec/specs/package-mutation/spec.md`. None blocks archive provided
+`sdd-archive` corrects them in the same edit.
+
+**Next**: `sdd-archive m7-tap-trust` (fix W6/W7/W8 in that edit) → tag `v1.1.0`.

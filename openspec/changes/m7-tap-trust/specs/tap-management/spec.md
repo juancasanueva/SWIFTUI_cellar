@@ -3,7 +3,7 @@
 Existing capability — `openspec/specs/tap-management/spec.md` (**11 requirements / 34 scenarios**,
 established by the archived `2026-08-05-m3-taps`). This delta is **6 MODIFIED / 2 ADDED, 0 removed,
 0 renamed**: **29 scenarios** replace the 20 the six modified blocks carry today, and **11 scenarios**
-are added, taking the capability to **13 requirements / 54 scenarios**.
+are added, taking the capability to **13 requirements / 55 scenarios** (54 at first verification; D4 added one TM7 scenario on 2026-08-23).
 
 Nothing is removed and no requirement is renamed, so `rules.archive`'s destructive-delta warning does
 not fire. Every MODIFIED block below is a whole-block replacement copied from the main spec and then
