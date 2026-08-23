@@ -334,4 +334,22 @@ struct CaskZapInventoryTests {
         #expect(readme.contains("juancasanueva/cellar/home-cellar"))
         #expect(readme.contains("cellar.app"))
     }
+
+    /// A direct-download copy already sits at `/Applications/cellar.app` for
+    /// every user who installed before the tap existed, and for every user who
+    /// dragged the zip. `brew install --cask home-cellar` refuses to overwrite
+    /// an app it did not place, so the README must hand those users the exact
+    /// adopt command as a whole line, not a flag mentioned in prose.
+    @Test("The README tells direct-download users how brew adopts an existing copy")
+    func theReadmeCarriesTheAdoptCommandAsAWholeLine() throws {
+        let readme = try CaskZapSources.text(CaskZapSources.readmePath)
+        let lines = readme
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+
+        #expect(
+            lines.contains("brew install --cask --adopt home-cellar"),
+            "README.md must carry the adopt command as a whole, copy-pasteable line"
+        )
+    }
 }
