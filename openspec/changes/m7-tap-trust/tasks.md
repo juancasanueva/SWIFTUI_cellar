@@ -431,20 +431,20 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'MutationCommand
 
 ## Phase 8: Verification and bindings
 
-- [ ] 8.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline
+- [x] 8.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline
       (**1754 / 209 suites / 1 known issue**) **plus** every new case, **0 failures**. Assert counts,
       never a bare success line.
-- [ ] 8.2 App target: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`
+- [x] 8.2 App target: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`
       → the Phase 0 baseline (**238 / 0**) plus the new composition cases, 0 failures.
-- [ ] 8.3 `xcodebuild test … -only-testing:cellarUITests/TapTrustUITests` → green (unit 11).
-- [ ] 8.4 **Bindings proof.**
+- [x] 8.3 `xcodebuild test … -only-testing:cellarUITests/TapTrustUITests` → green (unit 11).
+- [x] 8.4 **Bindings proof.**
       `git diff --stat main -- scripts/ .github/workflows/ Packages/CellarCore/Sources/Catalog Packages/CellarCore/Sources/BrewProcess Packages/CellarCore/Sources/BrewClient/TapPayloadSource.swift Packages/CellarCore/Sources/BrewClient/MutationCommand.swift cellar.xcodeproj/project.pbxproj`
       → **empty output**. `MutationCommand.swift` is a **new** binding under DD-8; any line there means
       a `/` gate was added and D3 was violated. `BrewfilePlan.swift` is **no longer** bound to zero.
       A deviation is reported before merge, never absorbed.
-- [ ] 8.5 `git diff --stat main` for the whole branch — record the authored total and compare it with
+- [x] 8.5 `git diff --stat main` for the whole branch — record the authored total and compare it with
       the forecast (**2,885–3,567**). A large miss is information for the next forecast, not a failure.
-- [ ] 8.6 Confirm the regression guards that must never have moved: `ConfirmationDisclosureTests`
+- [x] 8.6 Confirm the regression guards that must never have moved: `ConfirmationDisclosureTests`
       `:161-178` and `:203`, `BrewMutatingTests:231-240`, `MutationCommandTests:289`,
       `TapShippingProofTests:197`. Confirm `rg '\.tapTrust\('` is still zero (task 2.5's rule).
 - [ ] 8.7 Open the PR from `feat/m7-tap-trust`: title
@@ -485,14 +485,14 @@ in this repository (spec amendment #7; a design written before execution cannot 
 
 ## Phase 10: Archive obligations (recorded now so they are not re-derived at `sdd-archive`)
 
-- [ ] 10.1 **No `## Verification classes` table exists** in any of the four target specs, so — unlike
+- [x] 10.1 **No `## Verification classes` table exists** in any of the four target specs, so — unlike
       the `m6-sparkle-updates` / `m6-cask-tap` precedent — **there is no class table to hand-update**.
       This change is the first to annotate these specs with inline `- Verification:` lines; untouched
       requirements deliberately keep none.
-- [ ] 10.2 `tap-management` provenance arithmetic: the main spec records `m3-taps` as 11 requirements /
+- [x] 10.2 `tap-management` provenance arithmetic: the main spec records `m3-taps` as 11 requirements /
       **33** scenarios while the file carries **34** `#### Scenario:` headings. Count the headings,
       then correct provenance in the same archive edit.
-- [ ] 10.3 Record the deviation the tap-management delta declares: the proposal budgeted **one** ADDED
+- [x] 10.3 Record the deviation the tap-management delta declares: the proposal budgeted **one** ADDED
       requirement and the delta writes **two** (TM12, TM13); resulting counts assume both. Record D1,
       D2 and D3 with what each rejected, and the deferred follow-ups (per-package trust surface, a
       trust column in the Brewfile diff, trust for official taps, and **R15** — a qualified Brewfile
