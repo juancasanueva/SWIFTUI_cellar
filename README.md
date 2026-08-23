@@ -31,12 +31,33 @@ Cellar is a full-featured visual layer over the `brew` binary already on your Ma
 
 ## Install
 
-Download the latest `Home-Cellar-<version>.zip` from
+With Homebrew:
+
+```sh
+brew tap juancasanueva/cellar
+brew trust juancasanueva/cellar
+brew install --cask home-cellar
+```
+
+That installs `/Applications/cellar.app`, the same notarized build the releases
+page serves. Homebrew 6 refuses to load a cask from a third-party tap until the
+tap is trusted, which is what the middle line does; it grants nothing beyond
+this tap. If another tap ever claims the `home-cellar` token, the
+fully-qualified `brew install --cask juancasanueva/cellar/home-cellar` is the
+unambiguous form.
+
+Or download the latest `Home-Cellar-<version>.zip` from
 [Releases](../../releases), unzip it, and drag `cellar.app` to `/Applications`.
 
 The build is notarized and stapled, so the first launch is a single ordinary
 "Open" confirmation — no right-click workaround, and no network access needed to
 get past Gatekeeper. Apple Silicon and macOS 26 only.
+
+To remove a cask install, `brew uninstall --cask --zap home-cellar` also deletes
+Cellar's caches, catalog, metadata and preferences. It cannot delete the two
+Keychain items Cellar creates — `com.juancasanueva.cellar.nvd-api-key` and
+`com.juancasanueva.cellar.github-pat` — because Homebrew's uninstall has no
+Keychain facility. Remove those in Keychain Access if you want them gone.
 
 ## Updates
 

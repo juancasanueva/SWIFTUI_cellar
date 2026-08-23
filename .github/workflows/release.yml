@@ -172,8 +172,6 @@ jobs:
           # shellcheck disable=SC2086            # $PRERELEASE is a bare flag or empty
           gh release create "$GITHUB_REF_NAME" "build/Home-Cellar-${VERSION}.zip" \
             --verify-tag --generate-notes --title "$GITHUB_REF_NAME" $PRERELEASE
-      # --- extension point: the cask bump (m6-cask-tap) inserts here without
-      #     restructuring the job. ---
 
       # Appcast publication. Every step below carries the same prerelease guard
       # the publish step uses for `--prerelease`: a Pages deploy is a full-site
