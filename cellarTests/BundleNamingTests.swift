@@ -215,4 +215,26 @@ struct BundleNamingTests {
         #expect(BundleNamingSources.occurrences(of: "$PRODUCT.app", in: script) == 2)
         #expect(BundleNamingSources.occurrences(of: "MacOS/$PRODUCT", in: script) == 2)
     }
+
+    // MARK: - Unit 5 — the workflow inspects the path that now exists
+
+    /// The workflow hardcodes the export path rather than deriving it, so it does
+    /// not follow `PRODUCT_NAME` on its own.
+    ///
+    /// This is the one line in the release run that would fail *after* signing
+    /// and *before* publishing: `codesign -dvvv` on a path that no longer exists
+    /// exits non-zero on a tag, with an archive already built and nothing
+    /// released. Nothing else notices, because the asset name, the zip path and
+    /// the display-name gate were all already spelled `Home-Cellar`.
+    ///
+    /// Both halves are asserted: the new path is present *and* the old one is
+    /// gone. A workflow that gained the new line while keeping the old one would
+    /// still fail on the same tag.
+    @Test("The release workflow inspects the renamed export path")
+    func theWorkflowInspectsTheRenamedExportPath() throws {
+        let workflow = try BundleNamingSources.text(BundleNamingSources.releaseWorkflow)
+
+        #expect(workflow.contains("build/export/Home-Cellar.app"))
+        #expect(!workflow.contains("build/export/cellar.app"))
+    }
 }
