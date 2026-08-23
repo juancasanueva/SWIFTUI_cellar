@@ -47,15 +47,31 @@ public struct ForceUntapEvidence: Sendable, Equatable {
 /// equality semantics change.
 public enum ConfirmationDisclosure: Sendable, Hashable {
     case packageRemoval
-    case tapTrust(TapName)
+    /// What `brew tap` does, and — the part the shipped copy got wrong — what
+    /// it does **not** do (**D2**).
+    case tapAdd(TapName)
+    /// What `brew trust` does. A separate case because it is a separate answer
+    /// to a separate question, and a user must be able to tell which one they
+    /// gave (tap-management TM13).
+    case tapTrustGrant(TapName)
     case forceUntap(tap: TapName, affected: Set<PackageID>)
 
     public var warningText: String {
         switch self {
         case .packageRemoval:
             "This removes installed software."
-        case .tapTrust(let tap):
-            "Adding \(tap.rawValue) trusts third-party formulae and casks that can distribute code."
+        case .tapAdd(let tap):
+            """
+            Adding \(tap.rawValue) clones a third-party repository. Homebrew \
+            will not load its formulae or casks until you trust it, and Cellar \
+            does not trust it for you.
+            """
+        case .tapTrustGrant(let tap):
+            """
+            Trusting \(tap.rawValue) lets Homebrew load and run its formulae \
+            and casks. That is third-party code running as you, with your \
+            permissions.
+            """
         case .forceUntap(let tap, let affected):
             "Force-removing \(tap.rawValue) affects \(affected.count) installed packages."
         }
@@ -119,7 +135,7 @@ public enum TapCommand: Sendable, Equatable, BrewMutating {
 
     public var disclosure: ConfirmationDisclosure {
         switch self {
-        case .addTap(let tap): .tapTrust(tap)
+        case .addTap(let tap): .tapAdd(tap)
         case .removeTap: .packageRemoval
         case .forceRemoveTap(let evidence):
             .forceUntap(tap: evidence.tap, affected: evidence.affected)

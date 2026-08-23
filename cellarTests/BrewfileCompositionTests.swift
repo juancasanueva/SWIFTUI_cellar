@@ -259,11 +259,12 @@ struct BrewfileCompositionTests {
         )
 
         #expect(center.pendingConfirmation == request, "the request never reached the gate")
-        #expect(request.disclosure == .tapTrust(try #require(TapName("acme/tap"))))
-        #expect(
-            request.warningText
-                == "Adding acme/tap trusts third-party formulae and casks that can distribute code."
-        )
+        #expect(request.disclosure == .tapAdd(try #require(TapName("acme/tap"))))
+        #expect(request.warningText == """
+        Adding acme/tap clones a third-party repository. Homebrew will not load \
+        its formulae or casks until you trust it, and Cellar does not trust it \
+        for you.
+        """)
         #expect(
             request.warningText != "This removes installed software.",
             "the erased batch presented the package-removal disclosure — DD1 has regressed"

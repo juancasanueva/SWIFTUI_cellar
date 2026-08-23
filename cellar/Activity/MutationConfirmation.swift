@@ -150,7 +150,8 @@ private struct MutationConfirmationSheet: View {
             return "Confirm \(scopeName(cleanup.scope))?"
         }
         switch request.disclosure {
-        case .tapTrust: return "Add this tap?"
+        case .tapAdd: return "Add this tap?"
+        case .tapTrustGrant: return "Trust this tap?"
         case .forceUntap: return "Force-remove this tap?"
         case .packageRemoval: break
         }
@@ -165,7 +166,8 @@ private struct MutationConfirmationSheet: View {
     private var confirmLabel: String {
         if request.cleanupDisclosure != nil { return "Confirm Cleanup" }
         switch request.disclosure {
-        case .tapTrust: return "Add Tap"
+        case .tapAdd: return "Add Tap"
+        case .tapTrustGrant: return "Trust"
         case .forceUntap: return "Force Untap"
         case .packageRemoval: break
         }

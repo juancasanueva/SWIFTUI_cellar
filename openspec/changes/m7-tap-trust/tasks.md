@@ -195,27 +195,27 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapDecodeTests|
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'ConfirmationDisclosureTests|BrewMutatingTests'`
 
-- [ ] 2.1 **RED — unit 3.** `ConfirmationDisclosureTests ·
+- [x] 2.1 **RED — unit 3.** `ConfirmationDisclosureTests ·
       theAddDisclosureClaimsNoGrantAndTheGrantDisclosureClaimsOne`: the exact `warningText` for
       `.tapAdd(TapName)` and `.tapTrustGrant(TapName)` from design §2, plus `.packageRemoval` and
       `.forceUntap` unchanged. In the **same** RED commit, rename the shipped assertions at
       `ConfirmationDisclosureTests.swift:176-177` and `BrewMutatingTests.swift:279`/`:292` from
       `.tapTrust(tap)` to `.tapAdd(tap)`. **RED because** `.tapTrust` still asserts a grant.
       *(TM6.3, PM3.7)*
-- [ ] 2.2 **Prove RED**, then **GREEN**: `TapCommand.swift` — `ConfirmationDisclosure.tapTrust`
+- [x] 2.2 **Prove RED**, then **GREEN**: `TapCommand.swift` — `ConfirmationDisclosure.tapTrust`
       becomes `.tapAdd(TapName)` and `.tapTrustGrant(TapName)` is added (**D2**). `.tapTrustGrant`
       has no producer yet; that is WU4 and is correct here.
-- [ ] 2.3 **GREEN.** `cellar/Activity/MutationConfirmation.swift` :153 / :168 — `.tapAdd` → title
+- [x] 2.3 **GREEN.** `cellar/Activity/MutationConfirmation.swift` :153 / :168 — `.tapAdd` → title
       "Add this tap?" / confirm label "Add Tap"; `.tapTrustGrant` → "Trust this tap?" / "Trust".
-- [ ] 2.4 **GREEN.** `PRD.md` §3.7 :108 — the taps-manager line describes tap **versus** trust
+- [x] 2.4 **GREEN.** `PRD.md` §3.7 :108 — the taps-manager line describes tap **versus** trust
       honestly (adding clones a repository; loading its formulae and casks needs a separate trust that
       Cellar never grants for the user), and the action list grows to include trust and untrust.
       `README.md` :37-45 **already** states this correctly — confirm, do not edit.
-- [ ] 2.5 **Rename sweep, precisely (R10).** `rg '\.tapTrust\('` and `rg 'case tapTrust\b'` MUST return
+- [x] 2.5 **Rename sweep, precisely (R10).** `rg '\.tapTrust\('` and `rg 'case tapTrust\b'` MUST return
       **zero** hits across `cellar/`, `Packages/` and `openspec/changes/m7-tap-trust/`. Do **not** grep
       the bare substring `tapTrust`: `.tapTrustGrant` and `TapCommand.verb == "tapTrust"` (the verb of
       `.trustTap`, added in WU4) legitimately contain it.
-- [ ] 2.6 Focused command green; commit WU2.
+- [x] 2.6 Focused command green; commit WU2.
 
 ## Phase 3: WU3 — a withheld tap is absent, not empty (II2.6, .7, .8; TM5.5, .6, .7)
 

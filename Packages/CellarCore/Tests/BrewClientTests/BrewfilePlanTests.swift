@@ -144,7 +144,7 @@ struct BrewfilePlanTests {
         // ordering is what makes the tap warning reachable at all.
         let harness = CenterHarness()
         let request = try #require(harness.center.request(plan.commands))
-        #expect(request.disclosure == .tapTrust(TapName("acme/tap")!))
+        #expect(request.disclosure == .tapAdd(TapName("acme/tap")!))
     }
 
     @Test("Relative order inside each group follows the file")
@@ -188,7 +188,7 @@ struct BrewfilePlanTests {
 
         let request = try #require(harness.center.request(plan.commands))
         #expect(request.commands.count == 3, "the confirmation covered less than the whole batch")
-        #expect(request.disclosure == .tapTrust(TapName("acme/tap")!))
+        #expect(request.disclosure == .tapAdd(TapName("acme/tap")!))
         #expect(harness.launcher.launchCount == 0, "something was enqueued before the yes")
 
         // Declining submits none of it, never a partial subset.
@@ -246,7 +246,7 @@ struct BrewfilePlanTests {
 
         #expect(claimedRequest.disclosure == plainRequest.disclosure)
         #expect(claimedRequest.warningText == plainRequest.warningText)
-        #expect(claimedRequest.disclosure == .tapTrust(TapName("acme/tap")!))
+        #expect(claimedRequest.disclosure == .tapAdd(TapName("acme/tap")!))
 
         // And nothing derived from the option reaches argv.
         #expect(claimedRequest.commands.map(\.arguments) == [["tap", "acme/tap"]])

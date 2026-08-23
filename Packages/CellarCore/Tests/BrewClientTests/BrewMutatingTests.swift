@@ -276,7 +276,7 @@ struct BrewMutatingTests {
         let tap = try #require(TapName("acme/tap"))
         let plain = DisclosingProbe()
         var warning = plain
-        warning.disclosure = .tapTrust(tap)
+        warning.disclosure = .tapAdd(tap)
 
         // Same argv, same verb, same scope, same everything else.
         #expect(plain.arguments == warning.arguments)
@@ -289,7 +289,7 @@ struct BrewMutatingTests {
 
         // And it is still equality *of what will run plus what it warns about*:
         // two independently built values that agree on both are the same value.
-        #expect(AnyBrewMutation(warning) == AnyBrewMutation(DisclosingProbe(disclosure: .tapTrust(tap))))
+        #expect(AnyBrewMutation(warning) == AnyBrewMutation(DisclosingProbe(disclosure: .tapAdd(tap))))
     }
 
     /// `confirm` and `decline` are gated by `pendingConfirmation == request`,

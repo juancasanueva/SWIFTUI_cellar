@@ -77,7 +77,7 @@ struct ConfirmationDisclosureTests {
             "an erased batch containing a tap add raised no confirmation at all"
         )
 
-        #expect(request.disclosure == .tapTrust(Self.acme))
+        #expect(request.disclosure == .tapAdd(Self.acme))
         #expect(request.tapIdentity == Self.acme)
         #expect(request.commands.count == 3, "the batch lost commands on the way to the gate")
         #expect(harness.launcher.launchCount == 0, "the gate spawned before it was answered")
@@ -88,10 +88,11 @@ struct ConfirmationDisclosureTests {
         let unerased = try #require(reference.center.request(TapCommand.addTap(Self.acme)))
         #expect(request.disclosure == unerased.disclosure)
         #expect(request.warningText == unerased.warningText)
-        #expect(
-            request.warningText
-                == "Adding acme/tap trusts third-party formulae and casks that can distribute code."
-        )
+        #expect(request.warningText == """
+        Adding acme/tap clones a third-party repository. Homebrew will not load \
+        its formulae or casks until you trust it, and Cellar does not trust it \
+        for you.
+        """)
     }
 
     // MARK: - PM1 — an erased install-only batch still discloses package removal
@@ -126,7 +127,7 @@ struct ConfirmationDisclosureTests {
         // A single unerased `TapCommand` — tap trust, exactly as before.
         let single = CenterHarness()
         let tapRequest = try #require(single.center.request(TapCommand.addTap(Self.acme)))
-        #expect(tapRequest.disclosure == .tapTrust(Self.acme))
+        #expect(tapRequest.disclosure == .tapAdd(Self.acme))
 
         // A force-untap still carries its own evidence-bearing disclosure.
         let affected: Set<PackageID> = [PackageID(kind: .formula, name: "wget")]
@@ -173,8 +174,65 @@ struct ConfirmationDisclosureTests {
         #expect(request.disclosure == .packageRemoval)
 
         // A conformer that *does* declare one is taken at its word, erased or not.
-        #expect(TapCommand.addTap(Self.acme).disclosure == .tapTrust(Self.acme))
-        #expect(AnyBrewMutation(TapCommand.addTap(Self.acme)).disclosure == .tapTrust(Self.acme))
+        #expect(TapCommand.addTap(Self.acme).disclosure == .tapAdd(Self.acme))
+        #expect(AnyBrewMutation(TapCommand.addTap(Self.acme)).disclosure == .tapAdd(Self.acme))
+    }
+
+    // MARK: - TM6 / TM13 / PM3 — the add says what add does, the grant says what a grant does
+
+    /// **D2.** `brew tap` on Homebrew 6 grants nothing: the tap it clones is
+    /// inert until a separate `brew trust` runs. The shipped copy — "Adding
+    /// acme/tap trusts third-party formulae and casks that can distribute
+    /// code." — asserted a capability grant the command never made, which is
+    /// the one kind of wrong sentence a security disclosure may not contain.
+    ///
+    /// Two cases now, because two different things happen and a user answering
+    /// them must be able to tell which one they answered (TM6 :191-197,
+    /// TM13 :508-515, PM3 :245-260).
+    @Test("The add disclosure claims no grant and the grant disclosure claims one")
+    func theAddDisclosureClaimsNoGrantAndTheGrantDisclosureClaimsOne() throws {
+        let tap = try #require(TapName("acme/tools"))
+
+        #expect(ConfirmationDisclosure.tapAdd(tap).warningText == """
+        Adding acme/tools clones a third-party repository. Homebrew will not \
+        load its formulae or casks until you trust it, and Cellar does not \
+        trust it for you.
+        """)
+        #expect(ConfirmationDisclosure.tapTrustGrant(tap).warningText == """
+        Trusting acme/tools lets Homebrew load and run its formulae and casks. \
+        That is third-party code running as you, with your permissions.
+        """)
+
+        // The add text must not claim a grant, and the grant text must not
+        // pretend to be an add — the two are separate answers to separate
+        // questions (TM6 :164-169).
+        #expect(ConfirmationDisclosure.tapAdd(tap).warningText.contains("does not trust it for you"))
+        #expect(ConfirmationDisclosure.tapTrustGrant(tap).warningText.contains("clones") == false)
+
+        // TM12 :467-473 / R7 — both sentences are about the **tap**. A
+        // per-package grant can make a package loadable while its tap is not
+        // trusted, so neither may call a package untrusted.
+        for text in [
+            ConfirmationDisclosure.tapAdd(tap).warningText,
+            ConfirmationDisclosure.tapTrustGrant(tap).warningText
+        ] {
+            #expect(text.contains(tap.rawValue), "the disclosure does not name the tap: \(text)")
+            #expect(
+                text.localizedCaseInsensitiveContains("untrusted") == false,
+                "the disclosure calls something untrusted: \(text)"
+            )
+        }
+
+        // The two disclosures this change does not touch stay byte-identical.
+        #expect(ConfirmationDisclosure.packageRemoval.warningText == "This removes installed software.")
+        let affected: Set<PackageID> = [
+            PackageID(kind: .formula, name: "widget"),
+            PackageID(kind: .cask, name: "widget")
+        ]
+        #expect(
+            ConfirmationDisclosure.forceUntap(tap: tap, affected: affected).warningText
+                == "Force-removing acme/tools affects 2 installed packages."
+        )
     }
 
     // MARK: - PM1 — no disclosure is recovered by a type test

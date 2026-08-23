@@ -15,7 +15,7 @@ struct TapCommandTests {
         #expect(command.verb == "tapAdd")
         #expect(command.requiresConfirmation)
         #expect(command.invalidates == .taps)
-        #expect(command.disclosure == .tapTrust(TapName("acme/tools")!))
+        #expect(command.disclosure == .tapAdd(TapName("acme/tools")!))
         #expect(command.displayCommand == "brew tap acme/tools")
     }
 
@@ -105,10 +105,10 @@ struct TapCommandTests {
             id: UUID(),
             command: AnyBrewMutation(command),
             additional: [],
-            disclosure: .tapTrust(TapName("acme/tools")!)
+            disclosure: .tapAdd(TapName("acme/tools")!)
         )
 
-        #expect(request.warningText.contains("formulae and casks"))
+        #expect(request.warningText.contains("clones a third-party repository"))
         #expect(request.command.arguments == ["tap", "acme/tools"])
         #expect(request.displayCommand == "brew tap acme/tools")
     }

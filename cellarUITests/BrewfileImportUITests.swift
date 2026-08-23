@@ -89,8 +89,8 @@ final class BrewfileImportUITests: XCTestCase {
 
         let sentence = text(of: warning)
         XCTAssertTrue(
-            sentence.contains("trusts third-party formulae and casks"),
-            "the confirmation did not present the tap-trust disclosure: \(sentence)"
+            sentence.contains("clones a third-party repository"),
+            "the confirmation did not present the tap-add disclosure: \(sentence)"
         )
         XCTAssertFalse(
             sentence.contains("This removes installed software."),

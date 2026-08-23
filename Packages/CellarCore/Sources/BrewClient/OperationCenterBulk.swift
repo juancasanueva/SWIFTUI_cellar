@@ -254,7 +254,7 @@ extension OperationCenter {
 
         public var tapIdentity: TapName? {
             switch disclosure {
-            case .tapTrust(let tap), .forceUntap(let tap, _): tap
+            case .tapAdd(let tap), .tapTrustGrant(let tap), .forceUntap(let tap, _): tap
             case .packageRemoval: nil
             }
         }
