@@ -13,8 +13,8 @@ that no test or gate could ever check:
 
 | Class | Meaning | Count |
 |---|---|---|
-| `unit` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom (reads the repository or the test host's bundle information off disk) | **13** |
-| `ci-gate` | a hard gate inside the release run; failing it fails the job and publishes nothing | **12** |
+| `unit` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom (reads the repository or the test host's bundle information off disk) | **14** |
+| `ci-gate` | a hard gate inside the release run; failing it fails the job and publishes nothing | **14** |
 | `manual-evidence` | no harness can exist; the maintainer's observed output is recorded in `design.md` | **4** |
 
 What stays **design-owned and is deliberately absent here**: the runner image and Xcode pinning, the
@@ -36,6 +36,17 @@ bundle inside it MUST be **`cellar.app`** with display name **`Home-Cellar`**.
 An asset nobody can download is not a release: a run against a repository that is not anonymously
 readable MUST fail fast, with an explicit message, **before** any signing or notarization work, and
 MUST publish nothing.
+
+A run for a **stable** tag — one whose version carries no hyphen — MUST additionally publish an update
+feed describing that release, served over `https` from the project's GitHub Pages site. The feed is a
+**site artifact, not a release asset**, so the one-asset rule above is unaffected: the published release
+still carries exactly one downloadable asset. Publishing the feed MUST NOT require a version-control
+push and MUST NOT require a second release-management invocation beyond the single one that creates the
+release; it MUST reuse the run's already-published asset URL. A run for a **prerelease** tag — one whose
+version contains a hyphen — MUST publish the release and MUST NOT publish any feed entry for it, so that
+an installed copy of the app is never offered a prerelease.
+(Previously: the requirement covered only the single downloadable release asset and its reachability; a
+stable tag published no update feed, and prereleases had no stated feed consequence.)
 
 #### Scenario: A tag produces one correctly named, anonymously reachable asset
 
@@ -67,6 +78,26 @@ MUST publish nothing.
 - WHEN the run starts
 - THEN it fails with an explicit message before any signing or notarization step executes
 - AND no release, tag asset, or partial artifact is published
+- Verification: `ci-gate`
+
+#### Scenario: A stable tag also publishes the update feed, without a push and without a second release call
+
+- GIVEN a pushed stable tag `v1.0.0` whose release and asset have been published
+- WHEN the run completes
+- THEN the update feed served from the project's GitHub Pages site carries an entry for `1.0.0` whose
+  enclosure is the run's published `https` asset URL
+- AND the run performed no version-control push and no release-management invocation beyond the single
+  one that created the release
+- AND every entry published by an earlier stable tag is still present in the feed
+- Verification: `ci-gate`
+
+#### Scenario: A prerelease tag publishes a release and no feed entry
+
+- GIVEN a pushed tag `v0.0.1-rc.1`
+- WHEN the run completes
+- THEN the release and its single asset are published
+- AND the update feed contains no entry for `0.0.1-rc.1`
+- AND the feed is left exactly as the previous stable tag published it
 - Verification: `ci-gate`
 
 ### Requirement: The tag is the version, and a mislabelled build never ships
@@ -116,8 +147,14 @@ testing.
 
 ### Requirement: arm64 only, hardened, unsandboxed, and no entitlement added to get there
 
-The delivered binary MUST contain the **`arm64` slice and no other**. The delivered bundle MUST have
-the hardened runtime enabled and the app sandbox disabled.
+The delivered **application executable** MUST contain the `arm64` slice and no other. A prebuilt
+third-party framework vendored into the bundle MAY carry additional architecture slices, because
+thinning it would require either a sandboxed build phase or a post-export re-sign that takes signing
+ownership away from the export step; that cost is not worth paying, and stating it is more honest than
+implying a bundle-wide guarantee that has never been enforced. The delivered bundle MUST have the
+hardened runtime enabled and the app sandbox disabled.
+(Previously: "The delivered binary MUST contain the **`arm64` slice and no other**", which read as a
+bundle-wide claim while only the application executable was ever checked.)
 
 **No `.entitlements` file MUST exist in the repository**, and no entitlement MUST be added to make the
 delivered build work. Specifically, `allow-jit`, `allow-unsigned-executable-memory` and
@@ -127,12 +164,13 @@ a written rationale for this posture, based on **measured** signing output from 
 rather than on assumption, and that rationale MUST also explain what `ENABLE_USER_SELECTED_FILES` and
 `REGISTER_APP_GROUPS` mean while the sandbox is disabled.
 
-#### Scenario: The delivered binary is single-architecture
+#### Scenario: The delivered application executable is single-architecture
 
-- GIVEN the exported application binary
+- GIVEN the exported application executable
 - WHEN its architectures are enumerated
 - THEN `arm64` is the only one reported
-- AND the run fails if any other slice is present
+- AND the run fails if any other slice is present in the application executable
+- AND a vendored prebuilt framework carrying additional slices does not fail the run
 - Verification: `ci-gate`
 
 #### Scenario: The delivered bundle is hardened and unsandboxed
@@ -293,11 +331,30 @@ that run alone, and that storage MUST be destroyed **unconditionally at the end 
 when the run fails**. No step handling a credential MUST enable shell command tracing, and no
 credential value MUST ever be written to the run's log.
 
+The set of repository secrets the release run may reference MUST be **closed and enumerated**: exactly
+the **seven** named `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`,
+`APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, and `SPARKLE_PRIVATE_KEY`.
+Referencing a secret outside that set MUST fail a test. Adding one is allowed; adding one without
+updating the enumerated set is not. The update-signing private key MUST be piped to the signing tool on
+standard input, never written to disk and never echoed; its **public** counterpart is public by
+construction, ships inside every copy of the app, and MUST NOT be handled as a secret.
+(Previously: the requirement forbade credential material and mandated ephemeral, untraced injection,
+but never stated that the referenced secret set is closed or which secrets it contains.)
+
 #### Scenario: The repository carries no secret material
 
 - GIVEN every file in the repository
 - WHEN they are inspected for key headers, archived certificate blobs and literal credential values
 - THEN none is present
+- Verification: `unit`
+
+#### Scenario: The referenced secret set is exactly the seven named ones
+
+- GIVEN the release workflow
+- WHEN every repository secret it references is collected
+- THEN the collected set is exactly the seven named in this requirement, including
+  `SPARKLE_PRIVATE_KEY`
+- AND no eighth secret is referenced
 - Verification: `unit`
 
 #### Scenario: Credential cleanup cannot be skipped by a failure
@@ -424,4 +481,49 @@ it already owns; the build setting MUST NOT be used to carry it, because two sou
   the cask's `app` stanza must name `cellar.app` exactly, its token is `home-cellar`, and the arm64 pin
   plus the macOS 26.0 floor become `depends_on arch: :arm64` and `depends_on macos: ">= :tahoe"`.
   Those slices inherit these facts from this spec rather than re-deriving them.
-- The archived delta spec is the verbatim audit trail.
+- **Amended by change `m6-sparkle-updates`** (archived `2026-08-23`, PRD milestone **M6 "Ship"**,
+  slice 3 of 3 — Sparkle 2 in-app updates), MODIFIED-only delta — **3 requirements replaced in full,
+  0 added, 0 removed, 0 renamed**, taking the capability from **8 requirements / 29 scenarios** to
+  **8 requirements / 32 scenarios**, promoted from
+  `openspec/changes/archive/2026-08-23-m6-sparkle-updates/specs/release-distribution/spec.md`. The
+  three replaced blocks are *A pushed tag is the only thing that produces a downloadable release*,
+  *arm64 only, hardened, unsandboxed, and no entitlement added to get there*, and *No credential
+  material in the repository, and injected credentials die with the run*. The other five requirements
+  are byte-identical to their `m6-release-pipeline` text, and no scenario was deleted.
+  - **(a)** A **stable** tag now also publishes an update feed to GitHub Pages, and a **prerelease**
+    tag publishes no feed entry. The feed is a *site artifact, not a release asset*, so the
+    one-downloadable-asset rule is unaffected. **+2 scenarios**, both `ci-gate`.
+  - **(b)** The arm64 claim now binds the **application executable** and explicitly allows a vendored
+    prebuilt framework to carry additional slices (decision **D2**). This is the honest wording for
+    what the `lipo` gate has always read, not a weakening: probe `U31` measured
+    `Sparkle.framework` as `x86_64 arm64` while `Contents/MacOS/cellar` stayed `arm64`.
+    **Rejected:** `lipo -thin`, which needs a sandboxed build phase or a post-export re-sign that
+    takes signing ownership away from `-exportArchive`. 0 scenarios added; the architecture scenario
+    was reworded to follow.
+  - **(c)** The referenced repository-secret set is now stated as **closed and enumerated at seven**,
+    gaining `SPARKLE_PRIVATE_KEY`. The update-signing private key is piped to the signing tool on
+    standard input, never written to disk; its public counterpart ships inside every copy of the app
+    and is not a secret. **+1 scenario**, `unit`.
+- **The `## Verification classes` counts were hand-updated at archive**, from `unit` 13 / `ci-gate` 12
+  / `manual-evidence` 4 (total 29) to `unit` **14** / `ci-gate` **14** / `manual-evidence` **4**
+  (total **32**). The table lives outside every requirement block, so a MODIFIED delta structurally
+  cannot carry it; the delta's *Notes for archive* stated the obligation and the archive step
+  confirmed the arithmetic against the merged file by counting `- Verification:` lines rather than
+  trusting the note.
+- **The stowaway scenario was deliberately NOT touched.** A fourth MODIFIED block scoping
+  *None of it ships to the user* to exclude `Contents/Frameworks/` was pre-authorised **only** if
+  probe `U32` fired. It did not: the `find` sweep over the built bundle and again over the exported,
+  notarized bundle both returned empty, so `release.sh`'s sweep is unchanged and the scenario stands
+  as written.
+- **Execution status at the amendment (2026-08-23).** The maintainer prerequisites this spec's
+  original promotion listed as unmet are now **met**: the repository is public, the Developer ID
+  certificate and App Store Connect key exist, all **seven** secrets are set, and `v0.0.1-rc.1` was
+  published by a real release run whose notarization was `Accepted`
+  (`593818bf-c3db-460d-b674-3db6078732b6`). Of the four change-owned scenarios, `RD-c` is
+  runtime-proven and `RD-b` was re-measured locally and on the exported bundle; `RD-a1` and `RD-a2`
+  are **structurally verified but never executed** — the feed URL returns `404` and will until the
+  first stable tag. That is the pre-agreed shape of a publication path, not an open defect.
+- **The inherited-contract paragraph above is now enforced from the release side.** `RD-a1` requires
+  the feed entry's enclosure to be the run's own published `https` asset URL, so
+  `m6-sparkle-updates`'s binding is a gate rather than a note.
+- The archived delta specs are the verbatim audit trail.
