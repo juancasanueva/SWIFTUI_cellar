@@ -41,6 +41,50 @@ jobs:
           echo "::error::Repository is private; release assets are not anonymously downloadable."
           exit 1
 
+      # GitHub Pages keys a deployment by its build version, and the build
+      # version is the commit SHA — the deployments API rejects anything that is
+      # not a commit in this repository. A commit Pages has already deployed is
+      # therefore not redeployable: the request is accepted, reports `succeed`,
+      # and the previously published site keeps being served. Two stable tags
+      # can point at one commit — `v0.0.2` and `v0.0.3` both did — and that path
+      # would leave every installed copy reading a feed that never learned about
+      # the newer release.
+      #
+      # So the check happens here, next to the other refusal, and not at the
+      # deploy step: by then the release exists on the tag and Apple has already
+      # been asked for a notarization round trip, and there is no way back.
+      - name: Refuse a second feed deployment from this commit
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          # `github.token` rather than a repository secret: reading the
+          # deployment state needs nothing wider than the job already holds.
+          RELEASE_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail                       # never -e -u -x: tracing prints the token
+          API="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/deployments/${GITHUB_SHA}"
+          # The endpoint answers 200 for every SHA it is asked about, deployed
+          # or not; what separates the two is the `status` in the body —
+          # `succeed` against an empty string. A check that read the HTTP code
+          # would refuse every release.
+          STATUS="$(curl -sSf \
+            -H "Authorization: Bearer ${RELEASE_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$API" | jq -r '.status // ""')"
+          case "$STATUS" in
+            "")
+              echo "No Pages deployment exists for ${GITHUB_SHA}; the feed can be published from this commit."
+              ;;
+            succeed)
+              echo "::error::Commit ${GITHUB_SHA} has already deployed the update feed. GitHub Pages keys a deployment by its commit and ignores a second deployment of the same one, so a second stable tag on this commit would publish a release the feed never learns about. Cut the release from a new commit."
+              exit 1
+              ;;
+            *)
+              echo "::error::The Pages deployments API reports status '${STATUS}' for commit ${GITHUB_SHA}; refusing to publish a feed from it."
+              exit 1
+              ;;
+          esac
+
       - name: Check out the tagged commit
         uses: actions/checkout@v4
 
@@ -158,88 +202,20 @@ jobs:
         uses: actions/configure-pages@v6
 
       - name: Upload the site artifact
-        id: site
         if: ${{ !contains(github.ref_name, '-') }}
         uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ runner.temp }}/site
 
-      # Deployed by calling the Pages REST API directly rather than through
-      # `deploy-pages`, which sends the commit SHA as the build version and
-      # exposes no input to change it. A build version Pages has already
-      # deployed is not redeployed: the request is accepted, the deployment
-      # reports `succeed`, and the previously published site keeps being
-      # served. Two stable tags can point at one commit — `v0.0.2` and `v0.0.3`
-      # both did — so that path silently leaves every installed copy reading a
-      # feed that never learned about the newer release. The run number is what
-      # makes the version unique; the commit alone is not.
+      # `actions/deploy-pages` sends the commit SHA as the build version and
+      # exposes no input to change it — which is exactly right: the deployments
+      # API accepts *only* a build version that is a commit in this repository.
+      # A `<sha>-<run>` string is rejected with a 404, and that rejection lands
+      # after the release has already been published. The step upstream is what
+      # guarantees this commit has not deployed before.
       - name: Deploy to Pages
         if: ${{ !contains(github.ref_name, '-') }}
-        env:
-          # `github.token` rather than a repository secret: the job already
-          # holds `pages: write`, and nothing here needs a wider credential.
-          RELEASE_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ steps.site.outputs.artifact_id }}
-          BUILD_VERSION: ${{ github.sha }}-${{ github.run_number }}
-        run: |
-          set -euo pipefail                       # never -e -u -x: tracing prints the OIDC token
-          API="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/deployments"
-          ACCEPT="Accept: application/vnd.github+json"
-          VERSION_HEADER="X-GitHub-Api-Version: 2022-11-28"
-
-          # The OIDC token is what proves to Pages that the deployment came
-          # from this run. It is a credential: it is never echoed, and it
-          # reaches the request body through `jq --arg` rather than through
-          # string interpolation.
-          OIDC_TOKEN="$(curl -sSf \
-            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}" | jq -r '.value')"
-
-          # `--argjson` for the artifact id, which the API types as a number,
-          # and which therefore also fails loudly if the upload produced none.
-          BODY="$(jq -n \
-            --argjson artifact_id "${ARTIFACT_ID}" \
-            --arg pages_build_version "${BUILD_VERSION}" \
-            --arg oidc_token "${OIDC_TOKEN}" \
-            '{artifact_id: $artifact_id,
-              pages_build_version: $pages_build_version,
-              oidc_token: $oidc_token}')"
-
-          # Piped on standard input, not passed as an argument: the token would
-          # otherwise be readable in the process list for the life of the call.
-          DEPLOYMENT_ID="$(printf '%s' "$BODY" | curl -sSf -X POST "$API" \
-            -H "Authorization: Bearer ${RELEASE_TOKEN}" \
-            -H "$ACCEPT" -H "$VERSION_HEADER" \
-            --data-binary @- | jq -r '.id')"
-          echo "Pages deployment ${DEPLOYMENT_ID} requested as build version ${BUILD_VERSION}."
-
-          # A created deployment is not a published one. Ten minutes is the
-          # same ceiling `deploy-pages` used.
-          DEADLINE=$(( SECONDS + 600 ))
-          STATUS="unknown"
-          while [ "$SECONDS" -lt "$DEADLINE" ]; do
-            STATUS="$(curl -sSf "${API}/${DEPLOYMENT_ID}" \
-              -H "Authorization: Bearer ${RELEASE_TOKEN}" \
-              -H "$ACCEPT" -H "$VERSION_HEADER" | jq -r '.status')"
-            case "$STATUS" in
-              succeed)
-                echo "Pages deployment ${DEPLOYMENT_ID} reported: ${STATUS}."
-                exit 0
-                ;;
-              deployment_failed|deployment_content_failed|deployment_attempt_error|deployment_lost|deployment_cancelled)
-                break
-                ;;
-            esac
-            sleep 5
-          done
-
-          echo "::error::Pages deployment ${DEPLOYMENT_ID} ended in status: ${STATUS}"
-          # Best effort: a deployment left running would hold the Pages
-          # environment against the next tag.
-          curl -sS -X POST "${API}/${DEPLOYMENT_ID}/cancel" \
-            -H "Authorization: Bearer ${RELEASE_TOKEN}" \
-            -H "$ACCEPT" -H "$VERSION_HEADER" > /dev/null || true
-          exit 1
+        uses: actions/deploy-pages@v5
 
       - name: Delete the ephemeral keychain and the API key
         if: always()
