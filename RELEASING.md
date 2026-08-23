@@ -109,6 +109,7 @@ Then watch the run under the repository's Actions tab. The stages, in order:
 | Stage | What it does | What stops the run |
 |---|---|---|
 | Private-repository gate | Refuses to publish an unreachable asset | The repository is not public |
+| Distinct-commit gate | Asks the Pages deployments API whether this commit has already deployed the feed | This commit has deployed before (stable tags only) |
 | Archive | Release archive stamped with the tag and the run number | Any build failure |
 | Export | Developer ID export, then gates version and architecture | `CFBundleShortVersionString` ≠ the tag, or any slice other than `arm64` |
 | Package | `ditto` into `Home-Cellar-<version>.zip` | — |
@@ -118,21 +119,36 @@ Then watch the run under the repository's Actions tab. The stages, in order:
 | Publish | `gh release create --verify-tag --generate-notes` | — |
 | Build the appcast | Signs the zip and writes the whole feed to a directory outside the checkout | Signing or emission fails (stable tags only) |
 | Configure Pages / Upload | Uploads that directory as the `github-pages` artifact | — |
-| Deploy to Pages | Posts the artifact to the Pages deployment API as build version `<commit>-<run number>`, then polls for `succeed` for up to 10 minutes | The deployment reports a failure state, or the 10 minutes elapse |
+| Deploy to Pages | `actions/deploy-pages`, which deploys the artifact under this commit as its build version | The deployment reports a failure state, or its 10 minutes elapse |
 | Cleanup | Deletes the keychain and the API key, always | — |
 
-**Why the deploy step is hand-rolled rather than `actions/deploy-pages`.** The
-action sends the commit SHA as the Pages build version and exposes no input to
-override it. Pages will not redeploy a build version it has already served: the
-request is accepted, the deployment reports `succeed`, and the previously
-published site stays live. Two stable tags can point at one commit — `v0.0.2`
-and `v0.0.3` both did — so on that path the second tag uploads a correct feed,
-the run goes green, and every installed copy keeps reading the older one. The
-run number is what makes the build version unique; the commit alone is not.
+**Every stable release must be cut from its own commit.** GitHub Pages keys a
+deployment by its *build version*, and the deployments API accepts only a build
+version that is a commit in this repository — a `<commit>-<run number>` string
+is rejected with a 404, and so is any invented SHA. The commit is therefore not
+a default that could be improved on; it is the only value the API takes, and it
+is exactly what `actions/deploy-pages` sends.
+
+That leaves one hazard, and it is silent. Asking Pages to deploy a commit it has
+already deployed does not fail: the request is accepted, the deployment reports
+`succeed`, and the previously published site keeps being served. Two stable tags
+can point at one commit — `v0.0.2` and `v0.0.3` both did — and on that path the
+second tag publishes a release, uploads a correct feed, goes green, and leaves
+every installed copy reading the older one.
+
+The distinct-commit gate is what makes that impossible. It reads
+`GET /repos/<owner>/<repo>/pages/deployments/<commit>` before anything is signed
+or notarized. The endpoint answers `200` for any SHA, so the `status` in the
+body is the discriminator: an empty string means the commit has never deployed
+and the release may proceed; `succeed` means it has, and the run stops there —
+before Apple is asked for a round trip and before a release exists on the tag.
 
 **A failure publishes nothing.** Every gate runs before the publish step, so a
 failed run leaves no release, no asset, and no draft. To retry, delete the
-**tag** and tag again:
+**tag** and tag again — on the same commit, which is fine here precisely because
+the run never reached the deploy: no deployment exists for that commit yet, so
+the distinct-commit gate still lets it through. Once a run *has* deployed the
+feed, that commit is spent; the next version needs a new commit.
 
 ```sh
 git push --delete origin v1.0.0
@@ -321,16 +337,18 @@ an implementation detail: it breaks the Debug/Release parity that `cellarTests`
 asserts, so the assertion must be **explicitly relaxed** — with the reason
 recorded in the test — rather than deleted.
 
-**The run is green but the feed still advertises the previous version.** Read
-the deploy step's log: it prints the deployment id and the build version it
-requested. Pages keys a deployment by that string and will not redeploy one it
-has already served, which is exactly how `actions/deploy-pages` — which sends
-the bare commit SHA — left `appcast.xml` stale when `v0.0.2` and `v0.0.3` both
-pointed at the same commit. The step now sends `<commit>-<run number>`, so two
-tags on one commit ask for two different versions. If the feed is still stale
-with a fresh build version in the log, the deployment succeeded and the CDN has
-not yet purged; compare `last-modified` on the feed URL before assuming
-otherwise.
+**The run stopped at the distinct-commit gate.** This commit has already
+deployed the update feed, and Pages will not deploy it twice. Nothing is wrong
+with the tag: put the new version on a new commit and tag that. There is no flag
+to force the deployment, because forcing it is the failure — Pages would accept
+the request, report `succeed`, and keep serving the old feed.
+
+**The run is green but the feed still advertises the previous version.** The
+gate makes the stale-feed case unreachable for a stable tag, so the remaining
+explanation is the CDN: the deployment succeeded and the edge has not yet
+purged. Compare `last-modified` on the feed URL before assuming otherwise. If
+the feed really is stale, check that the run was a stable tag at all — a
+hyphenated tag skips every publication step, the deploy included, by design.
 
 **`spctl` accepts locally but a downloader sees a refusal.** The published
 archive must be the post-staple one. `scripts/release.sh staple` deletes the
