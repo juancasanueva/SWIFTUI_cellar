@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SUFeedURL</key>
+	<string>https://juancasanueva.github.io/SWIFTUI_cellar/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<!-- PLACEHOLDER — set during apply: the real 44-character base64 public key
+	     printed by Sparkle's generate_keys, maintainer checkpoint 4. It is
+	     deliberately not base64-shaped so the bundle-key test stays red until the
+	     real key lands; no placeholder may reach the merge commit. -->
+	<string>REPLACE-WITH-REAL-SUPublicEDKey-AT-MAINTAINER-CHECKPOINT-4</string>
+</dict>
+</plist>

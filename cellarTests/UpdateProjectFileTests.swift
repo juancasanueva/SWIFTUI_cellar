@@ -127,6 +127,7 @@ nonisolated enum UpdateProjectSources {
 struct UpdateProjectFileTests {
     static let applicationCategory =
         "INFOPLIST_KEY_LSApplicationCategoryType = \"public.app-category.developer-tools\";"
+    static let partialInfoPlist = "INFOPLIST_FILE = Resources/Cellar-Info.plist;"
 
     // MARK: - T12(a) — pbxproj item 6, the application category
 
@@ -145,6 +146,23 @@ struct UpdateProjectFileTests {
 
         #expect(blocks.count == 2)
         #expect(try UpdateProjectSources.appTargetBlocksDeclaring(Self.applicationCategory) == 2)
+        #expect(try UpdateProjectSources.appTargetBlocksDeclaring("GENERATE_INFOPLIST_FILE = YES;") == 2)
+    }
+
+    // MARK: - T12 — pbxproj item 7, the partial property list
+
+    /// The partial property list is merged by **both** configurations, and the
+    /// generator is still running.
+    ///
+    /// `INFOPLIST_FILE` and `GENERATE_INFOPLIST_FILE = YES` are asserted
+    /// together on purpose: this is a *merge*, not a replacement, and the
+    /// twenty-six keys the generator contributes — including the catalog-sourced
+    /// display name and copyright that two other suites bind to — only survive
+    /// while the generator stays on. Setting the file and turning the generator
+    /// off would still ship `SUFeedURL` and would silently strip everything else.
+    @Test("Both app-target configurations merge the partial property list")
+    func appTargetsMergeThePartialPropertyList() throws {
+        #expect(try UpdateProjectSources.appTargetBlocksDeclaring(Self.partialInfoPlist) == 2)
         #expect(try UpdateProjectSources.appTargetBlocksDeclaring("GENERATE_INFOPLIST_FILE = YES;") == 2)
     }
 
