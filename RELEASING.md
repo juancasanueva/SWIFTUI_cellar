@@ -44,7 +44,7 @@ None of these block merging the pipeline. All of them block the first release.
    `-authenticationKey*` flags, it is independently revocable, and it never
    prompts for two-factor confirmation — so automatic signing adds no new
    credential surface.
-4. **Six repository secrets**, named exactly:
+4. **Seven repository secrets**, named exactly:
 
    | Secret | Value |
    |---|---|
@@ -54,10 +54,43 @@ None of these block merging the pipeline. All of them block the first release.
    | `APPLE_API_KEY_P8` | The full contents of the App Store Connect `.p8` file |
    | `APPLE_API_KEY_ID` | The key id |
    | `APPLE_API_ISSUER_ID` | The issuer id |
+   | `SPARKLE_PRIVATE_KEY` | The EdDSA private key printed by `generate_keys -x` (see 7) |
 
 5. **Actions enabled**, with permission to write releases. The workflow declares
    `contents: write` and uses the run's own `GITHUB_TOKEN`; no personal token is
    involved.
+6. **GitHub Pages enabled, with source = GitHub Actions.** Settings → Pages →
+   Build and deployment → Source: **GitHub Actions**. This is what serves
+   `https://juancasanueva.github.io/SWIFTUI_cellar/appcast.xml`, the feed every
+   installed copy reads.
+
+   The `github-pages` deployment environment must also allow the refs the
+   release job runs on. It is created with a **branch** policy, and this job
+   runs on **tag** refs (`v*`), so a deployment from a tag is rejected until a
+   tag rule is added: Settings → Environments → `github-pages` → Deployment
+   branches and tags → add a **tag** rule matching `v*`. Without it the four
+   publication steps run and `deploy-pages` fails at the end of an otherwise
+   successful release.
+7. **A Sparkle EdDSA key pair, generated once and backed up before anything
+   else.** From the Sparkle 2.9.6 distribution:
+
+   ```
+   curl -fsSLO https://github.com/sparkle-project/Sparkle/releases/download/2.9.6/Sparkle-2.9.6.tar.xz
+   shasum -a 256 Sparkle-2.9.6.tar.xz    # 52bf9e88cdd972fc0c81501377a880e90d47031bd8ca5462488f843e2609e192
+   tar -xJf Sparkle-2.9.6.tar.xz
+   ./bin/generate_keys                   # writes the private key to the login Keychain, prints the public key
+   ./bin/generate_keys -x sparkle-private.key
+   # move sparkle-private.key to offline storage or a password manager, then:
+   rm -P sparkle-private.key
+   ```
+
+   **This is a one-way door.** Losing the private key permanently severs the
+   update channel for every copy already installed: rotation requires shipping a
+   new `SUPublicEDKey` through some channel that is not Sparkle. The public key
+   is *not* a secret — it is compiled into every copy, in
+   `Resources/Cellar-Info.plist` — and must never be handled as one.
+8. **The exported private key stored as `SPARKLE_PRIVATE_KEY`.** Verify it once
+   with `./bin/sign_update` against any zip before deleting the local copy.
 
 The team identifier `Z3S5JK8E38` lives in the repository and is not a secret.
 
@@ -242,16 +275,19 @@ change without a coordinated change there:
 | Bundle inside it | `cellar.app`, display name `Home-Cellar` |
 | Version stamping | `CFBundleShortVersionString` = tag minus `v`; `CFBundleVersion` = run number, strictly increasing |
 | Signature | Developer ID Application, team `Z3S5JK8E38`, hardened runtime, notarized and stapled |
-| Floor | Apple Silicon (`arm64` only), macOS 26 |
+| Floor | Apple Silicon (`arm64` only) for the app executable; the embedded `Sparkle.framework` is universal, which does not change the floor |
+| Update feed | `https://juancasanueva.github.io/SWIFTUI_cellar/appcast.xml`, republished by the same job on every **stable** tag; a prerelease publishes a release and no feed entry |
 
 `release.yml` carries a named extension point immediately after the publish
-step: appcast publication and the cask bump insert there without restructuring
-the job.
+step: appcast publication now occupies it, and the cask bump inserts after it
+without restructuring the job.
 
-**Known follow-up:** `xcodebuild archive` warns *"No App Category is set for
-target 'cellar'"*. Setting `LSApplicationCategoryType` belongs to
-`m6-sparkle-updates`, which touches the project file anyway; it is deliberately
-out of scope here, where the project file changes by exactly two lines.
+**Risk 3 — a Pages deploy is a full-site replacement.** `deploy-pages` serves
+whatever the uploaded artifact contains and nothing else, so the release job is
+the *only* thing that may deploy to Pages. If a landing page is ever wanted, it
+must be built by this same job into the same artifact directory; a second
+workflow deploying a site would silently overwrite `appcast.xml` and every
+installed copy would stop finding updates.
 
 ## 8. Troubleshooting
 
