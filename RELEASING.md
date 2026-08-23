@@ -181,8 +181,10 @@ space, so no hardened-runtime exception applies to it.
 
 **`ENABLE_USER_SELECTED_FILES` and `REGISTER_APP_GROUPS`.** Both are set in the
 project file (`readonly` and `YES`), and both are sandbox-era settings sitting
-inert beside a disabled sandbox: with `ENABLE_APP_SANDBOX = NO` they grant
-nothing and cost nothing, because the entitlements they would generate are only
+inert beside a disabled sandbox. The first one **does** emit an entitlement —
+`com.apple.security.files.user-selected.read-only` is the single key the
+notarized build carries (measured below) — but with `ENABLE_APP_SANDBOX = NO`
+it grants nothing and costs nothing, because that entitlement is only
 meaningful inside a sandbox. They matter only as a tripwire. Introducing **any**
 `.entitlements` file would make them live and re-activate the export-write trap
 recorded in `openspec/changes/archive/2026-08-22-m6-tip-jar/`, which is why the
@@ -191,18 +193,42 @@ absence of such a file is asserted by a test rather than left to discipline.
 **The rule going forward.** No entitlement is added without a measured failure
 that requires it, and every addition is visible in the notarization audit trail.
 
-**Measured evidence — placeholder, pending the first notarized build.**
+**Measured evidence — first notarized build, 2026-08-23.**
 
-> This block is **not yet filled in**. It will carry the quoted output of
-> `codesign -dvvv --entitlements :-` against the notarized, stapled build, and
-> the result of running a real Homebrew mutation (install then uninstall a small
-> formula, confirmed with `brew list --formula`) from that build. Both require a
-> Developer ID Application certificate and an App Store Connect API key, neither
-> of which exists on the build machine yet — see §2. Until they are measured,
-> this section states the design's reasoning and does **not** claim measured
-> output it does not have. If the mutation ever fails, **no entitlement is added
-> by default**: the failure is reported and the question is reopened as a
-> decision.
+Rehearsed with `scripts/release.sh all` (§5) under automatic signing; no manual
+fallback was needed. Notarization submission
+`ee153168-e28f-495b-8d8e-4b70be89843e` returned `Accepted`, the ticket stapled,
+and the Gatekeeper assessment of the bundle extracted from the zip was:
+
+```
+cellar.app: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Juan Casanueva (Z3S5JK8E38)
+```
+
+`codesign -dvv` on the same bundle: `Format=app bundle with Mach-O thin (arm64)`,
+`flags=0x10000(runtime)`, `TeamIdentifier=Z3S5JK8E38`,
+`Notarization Ticket=stapled`. Its complete entitlements dictionary, from
+`codesign -d --entitlements - --xml`:
+
+```xml
+<dict>
+  <key>com.apple.security.files.user-selected.read-only</key>
+  <true/>
+</dict>
+```
+
+No `com.apple.security.app-sandbox`, and none of the three hardened-runtime
+exceptions named above.
+
+**Homebrew mutation from that build.** The stapled bundle was copied to
+`/Applications` and launched. From it, `sl` (not previously installed) was
+installed and then uninstalled through Cellar's own mutation flow. Evidence:
+Homebrew's download cache holds the `sl-5.02` bottle manifest fetched at
+07:39 that day, one minute after launch, and `brew list --formula` no longer
+lists `sl` afterwards. `brew` ran to completion as a child of the
+hardened-runtime process with the entitlements above and nothing else — the
+design's reasoning holds as measured.
 
 ## 7. The contract the follow-up slices inherit
 
