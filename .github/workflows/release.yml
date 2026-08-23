@@ -21,6 +21,18 @@ jobs:
   release:
     runs-on: macos-26
     timeout-minutes: 90
+    # A job-level `permissions:` block **replaces** the workflow-level one
+    # rather than extending it, so `contents: write` is restated here or
+    # `gh release create` silently loses its token — a failure that would only
+    # appear on a real tag, after Apple had already been asked for a
+    # notarization round trip. `pages: write` and `id-token: write` are what
+    # `deploy-pages` needs.
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    # GitHub requires Pages deployments to target this environment.
+    environment: github-pages
     steps:
       - name: Refuse to publish from a private repository
         if: ${{ github.event.repository.private }}
@@ -115,8 +127,44 @@ jobs:
           # shellcheck disable=SC2086            # $PRERELEASE is a bare flag or empty
           gh release create "$GITHUB_REF_NAME" "build/Home-Cellar-${VERSION}.zip" \
             --verify-tag --generate-notes --title "$GITHUB_REF_NAME" $PRERELEASE
-      # --- extension point: appcast publication (m6-sparkle-updates) and the
-      #     cask bump (m6-cask-tap) insert here without restructuring the job. ---
+      # --- extension point: the cask bump (m6-cask-tap) inserts here without
+      #     restructuring the job. ---
+
+      # Appcast publication. Every step below carries the same prerelease guard
+      # the publish step uses for `--prerelease`: a Pages deploy is a full-site
+      # replacement, so a prerelease reaching it with an empty artifact would
+      # blank the live feed for every installed copy.
+      #
+      # They run **after** the release exists, because the item's enclosure
+      # points at the published asset's download URL.
+      - name: Build the appcast
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          # The key is bound here and read from the environment onto the signing
+          # tool's standard input. It is never interpolated into a `run:` line,
+          # which the runner would echo into the step header before masking it.
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          ASSET_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/Home-Cellar-${{ env.VERSION }}.zip
+          ZIP_PATH: build/Home-Cellar-${{ env.VERSION }}.zip
+          FEED_URL: https://juancasanueva.github.io/SWIFTUI_cellar/appcast.xml
+          # Outside the checkout, so nothing enters the repository tree and
+          # there is no new stowaway surface.
+          OUTPUT_DIR: ${{ runner.temp }}/site
+        run: scripts/appcast.sh
+
+      - name: Configure Pages
+        if: ${{ !contains(github.ref_name, '-') }}
+        uses: actions/configure-pages@v6
+
+      - name: Upload the site artifact
+        if: ${{ !contains(github.ref_name, '-') }}
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/site
+
+      - name: Deploy to Pages
+        if: ${{ !contains(github.ref_name, '-') }}
+        uses: actions/deploy-pages@v5
 
       - name: Delete the ephemeral keychain and the API key
         if: always()
