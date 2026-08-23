@@ -78,17 +78,21 @@ nonisolated enum AppcastWorkflowSources {
 struct AppcastWorkflowTests {
     static let prereleaseGuard = "if: ${{ !contains(github.ref_name, '-') }}"
 
-    /// The four publication steps, identified by what each one runs.
+    /// The five publication steps, identified by what each one runs.
+    ///
+    /// The guard is one of them: it is the step that decides whether this commit
+    /// may publish a feed at all, so a prerelease must skip it for the same
+    /// reason a prerelease skips the deploy.
     static let publicationMarkers = [
+        "Refuse a second feed deployment from this commit",
         "appcast.sh",
         "actions/configure-pages",
         "actions/upload-pages-artifact",
-        "pages_build_version"
+        "actions/deploy-pages"
     ]
 
-    /// The deploy step, identified by its name rather than by an action
-    /// reference: it is the step that no longer has one.
     static let deployStepMarker = "- name: Deploy to Pages"
+    static let guardStepMarker = "- name: Refuse a second feed deployment from this commit"
 
     // MARK: - T16 — ordering and the prerelease guard
 
@@ -111,12 +115,12 @@ struct AppcastWorkflowTests {
 
     /// Every publishing step is skipped on a prerelease tag.
     ///
-    /// All four, not just the first. The deploy step is the dangerous one: a
+    /// All five, not just the first. The deploy step is the dangerous one: a
     /// prerelease that reached it with an empty artifact would replace the live
     /// site — Pages deploys are a full-site replacement — and blank the feed for
     /// every installed copy.
-    @Test("All four publication steps carry the prerelease guard")
-    func allFourPublicationStepsCarryThePrereleaseGuard() throws {
+    @Test("All five publication steps carry the prerelease guard")
+    func allFivePublicationStepsCarryThePrereleaseGuard() throws {
         let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
 
         var guarded = 0
@@ -125,7 +129,7 @@ struct AppcastWorkflowTests {
             #expect(step.contains(Self.prereleaseGuard), "\(marker) is not guarded")
             guarded += 1
         }
-        #expect(guarded == 4)
+        #expect(guarded == 5)
     }
 
     // MARK: - T17 — the job header
@@ -171,67 +175,105 @@ struct AppcastWorkflowTests {
         #expect(step.contains("SPARKLE_PRIVATE_KEY"))
     }
 
-    // MARK: - Every stable tag gets its own Pages build version
+    // MARK: - One stable release per commit
 
-    /// `actions/deploy-pages` is gone, and the two actions around it stay.
+    /// `actions/deploy-pages` is what deploys the feed.
     ///
-    /// The action sends `pages_build_version = GITHUB_SHA` and offers no input
-    /// to change it. Two stable tags on one commit therefore ask Pages twice for
-    /// the same build version: the second request is accepted, reports
-    /// `succeed`, and leaves the previously deployed site in place — which for
-    /// this repository means every installed copy keeps reading a feed that
-    /// never learned about the new release.
-    @Test("The appcast is deployed without actions/deploy-pages")
-    func theAppcastIsDeployedWithoutTheDeployPagesAction() throws {
+    /// The action sends the commit SHA as the build version, and the Pages
+    /// deployments API accepts **only** a build version that is a commit in the
+    /// repository: a `<sha>-<run>` string and a synthetic forty-hex string both
+    /// answer 404. The action already sends the one value the API takes, so
+    /// there is nothing left for a hand-rolled request to improve on.
+    @Test("The appcast is deployed by actions/deploy-pages")
+    func theAppcastIsDeployedByTheDeployPagesAction() throws {
         let workflow = try AppcastWorkflowSources.workflow()
 
-        #expect(!workflow.contains("actions/deploy-pages"))
-        // Asserted so the absence above reads as a replaced step rather than a
-        // deleted publication half.
+        #expect(workflow.contains("actions/deploy-pages"))
         #expect(workflow.contains("actions/configure-pages"))
         #expect(workflow.contains("actions/upload-pages-artifact"))
-    }
 
-    /// The deploy step asks for a build version no earlier run can collide with.
-    ///
-    /// The run number is what makes it unique: the commit alone is not, because
-    /// a second tag can point at a commit Pages has already deployed.
-    @Test("The deploy step requests a build version unique to the run")
-    func theDeployStepRequestsABuildVersionUniqueToTheRun() throws {
-        let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
-        let deploy = try #require(steps.first { $0.contains(Self.deployStepMarker) })
-
-        #expect(deploy.contains(Self.prereleaseGuard))
-        #expect(deploy.contains("pages_build_version"))
-        #expect(
-            deploy.contains("GITHUB_RUN_NUMBER") || deploy.contains("github.run_number"),
-            "the build version must carry the run number, or a re-tagged commit collides again"
+        let deploy = try #require(
+            AppcastWorkflowSources.steps(in: workflow).first { $0.contains(Self.deployStepMarker) }
         )
-        #expect(deploy.contains("pages/deployments"))
-        // The deployment is asynchronous: a created deployment is not a
-        // published one, so the step waits for the terminal state.
-        #expect(deploy.contains("succeed"))
+        #expect(deploy.contains("actions/deploy-pages"))
     }
 
-    /// The step shells out to `curl`, and to nothing that could retract a
-    /// release.
+    /// Nothing in the workflow names the build version.
+    ///
+    /// The only value the API accepts is the commit SHA, which is what the
+    /// action sends unprompted. Every override this repository has tried —
+    /// `${{ github.sha }}-${{ github.run_number }}` among them — was rejected
+    /// with a 404, and the rejection landed *after* the release was published.
+    @Test("The workflow never overrides the Pages build version")
+    func theWorkflowNeverOverridesThePagesBuildVersion() throws {
+        let workflow = try AppcastWorkflowSources.workflow()
+
+        #expect(!workflow.contains("pages_build_version"))
+        #expect(!workflow.contains("BUILD_VERSION"))
+    }
+
+    /// The commit may not have deployed the feed already.
+    ///
+    /// Pages keys a deployment by its build version, and the build version is
+    /// the commit SHA. Asking it to deploy a commit it has already deployed is
+    /// accepted, reports `succeed`, and leaves the previously published site in
+    /// place — so a second stable tag on one commit would publish a release the
+    /// feed never learns about. Two stable tags did point at one commit here:
+    /// `v0.0.2` and `v0.0.3`.
+    @Test("A guard refuses a second feed deployment from one commit")
+    func aGuardRefusesASecondFeedDeploymentFromOneCommit() throws {
+        let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
+        let step = try #require(steps.first { $0.contains(Self.guardStepMarker) })
+
+        #expect(step.contains(Self.prereleaseGuard))
+        #expect(step.contains("pages/deployments/${GITHUB_SHA}"))
+        // The API answers 200 for every SHA it is asked about; what separates a
+        // deployed commit from an undeployed one is the `status` in the body —
+        // `succeed` against an empty string. A guard that read the HTTP code
+        // would refuse every release.
+        #expect(step.contains("succeed"))
+        #expect(step.contains("exit 1"))
+    }
+
+    /// The guard runs before anything Apple is asked for.
+    ///
+    /// A commit that cannot publish a feed cannot publish a release either, and
+    /// finding that out after notarization — which is what happened on
+    /// `v0.0.4` — means the release is already on the tag with no feed behind
+    /// it. So the guard sits with the other refusals at the top of the job.
+    @Test("The guard runs before notarization and before the release is published")
+    func theGuardRunsBeforeNotarizationAndBeforeTheReleaseIsPublished() throws {
+        let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
+
+        let refuseGuard = try #require(steps.firstIndex { $0.contains(Self.guardStepMarker) })
+        let privateRepo = try #require(steps.firstIndex { $0.contains("Refuse to publish from a private repository") })
+        let notarize = try #require(steps.firstIndex { $0.contains("release.sh notarize") })
+        let publish = try #require(steps.firstIndex { $0.contains("gh release create") })
+
+        #expect(privateRepo < refuseGuard)
+        #expect(refuseGuard < notarize)
+        #expect(refuseGuard < publish)
+    }
+
+    /// The guard reaches the API with `curl`, and with nothing that could touch
+    /// a release.
     ///
     /// The workflow's blast radius is pinned elsewhere at exactly one `gh`
-    /// invocation and no `git` invocation. Reaching the REST API through `gh`
-    /// here would quietly widen it.
-    @Test("The deploy step reaches the API with curl and not gh")
-    func theDeployStepReachesTheAPIWithCurlAndNotGh() throws {
+    /// invocation — `gh release create` — and no `git` invocation. Reading the
+    /// deployments API through `gh` here would quietly widen it.
+    @Test("The guard reaches the API with curl and not gh")
+    func theGuardReachesTheAPIWithCurlAndNotGh() throws {
         let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
-        let deploy = try #require(steps.first { $0.contains(Self.deployStepMarker) })
+        let step = try #require(steps.first { $0.contains(Self.guardStepMarker) })
 
-        #expect(AppcastWorkflowSources.invokes("curl", in: deploy))
-        #expect(!AppcastWorkflowSources.invokes("gh", in: deploy))
-        #expect(!AppcastWorkflowSources.invokes("git", in: deploy))
+        #expect(AppcastWorkflowSources.invokes("curl", in: step))
+        #expect(!AppcastWorkflowSources.invokes("gh", in: step))
+        #expect(!AppcastWorkflowSources.invokes("git", in: step))
     }
 
     /// The deploy step keeps its place in the job.
     ///
-    /// It must come after the upload, whose artifact id it posts, and before the
+    /// It must come after the upload, whose artifact it deploys, and before the
     /// `if: always()` cleanup that destroys the keychain and the API key — so a
     /// deployment that takes its full ten minutes never races the teardown.
     @Test("The deploy step runs after the upload and before the keychain cleanup")
