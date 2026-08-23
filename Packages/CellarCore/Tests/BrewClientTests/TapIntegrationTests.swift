@@ -164,14 +164,19 @@ struct TapIntegrationTests {
 
     // MARK: - TM7 :257-263 / TM13 :525-531
 
-    /// **DD-5, the second half.** The user's primary intent is removal. Blocking
-    /// it on a revocation that failed — which is what *every* untap does on a
-    /// Homebrew with no `untrust` verb (R5) — would leave them unable to remove
-    /// the tap at all. So the removal is still submitted, and the failure is its
-    /// own visible operation rather than being swallowed into the one that
-    /// succeeded.
-    @Test("A failed revocation does not block the removal")
-    func aFailedRevocationDoesNotBlockTheRemoval() async throws {
+    /// **DD-5, amended by D4 (2026-08-23).** `brew` refuses to untap a tap that
+    /// still owns installed packages — `Refusing to untap acme/tools because it
+    /// contains the following installed casks: …`, exit 1. The revocation must
+    /// therefore not run in front of it: revoking first and then being refused
+    /// leaves the grant gone, the tap still present, and Force Untap hidden
+    /// because it is only offered for a *trusted* tap (DD-14) — a loop with no
+    /// exit.
+    ///
+    /// So a refused removal submits **no** revocation at all. No phantom queue
+    /// item appears for a command that was never run, and the one failed item
+    /// carries brew's own reason.
+    @Test("A refused removal submits no revocation")
+    func aRefusedRemovalSubmitsNoRevocation() async throws {
         let removal = try #require(TapCommand.removal(of: "acme/tools"))
         let launcher = ControllableProcessLauncher()
         let center = OperationCenter(
@@ -180,33 +185,70 @@ struct TapIntegrationTests {
         )
         center.attach(installation: TestInstallation.appleSilicon)
 
-        _ = center.submitSequence(removal)
+        _ = center.submitDependentSequence(removal)
 
-        // The revocation fails…
+        // The removal leads, and brew refuses it.
         await launcher.waitForLaunches(atLeast: 1)
+        launcher.launchedProcesses[0].emitStderr(
+            "Error: Refusing to untap acme/tools because it contains the following "
+                + "installed casks:\nacme/tools/desk\n"
+        )
         launcher.launchedProcesses[0].terminate(with: BrewExit(status: 1, reason: .exited))
-        // …and the removal is still spawned behind it.
+        await settle()
+        await settle()
+
+        // Nothing followed it. Not "eventually", and not "not yet": there is one
+        // spawned process, and no `untrust` argv ever reached the launcher.
+        #expect(launcher.recordedSpecs.map(\.arguments) == [["untap", "acme/tools"]])
+        #expect(launcher.recordedSpecs.contains { $0.arguments.contains("untrust") } == false)
+
+        // One visible operation, carrying brew's own reason.
+        let items = center.items
+        #expect(items.count == 1)
+        #expect(items.map(\.command.verb) == ["tapUntap"])
+        #expect(items.map(\.outcome) == [.failed(status: 1)])
+        #expect(
+            items.first?.log.contains { $0.text.contains("Refusing to untap") } == true,
+            "the refused removal did not surface brew's reason"
+        )
+    }
+
+    /// **D4, the other half.** The grant still never outlives a removal brew
+    /// *accepted* (TM13.6): the revocation follows, unconditionally, the moment
+    /// the removal settles as succeeded — and `brew untrust` on a never-trusted
+    /// tap exits 0 (obs #7722), so there is nothing to check before submitting
+    /// it.
+    @Test("A successful removal is followed by the revocation")
+    func aSuccessfulRemovalIsFollowedByTheRevocation() async throws {
+        let removal = try #require(TapCommand.removal(of: "acme/tools"))
+        let launcher = ControllableProcessLauncher()
+        let center = OperationCenter(
+            gates: MutationGates(installed: InstalledMutationGate()),
+            launcherFactory: { _ in launcher }
+        )
+        center.attach(installation: TestInstallation.appleSilicon)
+
+        _ = center.submitDependentSequence(removal)
+
+        // Only the removal is enqueued up front: the revocation is not a queued
+        // command waiting its turn, it does not exist yet.
+        await launcher.waitForLaunches(atLeast: 1)
+        #expect(center.items.count == 1)
+        launcher.launchedProcesses[0].terminate(with: BrewExit(status: 0, reason: .exited))
+
+        // …and now it does.
         await launcher.waitForLaunches(atLeast: 2)
         launcher.launchedProcesses[1].terminate(with: BrewExit(status: 0, reason: .exited))
         await settle()
 
         #expect(launcher.recordedSpecs.map(\.arguments) == [
-            ["untrust", "acme/tools"],
-            ["untap", "acme/tools"]
+            ["untap", "acme/tools"],
+            ["untrust", "acme/tools"]
         ])
-
-        // Two visible operations, each with its own terminal outcome — the
-        // failure is not folded into the success, and it is not suppressed.
         let items = center.items
         #expect(items.count == 2)
-        var verbs: [String] = []
-        var outcomes: [MutationOutcome?] = []
-        for item in items {
-            verbs.append(item.command.verb)
-            outcomes.append(item.outcome)
-        }
-        #expect(verbs == ["tapUntrust", "tapUntap"])
-        #expect(outcomes == [.failed(status: 1), .succeeded])
+        #expect(items.map(\.command.verb) == ["tapUntap", "tapUntrust"])
+        #expect(items.map(\.outcome) == [.succeeded, .succeeded])
     }
 
     /// TM13 :525-531 and obs #7722. `brew trust` on an already-trusted tap and

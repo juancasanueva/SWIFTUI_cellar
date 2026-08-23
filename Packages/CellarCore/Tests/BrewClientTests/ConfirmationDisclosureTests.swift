@@ -237,17 +237,21 @@ struct ConfirmationDisclosureTests {
 
     // MARK: - PM1 / TM8 — a batch takes the disclosure of its first *declaring* command
 
-    /// **The defect this exists to prevent.** TM7 and TM8 prepend a revocation
-    /// to every removal. Under the shipped rule — `first.disclosure` — the batch
-    /// head became a command with nothing of its own to say, whose protocol
-    /// default is "This removes installed software.", and the force-untap
-    /// affected-package disclosure was silently downgraded to it. That is the
-    /// exact defect PM1 was written to fix, reintroduced by an unrelated change.
+    /// **The defect this exists to prevent**, and the order it survives.
     ///
-    /// The fix is a *skip*, not a re-rank: a command that declares nothing is
-    /// passed over, and the first command that declares something wins
+    /// TM7 and TM8 used to *prepend* the revocation. Under the shipped rule —
+    /// `first.disclosure` — the batch head became a command with nothing of its
+    /// own to say, whose protocol default is "This removes installed software.",
+    /// and the force-untap affected-package disclosure was silently downgraded
+    /// to it. That is the exact defect PM1 was written to fix.
+    ///
+    /// D4 (2026-08-23) reversed the sequence, so the force removal now leads and
+    /// declares the disclosure directly. The lead-disclosure rule is unchanged
+    /// and still asserted here: it is a *skip*, not a re-rank, and
+    /// `skippingPicksTheFirstDeclaringCommandNotTheStrongest` below keeps
+    /// proving the skip on a batch whose head still declares nothing
     /// (TM8 :308-314, PM1 :128-152).
-    @Test("A batch led by a command that discloses nothing still discloses the force untap")
+    @Test("The force untap leads its own sequence and discloses the affected packages")
     func aBatchLedByACommandThatDisclosesNothingStillDisclosesTheForceUntap() throws {
         let widget = PackageID(kind: .formula, name: "widget")
         let evidence = ForceUntapEvidence(tap: Self.acme, affected: [widget], isComplete: true)
@@ -256,17 +260,21 @@ struct ConfirmationDisclosureTests {
 
         let request = try #require(
             harness.center.request(forced),
-            "a revoke-first force untap raised no confirmation at all"
+            "a remove-first force untap raised no confirmation at all"
         )
         #expect(request.disclosure == .forceUntap(tap: Self.acme, affected: [widget]))
         #expect(request.warningText != "This removes installed software.")
         #expect(request.commands.map(\.arguments) == [
-            ["untrust", "acme/tap"],
-            ["untap", "--force", "acme/tap"]
+            ["untap", "--force", "acme/tap"],
+            ["untrust", "acme/tap"]
         ])
+        // D4 — one sheet for the whole sequence, and the removal is what it
+        // leads with.
+        #expect(request.isBulk)
+        #expect(forced.leadDisclosure == .forceUntap(tap: Self.acme, affected: [widget]))
 
         // TM8 :313 — identical to the disclosure the same force untap presents
-        // when submitted **without** the revocation in front of it.
+        // when submitted **without** the revocation behind it.
         let reference = CenterHarness()
         let alone = try #require(TapCommand.forceUntap(evidence: evidence))
         let unprefixed = try #require(reference.center.request(alone))
@@ -274,9 +282,16 @@ struct ConfirmationDisclosureTests {
         #expect(request.warningText == unprefixed.warningText)
 
         // TM7 :219-220 — the plain removal still raises nothing, because neither
-        // of its members requires a confirmation.
+        // of its members requires a confirmation. Its lead disclosure is the
+        // protocol default, since neither member declares one.
         let plain = try #require(TapCommand.removal(of: "acme/tap"))
         #expect(CenterHarness().center.request(plain) == nil)
+        #expect(plain.contains(where: \.requiresConfirmation) == false)
+        #expect(plain.leadDisclosure == .packageRemoval)
+        #expect(plain.map(\.arguments) == [
+            ["untap", "acme/tap"],
+            ["untrust", "acme/tap"]
+        ])
 
         // PM1 :137 — an erased install-only batch still discloses the ordinary
         // package removal, through the protocol default and not through a caller.

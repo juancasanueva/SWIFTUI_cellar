@@ -15,7 +15,8 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 
 **Binding decisions consumed** (proposal, maintainer 2026-08-23): **D1** keeps Homebrew's tap/trust
 split — add grants nothing, trust and untrust are separate explicitly answered commands, untap revokes
-first, and a fully-qualified-argv bypass is prohibited; **D2** renames
+(amended by **D4**, 2026-08-23: only after a removal Homebrew accepted), and a fully-qualified-argv
+bypass is prohibited; **D2** renames
 `ConfirmationDisclosure.tapTrust` → `.tapAdd(TapName)` and adds `.tapTrustGrant(TapName)`. All five of
 the proposal's open questions resolve to their stated defaults.
 
@@ -214,28 +215,37 @@ wording that over-claimed a capability grant `brew tap` never makes — the tap 
 ### Requirement: Plain untap is primary and force availability is fail-closed
 
 For a third-party tap, ordinary removal MUST be the primary action. The removal action MUST submit
-**two ordered commands**: the revocation `untrust user/repo` first, then the removal `untap user/repo`.
+**two ordered commands**: the removal `untap user/repo` first, then the revocation `untrust user/repo`.
 Each argv MUST be exactly those tokens and nothing else; the removal MUST NOT silently retry with or
 append `--force`, and neither command MUST require confirmation, because revocation only *reduces*
 authority.
 
-The order is load-bearing and unconditional: revocation MUST run while the tap still resolves, and it
-MUST be submitted even when the tap's trust state is `untrusted` or `unreported`, because `brew
-untrust` on a never-trusted tap is an ordinary success. Untapping without revoking would leave a
-dormant grant that Cellar can no longer see and that a later re-tap — including one performed by a
-Brewfile import — would silently re-arm without new consent.
+The order is load-bearing (maintainer decision **D4**, 2026-08-23). Homebrew refuses to untap a tap
+that still owns installed packages — `Refusing to untap user/repo because it contains the following
+installed casks: …`, exit 1 — so a revocation submitted *before* such a removal succeeds while the
+removal is refused. That leaves the grant revoked, the tap still installed, and Force Untap hidden
+because it is offered only for a tap whose packages Homebrew will still name: a dead end whose only
+signposted exit was the removal that had just failed.
 
-A failed revocation MUST NOT block the removal. The removal MUST still be submitted, and the failed
-revocation MUST appear as its own visible operation with its own terminal outcome rather than being
-swallowed, because the user's primary intent is removal and blocking it would leave them unable to
-remove the tap at all.
+The revocation MUST therefore be submitted **only after** the removal has settled with a successful
+terminal outcome. A refused removal MUST submit no revocation at all: no queue item MUST appear for a
+command that was never run, and the failed removal MUST carry Homebrew's own reason. The grant MUST
+NOT outlive a *successful* removal; it MAY outlive a refused one, which is the only state that still
+has a tap for it to belong to.
+
+Behind a removal Homebrew accepted, the revocation MUST be unconditional. It MUST be submitted even
+when the tap's trust state is `untrusted` or `unreported`, because `brew untrust` on a never-trusted
+tap is an ordinary success. Removing without revoking would leave a dormant grant that Cellar can no
+longer see and that a later re-tap — including one performed by a Brewfile import — would silently
+re-arm without new consent.
 
 A complete, current installed cross-reference containing zero exact matches MUST expose no force
 action. When installed inventory is unavailable, stale, failed, or incomplete, force MUST be
 non-invocable with state guidance rather than guessing. An enabled force action MUST appear only for a
 complete, current, non-empty cross-reference.
 (Previously: ordinary removal submitted the single command `untap user/repo`, so the trust grant
-survived the tap it belonged to.)
+survived the tap it belonged to. Then, until D4 on 2026-08-23, it submitted the revocation first and
+both commands unconditionally, so a removal Homebrew refused still lost the grant.)
 
 #### Scenario: Plain untap never grows a hidden force flag
 
@@ -246,20 +256,29 @@ survived the tap it belonged to.)
 - AND no confirmation is required
 - Verification: `unit`
 
-#### Scenario: Untap revokes before it removes
+#### Scenario: Untap removes before it revokes
 
 - GIVEN third-party tap `acme/tools`, in turn with trust state `trusted`, `untrusted` and `unreported`
 - WHEN ordinary untap is requested
-- THEN exactly two commands are submitted in every case, with argvs `untrust acme/tools` then `untap acme/tools`, in that order
+- THEN the action's two commands are, in every case, `untap acme/tools` then `untrust acme/tools`, in that order
 - AND no third command is submitted
 - Verification: `unit`
 
-#### Scenario: A failed revocation does not block the removal
+#### Scenario: A refused removal submits no revocation
 
-- GIVEN an untap action whose revocation command reaches a failed terminal outcome
+- GIVEN an untap action whose removal command is refused by Homebrew with a failed terminal outcome
 - WHEN the action settles
-- THEN the removal command was still submitted and reached its own terminal outcome
-- AND the failed revocation is visible as its own operation rather than being suppressed
+- THEN no revocation command was submitted, and no queue item exists for one
+- AND the refused removal is visible as its own operation carrying Homebrew's reason
+- Verification: `unit`
+
+#### Scenario: A successful removal is followed by the idempotent revocation
+
+- GIVEN an untap action whose removal command reaches a successful terminal outcome, for a tap in turn
+  `trusted`, `untrusted` and `unreported`
+- WHEN the removal settles
+- THEN the revocation is submitted behind it, unconditionally, and reaches its own terminal outcome
+- AND an exit 0 from `untrust` on a never-trusted tap is an ordinary success, not a failure
 - Verification: `unit`
 
 #### Scenario: Empty current cross-reference hides force
@@ -279,15 +298,18 @@ survived the tap it belonged to.)
 ### Requirement: Force untap discloses a current complete affected set
 
 The force removal action MUST submit the same two ordered commands as ordinary removal, with the
-force removal in place of the plain one: the revocation `untrust user/repo` first, then
-`untap --force user/repo`. The force removal's argv MUST be exactly those tokens and MUST require a
-separate confirmation. The confirmation MUST name every affected installed package individually with
-formula-or-cask kind. It MUST NOT elide entries or substitute only a count, even for a large set.
+force removal in place of the plain one: `untap --force user/repo` first, then the revocation
+`untrust user/repo` behind a successful removal (**D4**, 2026-08-23). The force removal's argv MUST be
+exactly those tokens and MUST require a separate confirmation. The confirmation MUST name every
+affected installed package individually with formula-or-cask kind. It MUST NOT elide entries or
+substitute only a count, even for a large set.
 
-Prepending the revocation MUST NOT change which disclosure the confirmation presents. The revocation
-declares no disclosure of its own, and `package-mutation` PM1 requires a batch to take the disclosure
-of its first command that declares one, so the confirmation MUST still present the force-untap
-affected-package disclosure and MUST NOT fall back to the ordinary package-removal disclosure.
+The trailing revocation MUST NOT change which disclosure the confirmation presents. `package-mutation`
+PM1 requires a batch to take the disclosure of its first command that declares one; the force removal
+now leads and declares that disclosure directly, so the confirmation MUST present the force-untap
+affected-package disclosure and MUST NOT fall back to the ordinary package-removal disclosure. The
+lead-disclosure rule itself is unchanged and MUST continue to skip a leading command that declares
+nothing.
 
 Immediately before spawn, the affected set MUST be compared with a complete current exact-tap
 cross-reference using order-insensitive `(kind, name)` identity. Any addition, removal, or kind change
@@ -295,7 +317,8 @@ while confirmation is open or queued MUST invalidate the request before spawn, r
 set, and require a new confirmation. Reordering the same identities MUST NOT invalidate it.
 (Previously: force removal submitted the single command `untap --force user/repo`, so the trust grant
 survived the tap it belonged to, and no rule protected the force disclosure from a leading command
-that declares none.)
+that declares none. Then, until D4 on 2026-08-23, the revocation led the sequence unconditionally, so
+a force removal Homebrew refused still lost the grant.)
 
 #### Scenario: Disclosure names every kind-qualified package
 
@@ -305,12 +328,13 @@ that declares none.)
 - AND the exact command is `brew untap --force user/repo`
 - Verification: `unit`
 
-#### Scenario: A revoke-first force batch still presents the force-untap disclosure
+#### Scenario: A remove-first force batch still presents the force-untap disclosure
 
-- GIVEN a force untap whose batch is `untrust user/repo` followed by `untap --force user/repo`
+- GIVEN a force untap whose batch is `untap --force user/repo` followed by `untrust user/repo`
 - WHEN it reaches the shared confirmation gate
 - THEN the confirmation carries the force-untap affected-package disclosure
 - AND it is identical to the one the same force untap presents when submitted without the revocation
+- AND a batch whose leading command declares no disclosure of its own is still skipped past
 - Verification: `unit`
 
 #### Scenario: Additions and removals invalidate stale confirmation
@@ -423,10 +447,10 @@ detail header, so the two cannot drift. An `untrusted` tap MUST carry the exact 
 and MUST offer the **Trust** control. A `trusted` tap MUST carry no badge and MUST offer the
 **Untrust** control. An `unreported` tap MUST carry no badge and MUST offer **neither** control, and
 neither the **Trust nor the Untrust control** MUST build or spawn a process for it. This governs the
-two controls only: TM7's revocation before removal is unconditional, so untapping an `unreported` tap
-MUST still submit `untrust`, where it MAY fail — on a Homebrew with no trust verb it always will — and
-MUST remain visible as its own operation with its own terminal outcome rather than blocking the
-removal or being suppressed. Only third-party taps MUST expose either control; TM4 keeps official
+two controls only: TM7's revocation behind a successful removal is unconditional, so untapping an
+`unreported` tap MUST still submit `untrust` once Homebrew has accepted the removal, where it MAY fail
+— on a Homebrew with no trust verb it always will — and MUST remain visible as its own operation with
+its own terminal outcome rather than being suppressed. Only third-party taps MUST expose either control; TM4 keeps official
 sources non-mutable.
 
 Every user-facing string in this surface MUST be scoped to the **tap**. None MUST state or imply that a
@@ -446,7 +470,7 @@ loadable while its tap is not trusted.
 - GIVEN a tap whose snapshot record carries no `trusted` field
 - WHEN it is projected, its controls are enumerated and invoked, and it is separately untapped
 - THEN it carries no badge and offers neither Trust nor Untrust
-- AND neither control builds or spawns a process, and no trust command is submitted except the revocation TM7 pins ahead of that removal
+- AND neither control builds or spawns a process, and no trust command is submitted except the revocation TM7 pins behind that removal once Homebrew accepts it
 - Verification: `unit`
 
 #### Scenario: The badge and controls follow the state exactly
@@ -489,9 +513,9 @@ without a confirmation and MUST NOT be presented as a destructive action.
 
 **No path MUST grant trust implicitly.** Adding a tap, importing a Brewfile, recovering from a refusal,
 and retrying a failed mutation MUST each submit no trust command. A tap's trust state MUST change only
-after an explicit confirmed answer to a Trust request, or as the revocation TM7 and TM8 pin ahead of
-removal. Revocation before removal is the one place a trust command is submitted without its own
-answer, and it is permitted precisely because it grants nothing.
+after an explicit confirmed answer to a Trust request, or as the revocation TM7 and TM8 pin behind a
+removal Homebrew accepted. That trailing revocation is the one place a trust command is submitted
+without its own answer, and it is permitted precisely because it grants nothing.
 
 Both commands MUST declare taps and installed inventory as the domains they invalidate, per TM9. Both
 are idempotent at brew: trusting an already-trusted tap and untrusting a never-trusted tap MUST be
@@ -568,7 +592,8 @@ reported as ordinary successful outcomes, not as errors and not as a Cellar defe
   the provenance entry in the same archive edit.
 - Extend the provenance section with this change's binding decisions **D1** (keep Homebrew's tap/trust
   split; add grants nothing; trust and untrust are separate explicitly answered commands; untap revokes
-  first; the fully-qualified-argv bypass is prohibited and asserted by test) and **D2** (rename
+  only after a removal Homebrew accepted, per **D4** 2026-08-23; the fully-qualified-argv bypass is
+  prohibited and asserted by test) and **D2** (rename
   `ConfirmationDisclosure.tapTrust` → `.tapAdd(TapName)`, add `.tapTrustGrant(TapName)`), each naming
   what was rejected: add-and-trust as one confirmed batch, the two-outcome confirmation, the pre-launch
   tap-state gate, and the fully-qualified argv.

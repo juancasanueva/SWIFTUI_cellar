@@ -178,25 +178,47 @@ public enum TapCommand: Sendable, Equatable, BrewMutating {
 
     // MARK: - Actions, which are not commands
 
-    /// What the **Untap** action means, whole: revoke the grant, then remove the
-    /// tap.
+    /// What the **Untap** action means, whole: remove the tap, then revoke the
+    /// grant it owned.
     ///
-    /// The order is load-bearing — the revocation must run while the tap still
-    /// resolves — and unconditional, because `brew untrust` on a never-trusted
-    /// tap exits 0 (obs #7722) and because Cellar must not decide from a state
-    /// it may be reading off a brew that reports none. Without this, untapping
-    /// leaves a dormant, invisible grant in `trust.json` that a later re-tap —
-    /// including one performed by a Brewfile import — silently re-arms with no
-    /// new consent (tap-management TM7 :216-231).
+    /// **The order is load-bearing, and it runs this way round (maintainer
+    /// decision D4, 2026-08-23).** `brew` refuses to untap a tap that still owns
+    /// installed packages — `Refusing to untap acme/tools because it contains
+    /// the following installed casks: …`, exit 1 on Homebrew 6.0.18. A
+    /// revocation submitted *in front of* such a removal succeeds while the
+    /// removal is refused, and the user is left holding the worst of both: the
+    /// grant gone, the tap still installed, and Force Untap hidden because it is
+    /// offered only for a tap whose packages Homebrew will still name (DD-14) —
+    /// a loop whose only signposted exit was the Untap that had just failed.
+    ///
+    /// So the revocation is a **follower**, submitted only once the removal has
+    /// settled as succeeded. A refused removal submits none of it: no phantom
+    /// queue item for a command that never ran, and the failed removal carries
+    /// brew's own reason. `OperationCenter.submitDependentSequence` is what
+    /// enforces that; this factory only states the order.
+    ///
+    /// Behind a removal brew *accepted*, the revocation stays **unconditional**,
+    /// because `brew untrust` on a never-trusted tap exits 0 (obs #7722) and
+    /// because Cellar must not decide from a state it may be reading off a brew
+    /// that reports none. Without it, untapping leaves a dormant, invisible
+    /// grant in `trust.json` that a later re-tap — including one performed by a
+    /// Brewfile import — silently re-arms with no new consent (tap-management
+    /// TM7 :216-231, TM13.6). The grant therefore never outlives a successful
+    /// removal; it merely outlives a refused one, which is the only state that
+    /// still has a tap for it to belong to.
     public static func removal(of raw: String) -> [TapCommand]? {
         guard let tap = TapName(raw) else { return nil }
-        return [.untrustTap(tap), .removeTap(tap)]
+        return [.removeTap(tap), .untrustTap(tap)]
     }
 
     /// The same, with the force removal in place of the plain one (TM8 :281-283).
+    ///
+    /// With the removal leading, the sequence's `leadDisclosure` is the force
+    /// untap's own `.forceUntap(tap:affected:)` directly rather than through the
+    /// skip — the rule is unchanged, and it simply has nothing to skip here.
     public static func forcedRemoval(evidence: ForceUntapEvidence) -> [TapCommand]? {
         guard let forced = forceUntap(evidence: evidence) else { return nil }
-        return [.untrustTap(evidence.tap), forced]
+        return [forced, .untrustTap(evidence.tap)]
     }
 }
 

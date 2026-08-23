@@ -241,7 +241,7 @@ struct MutationRefreshReceiptTests {
         defer { watchers.forEach { $0.cancel() } }
         await settle()
 
-        center.submitSequence(removal)
+        center.submitDependentSequence(removal)
         for index in 0..<2 {
             await launcher.waitForLaunches(atLeast: index + 1)
             launcher.launchedProcesses[index].terminate(with: BrewExit(status: 0, reason: .exited))
@@ -254,8 +254,8 @@ struct MutationRefreshReceiptTests {
         await settle()
 
         #expect(launcher.recordedSpecs.map(\.arguments) == [
-            ["untrust", "acme/tools"],
-            ["untap", "acme/tools"]
+            ["untap", "acme/tools"],
+            ["untrust", "acme/tools"]
         ])
         // Two commands, two tap refreshes — one each, as TM9 requires.
         #expect(taps.value == 2)
@@ -263,10 +263,11 @@ struct MutationRefreshReceiptTests {
         #expect(installed.value == 1)
 
         // Attributable, not incidental: the revocation declares it and the
-        // removal still does not.
-        #expect(removal[0].invalidates == [.taps, .installedInventory])
-        #expect(removal[1].invalidates == .taps)
-        #expect(removal[1].invalidates.isDisjoint(with: .installedInventory))
+        // removal still does not. D4 moved the revocation behind the removal,
+        // which changes the order and nothing about what either declares.
+        #expect(removal[0].invalidates == .taps)
+        #expect(removal[0].invalidates.isDisjoint(with: .installedInventory))
+        #expect(removal[1].invalidates == [.taps, .installedInventory])
     }
 
     /// The four terminals TM9 enumerates, including the two that never spawn.

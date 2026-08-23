@@ -100,23 +100,24 @@ struct TapShippingProofTests {
         }
 
         #expect(launcher.specs.map(\.arguments) == [["tap-info", "--installed", "--json"]])
-        // Seven commands for eight actions: each removal is a revocation
-        // followed by the removal itself (TM7 :216-221).
+        // Seven commands for eight actions: each removal is the removal itself
+        // followed by the revocation that only a successful removal earns
+        // (TM7 :216-221, D4).
         #expect(commands.map(\.arguments) == [
             ["tap", "other/home"],
-            ["untrust", "acme/tools"],
             ["untap", "acme/tools"],
             ["untrust", "acme/tools"],
             ["untap", "--force", "acme/tools"],
+            ["untrust", "acme/tools"],
             ["trust", "acme/tools"],
             ["untrust", "acme/tools"]
         ])
         #expect(commands.map(\.invalidates) == [
             .taps,
-            [.taps, .installedInventory],
             .taps,
             [.taps, .installedInventory],
             [.taps, .installedInventory, .diskUsage],
+            [.taps, .installedInventory],
             [.taps, .installedInventory],
             [.taps, .installedInventory]
         ])
@@ -162,14 +163,19 @@ struct TapShippingProofTests {
         #expect(launcher.specs.isEmpty, "an unreported tap's controls spawned a process")
 
         // …while untapping the same tap is untouched by any of that: TM7's
-        // revocation is unconditional, so it is still submitted here — where it
-        // may well fail, which TM12 :426-428 explicitly accepts.
-        center.submitSequence(try #require(TapCommand.removal(of: record.name)))
+        // revocation is unconditional, so a removal brew accepts is still
+        // followed by it here — where it may well fail, which TM12 :426-428
+        // explicitly accepts. The whole action still reaches the centre as one
+        // dependent sequence, not as two independent submissions.
+        #expect(
+            center.submitDependentSequence(try #require(TapCommand.removal(of: record.name))) == nil,
+            "a plain untap asked for a confirmation"
+        )
         await TestPoll.until(launcher.launchCount >= 2)
         await drain()
         #expect(launcher.specs.map(\.arguments) == [
-            ["untrust", "acme/tools"],
-            ["untap", "acme/tools"]
+            ["untap", "acme/tools"],
+            ["untrust", "acme/tools"]
         ])
     }
 

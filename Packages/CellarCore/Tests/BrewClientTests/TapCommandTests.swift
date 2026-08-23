@@ -185,22 +185,25 @@ struct TapCommandTests {
         #expect(try #require(TapCommand.untap("acme/tools")).invalidates == .taps)
     }
 
-    // MARK: - TM7 / TM8 — the removal revokes before it removes
+    // MARK: - TM7 / TM8 — the removal removes before it revokes (D4)
 
-    /// **DD-5.** Untapping without revoking leaves a dormant grant in
-    /// `trust.json` that Cellar can no longer see and that a later re-tap —
-    /// including one performed by a Brewfile import — silently re-arms with no
-    /// new consent (TM7 :222-226).
+    /// **D4, 2026-08-23.** The removal leads and the revocation follows it.
     ///
-    /// Unconditional on purpose, and the trust state is varied here precisely to
-    /// show it is never consulted: `brew untrust` on a never-trusted tap exits 0
-    /// (obs #7722), so there is no precondition to check, and Cellar must not
-    /// decide from a state it may be reading off a brew that reports none.
+    /// `brew` refuses to untap a tap that still owns installed packages, so a
+    /// revocation submitted in front of a refused removal strands the user on an
+    /// untrusted tap whose Force Untap is hidden — the grant gone, the tap still
+    /// there, and no affordance left to finish with.
+    ///
+    /// The revocation itself stays unconditional, and the trust state is varied
+    /// here precisely to show it is never consulted: `brew untrust` on a
+    /// never-trusted tap exits 0 (obs #7722), so there is no precondition to
+    /// check, and Cellar must not decide from a state it may be reading off a
+    /// brew that reports none.
     @Test(
-        "Every removal revokes before it removes, whatever the tap's trust state",
+        "Every removal removes before it revokes, whatever the tap's trust state",
         arguments: [TapTrustState.trusted, .untrusted, .unreported]
     )
-    func everyRemovalRevokesBeforeItRemoves(trust: TapTrustState) throws {
+    func untapRevokesOnlyAfterRemovalAccordingToD4(trust: TapTrustState) throws {
         let record = TapRecord(name: "acme/tools", repository: "tools", trust: trust)
         let tap = try #require(TapName(record.name))
         let widget = PackageID(kind: .formula, name: "widget")
@@ -209,18 +212,23 @@ struct TapCommandTests {
         let removal = try #require(TapCommand.removal(of: record.name))
         let forced = try #require(TapCommand.forcedRemoval(evidence: evidence))
 
-        #expect(removal == [.untrustTap(tap), .removeTap(tap)])
-        #expect(forced == [.untrustTap(tap), .forceRemoveTap(evidence)])
+        #expect(removal == [.removeTap(tap), .untrustTap(tap)])
+        #expect(forced == [.forceRemoveTap(evidence), .untrustTap(tap)])
 
         // Character for character, in TM7 :249-255 / TM8 :281-283's order.
         #expect(removal.map(\.arguments) == [
-            ["untrust", "acme/tools"],
-            ["untap", "acme/tools"]
+            ["untap", "acme/tools"],
+            ["untrust", "acme/tools"]
         ])
         #expect(forced.map(\.arguments) == [
-            ["untrust", "acme/tools"],
-            ["untap", "--force", "acme/tools"]
+            ["untap", "--force", "acme/tools"],
+            ["untrust", "acme/tools"]
         ])
+
+        // The revocation is the follower in both, never the head: that is the
+        // whole of D4, read off the sequence rather than off a comment.
+        #expect(removal.last == .untrustTap(tap))
+        #expect(forced.last == .untrustTap(tap))
 
         // Exactly two commands — no third, and no silent retry.
         #expect(removal.count == 2)

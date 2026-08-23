@@ -141,6 +141,63 @@ extension OperationCenter {
         return nil
     }
 
+    /// The same user action, and the same single confirmation — but each command
+    /// after the first is submitted **only once the one before it has settled as
+    /// succeeded** (maintainer decision D4, 2026-08-23).
+    ///
+    /// `submitSequence` above fans everything out at submission time and never
+    /// looks back, which is right for N independent packages and wrong for an
+    /// action whose second command only means anything if the first one
+    /// happened. Untap is the second kind: `brew` refuses to untap a tap that
+    /// still owns installed packages, and the revocation behind that refusal
+    /// would strip the grant off a tap that is still installed — leaving Force
+    /// Untap hidden and no way forward.
+    ///
+    /// The confirmation shape is deliberately identical: one request covering
+    /// the whole sequence, declining submits none of it, never a partial subset
+    /// (package-mutation PM3 :238-243). Only the execution differs, and the
+    /// request carries `dependsOnLead` so `confirm(_:)` knows which one it
+    /// answered.
+    ///
+    /// A refused lead therefore produces exactly one queue item, carrying brew's
+    /// own reason — never a second item for a command that was never run.
+    @discardableResult
+    public func submitDependentSequence(_ commands: [some BrewMutating]) -> ConfirmationRequest? {
+        if let request = request(commands, dependsOnLead: true) { return request }
+        submitDependent(commands)
+        return nil
+    }
+
+    /// Submits the lead now and arms every follower behind it.
+    ///
+    /// Generic rather than erased, so the concrete command's own
+    /// `classify(exit:fault:log:)` still decides its outcome — the same reason
+    /// `OperationCenter.run` is generic (design D4). The confirmed path passes
+    /// `[AnyBrewMutation]`, which is what it has always submitted.
+    @discardableResult
+    func submitDependent(_ commands: [some BrewMutating]) -> [ActivityItem] {
+        guard let lead = commands.first else { return [] }
+        let item = submit(lead)
+        arm(item, followedBy: Array(commands.dropFirst()))
+        return [item]
+    }
+
+    /// Recursive by construction: each follower arms the next one when it
+    /// settles, so "in order, each dependent on the one before it" needs no
+    /// index and no queue of its own.
+    ///
+    /// `isSuccess` and nothing weaker. A cancelled, refused, launch-failed or
+    /// abandoned lead all mean the same thing here — the command did not happen
+    /// — and a follower submitted off any of them would act on a tap that is
+    /// still there.
+    private func arm(_ item: ActivityItem, followedBy remaining: [some BrewMutating]) {
+        guard let next = remaining.first else { return }
+        item.onSettle { [weak self] outcome in
+            guard let self, outcome.isSuccess else { return }
+            self.arm(self.submit(next), followedBy: Array(remaining.dropFirst()))
+        }
+    }
+
     // MARK: - Confirmation (design D6, D8)
 
     /// Asks for confirmation, when this command needs one.
@@ -176,6 +233,16 @@ extension OperationCenter {
     /// then failed and quietly presented "This removes installed software."
     /// instead of the tap-trust warning (package-mutation PM1, design DD1).
     public func request(_ commands: [some BrewMutating]) -> ConfirmationRequest? {
+        request(commands, dependsOnLead: false)
+    }
+
+    /// The one implementation. `dependsOnLead` records *how* a yes will be
+    /// carried out, and changes nothing about what the sheet shows or about
+    /// which batches raise one at all.
+    func request(
+        _ commands: [some BrewMutating],
+        dependsOnLead: Bool
+    ) -> ConfirmationRequest? {
         guard let first = commands.first,
               commands.contains(where: \.requiresConfirmation)
         else { return nil }
@@ -184,7 +251,8 @@ extension OperationCenter {
             id: UUID(),
             command: AnyBrewMutation(first),
             additional: commands.dropFirst().map(AnyBrewMutation.init),
-            disclosure: commands.leadDisclosure
+            disclosure: commands.leadDisclosure,
+            dependsOnLead: dependsOnLead
         )
         setPendingConfirmation(request)
         return request
@@ -192,11 +260,18 @@ extension OperationCenter {
 
     /// Submits every command the confirmation showed, in the order it showed
     /// them. Nothing was enqueued before this point.
+    ///
+    /// A `dependsOnLead` request submits only its **lead** here, and the rest as
+    /// each predecessor succeeds — so the returned items are the ones that
+    /// exist, never a promise of ones that may never be submitted. The yes still
+    /// covered the whole sequence; what it agreed to is an action, not two
+    /// commands running whatever happens.
     @discardableResult
     public func confirm(_ request: ConfirmationRequest) -> [ActivityItem] {
         guard pendingConfirmation == request else { return [] }
         confirmations.consume(request)
-        return request.commands.map { submit($0) }
+        guard request.dependsOnLead else { return request.commands.map { submit($0) } }
+        return submitDependent(request.commands)
     }
 
     /// Spawns nothing, enqueues nothing, leaves the inventory untouched.
@@ -238,19 +313,30 @@ extension OperationCenter {
         public let disclosure: ConfirmationDisclosure
         /// Cleanup-only typed evidence. `nil` for every existing command family.
         public let cleanupDisclosure: CleanupConfirmationDisclosure?
+        /// Whether confirming submits the whole sequence at once, or the lead
+        /// now and each follower as its predecessor succeeds (D4).
+        ///
+        /// It says nothing about what the sheet shows: the disclosure, the
+        /// listed argv and the all-or-nothing rule are identical either way, and
+        /// this is read by `confirm(_:)` alone. Defaulted to `false` so every
+        /// existing construction — and every shipped test that builds one —
+        /// keeps the fan-out it already had.
+        public let dependsOnLead: Bool
 
         public init(
             id: UUID,
             command: AnyBrewMutation,
             additional: [AnyBrewMutation],
             disclosure: ConfirmationDisclosure = .packageRemoval,
-            cleanupDisclosure: CleanupConfirmationDisclosure? = nil
+            cleanupDisclosure: CleanupConfirmationDisclosure? = nil,
+            dependsOnLead: Bool = false
         ) {
             self.id = id
             self.command = command
             self.additional = additional
             self.disclosure = disclosure
             self.cleanupDisclosure = cleanupDisclosure
+            self.dependsOnLead = dependsOnLead
         }
 
         /// Every command this confirmation will submit, in order.
