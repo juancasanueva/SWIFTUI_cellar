@@ -25,8 +25,9 @@ jobs:
     # rather than extending it, so `contents: write` is restated here or
     # `gh release create` silently loses its token — a failure that would only
     # appear on a real tag, after Apple had already been asked for a
-    # notarization round trip. `pages: write` and `id-token: write` are what
-    # `deploy-pages` needs.
+    # notarization round trip. `pages: write` authorizes the Pages deployment
+    # and `id-token: write` is what mints the OIDC token that deployment must
+    # present.
     permissions:
       contents: write
       pages: write
@@ -157,14 +158,88 @@ jobs:
         uses: actions/configure-pages@v6
 
       - name: Upload the site artifact
+        id: site
         if: ${{ !contains(github.ref_name, '-') }}
         uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ runner.temp }}/site
 
+      # Deployed by calling the Pages REST API directly rather than through
+      # `deploy-pages`, which sends the commit SHA as the build version and
+      # exposes no input to change it. A build version Pages has already
+      # deployed is not redeployed: the request is accepted, the deployment
+      # reports `succeed`, and the previously published site keeps being
+      # served. Two stable tags can point at one commit — `v0.0.2` and `v0.0.3`
+      # both did — so that path silently leaves every installed copy reading a
+      # feed that never learned about the newer release. The run number is what
+      # makes the version unique; the commit alone is not.
       - name: Deploy to Pages
         if: ${{ !contains(github.ref_name, '-') }}
-        uses: actions/deploy-pages@v5
+        env:
+          # `github.token` rather than a repository secret: the job already
+          # holds `pages: write`, and nothing here needs a wider credential.
+          RELEASE_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.site.outputs.artifact_id }}
+          BUILD_VERSION: ${{ github.sha }}-${{ github.run_number }}
+        run: |
+          set -euo pipefail                       # never -e -u -x: tracing prints the OIDC token
+          API="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/deployments"
+          ACCEPT="Accept: application/vnd.github+json"
+          VERSION_HEADER="X-GitHub-Api-Version: 2022-11-28"
+
+          # The OIDC token is what proves to Pages that the deployment came
+          # from this run. It is a credential: it is never echoed, and it
+          # reaches the request body through `jq --arg` rather than through
+          # string interpolation.
+          OIDC_TOKEN="$(curl -sSf \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}" | jq -r '.value')"
+
+          # `--argjson` for the artifact id, which the API types as a number,
+          # and which therefore also fails loudly if the upload produced none.
+          BODY="$(jq -n \
+            --argjson artifact_id "${ARTIFACT_ID}" \
+            --arg pages_build_version "${BUILD_VERSION}" \
+            --arg oidc_token "${OIDC_TOKEN}" \
+            '{artifact_id: $artifact_id,
+              pages_build_version: $pages_build_version,
+              oidc_token: $oidc_token}')"
+
+          # Piped on standard input, not passed as an argument: the token would
+          # otherwise be readable in the process list for the life of the call.
+          DEPLOYMENT_ID="$(printf '%s' "$BODY" | curl -sSf -X POST "$API" \
+            -H "Authorization: Bearer ${RELEASE_TOKEN}" \
+            -H "$ACCEPT" -H "$VERSION_HEADER" \
+            --data-binary @- | jq -r '.id')"
+          echo "Pages deployment ${DEPLOYMENT_ID} requested as build version ${BUILD_VERSION}."
+
+          # A created deployment is not a published one. Ten minutes is the
+          # same ceiling `deploy-pages` used.
+          DEADLINE=$(( SECONDS + 600 ))
+          STATUS="unknown"
+          while [ "$SECONDS" -lt "$DEADLINE" ]; do
+            STATUS="$(curl -sSf "${API}/${DEPLOYMENT_ID}" \
+              -H "Authorization: Bearer ${RELEASE_TOKEN}" \
+              -H "$ACCEPT" -H "$VERSION_HEADER" | jq -r '.status')"
+            case "$STATUS" in
+              succeed)
+                echo "Pages deployment ${DEPLOYMENT_ID} reported: ${STATUS}."
+                exit 0
+                ;;
+              deployment_failed|deployment_content_failed|deployment_attempt_error|deployment_lost|deployment_cancelled)
+                break
+                ;;
+            esac
+            sleep 5
+          done
+
+          echo "::error::Pages deployment ${DEPLOYMENT_ID} ended in status: ${STATUS}"
+          # Best effort: a deployment left running would hold the Pages
+          # environment against the next tag.
+          curl -sS -X POST "${API}/${DEPLOYMENT_ID}/cancel" \
+            -H "Authorization: Bearer ${RELEASE_TOKEN}" \
+            -H "$ACCEPT" -H "$VERSION_HEADER" > /dev/null || true
+          exit 1
 
       - name: Delete the ephemeral keychain and the API key
         if: always()
