@@ -161,7 +161,7 @@ None of the tasks below is a `cellarTests` task and none can be discharged by a 
       sets `bump=no`, and produces **zero** commits — at most one commit per published release, which
       is what keeps it compatible with "one stable release per commit" (DD-8: `GITHUB_TOKEN` pushes
       trigger no workflow, so the pre-commit gates are the only gates a bump commit gets).
-- [ ] 2.7 **`manual-evidence` — S1.** On a Mac that has never had Cellar:
+- [x] 2.7 **`manual-evidence` — S1.** *Waived by maintainer decision 2026-08-23 ("archive with S1 pending"): no fresh Mac was available; the tap CI install/zap round trip on a clean `macos-26` runner (run 32642667011, then 32644277515) stands as the clean-machine install evidence. Recorded in the archive report.* On a Mac that has never had Cellar:
       `brew tap juancasanueva/cellar && brew install --cask home-cellar`. **Accepted evidence**: a
       **verbatim transcript** showing `/Applications/cellar.app` exists, its
       `CFBundleShortVersionString` equals the released version, and first launch is a single ordinary
@@ -287,7 +287,7 @@ Placeholders until measured. **No probe outcome is invented.** Each row lands in
       **S5** (from 2.6).
 - [x] 6.3 `bump.yml` `workflow_dispatch` log showing the stable tag resolution or the prerelease
       refusal branch → **S4** (from 2.5).
-- [ ] 6.4 Verbatim `brew tap` + `brew install --cask` transcript showing `/Applications/cellar.app` at
+- [x] 6.4 *Waived with 2.7 (maintainer decision 2026-08-23).* Verbatim `brew tap` + `brew install --cask` transcript showing `/Applications/cellar.app` at
       the released version → **S1** (from 2.7).
 - [x] 6.5 Verbatim `brew upgrade` transcript against a Sparkle-self-updated copy showing no reinstall →
       **S3** (from 2.8).
