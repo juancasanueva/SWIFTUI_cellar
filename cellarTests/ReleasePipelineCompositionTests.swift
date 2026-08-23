@@ -681,7 +681,7 @@ struct ReleaseWorkflowContractTests {
         // repeated once per step that needs them, deliberately, because YAML
         // anchors are not reliable across workflow contexts. Which *names* may
         // appear is the next test's job.
-        #expect(referencing.count >= 6)
+        #expect(referencing.count >= 7)
         for line in referencing {
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
             #expect(
@@ -691,14 +691,23 @@ struct ReleaseWorkflowContractTests {
         }
     }
 
-    // MARK: - 4.6 T6 — exactly the six declared secrets
+    // MARK: - 4.6 T6 — exactly the seven declared secrets
 
-    /// S26: set equality, so a seventh secret fails too.
+    /// S26: set equality, so an eighth secret fails too.
     ///
     /// A release pipeline that quietly grows a new credential is a release
     /// pipeline whose blast radius nobody re-reviewed. Adding one is allowed;
     /// adding one without touching this list is not.
-    @Test("The workflow references exactly the six expected secrets")
+    ///
+    /// **Why the seventh arrived (m6-sparkle-updates).** Publishing an update
+    /// feed means signing the released zip with an EdDSA private key, because
+    /// every installed copy verifies the signature against the public key
+    /// compiled into its own bundle rather than trusting the feed's transport.
+    /// The key is bound only as an environment variable and reaches the signing
+    /// tool on standard input; it is never written to a file, never a command
+    /// argument, and never traced. Losing it severs the update channel for every
+    /// copy already installed, so it is backed up offline as well as stored here.
+    @Test("The workflow references exactly the seven expected secrets")
     func workflowReferencesExactlyTheExpectedSecrets() throws {
         let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
         let reference = try NSRegularExpression(pattern: "secrets\\.([A-Z0-9_]+)")
@@ -717,7 +726,8 @@ struct ReleaseWorkflowContractTests {
             "KEYCHAIN_PASSWORD",
             "APPLE_API_KEY_P8",
             "APPLE_API_KEY_ID",
-            "APPLE_API_ISSUER_ID"
+            "APPLE_API_ISSUER_ID",
+            "SPARKLE_PRIVATE_KEY"
         ])
     }
 

@@ -38,6 +38,21 @@ The build is notarized and stapled, so the first launch is a single ordinary
 "Open" confirmation — no right-click workaround, and no network access needed to
 get past Gatekeeper. Apple Silicon and macOS 26 only.
 
+## Updates
+
+Cellar updates itself with [Sparkle](https://sparkle-project.org), from an
+EdDSA-signed appcast published alongside each release. The feed URL and the
+public verification key are compiled into the app, so an update is only ever
+installed if its signature matches the key the running copy already carries.
+
+**Automatic checking is off by default.** A check is a network request, and
+Cellar asks before making one: turn it on in **Settings → Updates**, or leave it
+off and use **Cellar → Check for Updates…** whenever you want. The Settings card
+also shows when the last check actually happened, and says so plainly when there
+has never been one.
+
+Prereleases are never offered.
+
 ## Building
 
 Open `cellar.xcodeproj` in Xcode and run the `cellar` scheme, or:
@@ -61,6 +76,9 @@ arm64, Developer ID-signed, notarized and stapled `Home-Cellar-<version>.zip`
 and attaches it to a GitHub Release; every gate runs before publication, so a
 failed run publishes nothing.
 
+The same job publishes the Sparkle appcast to GitHub Pages on a stable tag; a
+prerelease tag publishes a release and no feed entry.
+
 The runbook, prerequisites, version policy and entitlements rationale live in
 [`RELEASING.md`](RELEASING.md).
 
@@ -82,4 +100,4 @@ Product requirements and the design record live in [`PRD.md`](PRD.md); change sp
 
 ## Third-party content
 
-Cask category and added-date data originate from the [CaskHub](https://github.com/alielsokary/CaskHub) project (MIT). See [`THIRD-PARTY.md`](THIRD-PARTY.md).
+Cask category and added-date data originate from the [CaskHub](https://github.com/alielsokary/CaskHub) project (MIT), and the embedded update framework is [Sparkle](https://github.com/sparkle-project/Sparkle) 2.9.6 (MIT). See [`THIRD-PARTY.md`](THIRD-PARTY.md).
