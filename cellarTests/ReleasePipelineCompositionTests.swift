@@ -770,6 +770,46 @@ struct ReleaseWorkflowContractTests {
         #expect(!workflow.contains("set -eux"))
     }
 
+    // MARK: - m6-cask-tap T5 — the release run gains no cross-repository reach
+
+    /// D1/D2: the release run gains no cross-repository reach.
+    ///
+    /// A `curl` to a dispatch endpoint would pass `gh == 1 / git == 0`, because
+    /// the Pages guard already establishes `curl` plus a bearer token as an
+    /// accepted shape. Passing the letter is not the point — this asserts the
+    /// decision itself, so "we chose not to insert here" stays chosen.
+    @Test("The release workflow gains no cross-repository reach")
+    func theWorkflowGainsNoCrossRepositoryReach() throws {
+        let workflow = try ReleasePipelineSources.text(ReleasePipelineSources.workflowPath)
+
+        // The declined extension point is gone, rather than standing as an
+        // invitation the suite would refuse.
+        #expect(!workflow.contains("extension point"))
+
+        for token in ["repository_dispatch", "dispatches"] {
+            #expect(!workflow.contains(token), "the workflow must not carry: \(token)")
+        }
+
+        let apiCalls = workflow
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { $0.contains("api.github.com/repos/") }
+        // Anchored: the distinct-commit gate really does call the API, so the
+        // loop below is not empty for the wrong reason.
+        #expect(!apiCalls.isEmpty)
+        for call in apiCalls {
+            #expect(
+                call.contains("api.github.com/repos/${GITHUB_REPOSITORY}")
+                    || call.contains("api.github.com/repos/${{ github.repository }}"),
+                "a GitHub API call names a repository that is not this one: \(call)"
+            )
+        }
+
+        for name in ["homebrew-cellar", "juancasanueva/cellar"] {
+            #expect(!workflow.contains(name), "the workflow must not name \(name)")
+        }
+    }
+
     /// The body of a shell function, from its opening line to the column-zero
     /// `}` that closes it.
     static func functionBody(named name: String, in script: String) -> String? {
