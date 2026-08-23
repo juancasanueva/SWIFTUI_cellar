@@ -86,7 +86,7 @@ Reused from `design.md` *Review Workload Forecast* — **not re-derived**.
 | Risk vs governing budget | **Low** — ≤71 % at the ceiling |
 | Chained PRs recommended | No — one PR, seven work-unit commits plus one artifact commit |
 | Suggested split | Single PR on `feat/m7-tap-trust`. If the maintainer later prefers slices, the natural cut is **WU1–WU3** (read, honest copy, withheld state) then **WU4–WU7** (grant, revoke, refusal, Brewfile) |
-| Sizing label | **None required — no `size:exception`.** PR label: exactly one `type:feature` |
+| Sizing label | **`size:exception` — recorded by maintainer decision 2026-08-23 after apply.** Measured PR total 6,555 changed lines: 2,680 code+tests (inside the corrected forecast band) + 3,760 SDD artifacts under `openspec/` (forecast 600–900; the two validator rounds and the 89-scenario deltas are the overrun). One PR kept; ledger objective reset to 7,000 with that reason. PR label: none (this repository defines no `type:*` labels) |
 | Delivery strategy | single-pr |
 | Chain strategy | pending (n/a — no chain) |
 
