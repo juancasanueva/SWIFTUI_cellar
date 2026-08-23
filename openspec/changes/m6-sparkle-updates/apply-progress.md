@@ -17,7 +17,7 @@ observations that cannot exist before a tag is pushed. They are not merge blocke
 
 | Runner | Before | After | Δ | Failures |
 |---|---|---|---|---|
-| `xcodebuild … -only-testing:cellarTests` | **183** distinct `Test case '…' passed` | **215** | **+32** | 0 |
+| `xcodebuild … -only-testing:cellarTests` | **184** distinct `Test case '…' passed` (183 counted from the torn log; `rg -c '@Test'` at `main` = 184) | **216** (215 from the log; `@Test` count at HEAD = 216) | **+32** | 0 |
 | `swift test --package-path Packages/CellarCore` | **1732** tests / 204 suites (1 known issue) | **1753** / 209 suites (1 known issue) | **+21** / +5 suites | 0 |
 
 Counted byte-oriented from the raw `xcodebuild` log (`rg -o "Test case '[^']+' passed" | sort -u | wc -l`),
@@ -152,7 +152,7 @@ private key, which is a repository secret only. M5/M6/M7 cover it at the first s
 12. **`AppTestUpdater` carries no dedicated T.** "No UI-test launch may construct
     `SparkleUpdateChecker`" is asserted inside `noSurfaceNamesTheConcreteChecker` as a green-on-arrival
     pin over `AppTestFixtures.swift`, following the house precedent for `appSourcesCarryNoReleaseInfrastructure`.
-13. **PR size.** `git diff main --stat` → **6,436 insertions, 24 deletions = 6,460 changed lines**,
+13. **PR size.** `git diff main --stat` → **6,436 insertions, 24 deletions = 6,460 changed lines** measured before this artifact's own commit; after it, `58 files changed, 6,644 insertions(+), 24 deletions(-)` = 6,668 changed lines (overrun ≈1,668 vs the ≈6,411 forecast ceiling, inside the accepted `size:exception`),
     against the forecast ceiling of ≈6,411 and the 5,000 budget. Within the accepted
     `size:exception`, overrun ≈1,460 lines rather than the recorded ≈1,411.
 14. **`A7.2` moved into `B3.1`**, as `tasks.md` specifies under option (B). The
@@ -206,3 +206,6 @@ Not pushed. No PR opened. No `Co-Authored-By` or AI-attribution trailers. `build
 | `B4.7` — RD-a2 | requires a pushed prerelease tag to observe the four steps being skipped |
 
 `next_recommended: sdd-verify`.
+
+
+> **Validator correction (orchestrator, 2026-08-23).** Fresh-context apply validation: PASS-WITH-WARNINGS. Absolute app-test counts corrected to 184 → 216 (Δ+32 unchanged); PR size restated post-self-commit; M1–M3 (notarization `593818bf-c3db-460d-b674-3db6078732b6`, U31, U32) are attested manual evidence — `build/` is untracked, so `sdd-verify` must treat them as attested, not machine-checked.
