@@ -345,6 +345,18 @@ juancasanueva/cellar` first. Naming the tap or the fully-qualified cask on the
 command line is itself the grant, which is why every command in this section and
 in both tap workflows is fully qualified and needs no stored trust entry.
 
+**A direct-download copy blocks a plain install.** Every user who installed
+before the tap existed, or who dragged the zip, already has
+`/Applications/cellar.app`, and `brew install --cask home-cellar` stops with
+`It seems there is already an App at '/Applications/cellar.app'` rather than
+overwrite an app it did not place. The documented answer is
+`brew install --cask --adopt home-cellar`. Adoption moves nothing and compares
+nothing: Homebrew skips the bundle-version check for casks that declare
+`auto_updates` (`cask/artifact/moved.rb`, the `unless auto_updates` branch), so a
+copy Sparkle has already carried past the cask's `version` is adopted as-is.
+That is the intended outcome, since the next `brew upgrade` also defers to
+Sparkle for this cask. `--adopt` cannot be combined with `--force`.
+
 ### How the cask stays current
 
 `bump.yml` runs on a schedule (`17 */6 * * *`) and on `workflow_dispatch`. It

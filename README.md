@@ -46,6 +46,19 @@ this tap. If another tap ever claims the `home-cellar` token, the
 fully-qualified `brew install --cask juancasanueva/cellar/home-cellar` is the
 unambiguous form.
 
+**Already have `cellar.app` in `/Applications`?** Homebrew refuses to overwrite
+an app it did not place (`It seems there is already an App at
+'/Applications/cellar.app'`). Let it adopt the existing copy instead:
+
+```sh
+brew install --cask --adopt home-cellar
+```
+
+Adoption keeps the bundle and its data where they are and simply records it as
+brew-managed. Because the cask declares `auto_updates`, brew does not compare
+versions before adopting: the copy you have, whatever Sparkle has updated it
+to, is the one it takes over.
+
 Or download the latest `Home-Cellar-<version>.zip` from
 [Releases](../../releases), unzip it, and drag `cellar.app` to `/Applications`.
 
