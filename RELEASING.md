@@ -306,9 +306,13 @@ change without a coordinated change there:
 | Floor | Apple Silicon (`arm64` only) for the app executable; the embedded `Sparkle.framework` is universal, which does not change the floor |
 | Update feed | `https://juancasanueva.github.io/SWIFTUI_cellar/appcast.xml`, republished by the same job on every **stable** tag; a prerelease publishes a release and no feed entry |
 
-`release.yml` carries a named extension point immediately after the publish
-step: appcast publication now occupies it, and the cask bump inserts after it
-without restructuring the job.
+`release.yml` carried a named extension point immediately after the publish step.
+Appcast publication now occupies it, and the cask bump **declined** it: the tap
+is kept current by a scheduled workflow in `juancasanueva/homebrew-cellar` that
+pulls this repository's `releases/latest` (§8). The release job therefore gains
+no cross-repository write, no eighth secret, and no way for a successful,
+notarized release to report failure because of a channel that is not on the
+critical path. The comment is gone, and a test keeps it gone.
 
 **Risk 3 — a Pages deploy is a full-site replacement.** A Pages deployment
 serves whatever the uploaded artifact contains and nothing else, so the release job is
@@ -317,7 +321,118 @@ must be built by this same job into the same artifact directory; a second
 workflow deploying a site would silently overwrite `appcast.xml` and every
 installed copy would stop finding updates.
 
-## 8. Troubleshooting
+## 8. The Homebrew tap
+
+The second delivery channel. It publishes **no second artifact**: the cask points
+at the same `Home-Cellar-<version>.zip` §7 specifies.
+
+| Thing | Value |
+|---|---|
+| Tap repository | `juancasanueva/homebrew-cellar` (public) |
+| Tap name | `juancasanueva/cellar` |
+| Cask token | `home-cellar` |
+| Canonical install | `brew tap juancasanueva/cellar`, then `brew trust juancasanueva/cellar`, then `brew install --cask home-cellar` |
+| Unambiguous form | `brew install --cask juancasanueva/cellar/home-cellar` |
+| Installed path | `/Applications/cellar.app` — the same bundle name the zip carries |
+
+Four files plus a `LICENSE` live there: `Casks/home-cellar.rb`,
+`.github/workflows/ci.yml`, `.github/workflows/bump.yml`, and a user-facing
+`README.md`.
+
+**Homebrew 6 requires tap trust.** It refuses to load a cask from a non-official
+tap until the tap is trusted, so the short install form needs `brew trust
+juancasanueva/cellar` first. Naming the tap or the fully-qualified cask on the
+command line is itself the grant, which is why every command in this section and
+in both tap workflows is fully qualified and needs no stored trust entry.
+
+### How the cask stays current
+
+`bump.yml` runs on a schedule (`17 */6 * * *`) and on `workflow_dispatch`. It
+**pulls**: it reads this repository's `releases/latest` anonymously, exits 0 when
+the cask already declares that version, downloads the published asset, computes
+the checksum from those bytes, rewrites `version` and `sha256`, runs `brew style`
+and both audits, and only then commits `chore(cask): home-cellar <version>`.
+
+Three properties are deliberate:
+
+1. **Nothing here pushes to it.** `release.yml` names no other repository and
+   holds no credential for one. A missed scheduled run is corrected by the next;
+   a missed dispatch would have been lost forever.
+2. **The checksum comes from the published asset**, not from the build runner.
+   That proves the URL a stranger will use serves exactly those bytes.
+3. **It is idempotent on `version`**, so four runs a day produce at most one
+   commit per release. It never tags, never releases here, and never touches
+   Pages, so it cannot interact with the distinct-commit gate of §3.
+
+The `releases/latest` read is unauthenticated, so it draws on GitHub's anonymous
+per-IP API allowance. At four runs a day that is never close to the limit, but
+two dispatches in the same minute can return `403` and fail the run. That failure
+is inert by design: nothing is committed, and the next run recomputes the same
+answer from scratch.
+
+### Manual fallback
+
+If the tap's Actions are down, the bump is two lines and one command:
+
+```sh
+gh release view --repo juancasanueva/SWIFTUI_cellar --json tagName --jq .tagName
+curl -fsSLO https://github.com/juancasanueva/SWIFTUI_cellar/releases/download/v<version>/Home-Cellar-<version>.zip
+shasum -a 256 Home-Cellar-<version>.zip
+# edit version and sha256 in Casks/home-cellar.rb, then, from a checkout tapped
+# into $(brew --repository)/Library/Taps/juancasanueva/homebrew-cellar:
+brew style juancasanueva/cellar
+brew audit --cask --online --strict juancasanueva/cellar/home-cellar
+git commit -am "chore(cask): home-cellar <version>" && git push
+```
+
+Never commit a checksum that the online audit has not verified.
+
+### The zap inventory
+
+`brew uninstall --cask --zap home-cellar` removes exactly these roots. The block
+is machine-checkable: `cellarTests/CaskZapInventoryTests.swift` parses it and
+fails if the shipped sources declare a write root that is missing from it.
+
+`source` rows are declared by shipped Swift and are bound to it by that test.
+`framework` rows are written by AppKit, Foundation and Sparkle rather than by
+Cellar's own code, so no source scan can find them; they are here because they
+were **measured on a real machine** (probes P7/P8), and they are the reason the
+test asserts scan-coverage rather than list-equality.
+
+```zap-inventory
+source     ~/Library/Application Support/com.juancasanueva.cellar
+source     ~/Library/Caches/Cellar
+framework  ~/Library/Caches/com.juancasanueva.cellar
+framework  ~/Library/HTTPStorages/com.juancasanueva.cellar
+framework  ~/Library/Preferences/com.juancasanueva.cellar.plist
+```
+
+`~/Library/Saved Application State/com.juancasanueva.cellar.savedState` is
+**deliberately absent**: it was measured and does not exist, and a path nobody
+has observed is never guessed into a list of things to delete.
+
+`~/Library/Caches/Cellar` is a **display-name** directory rather than a
+bundle-id one, which is a slightly broader claim than it looks — "Cellar" is
+also Homebrew's own word for `/opt/homebrew/Cellar`. It is correct today
+(Homebrew's user cache is `~/Library/Caches/Homebrew`, which this list must
+never contain), and moving Cellar's cache under the bundle id is a deferred
+migration, not this change.
+
+### What a zap cannot remove
+
+Homebrew's `zap` offers `trash:`, `delete:`, `rmdir:`, `signal:`, `launchctl:`,
+`quit:`, `pkgutil:`, `script:` and `login_item:` — and **nothing for the
+Keychain**. Cellar creates two generic-password items, and both survive
+"uninstall everything":
+
+- `com.juancasanueva.cellar.nvd-api-key`
+- `com.juancasanueva.cellar.github-pat`
+
+Naming them is the whole obligation. No code is added to delete them: an app
+that silently reaches into the Keychain during uninstall is a worse trade than
+an honest sentence in two READMEs.
+
+## 9. Troubleshooting
 
 **Notarization rejected.** The run prints `notarytool log` output for the failed
 submission before it exits. The usual causes are an unsigned nested binary, a
