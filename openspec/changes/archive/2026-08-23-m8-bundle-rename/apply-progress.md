@@ -116,7 +116,7 @@ turned these red instead).
 ### Test summary
 
 - **Tests written**: 5 new (`BundleNamingTests`), 1 shipped assertion deliberately updated.
-- **Tests passing**: 247/247 in `cellarTests` (242 baseline + 5).
+- **Tests passing**: 247/247 executed cases in `cellarTests` (242 baseline + 5); 237 distinct test functions (see S1).
 - **Layers used**: Unit 5. No integration or E2E layer exists for build-system composition; the
   runtime harness below is the higher layer that does exist.
 - **Approval tests**: 1 — task 5.1 is an approval-style update of shipped behaviour (the README's
@@ -141,7 +141,7 @@ turned these red instead).
 | 0 — R5 pre-probe | Already measured in `design.md` at `main f0a5817`; not re-run |
 | 1 — core package | **PASS.** `1793 tests in 210 suites passed … with 1 known issue`, identical to baseline. See the flake note below |
 | 2 — build | **PASS.** `** BUILD SUCCEEDED **`; product is `Home-Cellar.app` with `Contents/MacOS/Home-Cellar` |
-| 3 — full suite | **PASS for `cellarTests`**: 247 distinct ids, 247 Passed, 0 failures. Two `cellarUITests` cases fail — **pre-existing, proven at `main`** (below) |
+| 3 — full suite | **PASS for `cellarTests`**: 247 executed cases, 247 Passed, 0 failures. Two `cellarUITests` cases fail — **pre-existing, proven at `main`** (below) |
 | 4 — R5 post-probe | **PASS**, recorded verbatim above and in `tasks.md` task 2.11 |
 | 5 — import proof | **PASS.** 22 `@testable import cellar` files at `main`, 22 on the branch, **zero** Swift source edits |
 | 6 — display-name gate | **Unmodified.** `git diff main -- scripts/release.sh \| rg 'CFBundleDisplayName'` returns nothing |

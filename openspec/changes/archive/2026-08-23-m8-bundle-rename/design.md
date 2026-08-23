@@ -213,7 +213,7 @@ is the assertion.
 
 | Test | Why it matters here |
 |---|---|
-| `ReleasePipelineCompositionTests:94`, `UpdateProjectFileTests:68` | `PRODUCT_BUNDLE_IDENTIFIER = com.juancasanueva.cellar;` — 0-line diff |
+| `ReleasePipelineCompositionTests:94`, `UpdateProjectFileTests:68` | `PRODUCT_BUNDLE_IDENTIFIER = com.juancasanueva.cellar;` — 0-line diff. **These two lines are block-selection `.filter`s inside `appTargetBuildConfigurationBlocks()`, not assertions** (verify-report S2): they *select* the two app-target blocks by the identifier, so if the identifier moved they would select 0 blocks and every dependent `blocks.count == 2` assertion would fail. Load-bearing as a filter, not as a guard |
 | `ReleasePipelineCompositionTests:213-229` byte-identity | Enforces DD-7; a one-sided pbxproj edit turns it RED |
 | `ReleasePipelineCompositionTests:519-521` | `release.sh` still reads `CFBundleDisplayName` |
 | `ReleasePipelineCompositionTests:808` | The app repo still names no other repository (DD-8) |
