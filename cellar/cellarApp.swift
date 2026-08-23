@@ -14,6 +14,7 @@ import Persistence
 import ReleaseNotes
 import SecurityKit
 import SwiftUI
+import Updates
 
 @main
 struct cellarApp: App {
@@ -97,6 +98,14 @@ struct cellarApp: App {
     /// NVD key's. Held rather than rebuilt per sheet so the consent surface and
     /// the source read the same store.
     private let releaseNotesCredentials: any ReleaseNotesCredentialStoring
+
+    /// Whether a newer Cellar exists, and the command that asks.
+    ///
+    /// Typed as the seam and never as the concrete checker, so a UI-test launch
+    /// substitutes an in-memory updater and can never start a real one, reach
+    /// the feed, or open an updater window. Held here because both the Settings
+    /// card and the menu command must observe the same instance.
+    private let updater: any AppUpdating
 
     /// Dismissed findings, on the same container as metadata and history.
     @State private var dismissals: DismissalStore
@@ -342,6 +351,28 @@ struct cellarApp: App {
                 credentials: releaseNotesCredentials
             )
         )
+        // Cellar's own recorded answer to "may this app look for updates on its
+        // own". A missing key reads `false`, and the checker writes this value
+        // to the updater before starting it, so neither a bundled default nor a
+        // value the framework persisted on a previous launch can decide whether
+        // Cellar reaches the network.
+        //
+        // Under a UI-test launch the preference goes to a throwaway suite, for
+        // the same reason the release-notes grant does: a UI test must never
+        // write the developer's real preferences, and "off on a fresh install"
+        // has to be genuinely fresh rather than left over from a previous run.
+        let automaticUpdateChecks = AutomaticUpdateChecks(
+            defaults: AppTestFixtures.isUpdatesEnabled
+                ? UserDefaults(suiteName: "cellar-ui-updates-\(UUID().uuidString)") ?? .standard
+                : .standard
+        )
+        // **No UI-test launch may construct `SparkleUpdateChecker`.** That is
+        // what makes it structurally impossible for a UI test to start an
+        // updater, reach the feed, or open an updater window — the same reason
+        // `AppTestReleaseNotesProtocol` exists.
+        updater = AppTestFixtures.isUpdatesEnabled
+            ? AppTestUpdater() as any AppUpdating
+            : SparkleUpdateChecker(automaticChecks: automaticUpdateChecks)
         // Beside `disk-usage-v1.json` and the other derived caches, carrying
         // its own schema version for the same reason each of them does.
         let caskChartsDirectory = isUITesting
@@ -463,6 +494,7 @@ struct cellarApp: App {
                 .environment(releaseNotes)
                 .environment(releaseNotesConsent)
                 .environment(\.releaseNotesCredentials, releaseNotesCredentials)
+                .environment(\.appUpdater, updater)
                 // Evaluate at launch, and again whenever the app comes back to
                 // the front: brew may have been installed, upgraded, or removed
                 // from a terminal while Cellar was in the background.
@@ -503,7 +535,10 @@ struct cellarApp: App {
         // separate title bar, 1440×900 by default.
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)
-        .commands { AboutCommands() }
+        .commands {
+            AboutCommands()
+            CheckForUpdatesCommands(updater: updater)
+        }
 
         Window("About \(AppIdentity.name)", id: "about") {
             AboutView()

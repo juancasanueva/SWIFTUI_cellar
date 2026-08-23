@@ -3,8 +3,10 @@ import BrewProcess
 import Catalog
 import DiskUsage
 import Foundation
+import Observation
 import ReleaseNotes
 import SecurityKit
+import Updates
 
 /// Deterministic, process-free app dependencies used only by the XCUITest launch mode.
 enum AppTestFixtures {
@@ -26,6 +28,19 @@ enum AppTestFixtures {
             || arguments.contains("--ui-testing-m5-release-notes")
             || arguments.contains("--ui-testing-m5-brewfile")
             || arguments.contains("--ui-testing-m5-health")
+            || arguments.contains("--ui-testing-m6-updates")
+    }
+
+    // MARK: - M6 Updates
+
+    /// A launch that must never construct the real updater.
+    ///
+    /// The whole point of the flag: under it the app injects `AppTestUpdater`,
+    /// so a UI test can never start an updater, reach the feed, download
+    /// anything, or open an updater window. Same reason
+    /// `AppTestReleaseNotesProtocol` exists.
+    nonisolated static var isUpdatesEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-m6-updates")
     }
 
     // MARK: - M5 Health
@@ -576,5 +591,26 @@ private final class AppTestLaunchedProcess: LaunchedProcess {
 
     func waitForTermination() async -> BrewExit {
         BrewExit(status: 0, reason: .exited)
+    }
+}
+
+/// An in-memory `AppUpdating` for the UI-test launch.
+///
+/// It records what it was asked to do and answers from memory. Nothing here
+/// reaches the network, touches the real defaults domain, or names a single
+/// updater-framework type — which is what makes "a UI test cannot check for
+/// updates" a fact about the composition rather than a rule about test authors.
+@Observable
+final class AppTestUpdater: AppUpdating {
+    private(set) var canCheckForUpdates = true
+    var automaticallyChecksForUpdates = false
+    private(set) var lastUpdateCheckDate: Date?
+    private(set) var checkCount = 0
+
+    /// Records the request and the date it would have checked. It never starts
+    /// anything, so the surfaces still update and the machine stays untouched.
+    func checkForUpdates() {
+        checkCount += 1
+        lastUpdateCheckDate = Date()
     }
 }

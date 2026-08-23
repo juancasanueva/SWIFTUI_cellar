@@ -72,6 +72,10 @@ struct SettingsView: View {
                     }
                 }
 
+                // Its own file and its own card, so the whole update surface
+                // rolls back by deleting one file and this one line.
+                UpdatesSettingsGroup()
+
                 freeCard
             }
             .frame(maxWidth: 760, alignment: .topLeading)
