@@ -69,7 +69,7 @@ None of these block merging the pipeline. All of them block the first release.
    runs on **tag** refs (`v*`), so a deployment from a tag is rejected until a
    tag rule is added: Settings → Environments → `github-pages` → Deployment
    branches and tags → add a **tag** rule matching `v*`. Without it the four
-   publication steps run and `deploy-pages` fails at the end of an otherwise
+   publication steps run and the deploy step fails at the end of an otherwise
    successful release.
 7. **A Sparkle EdDSA key pair, generated once and backed up before anything
    else.** From the Sparkle 2.9.6 distribution:
@@ -116,7 +116,19 @@ Then watch the run under the repository's Actions tab. The stages, in order:
 | Staple | Staples the ticket and repackages | Stapling fails |
 | Verify | Eight gates against the copy extracted from the zip (the `spctl` assessment runs online here; the offline assessment is manual evidence M3 in §6) | Any gate |
 | Publish | `gh release create --verify-tag --generate-notes` | — |
+| Build the appcast | Signs the zip and writes the whole feed to a directory outside the checkout | Signing or emission fails (stable tags only) |
+| Configure Pages / Upload | Uploads that directory as the `github-pages` artifact | — |
+| Deploy to Pages | Posts the artifact to the Pages deployment API as build version `<commit>-<run number>`, then polls for `succeed` for up to 10 minutes | The deployment reports a failure state, or the 10 minutes elapse |
 | Cleanup | Deletes the keychain and the API key, always | — |
+
+**Why the deploy step is hand-rolled rather than `actions/deploy-pages`.** The
+action sends the commit SHA as the Pages build version and exposes no input to
+override it. Pages will not redeploy a build version it has already served: the
+request is accepted, the deployment reports `succeed`, and the previously
+published site stays live. Two stable tags can point at one commit — `v0.0.2`
+and `v0.0.3` both did — so on that path the second tag uploads a correct feed,
+the run goes green, and every installed copy keeps reading the older one. The
+run number is what makes the build version unique; the commit alone is not.
 
 **A failure publishes nothing.** Every gate runs before the publish step, so a
 failed run leaves no release, no asset, and no draft. To retry, delete the
@@ -282,8 +294,8 @@ change without a coordinated change there:
 step: appcast publication now occupies it, and the cask bump inserts after it
 without restructuring the job.
 
-**Risk 3 — a Pages deploy is a full-site replacement.** `deploy-pages` serves
-whatever the uploaded artifact contains and nothing else, so the release job is
+**Risk 3 — a Pages deploy is a full-site replacement.** A Pages deployment
+serves whatever the uploaded artifact contains and nothing else, so the release job is
 the *only* thing that may deploy to Pages. If a landing page is ever wanted, it
 must be built by this same job into the same artifact directory; a second
 workflow deploying a site would silently overwrite `appcast.xml` and every
@@ -308,6 +320,17 @@ Release configuration to `CODE_SIGN_STYLE = Manual` with
 an implementation detail: it breaks the Debug/Release parity that `cellarTests`
 asserts, so the assertion must be **explicitly relaxed** — with the reason
 recorded in the test — rather than deleted.
+
+**The run is green but the feed still advertises the previous version.** Read
+the deploy step's log: it prints the deployment id and the build version it
+requested. Pages keys a deployment by that string and will not redeploy one it
+has already served, which is exactly how `actions/deploy-pages` — which sends
+the bare commit SHA — left `appcast.xml` stale when `v0.0.2` and `v0.0.3` both
+pointed at the same commit. The step now sends `<commit>-<run number>`, so two
+tags on one commit ask for two different versions. If the feed is still stale
+with a fresh build version in the log, the deployment succeeded and the CDN has
+not yet purged; compare `last-modified` on the feed URL before assuming
+otherwise.
 
 **`spctl` accepts locally but a downloader sees a refusal.** The published
 archive must be the post-staple one. `scripts/release.sh staple` deletes the
