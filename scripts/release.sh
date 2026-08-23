@@ -29,6 +29,11 @@ set -euo pipefail
 
 readonly TEAM_ID="Z3S5JK8E38"
 readonly SCHEME="cellar"
+# The Xcode target is still called `cellar` and the scheme still builds it, but
+# the product it produces is `Home-Cellar.app` with `Contents/MacOS/Home-Cellar`.
+# One constant cannot mean both: `SCHEME` names what xcodebuild is asked to
+# build, `PRODUCT` names what comes out.
+readonly PRODUCT="Home-Cellar"
 readonly PROJECT="cellar.xcodeproj"
 readonly EXPORT_OPTIONS="scripts/ExportOptions.plist"
 
@@ -45,9 +50,9 @@ BUILD="${RELEASE_BUILD_DIR:-build}"
 
 ARCHIVE_PATH="$BUILD/$SCHEME.xcarchive"
 EXPORT_DIR="$BUILD/export"
-APP="$EXPORT_DIR/$SCHEME.app"
+APP="$EXPORT_DIR/$PRODUCT.app"
 VERIFY_DIR="$BUILD/verify"
-VERIFIED_APP="$VERIFY_DIR/$SCHEME.app"
+VERIFIED_APP="$VERIFY_DIR/$PRODUCT.app"
 ZIP=""
 SIGN_FLAGS=()
 
@@ -145,7 +150,7 @@ phase_export() {
 		"$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist")" \
 		"$VERSION" "the exported CFBundleShortVersionString"
 	expect_equal \
-		"$(lipo -archs "$APP/Contents/MacOS/$SCHEME")" \
+		"$(lipo -archs "$APP/Contents/MacOS/$PRODUCT")" \
 		"arm64" "the exported architecture"
 }
 
@@ -233,7 +238,7 @@ phase_verify() {
 	fi
 
 	expect_equal \
-		"$(lipo -archs "$VERIFIED_APP/Contents/MacOS/$SCHEME")" \
+		"$(lipo -archs "$VERIFIED_APP/Contents/MacOS/$PRODUCT")" \
 		"arm64" "the delivered architecture"
 	expect_equal \
 		"$(plutil -extract CFBundleShortVersionString raw -o - "$VERIFIED_APP/Contents/Info.plist")" \

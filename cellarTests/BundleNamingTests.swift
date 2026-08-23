@@ -177,4 +177,42 @@ struct BundleNamingTests {
         #expect(BundleNamingSources.occurrences(of: "BuildableName = \"cellar.app\"", in: scheme) == 0)
         #expect(BundleNamingSources.occurrences(of: "BlueprintName = \"cellar\"", in: scheme) == 3)
     }
+
+    // MARK: - Unit 3 — the release script stops letting one constant mean four things
+
+    /// `SCHEME` served four roles: the scheme `xcodebuild` builds, the archive
+    /// filename, the exported bundle name, and the main executable name. Two of
+    /// those follow the Xcode target and two follow the product, and this change
+    /// moves the product without moving the target — so a rename that kept one
+    /// constant would have to be wrong about half of them. That is why this is a
+    /// split and not a substitution, and why the split is itself the assertion.
+    ///
+    /// Six counts, in three deliberate pairs:
+    ///
+    /// - `PRODUCT` is declared, and `-scheme "$SCHEME"` **still** invokes the
+    ///   scheme by its unchanged name. The second half is the one that catches an
+    ///   over-eager rename: a script that passed `-scheme "$PRODUCT"` would fail
+    ///   only at release time, on a tag, with nothing built.
+    /// - The two old spellings are gone. Zero, not "fewer".
+    /// - The two new spellings appear exactly twice each — once on the exported
+    ///   copy and once on the re-downloaded, notarization-verified copy. Both
+    ///   paths must move together or `verify` inspects a bundle the export step
+    ///   never produced.
+    ///
+    /// `ARCHIVE_PATH="$BUILD/$SCHEME.xcarchive"` is deliberately *not* covered by
+    /// the `$SCHEME.app` count and deliberately not renamed (DD-4): the archive is
+    /// a build intermediate no user ever sees.
+    @Test("The release script separates the product name from the scheme name")
+    func theReleaseScriptSeparatesTheProductFromTheScheme() throws {
+        let script = try BundleNamingSources.text(BundleNamingSources.releaseScript)
+
+        #expect(script.contains("readonly PRODUCT=\"Home-Cellar\""))
+        #expect(script.contains("-scheme \"$SCHEME\""))
+
+        #expect(BundleNamingSources.occurrences(of: "$SCHEME.app", in: script) == 0)
+        #expect(BundleNamingSources.occurrences(of: "MacOS/$SCHEME", in: script) == 0)
+
+        #expect(BundleNamingSources.occurrences(of: "$PRODUCT.app", in: script) == 2)
+        #expect(BundleNamingSources.occurrences(of: "MacOS/$PRODUCT", in: script) == 2)
+    }
 }
