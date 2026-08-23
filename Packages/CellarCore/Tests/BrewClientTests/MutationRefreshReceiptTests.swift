@@ -215,6 +215,60 @@ struct MutationRefreshReceiptTests {
         }
     }
 
+    /// TM9 :373-379. Invalidation is declared **per command**, not per action.
+    /// The untap *action* does refresh installed inventory — but by virtue of
+    /// the revocation it submits, never by widening what `untap` itself
+    /// declares. Those are different facts, and conflating them would make the
+    /// plain untap pay for a probe it cannot learn anything from.
+    @MainActor
+    @Test("An untap action's inventory refresh comes from its revocation")
+    func anUntapActionsInventoryRefreshComesFromItsRevocation() async throws {
+        let removal = try #require(TapCommand.removal(of: "acme/tools"))
+        let launcher = ControllableProcessLauncher()
+        let tapsGate = InstalledMutationGate()
+        let installedGate = InstalledMutationGate()
+        let center = OperationCenter(
+            gates: MutationGates([(.taps, tapsGate), (.installedInventory, installedGate)]),
+            launcherFactory: { _ in launcher }
+        )
+        center.attach(installation: TestInstallation.appleSilicon)
+        let taps = Counter()
+        let installed = Counter()
+        let watchers = [
+            Task { for await _ in tapsGate.terminals { taps.increment() } },
+            Task { for await _ in installedGate.terminals { installed.increment() } }
+        ]
+        defer { watchers.forEach { $0.cancel() } }
+        await settle()
+
+        center.submitSequence(removal)
+        for index in 0..<2 {
+            await launcher.waitForLaunches(atLeast: index + 1)
+            launcher.launchedProcesses[index].terminate(with: BrewExit(status: 0, reason: .exited))
+            await settle()
+        }
+
+        // Both commands declare taps, so waiting on that counter is the bounded
+        // wait that makes the counts below a measurement rather than a race.
+        await TestPoll.until(taps.value >= 2)
+        await settle()
+
+        #expect(launcher.recordedSpecs.map(\.arguments) == [
+            ["untrust", "acme/tools"],
+            ["untap", "acme/tools"]
+        ])
+        // Two commands, two tap refreshes — one each, as TM9 requires.
+        #expect(taps.value == 2)
+        // …and exactly one inventory refresh across the whole action.
+        #expect(installed.value == 1)
+
+        // Attributable, not incidental: the revocation declares it and the
+        // removal still does not.
+        #expect(removal[0].invalidates == [.taps, .installedInventory])
+        #expect(removal[1].invalidates == .taps)
+        #expect(removal[1].invalidates.isDisjoint(with: .installedInventory))
+    }
+
     /// The four terminals TM9 enumerates, including the two that never spawn.
     enum TapTerminal: String, CaseIterable, Sendable {
         case success

@@ -1,3 +1,4 @@
+import CellarTestSupport
 import Foundation
 import Testing
 
@@ -99,16 +100,22 @@ struct TapShippingProofTests {
         }
 
         #expect(launcher.specs.map(\.arguments) == [["tap-info", "--installed", "--json"]])
+        // Seven commands for eight actions: each removal is a revocation
+        // followed by the removal itself (TM7 :216-221).
         #expect(commands.map(\.arguments) == [
             ["tap", "other/home"],
+            ["untrust", "acme/tools"],
             ["untap", "acme/tools"],
+            ["untrust", "acme/tools"],
             ["untap", "--force", "acme/tools"],
             ["trust", "acme/tools"],
             ["untrust", "acme/tools"]
         ])
         #expect(commands.map(\.invalidates) == [
             .taps,
+            [.taps, .installedInventory],
             .taps,
+            [.taps, .installedInventory],
             [.taps, .installedInventory, .diskUsage],
             [.taps, .installedInventory],
             [.taps, .installedInventory]
@@ -149,16 +156,21 @@ struct TapShippingProofTests {
         if presentation.canGrant, let grant = TapCommand.trust(record.name) { built.append(grant) }
         if presentation.canRevoke, let revoke = TapCommand.untrust(record.name) { built.append(revoke) }
         for command in built { _ = center.submit(command) }
-        await settle([])
+        await drain()
 
         #expect(built.isEmpty, "an unreported tap built a trust command")
         #expect(launcher.specs.isEmpty, "an unreported tap's controls spawned a process")
 
-        // …while untapping the same tap is untouched by any of that.
-        let untap = center.submit(try #require(TapCommand.untap(record.name)))
-        await settle([untap])
-        #expect(launcher.specs.isEmpty == false, "the unconditional removal stopped being submitted")
-        #expect(launcher.specs.map(\.arguments).contains(["untap", "acme/tools"]))
+        // …while untapping the same tap is untouched by any of that: TM7's
+        // revocation is unconditional, so it is still submitted here — where it
+        // may well fail, which TM12 :426-428 explicitly accepts.
+        center.submitSequence(try #require(TapCommand.removal(of: record.name)))
+        await TestPoll.until(launcher.launchCount >= 2)
+        await drain()
+        #expect(launcher.specs.map(\.arguments) == [
+            ["untrust", "acme/tools"],
+            ["untap", "acme/tools"]
+        ])
     }
 
     /// TM11 :400-406. Showing a reported state and offering brew's own grant is
@@ -262,11 +274,11 @@ struct TapShippingProofTests {
             return [command]
         case .plainUntap:
             let target = ["acme", "tools"].joined(separator: "/")
-            guard let command = TapCommand.untap(target) else {
+            guard let commands = TapCommand.removal(of: target) else {
                 Issue.record("plain untap was unavailable")
                 return []
             }
-            return [command]
+            return commands
         case .trust:
             let target = ["acme", "tools"].joined(separator: "/")
             guard let command = TapCommand.trust(target) else {
@@ -286,7 +298,7 @@ struct TapShippingProofTests {
             let affected = Set(
                 try packages(store: store, installed: installed).compactMap(\.installedHandoff)
             )
-            guard let command = TapCommand.forceUntap(evidence: ForceUntapEvidence(
+            guard let commands = TapCommand.forcedRemoval(evidence: ForceUntapEvidence(
                 tap: tap,
                 affected: affected,
                 isComplete: true
@@ -294,7 +306,7 @@ struct TapShippingProofTests {
                 Issue.record("eligible force untap was unavailable")
                 return []
             }
-            return [command]
+            return commands
         }
     }
 
@@ -393,6 +405,10 @@ struct TapShippingProofTests {
             guard let range = Range(match.range(at: 1), in: source) else { return nil }
             return String(source[range])
         })
+    }
+
+    private func drain() async {
+        for _ in 0..<500 { await Task.yield() }
     }
 
     private func settle(_ items: [ActivityItem]) async {

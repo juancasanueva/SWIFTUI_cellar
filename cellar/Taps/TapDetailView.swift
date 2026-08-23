@@ -273,16 +273,19 @@ struct TapDetailView: View {
         operations.submit(command)
     }
 
+    /// Both removals submit the whole **action**, not one command: revoke the
+    /// grant, then remove the tap. One request covers the sequence, so declining
+    /// a force untap submits none of it (TM7 :216-231, TM8 :281-283).
     private func untap(_ tap: TapRecord) {
-        guard let command = TapCommand.untap(tap.name) else { return }
-        operations.submit(command)
+        guard let commands = TapCommand.removal(of: tap.name) else { return }
+        operations.submitSequence(commands)
     }
 
     private func requestForceUntap(_ name: TapName) {
         guard let evidence = currentForceEvidence(name),
-              let command = TapCommand.forceUntap(evidence: evidence)
+              let commands = TapCommand.forcedRemoval(evidence: evidence)
         else { return }
-        _ = operations.request(command)
+        operations.submitSequence(commands)
     }
 }
 

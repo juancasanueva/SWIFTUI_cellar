@@ -161,6 +161,92 @@ struct TapIntegrationTests {
             encoding: .utf8
         )
     }
+
+    // MARK: - TM7 :257-263 / TM13 :525-531
+
+    /// **DD-5, the second half.** The user's primary intent is removal. Blocking
+    /// it on a revocation that failed — which is what *every* untap does on a
+    /// Homebrew with no `untrust` verb (R5) — would leave them unable to remove
+    /// the tap at all. So the removal is still submitted, and the failure is its
+    /// own visible operation rather than being swallowed into the one that
+    /// succeeded.
+    @Test("A failed revocation does not block the removal")
+    func aFailedRevocationDoesNotBlockTheRemoval() async throws {
+        let removal = try #require(TapCommand.removal(of: "acme/tools"))
+        let launcher = ControllableProcessLauncher()
+        let center = OperationCenter(
+            gates: MutationGates(installed: InstalledMutationGate()),
+            launcherFactory: { _ in launcher }
+        )
+        center.attach(installation: TestInstallation.appleSilicon)
+
+        _ = center.submitSequence(removal)
+
+        // The revocation fails…
+        await launcher.waitForLaunches(atLeast: 1)
+        launcher.launchedProcesses[0].terminate(with: BrewExit(status: 1, reason: .exited))
+        // …and the removal is still spawned behind it.
+        await launcher.waitForLaunches(atLeast: 2)
+        launcher.launchedProcesses[1].terminate(with: BrewExit(status: 0, reason: .exited))
+        await settle()
+
+        #expect(launcher.recordedSpecs.map(\.arguments) == [
+            ["untrust", "acme/tools"],
+            ["untap", "acme/tools"]
+        ])
+
+        // Two visible operations, each with its own terminal outcome — the
+        // failure is not folded into the success, and it is not suppressed.
+        let items = center.items
+        #expect(items.count == 2)
+        var verbs: [String] = []
+        var outcomes: [MutationOutcome?] = []
+        for item in items {
+            verbs.append(item.command.verb)
+            outcomes.append(item.outcome)
+        }
+        #expect(verbs == ["tapUntrust", "tapUntap"])
+        #expect(outcomes == [.failed(status: 1), .succeeded])
+    }
+
+    /// TM13 :525-531 and obs #7722. `brew trust` on an already-trusted tap and
+    /// `brew untrust` on a never-trusted one both exit 0. Reporting either as a
+    /// failure — or worse, as a Cellar defect — would train the user to ignore a
+    /// failed trust operation, which is the one they must never ignore.
+    @Test("An idempotent grant or revocation is an ordinary success")
+    func anIdempotentGrantOrRevocationIsAnOrdinarySuccess() async throws {
+        let launcher = ControllableProcessLauncher()
+        let center = OperationCenter(
+            gates: MutationGates(installed: InstalledMutationGate()),
+            launcherFactory: { _ in launcher }
+        )
+        center.attach(installation: TestInstallation.appleSilicon)
+
+        let regrant = center.submit(try #require(TapCommand.trust("acme/tools")))
+        await launcher.waitForLaunches(atLeast: 1)
+        launcher.launchedProcesses[0].terminate(with: BrewExit(status: 0, reason: .exited))
+        await settle()
+
+        let neverTrusted = center.submit(try #require(TapCommand.untrust("other/home")))
+        await launcher.waitForLaunches(atLeast: 2)
+        launcher.launchedProcesses[1].terminate(with: BrewExit(status: 0, reason: .exited))
+        await settle()
+
+        #expect(regrant.outcome == .succeeded)
+        #expect(neverTrusted.outcome == .succeeded)
+        #expect(regrant.outcome?.isFailure == false)
+        #expect(neverTrusted.outcome?.isFailure == false)
+        #expect(regrant.isTerminal)
+        #expect(neverTrusted.isTerminal)
+        #expect(launcher.recordedSpecs.map(\.arguments) == [
+            ["trust", "acme/tools"],
+            ["untrust", "other/home"]
+        ])
+    }
+
+    private func settle() async {
+        for _ in 0..<500 { await Task.yield() }
+    }
 }
 
 private struct IntegrationDenyingAuthorizer: MutationLaunchAuthorizing {

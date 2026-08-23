@@ -184,4 +184,71 @@ struct TapCommandTests {
         #expect(try #require(TapCommand.add("acme/tools")).invalidates == .taps)
         #expect(try #require(TapCommand.untap("acme/tools")).invalidates == .taps)
     }
+
+    // MARK: - TM7 / TM8 — the removal revokes before it removes
+
+    /// **DD-5.** Untapping without revoking leaves a dormant grant in
+    /// `trust.json` that Cellar can no longer see and that a later re-tap —
+    /// including one performed by a Brewfile import — silently re-arms with no
+    /// new consent (TM7 :222-226).
+    ///
+    /// Unconditional on purpose, and the trust state is varied here precisely to
+    /// show it is never consulted: `brew untrust` on a never-trusted tap exits 0
+    /// (obs #7722), so there is no precondition to check, and Cellar must not
+    /// decide from a state it may be reading off a brew that reports none.
+    @Test(
+        "Every removal revokes before it removes, whatever the tap's trust state",
+        arguments: [TapTrustState.trusted, .untrusted, .unreported]
+    )
+    func everyRemovalRevokesBeforeItRemoves(trust: TapTrustState) throws {
+        let record = TapRecord(name: "acme/tools", repository: "tools", trust: trust)
+        let tap = try #require(TapName(record.name))
+        let widget = PackageID(kind: .formula, name: "widget")
+        let evidence = ForceUntapEvidence(tap: tap, affected: [widget], isComplete: true)
+
+        let removal = try #require(TapCommand.removal(of: record.name))
+        let forced = try #require(TapCommand.forcedRemoval(evidence: evidence))
+
+        #expect(removal == [.untrustTap(tap), .removeTap(tap)])
+        #expect(forced == [.untrustTap(tap), .forceRemoveTap(evidence)])
+
+        // Character for character, in TM7 :249-255 / TM8 :281-283's order.
+        #expect(removal.map(\.arguments) == [
+            ["untrust", "acme/tools"],
+            ["untap", "acme/tools"]
+        ])
+        #expect(forced.map(\.arguments) == [
+            ["untrust", "acme/tools"],
+            ["untap", "--force", "acme/tools"]
+        ])
+
+        // Exactly two commands — no third, and no silent retry.
+        #expect(removal.count == 2)
+        #expect(forced.count == 2)
+        // TM7 :240-247 — the plain removal grows no hidden force flag, and
+        // neither of its members asks for a confirmation.
+        #expect(removal.flatMap(\.arguments).contains("--force") == false)
+        #expect(removal.allSatisfy { $0.requiresConfirmation == false })
+        // …while the force removal still asks, once, for the whole sequence.
+        #expect(forced.contains { $0.requiresConfirmation })
+
+        // A target that does not survive the gate builds neither sequence.
+        #expect(TapCommand.removal(of: "acme/tools/extra") == nil)
+    }
+
+    /// **DD-3.** The revocation declares nothing of its own, which is what makes
+    /// the batch rule able to skip it without downgrading anything.
+    @Test("The two commands with nothing to disclose declare nothing")
+    func removalAndRevocationDeclareNoDisclosure() throws {
+        let tap = try #require(TapName("acme/tools"))
+
+        #expect(try #require(TapCommand.untrust("acme/tools")).declaredDisclosure == nil)
+        #expect(try #require(TapCommand.untap("acme/tools")).declaredDisclosure == nil)
+        #expect(try #require(TapCommand.add("acme/tools")).declaredDisclosure == .tapAdd(tap))
+        #expect(try #require(TapCommand.trust("acme/tools")).declaredDisclosure == .tapTrustGrant(tap))
+
+        // Declaring nothing is not the same fact as declaring the ordinary
+        // removal text, and `disclosure` still answers the second question.
+        #expect(try #require(TapCommand.untrust("acme/tools")).disclosure == .packageRemoval)
+    }
 }

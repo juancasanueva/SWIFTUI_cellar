@@ -310,13 +310,13 @@ and `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'plat
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'ConfirmationDisclosureTests|BrewMutatingTests|TapCommandTests|MutationRefreshReceiptTests|TapIntegrationTests'`
 
-- [ ] 5.1 **RED — unit 2c.** `TapCommandTests · everyRemovalRevokesBeforeItRemoves`:
+- [x] 5.1 **RED — unit 2c.** `TapCommandTests · everyRemovalRevokesBeforeItRemoves`:
       `removal(of:) == [.untrustTap, .removeTap]` and
       `forcedRemoval(evidence:) == [.untrustTap, .forceRemoveTap]` for **all three** trust states
       (DD-5 — unconditional); argvs character-for-character as TM7/TM8 pin them; no third command;
       plain untap grows no hidden `--force`. **RED because** the factories do not exist.
       *(TM7.1, TM7.2)*
-- [ ] 5.2 **RED — unit 8, with the four guard updates in the same commit.**
+- [x] 5.2 **RED — unit 8, with the four guard updates in the same commit.**
       `ConfirmationDisclosureTests · aBatchLedByACommandThatDisclosesNothingStillDisclosesTheForceUntap`:
       `[.untrustTap, .forceRemoveTap]` → `.forceUntap`; `[.untrustTap, .removeTap]` raises **no**
       request; an erased install-only batch → `.packageRemoval`; an erased mixed tap+install batch →
@@ -331,32 +331,32 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'ConfirmationDis
       MUST stay green** — `declaredDisclosure ?? .packageRemoval` does not contain the banned
       substring `?.disclosure ??` (capital `D`), and `:231-240`'s `divergent.count == 7` is unchanged.
       *(TM8.2, PM1.7, PM1.8, PM1.9)*
-- [ ] 5.3 **RED — unit 8b.** `ConfirmationDisclosureTests ·
+- [x] 5.3 **RED — unit 8b.** `ConfirmationDisclosureTests ·
       skippingPicksTheFirstDeclaringCommandNotTheStrongest`: `[untrust, addTap, forceRemoveTap]` →
       `.tapAdd`, **not** `.forceUntap` — submission order, never severity. *(PM1.10, BF7.3)*
-- [ ] 5.4 **RED — unit 13b.** `MutationRefreshReceiptTests ·
+- [x] 5.4 **RED — unit 13b.** `MutationRefreshReceiptTests ·
       anUntapActionsInventoryRefreshComesFromItsRevocation`: an untap action refreshes installed
       inventory exactly once, attributable to the revocation, while `removeTap.invalidates` still
       excludes it. *(TM9.3)*
-- [ ] 5.5 **RED — unit 14.** `TapIntegrationTests · aFailedRevocationDoesNotBlockTheRemoval`: the
+- [x] 5.5 **RED — unit 14.** `TapIntegrationTests · aFailedRevocationDoesNotBlockTheRemoval`: the
       revocation reaches a failed terminal outcome, the removal is **still** submitted and reaches its
       own, and the failure is its own visible `ActivityItem` rather than being swallowed (DD-5).
       *(TM7.3)*
-- [ ] 5.6 **RED — unit 14b.** `TapIntegrationTests · anIdempotentGrantOrRevocationIsAnOrdinarySuccess`:
+- [x] 5.6 **RED — unit 14b.** `TapIntegrationTests · anIdempotentGrantOrRevocationIsAnOrdinarySuccess`:
       exit 0 for a re-grant and for a never-trusted revocation → `.succeeded`, not a failure and not a
       defect (obs `#7722`). *(TM13.4)*
-- [ ] 5.7 **Prove RED** (six), then **GREEN**: `BrewMutating.swift` — add the
+- [x] 5.7 **Prove RED** (six), then **GREEN**: `BrewMutating.swift` — add the
       `declaredDisclosure: ConfirmationDisclosure?` protocol requirement with a `nil` default,
       redefine `disclosure`'s default as `declaredDisclosure ?? .packageRemoval` (one source of
       truth), add `Collection.leadDisclosure`, and store **both** members on `AnyBrewMutation`,
       copied from the same command in its single initialiser.
-- [ ] 5.8 **GREEN.** `TapCommand.swift`: replace the `disclosure` override with `declaredDisclosure`
+- [x] 5.8 **GREEN.** `TapCommand.swift`: replace the `disclosure` override with `declaredDisclosure`
       (`nil` for `.removeTap` and `.untrustTap`), and add `removal(of:)` / `forcedRemoval(evidence:)`.
-- [ ] 5.9 **GREEN.** `OperationCenterBulk.swift`: `disclosure: commands.leadDisclosure` (the one
+- [x] 5.9 **GREEN.** `OperationCenterBulk.swift`: `disclosure: commands.leadDisclosure` (the one
       behavioural line at `:169`), the `submitSequence(_:)` mirror of `submitBulk`, and the two new
       `ConfirmationRequest.tapIdentity` arms. `TapDetailView.swift`: Untap and Force Untap submit
       through `submitSequence`.
-- [ ] 5.10 Focused command green, **and `:161-178` / `:203` / `:231-240` still green**; commit WU5.
+- [x] 5.10 Focused command green, **and `:161-178` / `:203` / `:231-240` still green**; commit WU5.
 
 ## Phase 6: WU6 — classify the refusal, offer the only safe recovery (PM10.1–.4, .6; TM13.3)
 

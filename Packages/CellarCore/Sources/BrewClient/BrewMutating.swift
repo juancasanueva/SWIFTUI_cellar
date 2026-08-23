@@ -98,6 +98,19 @@ public protocol BrewMutating: Sendable {
     /// by every caller remembering the same `??`.
     var disclosure: ConfirmationDisclosure { get }
 
+    /// The warning this command declares **of its own**.
+    ///
+    /// `nil` means "this command has nothing of its own to disclose", which is a
+    /// different fact from "it discloses the ordinary removal text" — and the
+    /// batch rule below exists only because those two must be distinguishable.
+    ///
+    /// Prepending a revocation to a force untap makes the batch head a command
+    /// with nothing to say. Under the shipped rule that silently downgraded the
+    /// force-untap affected-package disclosure to "This removes installed
+    /// software.", which is the exact defect PM1 was written to fix
+    /// (tap-management TM8 :288-290, design DD-3).
+    var declaredDisclosure: ConfirmationDisclosure? { get }
+
     /// Decides the outcome from the terminal facts and the output.
     ///
     /// A protocol requirement with a default rather than a free function, so a
@@ -110,7 +123,10 @@ public protocol BrewMutating: Sendable {
 extension BrewMutating {
     public var diskAreas: Set<DiskArea> { [] }
     public var environmentOverrides: Set<BrewEnvironment.CommandOverride> { [] }
-    public var disclosure: ConfirmationDisclosure { .packageRemoval }
+    public var declaredDisclosure: ConfirmationDisclosure? { nil }
+    /// One source of truth: the default is *derived* from the declaration, so a
+    /// conformer cannot declare one warning and present another.
+    public var disclosure: ConfirmationDisclosure { declaredDisclosure ?? .packageRemoval }
     /// The command as a human reads it — and as they can paste it.
     ///
     /// Display only. Nothing parses this back into argv, which is what makes
@@ -176,6 +192,13 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
     /// and they hash apart. That is stated in `BrewMutatingTests` rather than
     /// discovered downstream.
     public let disclosure: ConfirmationDisclosure
+    /// The ninth projection, stored beside the eighth.
+    ///
+    /// Both are copied from the same command in the single initialiser below,
+    /// so they cannot disagree; there is no memberwise init that could let them.
+    /// Erasure must discard neither, because an erased batch is exactly where
+    /// the batch rule has to work (design DD-3).
+    public let declaredDisclosure: ConfirmationDisclosure?
 
     public init(_ command: some BrewMutating) {
         arguments = command.arguments
@@ -186,6 +209,29 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
         diskAreas = command.diskAreas
         environmentOverrides = command.environmentOverrides
         disclosure = command.disclosure
+        declaredDisclosure = command.declaredDisclosure
+    }
+}
+
+extension Collection where Element: BrewMutating {
+    /// The disclosure one confirmation over this whole batch must lead with: the
+    /// first command that declares one of its own, skipping every command that
+    /// relies on the protocol default.
+    ///
+    /// **Submission order, never severity.** The first *declaring* command wins,
+    /// because the alternative is a ranking Cellar has no basis for and a
+    /// warning about a command other than the one the batch leads with
+    /// (package-mutation PM1 :154-161).
+    ///
+    /// A named member rather than a `commands.first(where:)?.declaredDisclosure
+    /// ?? .packageRemoval` written at the gate: the shipped ban on a
+    /// caller-side `?.disclosure ??` caught exactly that shape once already, and
+    /// it keeps its intent here instead of being traded away (design DD-9).
+    public var leadDisclosure: ConfirmationDisclosure {
+        for command in self {
+            if let declared = command.declaredDisclosure { return declared }
+        }
+        return .packageRemoval
     }
 }
 

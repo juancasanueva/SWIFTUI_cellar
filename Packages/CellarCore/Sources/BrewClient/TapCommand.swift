@@ -160,14 +160,43 @@ public enum TapCommand: Sendable, Equatable, BrewMutating {
         return Set(evidence.affected.map { $0.kind == .formula ? .cellar : .caskroom })
     }
 
-    public var disclosure: ConfirmationDisclosure {
+    /// What this command declares **of its own** (design DD-3). `nil` for the
+    /// two commands that have nothing to disclose — which is what lets a
+    /// revocation lead a batch without downgrading the disclosure behind it.
+    ///
+    /// `disclosure` itself is no longer declared here at all: the protocol
+    /// default derives it from this, so the two cannot disagree.
+    public var declaredDisclosure: ConfirmationDisclosure? {
         switch self {
         case .addTap(let tap): .tapAdd(tap)
         case .trustTap(let tap): .tapTrustGrant(tap)
-        case .removeTap, .untrustTap: .packageRemoval
+        case .removeTap, .untrustTap: nil
         case .forceRemoveTap(let evidence):
             .forceUntap(tap: evidence.tap, affected: evidence.affected)
         }
+    }
+
+    // MARK: - Actions, which are not commands
+
+    /// What the **Untap** action means, whole: revoke the grant, then remove the
+    /// tap.
+    ///
+    /// The order is load-bearing — the revocation must run while the tap still
+    /// resolves — and unconditional, because `brew untrust` on a never-trusted
+    /// tap exits 0 (obs #7722) and because Cellar must not decide from a state
+    /// it may be reading off a brew that reports none. Without this, untapping
+    /// leaves a dormant, invisible grant in `trust.json` that a later re-tap —
+    /// including one performed by a Brewfile import — silently re-arms with no
+    /// new consent (tap-management TM7 :216-231).
+    public static func removal(of raw: String) -> [TapCommand]? {
+        guard let tap = TapName(raw) else { return nil }
+        return [.untrustTap(tap), .removeTap(tap)]
+    }
+
+    /// The same, with the force removal in place of the plain one (TM8 :281-283).
+    public static func forcedRemoval(evidence: ForceUntapEvidence) -> [TapCommand]? {
+        guard let forced = forceUntap(evidence: evidence) else { return nil }
+        return [.untrustTap(evidence.tap), forced]
     }
 }
 
