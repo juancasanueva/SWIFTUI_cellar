@@ -87,13 +87,15 @@ whose behaviour they verify.
 
 **Ordering edges.**
 
-- **WU5 → the `v1.2.0` tag push (R4 — binding spec text, not a note).** The tap PR MUST be **merged
-  before** any `v*` tag that publishes a renamed asset. `bump.yml` runs `17 */6 * * *`, rewrites only
-  `version`/`sha256`, and gates on `brew style` + `brew audit` — **neither extracts the archive nor
-  resolves the `app` stanza** — so a tag pushed against `app "cellar.app"` yields a cask that audits
-  clean and installs broken. **Fallback if the tap PR cannot land first: pause `bump.yml` across the
-  window** (disable the schedule, restore it after the tap merges). `bump.yml` itself is otherwise
-  untouched; any edit to it reopens R4.
+- **The `v1.2.0` tag push → WU5's merge (R4 — binding spec text, not a note). CORRECTED after
+  verify-report C1; the earlier "tap merges first" edge was unsatisfiable.** `v1.1.0`'s published asset
+  contains `cellar.app`, so merging `app "Home-Cellar.app"` against that declared version breaks fresh
+  installs and red-lights the tap's own install job. Tag-first alone is no better: `bump.yml` runs
+  `17 */6 * * *`, rewrites only `version`/`sha256`, and gates on `brew style` + `brew audit` —
+  **neither extracts the archive nor resolves the `app` stanza** — so it lands the renamed version
+  against `app "cellar.app"`. Only **atomic and post-release** works: publish the renamed asset, pause
+  `bump.yml`'s schedule (or supersede its open PR), land **one** tap commit moving `version`, `sha256`
+  and `app` together, restore the schedule. Any edit to `bump.yml`'s content reopens R4.
 - **WU1 → WU2 / WU3 / WU4 (soft, single-writer).** No compile dependency: the four app-repo units
   touch disjoint files. They share `cellarTests/BundleNamingTests.swift` (WU1 creates it with tests
   1, 2 and 4; WU2 appends test 3; WU3 appends test 5), so they execute **sequentially, one writer**.
@@ -103,8 +105,9 @@ whose behaviour they verify.
   `TEST_HOST` leaves the test host pointing at a bundle that no longer exists and the whole
   `cellarTests` bundle fails to launch — an intermediate state that is not merely red, it is
   unrunnable.
-- **WU5 ∥ WU1–WU4.** Different repository, different PR, no shared file. Schedule it first so R4 is
-  satisfied by construction rather than by a checklist item at tag time.
+- **WU5 ∥ WU1–WU4.** Different repository, different PR, no shared file. Prepare it alongside them, but
+  **hold its merge until after the renamed release publishes** — R4 is satisfied by the atomicity of
+  that one post-release commit, not by landing the tap early.
 - **Inside every unit**: RED before GREEN, `strict_tdd: true`. Never negotiable.
 - **Rollback order** is the reverse: WU5 → WU4 → WU3 → WU2 → WU1. If a tag already shipped, revert
   the **tap first** and re-point it at the last `cellar.app` asset — a reverted app repo against a
@@ -147,7 +150,12 @@ whose behaviour they verify.
       reviewed diff opens with the reasoning:
       `docs(sdd): record the m8-bundle-rename proposal, spec delta, design and tasks`.
 
-## Phase 1: WU5 — the tap goes first (R4)
+## Phase 1: WU5 — the tap change is *prepared*, not merged (R4)
+
+**RESTRUCTURED after verify-report C1.** This phase originally read "the tap goes first", which cannot
+be satisfied while `v1.1.0`'s published asset still contains `cellar.app`. Preparing the branch stays
+here; **merging it moved to Phase 7** — post-release, as one atomic `version`+`sha256`+`app` commit.
+Tasks 1.1–1.4 are unaffected: the edits they made are correct and stay `[x]`.
 
 Executed in `/Users/juancasanueva/programming/swiftUI/homebrew-cellar`, on branch
 `feat/m8-bundle-rename`. **No RED/GREEN pair exists here**: the tap repo has no test harness (design
@@ -177,20 +185,18 @@ happens to have cloned it.
       `auto_updates true`, `:22-28` `zap trash:` (no data root moves, and **no
       `/Applications/cellar.app` entry may be added** — a zap must not delete a bundle the cask never
       placed), and `.github/workflows/bump.yml` in its entirety (any edit reopens R4).
-- [ ] 1.5 **DEFERRED — maintainer action.** `sdd-apply` never pushes and never opens PRs, so the
-      branch `feat/m8-bundle-rename` is left ready at commit `e16589f` in
-      `/Users/juancasanueva/programming/swiftUI/homebrew-cellar` for the maintainer to push and open.
-      Local proxy evidence captured now: `brew style Casks/home-cellar.rb` → `1 file inspected, no
-      offenses detected`. The online strict audit and the install/uninstall round trip need the tap's
-      CI runner and stay unexercised here.
-      Open the tap PR. Its CI is the verification: `brew style`, `brew audit --cask --online
-      --strict`, and the install/uninstall job resolving the `app` artifact against
-      `/Applications/Home-Cellar.app`.
-- [ ] 1.6 **DEFERRED — maintainer gate, post-merge.** Cannot be satisfied by this phase; recorded as
-      the binding R4 pre-condition on the `v1.2.0` tag push.
-      **Gate.** The tap PR is **merged**. If it cannot merge before the app repo is ready, pause
-      `bump.yml`'s schedule and record that in the app PR body. Do not push a `v*` tag until one of
-      the two holds.
+- [x] 1.5 **DONE (remediation) — branch rebased onto `origin/main` and held.** It was based on `f9e7428`,
+      two `bump.yml` commits behind `origin/main` (`5e02b96`), so it still declared `version "1.0.0"` and
+      a merge or fast-forward would have regressed the published cask (verify-report W1). Rebased: the
+      branch now carries `version "1.1.0"` / `sha256 a6d5c68…` with only the three intended files changed
+      (`ci.yml` 6, `home-cellar.rb` 2, `README.md` 10). New head **`7c50ee6`**.
+      **Shape chosen: one atomic commit, HOLD + four-step merge procedure in its message** — not a
+      two-commit "safe pre-tag" / "post-release" split, because `ci.yml`'s install job asserts
+      `/Applications/Home-Cellar.app` right after `brew install --cask`, so a commit carrying `ci.yml`
+      without the `app` stanza would still red-light CI. Nothing here is safe to merge earlier.
+      Re-captured after the rebase: `brew style` → `no offenses detected`; `rg 'cellar\.app'` → 0 hits.
+- [ ] 1.6 **MOVED to Phase 7 (7.3–7.5).** Pushing, opening and merging the tap PR are **post-release**
+      actions now, so they no longer belong to a phase that runs before the tag.
 
 ## Phase 2: WU1 — the product is renamed, the module is pinned
 
@@ -466,38 +472,56 @@ Runner: `xcodebuild test … -only-testing:cellarTests/CaskZapInventoryTests`
       left ready at `8e01341` with six commits; the PR body content required below is drafted in
       `apply-progress.md`. Open the app-repo PR from `feat/m8-bundle-rename`: title
       `feat(release): name the delivered bundle Home-Cellar.app`, and a body that states up front
-      (a) the tap PR's merge status and that **no `v*` tag may be pushed until it is merged or
-      `bump.yml` is paused** (R4); (b) that `PRODUCT_MODULE_NAME` is pinned to `cellar` **on purpose**
+      (a) that `bump.yml`'s schedule is paused **before** the tag and the tap PR merges **after** the
+      renamed release publishes, as one atomic `version`+`sha256`+`app` commit (R4 — corrected from the
+      unsatisfiable "tap first" ordering); (b) that `PRODUCT_MODULE_NAME` is pinned to `cellar` **on purpose**
       (DD-1), so the Swift module and all 22 `@testable import cellar` lines are untouched; and
       (c) that **D1 makes this update-safe with no migration** — the installed base is empty, so no
       `target:`, no zap entry for the old path, and no user-facing old-name guidance exists anywhere.
       This repository defines no `type:*` labels, so apply none.
 
-## Phase 7: Post-tag `manual-evidence` (maintainer's Mac — not merge blockers, not test tasks)
+## Phase 7: Post-tag — the atomic tap landing, then `manual-evidence` (maintainer's Mac)
 
-Both scenarios are unreachable until `v1.2.0` ships. The rename **rides the next tag**; there is no
-rename-only release (D1). Capture each transcript **verbatim into the verify report**.
+**RESTRUCTURED after verify-report C1.** The tap merge moved here from Phase 1: it is **post-release**,
+and it must be **one commit** moving `version`, `sha256` and `app` together (R4). Everything below is
+unreachable until `v1.2.0` ships; the rename **rides the next tag** (D1). Capture each transcript
+**verbatim into the verify report**.
 
-- [ ] 7.1 **DEFERRED — post-merge, pre-tag maintainer gate.** Unreachable now: the tap PR is not pushed
-      (hard rule — this phase opens no PR), so the tap's default branch still reads `app "cellar.app"`.
-      The renamed cask is ready on `feat/m8-bundle-rename` at `e16589f`.
-      **Gate — R4 re-check immediately before the tag push.** `Casks/home-cellar.rb` on the tap's
-      default branch reads `app "Home-Cellar.app"`, **or** `bump.yml`'s schedule is paused. Confirm by
-      reading the merged tap branch, not by trusting Phase 1.6.
-- [ ] 7.2 **DEFERRED — post-tag `manual-evidence`, maintainer's Mac.** Unreachable until `v1.2.0` ships;
-      there is no published `Home-Cellar.app` asset to install yet. **ME1 — "A tap and an install put the released build in `/Applications`."**
+- [ ] 7.1 **DEFERRED — pre-tag maintainer gate. Pause the automated bump.** Before pushing `v1.2.0`,
+      disable `bump.yml`'s `17 */6 * * *` schedule in `juancasanueva/homebrew-cellar` (or supersede any
+      open bump PR). It rewrites `version`/`sha256` **without** touching the `app` stanza, so an unpaused
+      bump against the renamed release lands exactly the mismatch R4 forbids. Restore it in 7.5, not
+      before, and do **not** edit `bump.yml`'s content — only its schedule state.
+- [ ] 7.2 **DEFERRED — post-tag asset proof (the pre-condition for 7.3).** Once `v1.2.0` publishes,
+      download `Home-Cellar-1.2.0.zip` and prove it carries the renamed bundle **before** touching the
+      tap: `unzip -Z1 Home-Cellar-1.2.0.zip | head -2` must print `Home-Cellar.app` and
+      `Home-Cellar.app/Contents/MacOS/Home-Cellar`. Record `shasum -a 256` of that **downloaded** file —
+      not a build-time value — as the `sha256` for 7.3. If it still contains `cellar.app`, **stop**.
+- [ ] 7.3 **DEFERRED — maintainer action. The atomic tap commit.** Amend `7c50ee6` on
+      `feat/m8-bundle-rename` in `/Users/juancasanueva/programming/swiftUI/homebrew-cellar` so
+      `version "1.2.0"`, the 7.2 `sha256`, and `app "Home-Cellar.app"` all move in **that one commit**;
+      the four-step procedure is already written into its message. Push and open the tap PR. Its CI is
+      the verification: `brew style`, `brew audit --cask --online --strict`, and the install/uninstall
+      job resolving the `app` artifact against `/Applications/Home-Cellar.app` — only passable once 7.2 holds.
+- [ ] 7.4 **DEFERRED — maintainer gate.** The tap PR is **merged** and its CI install round trip is
+      green. Confirm by reading `Casks/home-cellar.rb` on the tap's **default** branch: `version`,
+      `sha256` and `app` must all describe the same published release. Do not trust Phase 1.
+- [ ] 7.5 **DEFERRED — maintainer action.** Restore `bump.yml`'s schedule; confirm its next run is a
+      no-op (delta scenario *Keeping the cask current is idempotent on the declared version*).
+- [ ] 7.6 **DEFERRED — post-tag `manual-evidence`, maintainer's Mac.** Unreachable until 7.4 holds.
+      **ME1 — "A tap and an install put the released build in `/Applications`."**
       `brew uninstall --cask home-cellar` → `brew install --cask home-cellar` →
       `/Applications/Home-Cellar.app` exists and reports the released version, `codesign -dvvv` reads
       the new path, `Contents/MacOS/Home-Cellar` is present, and the app launches with no Gatekeeper
       refusal.
-- [ ] 7.3 **DEFERRED — post-tag `manual-evidence`, maintainer's Mac.** Requires a Sparkle self-update of
+- [ ] 7.7 **DEFERRED — post-tag `manual-evidence`, maintainer's Mac.** Requires a Sparkle self-update of
       a cask-installed copy of the renamed build, which cannot exist before the tag. The
       `--dry-run` binding below stands. **ME2 — "A self-updated app does not fight `brew upgrade`."** After a Sparkle self-update in
       place, Homebrew does not report the copy as outdated and does not reinstall over it, and exactly
       one bundle exists at the original path.
       **BINDING — never run `brew upgrade` without `--dry-run` on the maintainer's Mac** (Engram
       `#7724`). Use `brew upgrade --cask --dry-run home-cellar`. This applies to every retry.
-- [ ] 7.4 **DEFERRED to `sdd-verify`** — this is an obligation on the verify report, which this phase
+- [ ] 7.8 **DEFERRED to `sdd-verify`** — this is an obligation on the verify report, which this phase
       does not author. Stated here for the record: the five `BundleNamingTests` cases prove the
       pipeline is **composed** to produce `Home-Cellar.app`; `release.sh` and `release.yml` are
       **unexercised** until the `v1.2.0` run, and the three tap `ci-gate` scenarios until the tap CI
@@ -508,8 +532,8 @@ rename-only release (D1). Capture each transcript **verbatim into the verify rep
 ## Phase 8: Archive obligations (recorded now so they are not re-derived at `sdd-archive`)
 
 - [ ] 8.1 **DEFERRED to `sdd-archive` by design** — the obligation is recorded, not executed here;
-      `openspec/specs/release-distribution/spec.md` is only edited at archive time. **R7 — three provenance passages sit outside every requirement block and a MODIFIED delta
-      structurally cannot carry them.** `sdd-archive` MUST hand-edit
+      `openspec/specs/release-distribution/spec.md` is only edited at archive time. **R7 — six provenance passages sit outside every requirement block and a MODIFIED delta
+      structurally cannot carry them** (three added by remediation, W2). `sdd-archive` MUST hand-edit
       `openspec/specs/release-distribution/spec.md`:
       **`:619`** — the `m6-sparkle-updates` provenance reads `Contents/MacOS/cellar` as the `U31`
       measurement; that is a **historical measurement**, so keep the recorded fact and mark that the
@@ -522,6 +546,11 @@ rename-only release (D1). Capture each transcript **verbatim into the verify rep
       its "update continuity for every installed 1.0.0 copy" clause as **closed by D1** (the installed
       base was empty, so no continuity work was owed). The other two deferred items (cache dir under
       the bundle id; `homebrew/cask` submission) **stay deferred**.
+      **`:567`** (`m6-release-pipeline` D4/D7, "containing `cellar.app`") and **`:706`** (the "now
+      CONSUMED" paragraph, "its `app` stanza to `cellar.app`") are historical: keep each fact, mark the
+      path as since moved. **`:601`** is **the urgent one** — it says the cask's `app` stanza "must name
+      `cellar.app` exactly" in the **present tense**, so left alone it directly contradicts the merged
+      requirement; record that `m8-bundle-rename` superseded it.
 - [ ] 8.2 **DEFERRED to `sdd-archive`.** **Hand-update the `## Verification classes` table** (outside every requirement block, as its
       counts were hand-updated at `:627-632`). This delta adds **one** scenario (*The rename ships no
       migration mechanism*, `ci-gate`): `unit` 18 / `ci-gate` 17 / `manual-evidence` 6 (41) →

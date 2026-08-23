@@ -144,8 +144,12 @@ MUST NOT delete a bundle the cask never placed.
 A cask's `app` artifact MUST name the bundle that the version it declares actually contains. The
 automated bump path gates only on style and audit, and **neither extracts the archive nor resolves the
 `app` artifact**, so a cask naming a bundle its declared asset does not contain audits clean and
-installs broken. A change to the delivered bundle's name MUST therefore reach the tap **before** the tag
-that publishes the renamed asset is pushed.
+installs broken. A change to the delivered bundle's name MUST therefore reach the tap in **one atomic
+commit that moves `version`, `sha256` and the `app` artifact together**, applied **after** the first
+release whose published asset actually contains the renamed bundle — never ahead of that release, since
+a cask naming a bundle its already-declared version lacks is the same violation in the other direction.
+Across that window the automated bump MUST be paused, or its open pull request superseded, until that
+commit lands: it moves `version` and `sha256` without the `app` artifact, re-opening the same mismatch.
 
 The cask MUST declare that the app **updates itself**, because Sparkle replaces the bundle in place: a
 self-updated copy MUST NOT cause `brew` to report a mismatch or to reinstall over the newer app. The
@@ -159,7 +163,7 @@ version** — an update attempt against a release the cask already declares MUST
 channel therefore cannot manufacture a second commit, or a second release, from one published release,
 which is what keeps it compatible with "one stable release per commit".
 (Previously: the installed bundle was `/Applications/cellar.app` and the requirement forbade renaming
-it; the update-continuity, no-migration-mechanism and tap-before-tag ordering clauses did not exist.)
+it; the update-continuity, no-migration-mechanism and atomic-tap-commit ordering clauses did not exist.)
 
 #### Scenario: A tap and an install put the released build in `/Applications`
 
@@ -171,7 +175,8 @@ it; the update-continuity, no-migration-mechanism and tap-before-tag ordering cl
 
 #### Scenario: The cask is style-clean, audit-clean, and survives a real install/uninstall round trip
 
-- GIVEN the cask as published in the tap repository
+- GIVEN a cask commit that moves `version`, `sha256` and the `app` artifact together, against a release
+  that is already published
 - WHEN the tap's CI runs style, offline audit, and online strict audit, then installs the cask and
   uninstalls it with a zap
 - THEN every gate passes, the online audit confirms the declared checksum against the downloaded
@@ -281,10 +286,11 @@ exclusivity clause, and the inventory's independence from the bundle name was un
 
 ## Notes for archive
 
-- **R7 — Provenance prose must be hand-updated; a MODIFIED delta structurally cannot carry it.** Three
+- **R7 — Provenance prose must be hand-updated; a MODIFIED delta structurally cannot carry it.** **Six**
   places in `openspec/specs/release-distribution/spec.md` sit **outside every requirement block** and
   will still name the old bundle after these three blocks are merged. `sdd-archive` MUST edit them by
-  hand, exactly as the verification-class counts were hand-updated at `:627-632`:
+  hand, exactly as the verification-class counts were hand-updated at `:627-632`. The six in-block hits
+  (`:34`, `:63`, `:415`, `:436`, `:489`, `:517`) need no hand edit — the MODIFIED blocks replace them:
   - `:619` — the `m6-sparkle-updates` provenance paragraph reads `Contents/MacOS/cellar` as the probe
     `U31` measurement. This is a **historical measurement**: keep the recorded fact, and mark that the
     path is now `Contents/MacOS/Home-Cellar` rather than silently rewriting what was measured.
@@ -298,6 +304,12 @@ exclusivity clause, and the inventory's independence from the bundle name was un
     "update continuity for every installed 1.0.0 copy" clause MUST be recorded as **closed by D1**: the
     installed base was empty, so no continuity work was owed. The other two deferred items (cache dir
     under the bundle id; `homebrew/cask` submission) stay deferred.
+  - `:567` (`m6-release-pipeline` D4/D7, "containing `cellar.app` with display name `Home-Cellar`") and
+    `:706` (the "now CONSUMED" paragraph, "its `app` stanza to `cellar.app`") are **historical**: keep
+    each recorded fact and mark that the path has since moved to `Home-Cellar.app`.
+  - `:601` — **the urgent one.** The inherited-contract paragraph states the cask's `app` stanza "must
+    name `cellar.app` exactly" in the **present tense**, as a binding contract, so left alone it
+    directly contradicts the merged requirement. Record that `m8-bundle-rename` superseded it.
 - **The `## Verification classes` table MUST be hand-updated.** The table lives outside every
   requirement block. This delta adds **one** scenario (*The rename ships no migration mechanism*,
   `ci-gate`), so the counts move from `unit` 18 / `ci-gate` 17 / `manual-evidence` 6 (total 41) to
@@ -310,10 +322,13 @@ exclusivity clause, and the inventory's independence from the bundle name was un
   Capabilities contract — three MODIFIED requirements, **zero ADDED requirements**, zero removed, zero
   renamed — is honoured exactly; only the scenario count moves.
 - **The ordering constraint (R4) is requirement text, not only a note.** "A change to the delivered
-  bundle's name MUST therefore reach the tap **before** the tag that publishes the renamed asset is
-  pushed" is now binding spec text, because a cask that audits clean and installs broken is a property
-  of the delivered build. `sdd-tasks` MUST still carry it as an explicit ordering dependency between
-  work units, and `bump.yml` itself is untouched by this change.
+  bundle's name MUST therefore reach the tap in **one atomic commit that moves `version`, `sha256` and
+  the `app` artifact together**, applied **after** the first release whose published asset actually
+  contains the renamed bundle" is now binding spec text, because a cask that audits clean and installs
+  broken is a property of the delivered build. **This corrects an earlier "tap before the tag" wording
+  that was unsatisfiable** (verify-report C1): `v1.1.0` publishes an asset containing `cellar.app`, so a
+  tap merged ahead of the renamed release declares a version whose asset it misnames. Both orderings
+  break. `sdd-tasks` MUST carry the atomic one as an edge **after** the tag, `bump.yml`'s schedule paused.
 - **The bundle identifier is now requirement text, not prose.** `com.juancasanueva.cellar` appears in
   the first and second MODIFIED blocks. `ReleasePipelineCompositionTests.swift:94` and
   `UpdateProjectFileTests.swift:68` already guard it and MUST stay green untouched — they are the
