@@ -119,14 +119,17 @@ MUST NOT expose tap or untap controls. Only third-party taps MUST expose mutatio
 ### Requirement: Tap package inventory preserves identity without entering the catalog
 
 Every tap package MUST retain formula-or-cask kind as part of its identity. For a selected tap, a
-formula display name MAY remove only the exact `<selected-tap>/` prefix; no other prefix or substring
-MAY be removed, and cask tokens MUST retain their published token. Formula and cask entries with the
-same token MUST remain distinct.
+formula display name and a cask display name MAY remove only the exact `<selected-tap>/` prefix; no
+other prefix or substring MAY be removed. `brew tap-info --json` publishes cask tokens fully qualified
+exactly as it publishes formula names, so the same rule applies to both kinds, and the projected
+identity MUST be the bare token brew installs by; the published, fully qualified name MUST be retained
+alongside it. Formula and cask entries with the same token MUST remain distinct.
 
 Installed status MUST come only from a complete installed snapshot whose exact `InstalledPackage.tap`
 equals the selected tap, preserving package kind. An installed match MUST offer **Show in Installed**.
-An uninstalled name MUST remain informational and show the exact copy “Not in Cellar’s core/cask
-catalog.” Tap packages MUST NOT enter the catalog snapshot, catalog search, or catalog detail; PD6
+An uninstalled name MUST remain informational and show the exact copy “Not installed.” — a statement
+about this Mac, not about the catalog, because a third-party package is never in the catalog whether
+installed or not. Tap packages MUST NOT enter the catalog snapshot, catalog search, or catalog detail; PD6
 remains unchanged and selection MUST NOT create a third-party detail fallback.
 
 The inventory MUST be filterable by package name and kind. A large inventory MUST remain usable by
@@ -139,6 +142,13 @@ presented eagerly.
 - WHEN their display names are projected
 - THEN they are `widget` and `other/tap/widget`, respectively
 
+#### Scenario: A fully qualified cask token matches the installed cask
+
+- GIVEN selected tap `acme/tools` publishes cask token `acme/tools/widget`
+- AND cask `widget` is installed from tap `acme/tools`
+- WHEN the tap inventory is presented
+- THEN the cask displays as `widget`, keeps `acme/tools/widget` as its published name, and offers **Show in Installed**
+
 #### Scenario: Equal formula and cask tokens remain distinct
 
 - GIVEN a formula and cask both displayed as `widget`
@@ -150,7 +160,7 @@ presented eagerly.
 - GIVEN formula `widget` has installed tap `acme/tools`, while same-named cask has `other/tools`
 - WHEN `acme/tools` inventory is presented
 - THEN only the formula offers **Show in Installed**
-- AND the cask shows “Not in Cellar’s core/cask catalog.”
+- AND the cask shows “Not installed.”
 
 #### Scenario: Tap names never become catalog records
 

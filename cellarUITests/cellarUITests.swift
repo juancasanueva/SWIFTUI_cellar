@@ -223,7 +223,7 @@ final class cellarUITests: XCTestCase {
         filter.typeText("widget")
         XCTAssertTrue(app.staticTexts["widget"].exists)
         XCTAssertTrue(app.buttons["Show in Installed"].exists)
-        XCTAssertTrue(app.staticTexts["Not in Cellar’s core/cask catalog."].exists)
+        XCTAssertTrue(app.staticTexts["Not installed."].exists)
 
         app.buttons["tap-force-untap-button"].click()
         let forceCommand = app.staticTexts["confirmation-command"]

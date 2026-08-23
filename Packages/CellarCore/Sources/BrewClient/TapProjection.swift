@@ -23,7 +23,7 @@ public struct TapPackage: Sendable, Equatable, Identifiable {
 
     public var isInstalled: Bool { installedHandoff != nil }
     public var uninstalledExplanation: String? {
-        isInstalled ? nil : "Not in Cellar’s core/cask catalog."
+        isInstalled ? nil : "Not installed."
     }
 
     public init(
@@ -80,11 +80,17 @@ public struct TapProjection: Sendable, Equatable {
                 installedHandoff: exactInstalled(id, tap: tap.name, inventory: installed)
             )
         }
-        let casks = tap.caskTokens.map { token -> TapPackage in
+        // `brew tap-info --json` publishes cask tokens fully qualified, exactly
+        // as it publishes formula names, while the installed snapshot keys a
+        // cask by the bare token brew installs by. Same prefix rule for both.
+        let casks = tap.caskTokens.map { published -> TapPackage in
+            let token = published.hasPrefix(prefix)
+                ? String(published.dropFirst(prefix.count))
+                : published
             let id = PackageID(kind: .cask, name: token)
             return TapPackage(
                 id: id,
-                publishedName: token,
+                publishedName: published,
                 displayName: token,
                 installedHandoff: exactInstalled(id, tap: tap.name, inventory: installed)
             )
