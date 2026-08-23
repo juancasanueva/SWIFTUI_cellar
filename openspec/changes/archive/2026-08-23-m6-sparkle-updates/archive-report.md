@@ -535,3 +535,37 @@ the delta's note.
 - `openspec/changes/m6-sparkle-updates/` no longer exists.
 - `tasks.md` was archived **unmodified**; no checkbox was reconciled, because none needed to be (§4).
 - No archived change was deleted or modified. The archive is an audit trail.
+
+---
+
+## 15. Post-archive addendum — the publication path, proven (2026-08-23, same day)
+
+Written after the archive commit, on the fresh commit `v1.0.0` is cut from. It closes the items §"Still
+open, by design" deferred to the first stable tag, and records two defects the proving releases found.
+
+| Evidence | Tag / run | Result |
+|---|---|---|
+| M4 / U33 — real `sign_update` with the repository secret; `deploy-pages` from a tag ref | `v0.0.2` · run 32629158393 | Feed live at `https://juancasanueva.github.io/SWIFTUI_cellar/appcast.xml`; signature verified offline with `sign_update --verify` against the published zip |
+| M5–M7 — an installed copy updates itself | 0.0.2 → 0.0.4 | Sparkle offered 0.0.4, downloaded, replaced the bundle in `/Applications`, relaunched; post-swap `spctl` accepted (Notarized Developer ID), ticket stapled, About shows `0.0.4 (4)`; no administrator prompt |
+| Feed history preserved across releases | `v0.0.5` · run 32633420385 | Feed shows `5, 4, 2` |
+| Same-commit guard | `v0.0.6` on the same commit as `v0.0.5` | Refused in 5 s before notarization; no release, feed unchanged; tag deleted afterwards |
+
+**Defect 1 — a second stable tag on an already-deployed commit left the feed stale (`v0.0.3`).**
+GitHub Pages keys a deployment by its commit SHA: a repeat deployment of the same commit is accepted,
+reports success, and changes nothing. Measured by diffing the run's artifact (correct, two items)
+against the served feed (unchanged) with both deployments at `succeed`.
+
+**Defect 2 — PR #61 fixed it wrongly (`v0.0.4`).** Replacing `actions/deploy-pages` with a `curl`
+deployment using `pages_build_version = <sha>-<run>` failed every deployment with HTTP 404, after the
+release had already been published. A throwaway diagnostic workflow then measured the API contract:
+`pages_build_version` must be a commit SHA present in the repository (a synthetic 40-hex string is
+also refused), and the status endpoint answers HTTP 200 for every SHA — only the body's `status`
+field distinguishes a deployed commit from one that never was.
+
+**Fix — PR #62 (`d30dfe7`).** `actions/deploy-pages@v5` is back, and a guard placed before any
+signing or notarization refuses a stable tag whose commit has already deployed the feed. The rule it
+enforces is now documented in `RELEASING.md`: **every stable release is cut from a distinct commit.**
+`0.0.3` exists as a release with no feed item, which strands nobody.
+
+**Carry-forward:** whether a commit whose earlier deployment ended in a failure state can be
+redeployed is unmeasured; the guard fails closed on any status other than empty or `succeed`.
