@@ -47,6 +47,18 @@ nonisolated enum AppcastWorkflowSources {
         return steps
     }
 
+    /// Whether `text` shells out to `command` as a command word.
+    ///
+    /// Substring matching would find `gh` inside `github.repository`, so the
+    /// token boundary is what makes "this step shells out to `gh`" a claim
+    /// worth asserting at all.
+    static func invokes(_ command: String, in text: String) -> Bool {
+        let pattern = "(?:^|[\\s;|&(])\(NSRegularExpression.escapedPattern(for: command))(?=\\s|$)"
+        return text.split(separator: "\n", omittingEmptySubsequences: false).contains {
+            String($0).range(of: pattern, options: [.regularExpression]) != nil
+        }
+    }
+
     /// The `release` job's header: everything it declares before its steps.
     ///
     /// Scoped deliberately. `permissions:` also exists at workflow level, and a
@@ -66,13 +78,17 @@ nonisolated enum AppcastWorkflowSources {
 struct AppcastWorkflowTests {
     static let prereleaseGuard = "if: ${{ !contains(github.ref_name, '-') }}"
 
-    /// The four steps this change adds, identified by what each one runs.
+    /// The four publication steps, identified by what each one runs.
     static let publicationMarkers = [
         "appcast.sh",
         "actions/configure-pages",
         "actions/upload-pages-artifact",
-        "actions/deploy-pages"
+        "pages_build_version"
     ]
+
+    /// The deploy step, identified by its name rather than by an action
+    /// reference: it is the step that no longer has one.
+    static let deployStepMarker = "- name: Deploy to Pages"
 
     // MARK: - T16 — ordering and the prerelease guard
 
@@ -153,5 +169,80 @@ struct AppcastWorkflowTests {
             AppcastWorkflowSources.steps(in: workflow).first { $0.contains("appcast.sh") }
         )
         #expect(step.contains("SPARKLE_PRIVATE_KEY"))
+    }
+
+    // MARK: - Every stable tag gets its own Pages build version
+
+    /// `actions/deploy-pages` is gone, and the two actions around it stay.
+    ///
+    /// The action sends `pages_build_version = GITHUB_SHA` and offers no input
+    /// to change it. Two stable tags on one commit therefore ask Pages twice for
+    /// the same build version: the second request is accepted, reports
+    /// `succeed`, and leaves the previously deployed site in place — which for
+    /// this repository means every installed copy keeps reading a feed that
+    /// never learned about the new release.
+    @Test("The appcast is deployed without actions/deploy-pages")
+    func theAppcastIsDeployedWithoutTheDeployPagesAction() throws {
+        let workflow = try AppcastWorkflowSources.workflow()
+
+        #expect(!workflow.contains("actions/deploy-pages"))
+        // Asserted so the absence above reads as a replaced step rather than a
+        // deleted publication half.
+        #expect(workflow.contains("actions/configure-pages"))
+        #expect(workflow.contains("actions/upload-pages-artifact"))
+    }
+
+    /// The deploy step asks for a build version no earlier run can collide with.
+    ///
+    /// The run number is what makes it unique: the commit alone is not, because
+    /// a second tag can point at a commit Pages has already deployed.
+    @Test("The deploy step requests a build version unique to the run")
+    func theDeployStepRequestsABuildVersionUniqueToTheRun() throws {
+        let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
+        let deploy = try #require(steps.first { $0.contains(Self.deployStepMarker) })
+
+        #expect(deploy.contains(Self.prereleaseGuard))
+        #expect(deploy.contains("pages_build_version"))
+        #expect(
+            deploy.contains("GITHUB_RUN_NUMBER") || deploy.contains("github.run_number"),
+            "the build version must carry the run number, or a re-tagged commit collides again"
+        )
+        #expect(deploy.contains("pages/deployments"))
+        // The deployment is asynchronous: a created deployment is not a
+        // published one, so the step waits for the terminal state.
+        #expect(deploy.contains("succeed"))
+    }
+
+    /// The step shells out to `curl`, and to nothing that could retract a
+    /// release.
+    ///
+    /// The workflow's blast radius is pinned elsewhere at exactly one `gh`
+    /// invocation and no `git` invocation. Reaching the REST API through `gh`
+    /// here would quietly widen it.
+    @Test("The deploy step reaches the API with curl and not gh")
+    func theDeployStepReachesTheAPIWithCurlAndNotGh() throws {
+        let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
+        let deploy = try #require(steps.first { $0.contains(Self.deployStepMarker) })
+
+        #expect(AppcastWorkflowSources.invokes("curl", in: deploy))
+        #expect(!AppcastWorkflowSources.invokes("gh", in: deploy))
+        #expect(!AppcastWorkflowSources.invokes("git", in: deploy))
+    }
+
+    /// The deploy step keeps its place in the job.
+    ///
+    /// It must come after the upload, whose artifact id it posts, and before the
+    /// `if: always()` cleanup that destroys the keychain and the API key — so a
+    /// deployment that takes its full ten minutes never races the teardown.
+    @Test("The deploy step runs after the upload and before the keychain cleanup")
+    func theDeployStepRunsAfterTheUploadAndBeforeTheKeychainCleanup() throws {
+        let steps = AppcastWorkflowSources.steps(in: try AppcastWorkflowSources.workflow())
+
+        let upload = try #require(steps.firstIndex { $0.contains("actions/upload-pages-artifact") })
+        let deploy = try #require(steps.firstIndex { $0.contains(Self.deployStepMarker) })
+        let cleanup = try #require(steps.firstIndex { $0.contains("security delete-keychain") })
+
+        #expect(upload < deploy)
+        #expect(deploy < cleanup)
     }
 }

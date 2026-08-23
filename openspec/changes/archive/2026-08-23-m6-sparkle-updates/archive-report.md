@@ -161,7 +161,7 @@ artifacts themselves. Authored product and infrastructure change: **51 files, +3
 | `Packages/CellarCore/Package.swift` | **Modified** — `.library(Updates)`, a target with **no `dependencies:` key at all**, and a test target carrying `Fixtures`. |
 | `cellar/Updates/{SparkleUpdateChecker,AutomaticUpdateChecks,UpdatesSettingsGroup,CheckForUpdatesCommands}.swift` | **New** — 0 pbxproj lines (`cellar/` is a synchronized root group). `SparkleUpdateChecker` is **the only file in the repository that imports Sparkle**. |
 | `cellar/{cellarApp,Settings/SettingsView,AppTestFixtures}.swift` | **Modified** — DI wiring, the Updates group after "Interface", and the UI-test route to an in-memory `AppTestUpdater`. |
-| `Resources/Cellar-Info.plist` | **New** — exactly two keys, merged into the bundle at build time: `SUFeedURL` and the **real** `SUPublicEDKey` `jqReS/cOvK94pbRz/4DwMBTRMwh/0Nf5OJZ5SAfZDVs=`. Held **outside** `cellar/` because a `.plist` inside a synchronized root group ships as a bundle resource. |
+| `Resources/Cellar-Info.plist` | **New** — exactly two keys, merged into the bundle at build time: `SUFeedURL` and the **real** `SUPublicEDKey` `jqReS/…/ZDVs= (redacted here: the repository's key-literal guard requires exactly one occurrence, in `Resources/Cellar-Info.plist`)`. Held **outside** `cellar/` because a `.plist` inside a synchronized root group ships as a bundle resource. |
 | `cellar.xcodeproj/project.pbxproj` | **Modified — exactly 29 insertions, 0 deletions**, the ten binding items and no eleventh key. Both app-target blocks stay byte-identical modulo `name`. |
 | `cellar.xcodeproj/.../swiftpm/Package.resolved` | **New** — pins Sparkle 2.9.6, revision `ac2def28…`. |
 | `scripts/appcast.sh` | **New** — fetch the live feed, verify a pinned tool by sha256, sign the asset with the key on **stdin**, merge one `<item>` newest-first, emit. Zero `git`, zero `gh`, no `set -x`. |
@@ -311,7 +311,7 @@ previous slice, **every maintainer prerequisite is already MET** — what remain
 | P2 | Developer ID Application certificate | ✅ installed; exercised by the `U30` rehearsal |
 | P3 | App Store Connect API key | ✅ `GF2PP6LZ22` |
 | P4 | **Seven** repository secrets incl. `SPARKLE_PRIVATE_KEY` | ✅ `gh secret list` → 7 (the seventh added 2026-08-23T07:33:58Z) |
-| P5 | EdDSA keypair generated, public key committed, **private key backed up offline** | ✅ public key `jqReS/cOvK94pbRz/4DwMBTRMwh/0Nf5OJZ5SAfZDVs=` in `Resources/Cellar-Info.plist`; private key in the login Keychain with an offline backup (Engram `#7686`) |
+| P5 | EdDSA keypair generated, public key committed, **private key backed up offline** | ✅ public key `jqReS/…/ZDVs= (redacted here: the repository's key-literal guard requires exactly one occurrence, in `Resources/Cellar-Info.plist`)` in `Resources/Cellar-Info.plist`; private key in the login Keychain with an offline backup (Engram `#7686`) |
 | P6 | GitHub Pages enabled, source = GitHub Actions | ✅ `has_pages: true`, `build_type: workflow`. The site root is **intentionally empty for v1** — the artifact carries only `appcast.xml`, and the root `404` is an accepted maintainer decision (Engram `#7681`) |
 | P7 | `github-pages` environment admits **tag** refs | ✅ **resolved during this cycle** — see §10 deviation 1 |
 
