@@ -541,9 +541,23 @@ inspect, analyse, score or judge a tap's contents, and MUST NOT derive a trust r
 <!-- TM12 -->
 ### Requirement: Tap trust is read from the tap snapshot and shown as a three-valued state
 
-A tap's trust state MUST be read from the snapshot this capability already acquires — the per-tap
-`trusted` boolean carried by `brew tap-info --installed --json`. It MUST NOT require a second probe, a
-second store, a second source of truth, or a new invalidation domain.
+A tap's **own** trust state MUST be read from the snapshot this capability already acquires — the
+per-tap `trusted` boolean carried by `brew tap-info --installed --json`. For that state, it MUST NOT
+require a second probe, a second store, a second source of truth, or a new invalidation domain.
+
+That clause is scoped to the **tap's own** trust state and MUST NOT be read as governing per-package
+grants. Homebrew grants trust at two independent granularities and publishes the per-package one
+through a different command, so a per-package grant is not derivable from `tap-info` at all. The
+`package-trust` capability owns that second read with its own payload source and its own store, and
+this capability MUST NOT acquire, cache or re-derive it.
+
+Of the four things the clause names, exactly **two** are taken for per-package grants — a second probe
+and a second store. **No new invalidation domain is introduced**: no Cellar command can mutate a
+per-package grant, so there is nothing for a per-package domain to be declared by, and the grant read
+refreshes with the **taps** domain this capability already declares. The tap's own trust state
+therefore remains a single source of truth in the sense that matters: it is read from `tap-info`, by
+this capability, and by nothing else. The grant ledger's own `taps` namespace MUST NOT be consumed as a
+second source for it, MUST NOT feed the badge, and MUST NOT feed any tap-level trust decision.
 
 The state MUST be **three-valued** — `trusted`, `untrusted`, `unreported` — and MUST NOT be reduced to
 a boolean. `unreported` is the absent or null field: a Homebrew with no trust concept. Absence MUST NOT
@@ -561,9 +575,21 @@ two controls only: TM7's revocation behind a successful removal is unconditional
 its own terminal outcome rather than being suppressed. Only third-party taps MUST expose either control; TM4 keeps official
 sources non-mutable.
 
-Every user-facing string in this surface MUST be scoped to the **tap**. None MUST state or imply that a
-package is untrusted, because a per-package grant is independent of a tap grant and can make a package
-loadable while its tap is not trusted.
+An **additive per-package count line** MAY accompany the badge on the tap row and the tap detail
+header. It MUST be supplied by exactly one projection value read by both surfaces, on the same
+one-projection rule the badge follows. It MUST NOT soften, qualify, replace, suppress or restyle the
+“Untrusted” badge, and the badge's own text and the condition that produces it MUST remain exactly as
+pinned above. The count line MUST be absent — not zero, not a placeholder — whenever there is nothing
+positive to state. `package-trust` owns its value, its exact copy and its absence rules.
+
+Every user-facing string **this capability** presents about trust MUST be scoped to the **tap**. None
+MUST state or imply that a package is untrusted, because a per-package grant is independent of a tap
+grant and can make a package loadable while its tap is not trusted. The per-package strings
+`package-trust` contributes to this surface are positive-only by that capability's own rule, and MUST
+NOT be used to qualify a tap-scoped string.
+(Previously: the single-source clause was unqualified, so it read as forbidding any second trust read
+anywhere in the app rather than a second source for the tap's own state; and no rule permitted, or
+constrained, an additive per-package line beside the badge.)
 
 #### Scenario: Trust decodes into three distinct states
 
@@ -602,6 +628,25 @@ loadable while its tap is not trusted.
 - WHEN they are enumerated
 - THEN each is scoped to the tap
 - AND none states or implies that a package is untrusted
+- Verification: `unit`
+
+#### Scenario: The tap's own state still comes from one source
+
+- GIVEN a tap whose trust state is in turn `trusted`, `untrusted` and `unreported`
+- WHEN every acquisition this capability performs to produce that state is enumerated, with the
+  per-package grant report in turn present, absent and failed
+- THEN the tap's state comes only from the tap snapshot in every case
+- AND it is unchanged by the presence, absence or failure of the per-package report
+- AND the report's own `taps` namespace feeds neither the state nor the badge, even when it names that exact tap
+- Verification: `unit`
+
+#### Scenario: The count line is additive and never touches the badge
+
+- GIVEN an `untrusted` tap with individually trusted packages, and the same tap with none
+- WHEN the row and the detail header are projected
+- THEN both carry the exact badge text “Untrusted” in both cases, from the same projection as before
+- AND the count line is present in the first case and absent in the second, and in neither case does it
+  alter, replace or qualify the badge
 - Verification: `unit`
 
 <!-- TM13 -->
@@ -737,3 +782,44 @@ reported as ordinary successful outcomes, not as errors and not as a Cellar defe
     tap-level state only, so a tap whose packages work through per-package grants still reads
     "Untrusted"; a trust column in the Brewfile diff; and trust state for official taps, which TM4 keeps
     non-mutable so no control could appear for them anyway.
+
+- **Amended by change `m9-per-package-trust`** (archived `2026-08-24` —
+  `openspec/changes/archive/2026-08-24-m9-per-package-trust/`), **1 MODIFIED, 0 added, 0 removed, 0
+  renamed** — **13 req / 55 sc → 13 req / 57 sc**. TM12 was replaced as a whole block: **7 scenarios**
+  replace the 5 it carried, and the replacement is a **strict superset** of the text it replaced.
+  `rules.archive`'s destructive-delta warning did not fire, and **TM1–TM11 and TM13 are byte-identical**
+  to their prior text — verified at archive by byte-slicing the untouched ranges against a pre-merge
+  copy rather than by assertion. Delivered in PR **#73**, merged `2026-08-24` at `ddb9661`.
+  - **The single-source clause is now scoped to the tap's *own* trust state.** It read as absolute —
+    "It MUST NOT require a second probe, a second store, a second source of truth, or a new
+    invalidation domain" — where "it" is *a tap's* trust state, which still comes from `tap-info`. Read
+    as a reviewer would read it, the clause governed the whole trust surface and every work unit in
+    `m9-per-package-trust` contradicted it. Scoping it was therefore that change's **first** work unit
+    (design **DD-12**), landed before the first line of code, not tidied up at archive.
+  - **Of the clause's four prohibitions, exactly two are taken** — a second probe and a second store,
+    both owned by the new `package-trust` capability. **No new invalidation domain exists** (**DD-3**):
+    no Cellar command can mutate a per-package grant, so the grant read rides the **taps** domain this
+    capability already declares. **Rejected:** extending `tap-info` to carry per-package grants (it does
+    not publish them); a dedicated per-package `InvalidationScope` member (dead declaration surface
+    across five command families); consuming the grant ledger's own `taps` namespace as a second source
+    for a tap's own state; and changing or softening the “Untrusted” badge.
+  - **TM9, TM11 and TM1 need no delta, each verified against its own text.** TM9's refresh arithmetic is
+    *unchanged and now provably so*: with no new domain, every count it pins holds and no command's
+    `invalidates` declaration was touched. TM11's enumerated action set is unchanged because the
+    per-package surface adds **no action** — it is read-only display — and its "a reported state, never
+    a verdict" scenario is reinforced by `package-trust` PT6. TM1's middle-state copy already states the
+    reason a per-package grant exists, and PT5's marker is additive beside it.
+  - **The additive count line is permitted and constrained here, not left to taste.** Exactly one
+    projection value feeds both the tap row and the detail header — the same one-projection rule the
+    badge follows — and it MUST be absent, never `0`, when there is nothing positive to state.
+    `package-trust` PT5 owns its value, its exact copy and its absence rules.
+  - **`brew untrust <tap>` was measured to cascade to that tap's per-package grants** (2026-08-24,
+    Homebrew 6.0.18-182-ga963211; Engram `#7775`; transcript in the m9 archive). TM7's revocation
+    behind an accepted removal therefore closes the dormant-grant hole **at package granularity too**,
+    which is stronger than `m7-tap-trust` recorded. That change's **R7** claim — that per-package grants
+    survive TM7's flow — is **false for the in-Cellar path** and MUST NOT be carried forward
+    unqualified. TM7 and TM8 themselves are unchanged; only what is known about their effect moved.
+  - **One deferred follow-up from `m7-tap-trust` is now closed**: the per-package trust surface it
+    recorded as deferred shipped as the `package-trust` capability. The other two — a trust column in
+    the Brewfile diff, and trust state for official taps (TM4 keeps them non-mutable) — remain open.
+  - The archived delta spec is the verbatim audit trail.

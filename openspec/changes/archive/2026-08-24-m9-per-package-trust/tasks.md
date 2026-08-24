@@ -461,7 +461,7 @@ and `… -only-testing:cellarUITests/PerPackageTrustUITests`.
       code+test bucket and the artifact bucket**, and compare each with its own forecast
       (2,736–3,312 and 1,900–2,300). A large miss is information for the next forecast, not a failure.
       **This is the m7 learning-E follow-through: the artifact bucket is measured separately.**
-- [ ] 8.7 Open the PR(s) per the resolved chain decision. The body states up front: (a) this change
+- [x] 8.7 Open the PR(s) per the resolved chain decision. The body states up front: (a) this change
       **grants and revokes nothing** — it shows what `brew trust --json v1` already reports; (b)
       **corrected by the live ME2 run (task 12.1)** — TM7's untap flow removes that tap's per-package
       grants because `brew untrust <tap>` cascades, so only an untap performed **outside** Cellar leaves
@@ -497,27 +497,27 @@ this repository.
 
 ## Phase 10: Archive obligations (recorded now so they are not re-derived at `sdd-archive`)
 
-- [ ] 10.1 `package-trust` is **established** by this change: create
+- [x] 10.1 `package-trust` is **established** by this change: create
       `openspec/specs/package-trust/spec.md`, promote the eight ADDED requirements in order as
       **PT1–PT8**, add the file header, the `## Requirements` wrapper, and a `## Provenance` section
       recording this change, its binding decisions and what each rejected (per-package grant/revoke
       controls; extending `tap-info`; a dedicated invalidation domain; any negative per-package copy).
-- [ ] 10.2 Promote the three MODIFIED/ADDED blocks as **whole-block replacements**: TM12 into
+- [x] 10.2 Promote the three MODIFIED/ADDED blocks as **whole-block replacements**: TM12 into
       `tap-management` (→ 13 req / 57 sc, TM1–TM11 and TM13 untouched), PM10 into `package-mutation`
       (→ 10 req / 63 sc, PM1–PM9 untouched), and PD8 appended after PD7 in `package-detail`
       (→ 8 req / 30 sc, PD1–PD7 byte-identical).
-- [ ] 10.3 Record in provenance: the argv prohibition was **reaffirmed, not relaxed** (C2 unchanged;
+- [x] 10.3 Record in provenance: the argv prohibition was **reaffirmed, not relaxed** (C2 unchanged;
       the C1 ban list extended — the one deliberate guard edit); **DD-3** adds **no new invalidation
       domain**; and **PD8 is expected to render nothing** on today's shipped surface (PD6), existing so
       the bare-name hazard is impossible to ship.
-- [ ] 10.4 Record the measured payload facts PT4 rests on (obs `#7764`) — namespaces **not disjoint**,
+- [x] 10.4 Record the measured payload facts PT4 rests on (obs `#7764`) — namespaces **not disjoint**,
       `@` in names, present-and-empty namespaces, side-effect-free read — because they are cheap to lose
       and expensive to re-derive, and the captured payload **is** the fixture.
-- [ ] 10.5 Record the deferrals: per-package grant/revoke controls stay out of scope until the
+- [x] 10.5 Record the deferrals: per-package grant/revoke controls stay out of scope until the
       `brew untrust --formula|--cask <qualified>` probe answers whether the revocation itself registers
       a grant through `explicitly_allowed?` before removing it; and `BrewfileDiff.isPresent` (**R15**)
       is deliberately not in this change.
-- [ ] 10.6 Record the **five binding reconciliations B1–B5** as design-vs-spec deviations resolved in
+- [x] 10.6 Record the **five binding reconciliations B1–B5** as design-vs-spec deviations resolved in
       the spec's favour, so a future reader does not mistake `design.md`'s superseded copy and
       three-category accounting for the shipped shape.
 
