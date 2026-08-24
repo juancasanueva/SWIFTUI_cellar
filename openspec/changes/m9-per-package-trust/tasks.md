@@ -265,70 +265,70 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TrustGrantStore
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TapProjectionTests|TrustGrantAccountingTests'`
 
-- [ ] 4.1 **RED.** `TapProjectionTests · attributionRequiresBothThePrefixAndThePublication`:
+- [x] 4.1 **RED.** `TapProjectionTests · attributionRequiresBothThePrefixAndThePublication`:
       prefix-only → unattributed; publication-only (a bare `wget`) → unattributed; **both** →
       attributed; the URL-shaped entry → unattributed, **never crashed and never split on `/`**; no tap
       is derived from its first two slash-separated components. **RED because** the rule does not
       exist. *(PT3.1, PT3.2, DD-5, R6)*
-- [ ] 4.2 **RED.** `TapProjectionTests · aSameNamedPackageUnderAnotherTapIsNotClaimed`: a report listing
+- [x] 4.2 **RED.** `TapProjectionTests · aSameNamedPackageUnderAnotherTapIsNotClaimed`: a report listing
       formula `acme/tools/widget`, with installed `widget` from `other/tools` and catalog `widget` from
       `homebrew/core`, leaves **both** `noGrantRecorded`; neither is marked from the bare name.
       *(PT3.3, PD8.1)*
-- [ ] 4.3 **RED — B4.** New file `TrustGrantAccountingTests.swift` ·
+- [x] 4.3 **RED — B4.** New file `TrustGrantAccountingTests.swift` ·
       `theAccountingPartitionsTheDecodedSet`: over the spec's exact fixture — 2 `taps` (one installed,
       one not), 3 `casks` (two published by installed taps), 1 URL-shaped `formulae`, 1 `commands` —
       the totals are **attributed 2 · excluded tap grants 1 · orphan tap grants 1 · unmatched package
       grants 2 · other 1**, they **sum to the 7 entries decoded**, every entry lands in exactly one
       category, and no `taps` entry contributes to any package count. **RED because** the design's
       three-category value cannot express the partition. *(PT4.1, PT8.1, DD-9)*
-- [ ] 4.4 **RED.** `TrustGrantAccountingTests · theSameIdentifierInTwoNamespacesIsTwoEntries`: both
+- [x] 4.4 **RED.** `TrustGrantAccountingTests · theSameIdentifierInTwoNamespacesIsTwoEntries`: both
       `gentleman-programming/tap/engram` occurrences are decoded and accounted **separately**, one as a
       formula and one as a cask; neither deduplicates, displaces, overwrites or masks the other; a grant
       for one kind does **not** mark the other kind; `nehir@rc` neither truncates nor fails.
       **RED because** nothing pins non-disjointness. *(PT4.2, obs `#7764`)*
-- [ ] 4.5 **RED.** `TrustGrantAccountingTests · theCommandsNamespaceIsCountedNeverDropped`: a report
+- [x] 4.5 **RED.** `TrustGrantAccountingTests · theCommandsNamespaceIsCountedNeverDropped`: a report
       whose only entries are in `commands` counts them as **other** and renders a non-empty section; a
       present-and-empty `commands` beside populated namespaces is a report of nothing, distinguishable
       from an absent key, and neither report is presented as empty. *(PT4.3, DD-9)*
-- [ ] 4.6 **RED.** `TapProjectionTests · oneProjectionCarriesTheCountAndTheMarkedSet`: a tap with two
+- [x] 4.6 **RED.** `TapProjectionTests · oneProjectionCarriesTheCountAndTheMarkedSet`: a tap with two
       attributed grants → `countLine` exactly **“2 trusted individually”**, singular form exactly
       **“1 trusted individually”**, and `marked` is exactly the attributed `PackageID`s — one value,
       read by the row **and** the header. *(PT5.1, TM12.7, DD-6)*
-- [ ] 4.7 **RED.** `TapProjectionTests · nothingIsClaimedForUnreportedOrZero`: `countLine == nil` and
+- [x] 4.7 **RED.** `TapProjectionTests · nothingIsClaimedForUnreportedOrZero`: `countLine == nil` and
       `marked.isEmpty` for `.unreported` and for a decoded report with zero attributed grants; **no
       rendering anywhere contains “0 trusted individually”**, and no string says a package is
       untrusted, unsafe, unverified or unprotected. *(PT5.2, PT6.1, PT6.2, DD-7, D-c, TM11)*
-- [ ] 4.8 **RED.** `TapProjectionTests · theCountIsScopedToItsOwnTap`: with `acme/tools` and
+- [x] 4.8 **RED.** `TapProjectionTests · theCountIsScopedToItsOwnTap`: with `acme/tools` and
       `other/tools`, one grant published by each, one orphan tap grant and one unmatched package grant,
       each tap's count is exactly 1 and includes neither the orphan nor the unmatched entry. *(PT5.3)*
-- [ ] 4.9 **RED — B1, B2, B3.** `TapProjectionTests · theSectionCopyIsExactAndDistinguishesTheStates`:
+- [x] 4.9 **RED — B1, B2, B3.** `TapProjectionTests · theSectionCopyIsExactAndDistinguishesTheStates`:
       `.unreported` → exactly **“This Homebrew does not report per-package trust.”**; a decoded report
       with no entries → exactly **“Homebrew records no packages trusted individually.”**; a non-empty
       orphan set → exactly **“Homebrew still records these grants. Cellar shows them; it does not
       remove them.”**; neither report-level state renders the other's copy or a count of `0`; nothing
       describes a grant as expired, stale, inactive or harmless. **RED because** the design's superseded
       strings would fail these byte comparisons. *(PT6.3, PT8.2)*
-- [ ] 4.10 **RED.** `TapProjectionTests · theLedgersTapKeyNeverFeedsATrustState`: a ledger naming a tap
+- [x] 4.10 **RED.** `TapProjectionTests · theLedgersTapKeyNeverFeedsATrustState`: a ledger naming a tap
       in `taps` changes no badge, no count line and no package category, **even when it names that exact
       tap**; `TapProjection.trust(for:)`'s output is identical for every `TrustGrantState`.
       *(TM12.6, PT4.1's exclusion, DD-9)*
-- [ ] 4.11 **RED — D-d, binding.** `TapShippingProofTests · theTapBadgeAndSummaryAreUnchangedByGrants`:
+- [x] 4.11 **RED — D-d, binding.** `TapShippingProofTests · theTapBadgeAndSummaryAreUnchangedByGrants`:
       `trust(for:)` and `packageSummary(for:)` produce byte-identical output for **every**
       `TrustGrantState`; the badge text and the condition producing it are unchanged. *(TM12.7)*
-- [ ] 4.12 **RED — PD8.** `TapProjectionTests · aGrantMarksOnlyTheExactPackageItNames`:
+- [x] 4.12 **RED — PD8.** `TapProjectionTests · aGrantMarksOnlyTheExactPackageItNames`:
       `grantsIndividually(_:publishedBy:in:)` is true only when kind, name **and** tap of origin match
       the entry exactly; a grant for `acme/tools/widget` marks neither `homebrew/cask`'s `widget` nor
       `other/tools`' `widget`; where identity cannot be established exactly the answer is false;
       `noGrantRecorded` and `unreported` both produce **no marker, no placeholder, no muted variant and
       no note**, and no string containing “trusted”. *(PD8.1, PD8.2, PD8.4)*
-- [ ] 4.13 **RED — PD8.3.** `TapProjectionTests · theMarkerIsNotAProjectionField`: with a decoded report
+- [x] 4.13 **RED — PD8.3.** `TapProjectionTests · theMarkerIsNotAProjectionField`: with a decoded report
       present, the catalog package-detail projection's exposed field set is **exactly** the one PD1
       pins, unchanged, and no field carries a trust state, a grant, a verdict, or a value meaning “this
       download is verified”. *(PD8.3, PD7 preserved by shape)*
-- [ ] 4.14 **RED.** `TapProjectionTests · aGrantForAnUninstalledTapIsSurfacedNotDropped`: an entry whose
+- [x] 4.14 **RED.** `TapProjectionTests · aGrantForAnUninstalledTapIsSurfacedNotDropped`: an entry whose
       owner/repo matches no installed tap appears in the unattributed totals, counted, and never in any
       tap's count. *(PT8.1, R7, D-e)*
-- [ ] 4.15 **Prove RED** (all fourteen), then **GREEN**: `TapProjection.swift` — add
+- [x] 4.15 **Prove RED** (all fourteen), then **GREEN**: `TapProjection.swift` — add
       `TapGrantPresentation { countLine: String?, marked: Set<PackageID> }`, `UnattributedGrants` with
       the **five-category** partition (B4: `orphanTapGrants`, `unmatchedFormulae`, `unmatchedCasks`,
       `other`, plus the `excluded` and `attributed` counts and a `total` that sums to the decoded
@@ -336,7 +336,7 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapProjectionTe
       `grants(for:in:)`, `grantsIndividually(_:publishedBy:in:)`, `unattributedSection(in:taps:)`, and
       the **one private** `attribute(_:kind:to:)` expressing DD-5's two required conditions, used by
       every caller. Exact copy per B1–B3 and PT5.
-- [ ] 4.16 Focused command green **and** every shipped `TapProjectionTests` / `TapShippingProofTests`
+- [x] 4.16 Focused command green **and** every shipped `TapProjectionTests` / `TapShippingProofTests`
       case still green; commit WU4
       (`feat(taps): attribute per-package grants without ever splitting a token`).
 
