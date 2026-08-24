@@ -385,16 +385,16 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 
 ## Phase 6: Verification and bindings
 
-- [ ] 6.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline **plus**
+- [x] 6.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline **plus**
       every new case, **0 failures**. Assert counts, never a bare success line.
-- [ ] 6.2 App target — **use the SCOPED runner**:
+- [x] 6.2 App target — **use the SCOPED runner**:
       `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`
       → baseline plus the new composition cases, 0 failures. **The full `-scheme cellar` runner is known
       red on `main` @ 5a0860b** from two **pre-existing** `cellarUITests` Taps failures
       (`cellarUITests.swift:209`, `:231`), tracked for a separate PR — it is **not** the gate for this
       change, and a red full-scheme run caused by those two cases is **not** a regression of m11.
       `cellarUITests` gains **no** new test and has a zero-line diff on this branch.
-- [ ] 6.3 **Bindings proof.**
+- [x] 6.3 **Bindings proof.**
       `git diff --stat main -- cellar.xcodeproj/project.pbxproj openspec/specs/ Packages/CellarCore/Sources/Catalog/PackageSearchIndex.swift Packages/CellarCore/Sources/BrewClient/MutationCommand.swift Packages/CellarCore/Sources/BrewClient/TapCommand.swift Packages/CellarCore/Sources/BrewClient/TapProjection.swift cellar/Browse/PackageDetailView.swift scripts/ .github/workflows/`
       → **empty output**. A non-zero `project.pbxproj` diff means the file-system-synchronized group
       assumption broke; a non-zero `openspec/specs/` diff means someone promoted a delta early (that is
@@ -402,17 +402,17 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
       **into** the index (Approach C, which PD6 now forbids outright); a non-zero `MutationCommand.swift`
       diff means a new argv family was invented (PM10). Any of them is reported before merge, never
       absorbed.
-- [ ] 6.4 **Regression guards that must never have moved**: `PerPackageTrustCompositionTests` (both
+- [x] 6.4 **Regression guards that must never have moved**: `PerPackageTrustCompositionTests` (both
       tests, 3-line edit only), `TapProjectionTests`, `TapShippingProofTests`, `MutationCommandTests`,
       `MutationCommandTargetTests`, `SearchIndexTests`, `FilterTests`, `InstalledFilterCompositionTests`,
       `ReceiptDetailCompositionTests`, `PackageGraphTests`.
-- [ ] 6.5 **Spec-delta self-check before verify**: re-count the four deltas against task 1.2's numbers;
+- [x] 6.5 **Spec-delta self-check before verify**: re-count the four deltas against task 1.2's numbers;
       confirm PD6's three, TM5's ten and TM11's two shipped scenarios are **byte-identical** to
       `openspec/specs/{package-detail,tap-management}/spec.md` (`git diff --no-index` on the extracted
       blocks); confirm every one of the **19** new scenarios has a task above naming it — **including
       ps4, whose RED row this artifact added** — and that **no** delta introduces a new verification
       class.
-- [ ] 6.6 `git diff --stat main` for the whole branch — record the authored total **split into the
+- [x] 6.6 `git diff --stat main` for the whole branch — record the authored total **split into the
       code+test bucket and the artifact bucket**, and compare each against its own forecast (1,509–2,608
       and the band task 0.4 fixed). If the total exceeds 5,000, record it as information for the next
       forecast, not as a mid-flight re-plan.
@@ -428,23 +428,23 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 
 ## Phase 7: Archive obligations (recorded now so they are not re-derived at `sdd-archive`)
 
-- [ ] 7.1 Promote the ADDED block as **PS8**, appended after `package-search`'s current last requirement
+- [x] 7.1 Promote the ADDED block as **PS8**, appended after `package-search`'s current last requirement
       (→ 8 req / 35 sc; PS1–PS7 byte-identical). Promote PD6, TM5 and TM11 as **whole-block
       replacements** (→ 8 req / 32 sc and 13 req / 60 sc). **Promote no verification-class table** —
       none of the three main specs carries one (precedent at
       `openspec/specs/installed-inventory/spec.md:1122-1184`); only the inline `- Verification:` lines
       promote. `package-search` and `package-detail` carry **no `<!-- PS# -->` / `<!-- PD# -->` markers**;
       match those blocks by heading.
-- [ ] 7.2 Record in provenance: **no `package-mutation` delta** — PM10 was **activated, not amended**,
+- [x] 7.2 Record in provenance: **no `package-mutation` delta** — PM10 was **activated, not amended**,
       and its argv enumeration gains no family; **no `installed-inventory` delta** — II7/II8/II15
       activated; **no `package-trust` delta** — nothing on this surface reads a grant; **TM12 untouched**
       — no Untrusted badge in Browse. Record the **TM10→TM11 / TM11→TM12 marker drift** once more, since
       `explore.md` and `proposal.md` still carry the pre-promotion ordinals.
-- [ ] 7.3 Record the deferrals, so a future contributor does not “complete the grid”: a **name-only
+- [x] 7.3 Record the deferrals, so a future contributor does not “complete the grid”: a **name-only
       detail pane for a not-installed tap hit** is a clearly scoped follow-up, blocked today by TM5's
       unconditional tap-source-read ban; **a merged ranked list** stays rejected (PS3's order is broken
       by 365-day install count, which a tap package does not have); **index ingestion** (Approach C) is
       now explicitly forbidden by PD6's modified text; **`SearchFilters` gains no member** for this
       source, by construction.
-- [ ] 7.4 Record which **PRD.md milestone** this closes (**M11**), and note that the two pre-existing
+- [x] 7.4 Record which **PRD.md milestone** this closes (**M11**), and note that the two pre-existing
       `cellarUITests` Taps failures (`:209`, `:231`) remain open and are **not** m11's to close.
