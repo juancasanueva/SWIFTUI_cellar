@@ -1,0 +1,207 @@
+//
+//  TapSearchView.swift
+//  cellar
+//
+
+import BrewClient
+import Catalog
+import SwiftUI
+
+/// Search our taps: the packages the taps this Mac has installed publish.
+///
+/// A visual sibling of `BrowseView` — the same search field, the same filter
+/// bar, the same list, rows and install menu — over a different source. It is
+/// its **own** surface rather than a section of the catalog list, so the
+/// catalog query surface stays catalog-only and its file carries a zero-line
+/// diff (`package-search` PS8, DD-8).
+///
+/// The surface composes **no copy of its own**. Every sentence it shows — the
+/// install state, the catalog collision and each empty state — is supplied by
+/// `TapPackageSearch`, so two surfaces cannot word the same fact differently
+/// (PS8, DD-7, DD-17).
+///
+/// It also decides nothing. Which rows may be selected, which carry a collision
+/// note, which identity the install names and why the list is empty are all
+/// facts of the projection, resolved once there and only read here (DD-4, DD-6).
+struct TapSearchView: View {
+    /// The tap inventory this Mac already has resident, from the refresh
+    /// `tap-management` performs. Read, never refreshed: composing this surface
+    /// costs no brew invocation (PS8).
+    let taps: TapStore
+    let installed: InstalledStore
+    /// Read for **membership alone** — whether the catalog carries a hit's bare
+    /// token — and never for a hit's content (PD6).
+    let catalog: CatalogStore
+    let operations: OperationCenter
+    /// The shell's one selection, threaded exactly as `BrowseView` threads it:
+    /// a routable hit lands on the shared `PackageDetailView` through the
+    /// existing resolution order, with no routing branch of its own (DD-4).
+    @Binding var selection: PackageID?
+
+    @State private var query = ""
+    @State private var filters = SearchFilters()
+    @State private var hideInstalled = false
+
+    var body: some View {
+        // Composed once per render and read twice below, rather than
+        // recomputed at each use. Built **synchronously in `body`**: both
+        // inputs are already resident, so an async hop would only add a frame
+        // where the list is empty for a value that was never absent (DD-12).
+        let hits = self.hits
+
+        VStack(spacing: 0) {
+            VStack(spacing: 10) {
+                PaneSearchField(
+                    text: $query,
+                    prompt: "Search \(packageCount.formatted()) packages…"
+                )
+                // The catalog's own bar, reused with its two unanswerable
+                // groups switched off: a tap hit has no version to be outdated
+                // and no published deprecation or disabled flag, so offering
+                // either control would leave an enabled control inert (DD-15).
+                CatalogFilterBar(
+                    filters: $filters,
+                    hideInstalled: $hideInstalled,
+                    outdatedOnly: .constant(false),
+                    isInstalledFilterEnabled: installed.absence == nil,
+                    showsOutdatedChip: false,
+                    showsCatalogPredicates: false
+                )
+            }
+            .padding(EdgeInsets(top: 11, leading: 13, bottom: 11, trailing: 13))
+            HairlineDivider()
+
+            List(selection: $selection) {
+                ForEach(hits) { hit in
+                    if let routable = hit.routableID {
+                        row(hit)
+                            .tag(routable)
+                            .themedListSelection(isSelected: selection == routable)
+                    } else {
+                        // Deliberately inert. Either the catalog carries this
+                        // token and would answer for it instead, or nothing on
+                        // this Mac has a record to show — so opening a pane
+                        // would present a different package than the row
+                        // chosen, or nothing at all.
+                        row(hit)
+                            .selectionDisabled()
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .overlay {
+                if hits.isEmpty {
+                    TapSearchEmptyState(presentation: presentation(hitCount: hits.count))
+                }
+            }
+        }
+        .background(Color.white.opacity(0.014))
+    }
+
+    private var packageCount: Int {
+        TapPackageSearch.packageCount(inventory: taps.inventory)
+    }
+
+    /// The matching hits, composed above the catalog index and never pushed
+    /// into it. An empty query lists everything the taps publish (DD-16).
+    private var hits: [TapSearchHit] {
+        TapPackageSearch(inventory: taps.inventory, installed: installed.inventory)
+            .hits(
+                query: query,
+                kinds: filters.kinds,
+                hideInstalled: hideInstalled,
+                isInCatalog: { catalog.package($0) != nil }
+            )
+    }
+
+    private func presentation(hitCount: Int) -> TapSearchPresentation {
+        TapPackageSearch.presentation(
+            tapState: taps.state,
+            inventory: taps.inventory,
+            query: query,
+            hitCount: hitCount
+        )
+    }
+
+    private func row(_ hit: TapSearchHit) -> some View {
+        HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(hit.displayName)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.88))
+                        .lineLimit(1)
+                    KindTag(kind: hit.id.kind)
+                    Spacer(minLength: 0)
+                }
+                Text(hit.tapName)
+                    .font(Theme.mono(11))
+                    .foregroundStyle(Color.white.opacity(0.4))
+                    .lineLimit(1)
+                Text(state(hit))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.textFaint)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+            // The shared spine, unconditionally: an entry with neither an
+            // installed nor a catalog record renders Install and Copy install
+            // command, over the bare token (package-mutation PM10).
+            MutationMenu(center: operations, entry: entry(for: hit))
+        }
+        .padding(.vertical, 3)
+    }
+
+    /// A row with neither an installed nor a catalog record, identified by the
+    /// bare token the projection resolved. `MutationMenu` reads that as "not
+    /// installed" and renders exactly Install and Copy install command.
+    private func entry(for hit: TapSearchHit) -> PackageEntry {
+        PackageEntry(installed: nil, catalog: nil, id: hit.mutationTarget)
+    }
+
+    /// The row's sentence — joined from values, never composed from words.
+    private func state(_ hit: TapSearchHit) -> String {
+        [hit.stateCopy, hit.collisionNote].compactMap(\.self).joined(separator: " ")
+    }
+}
+
+/// Why the list is empty, which is never the same reason twice.
+///
+/// A private sibling of `BrowseView`'s `EmptyResults` rather than a shared
+/// type. **Forced, not chosen** (DD-10): `EmptyResults` is `private` and Swift
+/// `private` is file-scoped, so any reuse — or any extraction to a third
+/// file — would edit `BrowseView.swift`, which this change requires to be
+/// byte-identical to its base revision. The two are not the same view either:
+/// they answer different questions and share only their last case.
+///
+/// Every sentence here comes from the projection. This view composes none.
+private struct TapSearchEmptyState: View {
+    let presentation: TapSearchPresentation
+
+    var body: some View {
+        switch presentation {
+        case .loading:
+            ContentUnavailableView("Reading your taps", systemImage: "sparkle.magnifyingglass")
+        case .unavailable, .failed, .noTaps:
+            ContentUnavailableView(
+                presentation.emptyStateCopy ?? "",
+                systemImage: "sparkle.magnifyingglass"
+            )
+        case .noMatch(let query):
+            ContentUnavailableView.search(text: query)
+        case .content:
+            EmptyView()
+        }
+    }
+}
+
+#Preview {
+    @Previewable @State var selection: PackageID?
+    return TapSearchView(
+        taps: TapStore(),
+        installed: InstalledStore(),
+        catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
+        operations: OperationCenter(),
+        selection: $selection
+    )
+}

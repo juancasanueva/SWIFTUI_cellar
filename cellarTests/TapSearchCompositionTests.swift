@@ -50,10 +50,10 @@ struct TapSearchCompositionTests {
     @Test("The tap section is titled and positioned after the catalog results")
     func theTapSectionIsTitledAndPositionedLast() throws {
         let browse = try TapSearchSources.browse()
-        let section = try TapSearchSources.section()
+        let surface = try TapSearchSources.surface()
 
         // The title is the surface's own copy and is byte-exact.
-        #expect(section.raw.contains("\"From your taps\""))
+        #expect(surface.raw.contains("\"From your taps\""))
 
         // One `List`, catalog rows first, the section after them.
         #expect(browse.code.contains("List(selection: $selection)"))
@@ -70,27 +70,27 @@ struct TapSearchCompositionTests {
 
     @Test("Not-installed and ambiguous tap rows are not selectable")
     func notInstalledTapRowsAreNotSelectable() throws {
-        let section = try TapSearchSources.section()
+        let surface = try TapSearchSources.surface()
 
-        #expect(section.code.contains(".selectionDisabled("))
+        #expect(surface.code.contains(".selectionDisabled("))
         // The two inert cases are one code path: the projection already decided,
         // and the view reads `routableID` rather than re-deriving anything.
-        #expect(section.code.contains("if let routable = hit.routableID"))
-        #expect(section.code.contains(".tag(routable)"))
+        #expect(surface.code.contains("if let routable = hit.routableID"))
+        #expect(surface.code.contains(".tag(routable)"))
         #expect(
-            section.code.components(separatedBy: ".tag(").count == 2,
+            surface.code.components(separatedBy: ".tag(").count == 2,
             "the row is tagged in more than one place, so a nil routable id can still reach a tag"
         )
         for forbidden in [".tag(hit.mutationTarget)", ".tag(hit.id)", ".tag(hit."] {
             #expect(
-                section.code.contains(forbidden) == false,
+                surface.code.contains(forbidden) == false,
                 "the row tags an identity the projection did not clear: \(forbidden)"
             )
         }
         // Nothing here re-derives the rule the projection owns.
         for forbidden in ["alsoInCatalog", "isInstalled", "== .notInstalled"] {
             #expect(
-                section.code.contains(forbidden) == false,
+                surface.code.contains(forbidden) == false,
                 "the view re-derives routability through \(forbidden)"
             )
         }
@@ -101,7 +101,7 @@ struct TapSearchCompositionTests {
     @Test("The surface copy lives in the projection, not in the view")
     func theSurfaceCopyLivesInTheProjectionNotTheView() throws {
         let projection = try TapSearchSources.projection()
-        let section = try TapSearchSources.section()
+        let surface = try TapSearchSources.surface()
 
         for copy in TapSearchSources.pinnedCopy {
             #expect(
@@ -109,16 +109,16 @@ struct TapSearchCompositionTests {
                 "the projection no longer supplies \(copy.debugDescription)"
             )
             #expect(
-                section.raw.contains(copy) == false,
+                surface.raw.contains(copy) == false,
                 "the view composes \(copy.debugDescription) locally"
             )
         }
         // What the view renders instead: the values, never the sentences.
-        #expect(section.code.contains("hit.stateCopy"))
-        #expect(section.code.contains("hit.collisionNote"))
+        #expect(surface.code.contains("hit.stateCopy"))
+        #expect(surface.code.contains("hit.collisionNote"))
         // The section title is the one string the view owns — it is `Section`
         // copy, not hit copy — and it is byte-exact.
-        #expect(section.raw.contains("Section(\"From your taps\")"))
+        #expect(surface.raw.contains("Section(\"From your taps\")"))
         #expect(projection.raw.contains("From your taps") == false)
     }
 
@@ -126,7 +126,7 @@ struct TapSearchCompositionTests {
 
     @Test("The Browse tap surface composes no trust gate and no badge")
     func theBrowseTapSurfaceComposesNoTrustGateAndNoBadge() throws {
-        let scanned = [try TapSearchSources.browse(), try TapSearchSources.section()]
+        let scanned = [try TapSearchSources.browse(), try TapSearchSources.surface()]
 
         for source in scanned {
             for forbidden in [
@@ -149,13 +149,13 @@ struct TapSearchCompositionTests {
 
         // The install affordance is offered unconditionally, through the shared
         // menu, over an entry with neither an installed nor a catalog record.
-        let section = try TapSearchSources.section()
-        #expect(section.code.contains("MutationMenu(center:"))
-        #expect(section.code.contains("PackageEntry(installed: nil, catalog: nil"))
-        #expect(section.code.contains("id: hit.mutationTarget"))
+        let surface = try TapSearchSources.surface()
+        #expect(surface.code.contains("MutationMenu(center:"))
+        #expect(surface.code.contains("PackageEntry(installed: nil, catalog: nil"))
+        #expect(surface.code.contains("id: hit.mutationTarget"))
         // …and no verb, argv or target is re-implemented here.
         for forbidden in ["MutationCommand", "PackageTarget(", "submit(", "FormulaID", "CaskID"] {
-            #expect(section.code.contains(forbidden) == false, "the row builds its own \(forbidden)")
+            #expect(surface.code.contains(forbidden) == false, "the row builds its own \(forbidden)")
         }
         // The shared menu really is the surface that renders Install, so
         // matching it proves something.
@@ -190,7 +190,7 @@ struct TapSearchCompositionTests {
 
     @Test("Neither tap search file reaches the process layer")
     func neitherTapSearchFileReachesTheProcessLayer() throws {
-        let scanned = [try TapSearchSources.projection(), try TapSearchSources.section()]
+        let scanned = [try TapSearchSources.projection(), try TapSearchSources.surface()]
 
         for source in scanned {
             for forbidden in [
@@ -249,9 +249,9 @@ struct TapSearchCompositionTests {
         // No visibility is relaxed and no new copy is invented (DD-10, R5).
         #expect(browse.code.contains("private struct EmptyResults: View"))
         #expect(browse.code.contains("EmptyResults(query: catalog.query, isReady: catalog.isReady)"))
-        let section = try TapSearchSources.section()
-        #expect(section.code.contains("EmptyResults") == false)
-        #expect(section.code.contains("ContentUnavailableView") == false)
+        let surface = try TapSearchSources.surface()
+        #expect(surface.code.contains("EmptyResults") == false)
+        #expect(surface.code.contains("ContentUnavailableView") == false)
     }
 
     @Test("Catalog row selection is unchanged")
@@ -286,7 +286,7 @@ nonisolated enum TapSearchSources {
 
     static let paths = [
         "Packages/CellarCore/Sources/BrewClient/TapPackageSearch.swift",
-        "cellar/Browse/TapSearchSection.swift",
+        "cellar/Browse/TapSearchView.swift",
         "cellar/Browse/BrowseView.swift"
     ]
 
@@ -324,8 +324,8 @@ nonisolated enum TapSearchSources {
         try source(at: "Packages/CellarCore/Sources/BrewClient/TapPackageSearch.swift")
     }
 
-    static func section() throws -> Source {
-        try source(at: "cellar/Browse/TapSearchSection.swift")
+    static func surface() throws -> Source {
+        try source(at: "cellar/Browse/TapSearchView.swift")
     }
 
     static func browse() throws -> Source {
@@ -362,10 +362,10 @@ nonisolated enum TapSearchSources {
             projection.code.contains("public struct TapPackageSearch"),
             "the projection scan read a file that is not the projection"
         )
-        let section = try section()
+        let surface = try surface()
         #expect(
-            section.code.contains("struct TapSearchSection"),
-            "the section scan read a file that does not supply the tap section"
+            surface.code.contains("struct TapSearchView: View"),
+            "the surface scan read a file that is not the tap search surface"
         )
         let browse = try browse()
         #expect(
