@@ -289,6 +289,83 @@ struct InstalledDetailProjectionTests {
         #expect(reported.tapOfOrigin?.value == "acme/tools")
     }
 
+    // MARK: - II15 sc7 second THEN, PD8, PT3 — and no marker either
+
+    /// sc7's other half: a receipt whose tap Homebrew withholds carries **no
+    /// per-package grant marker**, no placeholder for one and no explanatory
+    /// note — while a grant report that really does grant this exact kind and
+    /// name under some tap is on the table.
+    ///
+    /// The GIVEN is asserted before anything is denied, so "no marker" can
+    /// never be the report's own silence. The value-level half of the THEN is
+    /// this class's to make: the marker is unrepresentable in the projection
+    /// (PD8 forbids a member for it) and `Fact` has no note to put one in. The
+    /// presentation half — that the pane resolves the marker only under the
+    /// tap guard — is `unit-app`'s, in
+    /// `ReceiptDetailCompositionTests.theReceiptPaneResolvesTheMarkerOnlyUnderTheTapGuard`.
+    @Test("A withheld tap carries no per-package grant marker either")
+    func aWithheldTapCarriesNoGrantMarkerEither() throws {
+        let report = TrustGrantState.reported(TrustGrantLedger(
+            formulae: ["acme/tools/widget"],
+            casks: []
+        ))
+        let widget = PackageID(kind: .formula, name: "widget")
+        #expect(
+            TapProjection.grantsIndividually(widget, publishedBy: "acme/tools", in: report),
+            "the report grants nothing, so nothing below is being withheld"
+        )
+
+        let withheld = InstalledFixture.receipt(.formula, "widget", tap: nil)
+        let detail = InstalledDetailProjection(withheld)
+
+        // The receipt names no tap, so the exact-identity rule has nothing to
+        // resolve against: `grantsIndividually` takes a non-optional tap and
+        // this record has none to give it (PT3).
+        #expect(withheld.tap == nil)
+        #expect(withheld.id == widget)
+        #expect(detail.tapOfOrigin == nil)
+
+        // No member of the value could carry a marker instead. Unrepresentable
+        // rather than merely unset, in the same idiom sc3 uses for the kind
+        // asymmetry (DD-4).
+        let members = Mirror(reflecting: detail).children.compactMap(\.label)
+        #expect(members == ["description", "identity", "tapOfOrigin", "kindState"])
+        for member in members {
+            for forbidden in ["grant", "trust", "marker", "badge"] {
+                #expect(
+                    member.lowercased().contains(forbidden) == false,
+                    "the projection grew a \(forbidden) member for the marker to live in"
+                )
+            }
+        }
+
+        // …and no emitted fact says one, in label, value or note. `Fact` has
+        // exactly three members, so there is no note member to hold the
+        // "explanatory note" the scenario also forbids.
+        let emitted = detail.orderedFacts
+        #expect(emitted.isEmpty == false, "an empty detail would prove nothing above")
+        let factMembers = Mirror(reflecting: try #require(emitted.first)).children
+            .compactMap(\.label)
+        #expect(factMembers == ["label", "value", "style"])
+        for fact in emitted {
+            #expect(fact.value != TapProjection.grantMarker)
+            #expect(fact.label != TapProjection.grantMarker)
+            for forbidden in ["trust", "grant"] {
+                #expect(fact.value.lowercased().contains(forbidden) == false)
+                #expect(fact.label.lowercased().contains(forbidden) == false)
+            }
+        }
+
+        // Triangulated against the case that *does* earn a marker: the same
+        // receipt reporting the granted tap resolves it through the projection
+        // that owns the copy, from the tap value the origin fact carries. The
+        // absence above is the withheld tap's doing, not the report's.
+        let reported = InstalledFixture.receipt(.formula, "widget", tap: "acme/tools")
+        let origin = try #require(InstalledDetailProjection(reported).tapOfOrigin)
+        #expect(origin.value == "acme/tools")
+        #expect(TapProjection.grantsIndividually(reported.id, publishedBy: origin.value, in: report))
+    }
+
     // MARK: - II15 sc8, DD-3 — absence is omission, never a sentinel
 
     @Test("An absent description or homepage is absent, not empty")
@@ -388,11 +465,6 @@ struct InstalledDetailProjectionTests {
 
     @Test("The handoff lands on a receipt-backed detail, not on a catalog record")
     func theHandoffLandsOnAReceiptBackedDetail() throws {
-        // A launcher nothing in this flow is given: if any step needed a brew
-        // invocation to complete the detail, there would be a seam to hand it
-        // to, and this value could not stay at zero by construction.
-        let launcher = RecordingProcessLauncher()
-
         let tap = TapRecord(
             name: "acme/tools",
             repository: "tools",
@@ -438,9 +510,16 @@ struct InstalledDetailProjectionTests {
         #expect(index.recordCount == snapshot.packages.count)
         #expect(snapshot.packages.contains { $0.id == widget } == false)
 
-        // No additional brew invocation was recorded for any of it.
-        #expect(launcher.launchCount == 0, "completing the detail spawned a process")
-        #expect(launcher.specs.isEmpty)
+        // No step of the handoff completed the record from anywhere else: the
+        // inventory handed back the byte-identical receipt it already held, and
+        // a name it does not hold stays a miss rather than sending anyone to
+        // find it. A fake launcher here would assert nothing — the projection's
+        // only parameter is that record, so there is no seam to inject one
+        // into. The per-token proof that neither source reaches the process
+        // layer at all is II15 sc2's, in
+        // `ReceiptDetailCompositionTests.composingTheReducedDetailReachesNoProcessLayer`.
+        #expect(resolved == receipt, "the handoff completed the record from somewhere else")
+        #expect(inventory.package(PackageID(kind: .formula, name: "absent")) == nil)
     }
 
     /// A catalog that carries `curl` and `git` and has never heard of `widget`.
