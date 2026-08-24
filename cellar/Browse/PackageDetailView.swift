@@ -363,37 +363,11 @@ struct PackageDetailView: View {
         }
     }
 
-    /// The header alone, for an installed package the catalog does not list.
-    /// No tabs and no primary verb — the catalog record those need is exactly
-    /// what is absent — but the identity row and the heart still stand.
-    @ViewBuilder
-    private func uncatalogedContent(for snapshot: InstalledPackage) -> some View {
-        VStack(spacing: 0) {
-            header(
-                id: snapshot.id,
-                displayName: snapshot.displayName,
-                versionStory: versionStory(installed: snapshot),
-                installed: snapshot
-            ) {
-                EmptyView()
-            }
-            .padding(EdgeInsets(top: 24, leading: 30, bottom: 0, trailing: 30))
-            ContentUnavailableView(
-                "No further details",
-                systemImage: "shippingbox",
-                description: Text("This installed package is not in Cellar’s core/cask catalog.")
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(Theme.windowBackground)
-        .navigationTitle(snapshot.displayName)
-    }
-
     /// The one identity row both paths render: tile, name, version story, kind,
     /// status and the heart — fed by the catalog record when there is one and
     /// by the snapshot alone when there is not.
     @ViewBuilder
-    private func header(
+    func header(
         id: PackageID,
         displayName: String,
         versionStory: String,
@@ -460,7 +434,7 @@ struct PackageDetailView: View {
         return versionStory(installed: installed)
     }
 
-    private func versionStory(installed: InstalledPackage) -> String {
+    func versionStory(installed: InstalledPackage) -> String {
         if installed.isOutdated {
             return "\(installed.primaryKeg.version) → \(installed.catalogVersion)"
         }
@@ -567,13 +541,7 @@ struct PackageDetailView: View {
                     fact("License", license)
                 }
                 if let homepage = package.homepage {
-                    VStack(alignment: .leading, spacing: 3) {
-                        factLabel("Homepage")
-                        Link(homepage.absoluteString, destination: homepage)
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(theme.base)
-                            .lineLimit(1)
-                    }
+                    factLink("Homepage", homepage)
                 }
                 if package.kind == .cask, package.autoUpdates {
                     fact("Updates", "Updates itself")
@@ -583,7 +551,7 @@ struct PackageDetailView: View {
         }
     }
 
-    private func fact(
+    func fact(
         _ label: String,
         _ value: String,
         mono: Bool = false,
@@ -603,6 +571,22 @@ struct PackageDetailView: View {
                         .accessibilityIdentifier("package-detail-grant-marker")
                 }
             }
+        }
+    }
+
+    /// A labelled fact whose value is a link, in the same shape `fact(_:_:)`
+    /// gives a plain one.
+    ///
+    /// Extracted from the catalog pane's inline homepage block so both panes
+    /// render a homepage identically and `theme` can stay private to this file
+    /// (design DD-9).
+    func factLink(_ label: String, _ url: URL) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            factLabel(label)
+            Link(url.absoluteString, destination: url)
+                .font(.system(size: 12.5))
+                .foregroundStyle(theme.base)
+                .lineLimit(1)
         }
     }
 
@@ -626,7 +610,7 @@ struct PackageDetailView: View {
     /// The measured size, when this machine has the package and the disk scan
     /// has answered — the settled snapshot first, then the in-flight scan's
     /// incremental answer.
-    private func sizeOnDisk(for id: PackageID) -> Int64? {
+    func sizeOnDisk(for id: PackageID) -> Int64? {
         if let usage = diskUsage.incrementalPackages[id] {
             return usage.observation.allocatedBytes
         }
@@ -637,7 +621,7 @@ struct PackageDetailView: View {
 
     /// The design's "Installed as" fact — only for installed packages, where
     /// it is a recorded fact of the keg rather than a guess.
-    private func installedAs(for id: PackageID) -> String? {
+    func installedAs(for id: PackageID) -> String? {
         guard let installedPackage = installed.inventory.package(id) else { return nil }
         return installedPackage.isOnRequest ? "Installed on request" : "Installed as a dependency"
     }
