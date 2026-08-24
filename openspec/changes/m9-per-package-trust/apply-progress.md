@@ -7,7 +7,7 @@ No chain strategy applies; WU1–WU7 land on one branch, `feat/m9-per-package-tr
 **Batch**: round 1 (WU1–WU7), **discharge round 1** (the two evidence gaps `verify-report.md` named),
 and **discharge round 2** (the spec amendment the live ME2 run forced). See both sections below.
 
-**79 / 86 tasks complete.** The seven that remain are not apply work: 8.7 (open the PR — the
+**78 / 85 tasks complete** (mechanical checkbox count; an earlier prose tally said 79/86). The seven that remain are not apply work: 8.7 (open the PR — the
 orchestrator's) and 10.1–10.6 (archive-phase promotion, whose obligations are recorded below so
 `sdd-archive` does not re-derive them). ME2 is **executed and discharged** (round 2).
 

@@ -473,7 +473,7 @@ inactive or harmless.
 - WHEN the report is read and the unattributed section is presented
 - THEN the entry is still listed by brew
 - AND Cellar presents it as an orphan or unmatched grant rather than dropping it
-- AND the transcript and the screenshot of that section appear in the verify report
+- AND the filed transcript (`evidence/me2-transcript.txt`) appears in the verify report
 - Verification: `manual-evidence`
 
 #### Scenario: An untap performed inside Cellar removes that tap's per-package grants

@@ -148,3 +148,14 @@ juancasanueva/cellar
 kitlangton/tap
 letstri/tap
 modem-dev/tap
+
+=== ADDENDUM (orchestrator, post-round-2-verify, 2026-08-24) ===
+Clarifications to the capture above, without altering it:
+1. RESTORATION ran THREE distinct commands whose outputs are merged in the block above:
+   'brew tap guria/tap', then 'brew trust --cask guria/tap/nehir', then 'brew trust --cask guria/tap/nehir@rc'.
+   Re-tapping alone re-armed NOTHING; both cask grants required explicit re-grant commands.
+   This is consistent with PT8.4: the in-Cellar untap path leaves no grant for a re-tap to re-arm.
+2. Homebrew auto-updated during restoration: the measurement ran on 6.0.18-182-ga963211; the
+   final RESTORED payload read ran on 6.0.19. The payload content is identical to the pre-untap capture.
+3. The screenshots referenced in the capture were viewed live by the orchestrator and maintainer but
+   were not archived; the repository evidence for PT8.3/PT8.4 is this transcript alone.
