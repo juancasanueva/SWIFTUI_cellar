@@ -415,6 +415,435 @@ struct TapProjectionTests {
         #expect(TapProjection.publishes(PackageID(kind: .formula, name: "stranger"), in: tap) == false)
     }
 
+    // MARK: - package-trust PT3 :180-194 — attribution, and what it refuses
+
+    /// **DD-5, R6.** Two conditions, both required. Prefix alone would attribute
+    /// an entry for a package the tap does not publish; publication alone would
+    /// attribute a bare `widget` to every tap that publishes a `widget`. And
+    /// neither is a positional split, because a real `formulae` entry is
+    /// URL-shaped and every positional split misreads it.
+    @Test("Attribution requires both the prefix and the publication")
+    func attributionRequiresBothThePrefixAndThePublication() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"],
+            caskTokens: ["acme/tools/desk"]
+        )
+
+        // Prefix only: this tap's prefix, a package it does not publish.
+        let prefixOnly = TapProjection.grants(
+            for: tap,
+            in: .reported(TrustGrantLedger(formulae: ["acme/tools/ghost"]))
+        )
+        #expect(prefixOnly.marked.isEmpty)
+        #expect(prefixOnly.countLine == nil)
+
+        // Publication only: a bare token this tap really does publish.
+        let bare = TapProjection.grants(
+            for: tap,
+            in: .reported(TrustGrantLedger(formulae: ["widget"]))
+        )
+        #expect(bare.marked.isEmpty)
+        #expect(bare.countLine == nil)
+
+        // Both: attributed.
+        let both = TapProjection.grants(
+            for: tap,
+            in: .reported(TrustGrantLedger(formulae: ["acme/tools/widget"]))
+        )
+        #expect(both.marked == [PackageID(kind: .formula, name: "widget")])
+        #expect(both.countLine == "1 trusted individually")
+
+        // The URL-shaped entry: carried forward, never crashed, never split.
+        let urlEntry = "https://github.com/cloudmanic/spice-edit/spice-edit"
+        let splitCandidates = [
+            TapRecord(name: "github.com/cloudmanic", repository: "cloudmanic",
+                      formulaNames: ["spice-edit"]),
+            TapRecord(name: "cloudmanic/spice-edit", repository: "spice-edit",
+                      formulaNames: ["spice-edit"]),
+            TapRecord(name: "https:/", repository: "github.com", formulaNames: ["spice-edit"])
+        ]
+        for candidate in splitCandidates {
+            let presentation = TapProjection.grants(
+                for: candidate,
+                in: .reported(TrustGrantLedger(formulae: [urlEntry]))
+            )
+            #expect(
+                presentation.marked.isEmpty,
+                "\(candidate.name) was derived from the URL entry's components"
+            )
+            #expect(presentation.countLine == nil)
+        }
+        // …and it is surfaced rather than dropped.
+        let accounting = TapProjection.accounting(
+            of: TrustGrantLedger(formulae: [urlEntry]),
+            taps: splitCandidates
+        )
+        #expect(accounting.unmatchedFormulae == [urlEntry])
+        #expect(accounting.total == 1)
+    }
+
+    /// **PT3 :211-217, PD8 :65-71.** The bare-name hazard, pinned before the
+    /// marker exists: a grant for `acme/tools/widget` lighting up every other
+    /// `widget` on the machine is one `hasSuffix` away at all times.
+    @Test("A same-named package under another tap is not claimed")
+    func aSameNamedPackageUnderAnotherTapIsNotClaimed() {
+        let report = TrustGrantState.reported(TrustGrantLedger(formulae: ["acme/tools/widget"]))
+        let other = TapRecord(
+            name: "other/tools",
+            repository: "tools",
+            formulaNames: ["other/tools/widget"]
+        )
+        let widget = PackageID(kind: .formula, name: "widget")
+
+        #expect(TapProjection.grants(for: other, in: report).marked.isEmpty)
+        #expect(TapProjection.grants(for: other, in: report).countLine == nil)
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: "other/tools", in: report) == false)
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: "homebrew/core", in: report) == false)
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: "homebrew/cask", in: report) == false)
+
+        // Positively anchored: the tap that really does publish it is marked, so
+        // the four refusals above are not a rule that refuses everything.
+        let acme = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"]
+        )
+        #expect(TapProjection.grants(for: acme, in: report).marked == [widget])
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: "acme/tools", in: report))
+    }
+
+    // MARK: - PT5 :287-302 — one projection value, and its exact copy
+
+    @Test("One projection carries the count and the marked set")
+    func oneProjectionCarriesTheCountAndTheMarkedSet() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget", "acme/tools/helper"],
+            caskTokens: ["acme/tools/desk"]
+        )
+        let two = TrustGrantState.reported(TrustGrantLedger(
+            formulae: ["acme/tools/widget"],
+            casks: ["acme/tools/desk"]
+        ))
+
+        // The row's value and the header's value are the same value: one call,
+        // one result, and the type is `Equatable` so two calls cannot disagree.
+        let row = TapProjection.grants(for: tap, in: two)
+        let header = TapProjection.grants(for: tap, in: two)
+        #expect(row == header)
+        #expect(row.countLine == "2 trusted individually")
+        #expect(row.marked == [
+            PackageID(kind: .formula, name: "widget"),
+            PackageID(kind: .cask, name: "desk")
+        ])
+
+        // Singular, exactly.
+        let one = TapProjection.grants(
+            for: tap,
+            in: .reported(TrustGrantLedger(formulae: ["acme/tools/helper"]))
+        )
+        #expect(one.countLine == "1 trusted individually")
+        #expect(one.marked == [PackageID(kind: .formula, name: "helper")])
+    }
+
+    /// **DD-7, D-c.** A package under a *trusted* tap is loadable with no
+    /// individual entry at all, so "no entry" is not a fact about trust — and a
+    /// zero beside an `Untrusted` badge would read as a verdict (TM11).
+    @Test("Nothing is claimed for unreported or zero")
+    func nothingIsClaimedForUnreportedOrZero() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"]
+        )
+        let empty = TrustGrantState.reported(TrustGrantLedger(
+            formulae: [],
+            casks: [],
+            declaredNamespaces: ["formulae", "casks"]
+        ))
+        let noneForThisTap = TrustGrantState.reported(
+            TrustGrantLedger(formulae: ["other/tools/widget"])
+        )
+
+        for state in [TrustGrantState.unreported, empty, noneForThisTap] {
+            let presentation = TapProjection.grants(for: tap, in: state)
+            #expect(presentation.countLine == nil, "\(state) claimed a count line")
+            #expect(presentation.marked.isEmpty, "\(state) marked a package")
+        }
+
+        // No rendering anywhere states a zero, or anything negative about a
+        // package. Enumerated over every string these states can produce.
+        var rendered: [String] = []
+        for state in [TrustGrantState.unreported, empty, noneForThisTap] {
+            rendered.append(contentsOf: TapProjection.grants(for: tap, in: state).countLine.map { [$0] } ?? [])
+            let section = TapProjection.unattributedSection(in: state, taps: [tap])
+            rendered.append(contentsOf: [section.title] + [section.sentence].compactMap(\.self))
+            rendered.append(contentsOf: section.groups.flatMap { [$0.title] + $0.entries })
+        }
+        #expect(rendered.isEmpty == false, "the copy enumeration collapsed")
+        for line in rendered {
+            #expect(line.contains("0 trusted individually") == false, "a zero count was rendered: \(line)")
+            for negative in ["untrusted", "unsafe", "unverified", "unprotected", "not trusted"] {
+                #expect(
+                    line.localizedCaseInsensitiveContains(negative) == false,
+                    "per-package copy says a package is \(negative): \(line)"
+                )
+            }
+        }
+    }
+
+    @Test("The count is scoped to its own tap")
+    func theCountIsScopedToItsOwnTap() {
+        let acme = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"]
+        )
+        let other = TapRecord(
+            name: "other/tools",
+            repository: "tools",
+            caskTokens: ["other/tools/desk"]
+        )
+        let report = TrustGrantState.reported(TrustGrantLedger(
+            formulae: ["acme/tools/widget", "nobody/tools/lost"],
+            casks: ["other/tools/desk"],
+            taps: ["ghost/tools"]
+        ))
+
+        #expect(TapProjection.grants(for: acme, in: report).countLine == "1 trusted individually")
+        #expect(TapProjection.grants(for: other, in: report).countLine == "1 trusted individually")
+        #expect(TapProjection.grants(for: acme, in: report).marked
+            == [PackageID(kind: .formula, name: "widget")])
+        #expect(TapProjection.grants(for: other, in: report).marked
+            == [PackageID(kind: .cask, name: "desk")])
+
+        // Neither count includes the orphan tap grant or the unmatched package.
+        let accounting = TapProjection.accounting(
+            of: TrustGrantLedger(
+                formulae: ["acme/tools/widget", "nobody/tools/lost"],
+                casks: ["other/tools/desk"],
+                taps: ["ghost/tools"]
+            ),
+            taps: [acme, other]
+        )
+        #expect(accounting.attributed == 2)
+        #expect(accounting.orphanTapGrants == ["ghost/tools"])
+        #expect(accounting.unmatchedFormulae == ["nobody/tools/lost"])
+        #expect(accounting.total == 4)
+    }
+
+    // MARK: - PT6 :366-373, PT8 :443-449 — the exact copy, B1/B2/B3
+
+    /// The design's drafted strings are superseded here. These are byte
+    /// comparisons on purpose: the difference between "did not report" and
+    /// "does not report", and between rendering nothing and rendering a
+    /// sentence, is the whole of R4 in the copy.
+    @Test("The section copy is exact and distinguishes the states")
+    func theSectionCopyIsExactAndDistinguishesTheStates() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"]
+        )
+        let unreported = TapProjection.unattributedSection(in: .unreported, taps: [tap])
+        let reportedEmpty = TapProjection.unattributedSection(
+            in: .reported(TrustGrantLedger(declaredNamespaces: ["formulae", "casks"])),
+            taps: [tap]
+        )
+        let orphaned = TapProjection.unattributedSection(
+            in: .reported(TrustGrantLedger(taps: ["ghost/tools"])),
+            taps: [tap]
+        )
+        let allAttributed = TapProjection.unattributedSection(
+            in: .reported(TrustGrantLedger(formulae: ["acme/tools/widget"])),
+            taps: [tap]
+        )
+
+        #expect(unreported.sentence == "This Homebrew does not report per-package trust.")
+        #expect(reportedEmpty.sentence == "Homebrew records no packages trusted individually.")
+        #expect(orphaned.sentence
+            == "Homebrew still records these grants. Cellar shows them; it does not remove them.")
+        #expect(allAttributed.sentence == nil, "a fully attributed report rendered a sentence")
+
+        // Neither report-level state renders the other's copy, or a zero.
+        #expect(unreported != reportedEmpty)
+        #expect(unreported.sentence != reportedEmpty.sentence)
+        #expect(reportedEmpty.groups.isEmpty)
+        #expect(unreported.groups.isEmpty)
+        for section in [unreported, reportedEmpty, orphaned, allAttributed] {
+            let copy = [section.title] + [section.sentence].compactMap(\.self)
+                + section.groups.map(\.title)
+            for word in ["0 trusted", "expired", "stale", "inactive", "harmless"] {
+                #expect(
+                    copy.contains { $0.localizedCaseInsensitiveContains(word) } == false,
+                    "the section describes a grant as \(word)"
+                )
+            }
+        }
+        // …and the orphan section names the tap it is about, and offers nothing.
+        #expect(orphaned.groups.flatMap(\.entries) == ["ghost/tools"])
+    }
+
+    /// **TM12.6, DD-9.** The ledger's own `taps` namespace is decoded so nothing
+    /// is dropped, and consumed for a tap's trust state by nothing at all — that
+    /// state comes from `tap-info`, and a second source for it is precisely what
+    /// TM12 forbids.
+    @Test("The ledger's tap key never feeds a trust state")
+    func theLedgersTapKeyNeverFeedsATrustState() {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+        let namesThisTap = TrustGrantState.reported(TrustGrantLedger(taps: ["acme/tools"]))
+        let states: [TrustGrantState] = [
+            .unreported,
+            .reported(TrustGrantLedger(declaredNamespaces: ["taps"])),
+            namesThisTap,
+            .reported(TrustGrantLedger(taps: ["acme/tools", "ghost/tools"]))
+        ]
+
+        let badge = TapProjection.trust(for: tap)
+        #expect(badge.badge == "Untrusted")
+        for state in states {
+            #expect(TapProjection.trust(for: tap) == badge, "\(state) moved the badge")
+            #expect(TapProjection.grants(for: tap, in: state).countLine == nil)
+            #expect(TapProjection.grants(for: tap, in: state).marked.isEmpty)
+        }
+
+        // …and a `taps` entry contributes to no package category either: it is
+        // an excluded tap grant, stated rather than dropped.
+        let accounting = TapProjection.accounting(
+            of: TrustGrantLedger(taps: ["acme/tools"]),
+            taps: [tap]
+        )
+        #expect(accounting.excluded == 1)
+        #expect(accounting.attributed == 0)
+        #expect(accounting.unmatchedFormulae.isEmpty)
+        #expect(accounting.unmatchedCasks.isEmpty)
+        #expect(accounting.other.isEmpty)
+        #expect(accounting.orphanTapGrants.isEmpty)
+        #expect(accounting.total == 1)
+    }
+
+    // MARK: - PD8 :65-95 — the marker is exact, positive-only, and not a field
+
+    @Test("A grant marks only the exact package it names")
+    func aGrantMarksOnlyTheExactPackageItNames() {
+        let report = TrustGrantState.reported(TrustGrantLedger(casks: ["acme/tools/widget"]))
+        let widget = PackageID(kind: .cask, name: "widget")
+
+        // Kind, name and tap of origin, all three.
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: "acme/tools", in: report))
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: "homebrew/cask", in: report) == false)
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: "other/tools", in: report) == false)
+        #expect(TapProjection.grantsIndividually(
+            PackageID(kind: .formula, name: "widget"),
+            publishedBy: "acme/tools",
+            in: report
+        ) == false, "a cask grant marked a formula")
+        #expect(TapProjection.grantsIndividually(
+            PackageID(kind: .cask, name: "widget-pro"),
+            publishedBy: "acme/tools",
+            in: report
+        ) == false)
+
+        // Where identity cannot be established exactly, the answer is false —
+        // and both no-grant states produce no marker of any kind.
+        for state in [
+            TrustGrantState.unreported,
+            .reported(TrustGrantLedger(declaredNamespaces: ["casks"])),
+            .reported(TrustGrantLedger(casks: ["other/tools/widget"]))
+        ] {
+            #expect(TapProjection.grantsIndividually(widget, publishedBy: "acme/tools", in: state) == false)
+        }
+        // The marker itself is one string, stated positively, and it is the only
+        // one this surface has for a package.
+        #expect(TapProjection.grantMarker == "Trusted individually")
+    }
+
+    /// **PD8 :81-87.** The marker is joined at presentation beside the tap fact.
+    /// It is not, and must never become, a field of the catalog projection —
+    /// that is what would quietly weaken PD7.
+    @Test("The marker is not a projection field")
+    func theMarkerIsNotAProjectionField() {
+        let package = CatalogPackage(
+            kind: .cask,
+            name: "widget",
+            displayName: "Widget",
+            desc: nil,
+            homepage: nil,
+            license: nil,
+            version: "1.0",
+            tap: "acme/tools",
+            dependencies: [],
+            buildDependencies: [],
+            dependents: [],
+            caveats: nil,
+            deprecated: false,
+            deprecationReason: nil,
+            deprecationDate: nil,
+            disabled: false,
+            disableReason: nil,
+            disableDate: nil,
+            autoUpdates: false,
+            installCount365d: nil
+        )
+        // With a decoded report present, which is the condition under which a
+        // field would be tempting.
+        let report = TrustGrantState.reported(TrustGrantLedger(casks: ["acme/tools/widget"]))
+        #expect(TapProjection.grantsIndividually(package.id, publishedBy: package.tap, in: report))
+
+        let labels = Mirror(reflecting: package).children.compactMap(\.label)
+        #expect(labels == [
+            "kind", "name", "displayName", "desc", "homepage", "license", "version", "tap",
+            "dependencies", "buildDependencies", "dependents", "caveats",
+            "deprecated", "deprecationReason", "deprecationDate",
+            "disabled", "disableReason", "disableDate",
+            "autoUpdates", "installCount365d", "caskInspection", "formulaSources"
+        ])
+        #expect(labels.count == 22)
+        for forbidden in ["trust", "grant", "verified", "signature", "notariz", "verdict"] {
+            #expect(
+                labels.contains { $0.localizedCaseInsensitiveContains(forbidden) } == false,
+                "the catalog detail projection carries a \(forbidden) field"
+            )
+        }
+    }
+
+    // MARK: - PT8 :435-441 — an orphan grant is surfaced, not dropped
+
+    @Test("A grant for an uninstalled tap is surfaced, not dropped")
+    func aGrantForAnUninstalledTapIsSurfacedNotDropped() {
+        let installed = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"]
+        )
+        let ledger = TrustGrantLedger(
+            formulae: ["acme/tools/widget", "ghost/tools/lost"],
+            taps: ["ghost/tools"]
+        )
+        let accounting = TapProjection.accounting(of: ledger, taps: [installed])
+
+        #expect(accounting.orphanTapGrants == ["ghost/tools"])
+        #expect(accounting.unmatchedFormulae == ["ghost/tools/lost"])
+        #expect(accounting.attributed == 1)
+        #expect(accounting.total == ledger.entryCount)
+        // Counted in the unattributed totals, and in no tap's count.
+        #expect(TapProjection.grants(for: installed, in: .reported(ledger)).countLine
+            == "1 trusted individually")
+
+        let section = TapProjection.unattributedSection(in: .reported(ledger), taps: [installed])
+        #expect(section.groups.flatMap(\.entries).sorted() == ["ghost/tools", "ghost/tools/lost"])
+        #expect(section.sentence
+            == "Homebrew still records these grants. Cellar shows them; it does not remove them.")
+    }
+
     private func tapRecord(trust: TapTrustState) -> TapRecord {
         TapRecord(
             name: "acme/tools",

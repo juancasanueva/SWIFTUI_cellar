@@ -220,45 +220,45 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TrustGrantDecod
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TrustGrantStoreTests|TrustGrantRefreshTests|MutationRefreshReceiptTests'`
 
-- [ ] 3.1 **RED.** New file `TrustGrantStoreTests.swift` ·
+- [x] 3.1 **RED.** New file `TrustGrantStoreTests.swift` ·
       `concurrentRefreshesCoalesceIntoOneSpawn`: three refreshes requested while one is in flight →
       exactly one process spawned, all four requests observe the same report; `invalidate()` defeats
       coalescing. **RED because** the store does not exist. *(PT2.1, R5)*
-- [ ] 3.2 **RED.** `TrustGrantStoreTests · aFailedRefreshKeepsTheLastGoodReport`: success → `.granted`;
+- [x] 3.2 **RED.** `TrustGrantStoreTests · aFailedRefreshKeepsTheLastGoodReport`: success → `.granted`;
       a following failure keeps `.granted` and moves `state` to `.failed`; it is **not** replaced by an
       empty report, by `.unreported`, or by a zero count; a **first-ever** failure leaves `.unreported`.
       *(PT2.2)*
-- [ ] 3.3 **RED.** `TrustGrantStoreTests · aStaleAnswerIsNotAdoptedOverANewerOne`: two refreshes whose
+- [x] 3.3 **RED.** `TrustGrantStoreTests · aStaleAnswerIsNotAdoptedOverANewerOne`: two refreshes whose
       answers arrive out of order → the newer is retained, the older discarded. *(PT2.3)*
-- [ ] 3.4 **RED.** New file `TrustGrantRefreshTests.swift` ·
+- [x] 3.4 **RED.** New file `TrustGrantRefreshTests.swift` ·
       `bothReadsAreIssuedOnceForOneRefreshAndOverlap`: one coordinator refresh issues exactly one
       `tap-info` spawn and exactly one `trust` spawn, **overlapping rather than sequential**, and
       neither refreshes installed inventory or the catalog. **RED because** the coordinator holds one
       store. *(PT2.5, DD-4)*
-- [ ] 3.5 **RED.** `TrustGrantRefreshTests · aDegradedGrantReadNeverFailsTheTapReceipt`: the grant
+- [x] 3.5 **RED.** `TrustGrantRefreshTests · aDegradedGrantReadNeverFailsTheTapReceipt`: the grant
       source throws, and separately never answers; in both cases `RefreshResult` is the successful one
       the **tap** read produced, the taps domain still refreshes exactly once, the tap snapshot is
       adopted undelayed, and the grant state degrades to `.unreported` or the last good report.
       *(PT2.6, DD-4)*
-- [ ] 3.6 **RED.** `TrustGrantRefreshTests · noPerPackageInvalidationDomainExists`: enumerating every
+- [x] 3.6 **RED.** `TrustGrantRefreshTests · noPerPackageInvalidationDomainExists`: enumerating every
       `InvalidationScope` value every command family on the shared spine can declare yields **exactly
       the shipped set**, with no member for per-package trust, and no command declares one. **RED
       because** nothing today pins the enumeration against growth. *(PT2.4, DD-3, obs `#7766` gate 1)*
-- [ ] 3.7 **RED — extend the shipped `MutationRefreshReceiptTests`.** Tap trust, tap untrust and the
+- [x] 3.7 **RED — extend the shipped `MutationRefreshReceiptTests`.** Tap trust, tap untrust and the
       revocation behind an accepted removal, each across success, failure, launch failure and
       cancellation: each terminal refreshes the taps domain exactly once, and **that one refresh now
       issues one tap read and one grant read**. *(PT2.5)*
-- [ ] 3.8 **Prove RED** (all seven), then **GREEN**: new file `.../BrewClient/TrustGrantStore.swift` —
+- [x] 3.8 **Prove RED** (all seven), then **GREEN**: new file `.../BrewClient/TrustGrantStore.swift` —
       `TrustGrantLoadState` and `@MainActor @Observable TrustGrantStore`, cloning `TapStore`
       member-for-member (`InFlightRefresh` keyed on `(request, invalidationCount)`, `nextToken` /
       `installedSequence` monotonic adoption, `invalidate()`, both `refresh` overloads, `clear(to:)`,
       `vacate(_:)`), with `public private(set) var grants: TrustGrantState = .unreported` and
       `init(source: any TrustGrantSourcing = BrewTrustGrantPayloadSource())`.
-- [ ] 3.9 **GREEN.** `TapRefreshCoordinator.swift` — add `grants: TrustGrantStore?` with a **default of
+- [x] 3.9 **GREEN.** `TapRefreshCoordinator.swift` — add `grants: TrustGrantStore?` with a **default of
       `nil`** (the shipped `mutations:` / `refreshRegistry:` idiom, so every existing construction site
       still compiles), and refresh both stores with `async let` in `performRefresh`, `refresh(using:)`
       and `refresh(for:)`. **`RefreshResult` continues to read `store.state` alone.**
-- [ ] 3.10 Focused command green **and** `xcodebuild build …` still compiles; commit WU3
+- [x] 3.10 Focused command green **and** `xcodebuild build …` still compiles; commit WU3
       (`feat(taps): refresh the grant report alongside the tap snapshot`).
 
 ## Phase 4: WU4 — attribution, the five-category accounting, and the exact copy (PT3, PT4.1, PT5, PT6, PT8.1–.2; PD8.1–.3)

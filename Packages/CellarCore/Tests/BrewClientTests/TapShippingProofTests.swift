@@ -244,6 +244,62 @@ struct TapShippingProofTests {
         }
     }
 
+    // MARK: - package-trust D-d / TM12.7 — the badge is untouched
+
+    /// **Binding.** The count line is an *additional* component beside the
+    /// summary, never a replacement, a qualifier or a restyling of the badge.
+    /// Asserted twice over: by value, for every report state, and structurally,
+    /// because a later change could make the badge depend on the report without
+    /// changing any of today's values.
+    @Test("The tap badge and summary are unchanged by grants")
+    func theTapBadgeAndSummaryAreUnchangedByGrants() throws {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget", "acme/tools/helper"],
+            caskTokens: ["acme/tools/desk"],
+            trust: .untrusted
+        )
+        let states: [TrustGrantState] = [
+            .unreported,
+            .reported(TrustGrantLedger(declaredNamespaces: ["formulae", "casks"])),
+            .reported(TrustGrantLedger(formulae: ["acme/tools/widget"])),
+            .reported(TrustGrantLedger(taps: ["acme/tools"])),
+            .reported(TrustGrantLedger(
+                formulae: ["acme/tools/widget", "acme/tools/helper"],
+                casks: ["acme/tools/desk"]
+            ))
+        ]
+
+        let badge = TapProjection.trust(for: tap)
+        let summary = TapProjection.packageSummary(for: tap)
+        #expect(badge.badge == "Untrusted")
+        #expect(summary == "2 formulae · 1 cask")
+        #expect(states.count == 5, "the report-state enumeration collapsed")
+
+        for state in states {
+            #expect(TapProjection.trust(for: tap) == badge, "\(state) moved the badge")
+            #expect(TapProjection.packageSummary(for: tap) == summary, "\(state) moved the summary")
+        }
+        // Positively anchored: the count line really does vary across those
+        // states, so the two expectations above are not both trivially constant.
+        #expect(Set(states.map { TapProjection.grants(for: tap, in: $0).countLine }) == [
+            nil, "1 trusted individually", "3 trusted individually"
+        ])
+
+        // Structurally: neither shipped function can see a report at all.
+        let projection = try coreTrustSources()
+            .first { $0.name == "TapProjection.swift" }
+            .map(\.code)
+        let source = try #require(projection)
+        for signature in [
+            "public static func trust(for tap: TapRecord) -> TapTrustPresentation {",
+            "public static func packageSummary(for tap: TapRecord) -> String {"
+        ] {
+            #expect(source.contains(signature), "a shipped projection signature moved: \(signature)")
+        }
+    }
+
     /// Returns every command the action submits, in submission order — a list
     /// rather than one optional command, because an action is not the same thing
     /// as a command and TM7's removal is two of them.
