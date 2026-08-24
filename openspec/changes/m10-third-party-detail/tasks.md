@@ -313,27 +313,27 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 
 ## Phase 6: Verification and bindings
 
-- [ ] 6.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline **plus**
+- [x] 6.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline **plus**
       every new case, **0 failures**. Assert counts, never a bare success line.
-- [ ] 6.2 Full app target:
+- [x] 6.2 Full app target:
       `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
       → baseline plus the new composition cases, 0 failures. `cellarUITests` gains **no** new test — this
       change adds no new UI-test-flagged store.
-- [ ] 6.3 **Bindings proof.**
+- [x] 6.3 **Bindings proof.**
       `git diff --stat main -- cellar.xcodeproj/project.pbxproj scripts/ .github/workflows/ Packages/CellarCore/Sources/BrewClient/MutationCommand.swift Packages/CellarCore/Sources/BrewClient/TapCommand.swift Packages/CellarCore/Sources/BrewClient/InstalledDecoder.swift Packages/CellarCore/Sources/BrewClient/InstalledModels.swift`
       → **empty output**. A non-zero `project.pbxproj` diff means the file-system-synchronized group
       assumption broke; a non-zero `InstalledDecoder.swift` diff means someone “fixed” the epoch defect
       DD-6 defers. Either is reported before merge, never absorbed.
-- [ ] 6.4 **Regression guards that must never have moved**: `PerPackageTrustCompositionTests` (both
+- [x] 6.4 **Regression guards that must never have moved**: `PerPackageTrustCompositionTests` (both
       tests, 2-line edit only), `TapProjectionTests`, `TapShippingProofTests`, `MutationCommandTests`,
       `InstalledDeriveTests`, `InstalledFilterCompositionTests`, `SecurityCompositionTests`,
       `HealthCompositionSupport` consumers, `BrewfileCompositionTests`, `HomeCompositionTests`.
-- [ ] 6.5 **Spec-delta self-check before verify**: re-count the three deltas against task 1.2's numbers;
+- [x] 6.5 **Spec-delta self-check before verify**: re-count the three deltas against task 1.2's numbers;
       confirm PD6's two and TM5's nine shipped scenarios are **byte-identical** to
       `openspec/specs/{package-detail,tap-management}/spec.md`
       (`git diff --no-index` on the extracted blocks); confirm every one of the **14** new scenarios has
       a task above naming it, and that **no** delta introduces a new verification class.
-- [ ] 6.6 `git diff --stat main` for the whole branch — record the authored total **split into the
+- [x] 6.6 `git diff --stat main` for the whole branch — record the authored total **split into the
       code+test bucket and the artifact bucket**, and compare each against its own forecast (1,201–2,167
       and the band task 0.4 fixed). A large miss is information for the next forecast, not a failure.
 - [ ] 6.7 **Delivery — one PR** (`single-pr`, forecast Low against 5,000; no `size:exception`, no chain).
@@ -346,20 +346,20 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 
 ## Phase 7: Archive obligations (recorded now so they are not re-derived at `sdd-archive`)
 
-- [ ] 7.1 Promote the ADDED block as **II15**, appended after `installed-inventory`'s current last
+- [x] 7.1 Promote the ADDED block as **II15**, appended after `installed-inventory`'s current last
       requirement (→ 15 req / 79 sc; II1–II14 byte-identical). Promote PD6 and TM5 as **whole-block
       replacements** (→ 8 req / 31 sc and 13 req / 58 sc). **Promote no verification-class table** —
       none of the three main specs carries one (precedent recorded at
       `openspec/specs/installed-inventory/spec.md:948`); only the inline `- Verification:` lines promote.
-- [ ] 7.2 Record in provenance: **no `package-trust` delta** — PD8/PT3/PT5/PT6/PT7 were **activated, not
+- [x] 7.2 Record in provenance: **no `package-trust` delta** — PD8/PT3/PT5/PT6/PT7 were **activated, not
       amended**; and the **TM1→TM5 provenance correction** (m9 cited TM1 in ≥3 places for a clause that
       is TM5's).
-- [ ] 7.3 Record the deferrals, so a future contributor does not “complete the grid”: the **install-date
+- [x] 7.3 Record the deferrals, so a future contributor does not “complete the grid”: the **install-date
       fact** is blocked on an `InstalledDecoder` epoch-collapse fix (a follow-up delta against
       `installed-inventory`, **not** a rendering choice); **no “latest version” fact** may be added while
       `catalogVersion` falls back to the installed keg's version (**DD-5**); receipt-backed **release
       notes** stay in `release-notes` D4 territory; **Approach C** (synthesizing a `CatalogPackage`)
       is now explicitly forbidden by PD6's modified text.
-- [ ] 7.4 Record the presentation question the design left open — whether `MutationMenu` sits left of the
+- [x] 7.4 Record the presentation question the design left open — whether `MutationMenu` sits left of the
       heart or the heart left of it — as **closed by whatever apply shipped**, with the choice named. No
       requirement depends on it.
