@@ -138,32 +138,32 @@ Plus one artifact commit, **first on the branch**, which **is** WU1:
 
 ## Phase 0: Preflight (sequential; no behaviour changes)
 
-- [ ] 0.1 Measure and record the green baseline; do not re-derive it later, and do not assume the
+- [x] 0.1 Measure and record the green baseline; do not re-derive it later, and do not assume the
       `m7-tap-trust` numbers still hold — `m8-bundle-rename` shipped after them. Run
       `swift test --package-path Packages/CellarCore` and
       `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`.
       Count **distinct** passing test ids; `Executed 0 tests` is meaningless for Swift Testing bundles.
       A different number from any earlier change is the new baseline, not a defect.
-- [ ] 0.2 Confirm every anchor the design pins is still where it says:
+- [x] 0.2 Confirm every anchor the design pins is still where it says:
       `TapProjection.swift` :121-132 (`trust(for:)`) / :166-174 (`packageSummary`) / :208-222
       (`bareToken`, `publishes`) · `TapStore.swift` :26-36 / :55-93 (the spine WU3 clones) ·
       `TapRefreshCoordinator.swift` :11-19 / :46-59 · `MutationCommandTests.swift` :471-479 (the C1
       ban list) / :500-613 (**C2 — must not move and must not be edited**) · `TapsListView.swift:52` ·
       `TapDetailView.swift` :57-65 / :149-180 · `PackageDetailView.swift:557` · `README.md` :44-47.
       A moved anchor is a deviation to report, not to absorb.
-- [ ] 0.3 `git checkout -b feat/m9-per-package-trust main`.
+- [x] 0.3 `git checkout -b feat/m9-per-package-trust main`.
 
 ## Phase 1: WU1 — TM12 lands first (DD-12, R1; tap-management delta)
 
-- [ ] 1.1 Commit the SDD artifacts, **TM12's MODIFIED block included**, before any Swift file changes:
+- [x] 1.1 Commit the SDD artifacts, **TM12's MODIFIED block included**, before any Swift file changes:
       `docs(sdd): record the m9-per-package-trust proposal, spec deltas, design and tasks`.
       **Acceptance**: `specs/tap-management/spec.md` scopes the single-source clause to the tap's own
       trust state and states that **only two** of the clause's four prohibitions are taken.
-- [ ] 1.2 Confirm the delta's arithmetic before moving on: package-trust **8 ADDED / 32 scenarios**;
+- [x] 1.2 Confirm the delta's arithmetic before moving on: package-trust **8 ADDED / 32 scenarios**;
       tap-management **1 MODIFIED, 7 scenarios replacing 5** → 13 req / 57 sc; package-mutation
       **1 MODIFIED, 10 scenarios replacing 7** → 10 req / 63 sc; package-detail **1 ADDED / 4
       scenarios** → 8 req / 30 sc. A mismatch is a spec defect to report, not to patch here.
-- [ ] 1.3 Record the **five binding reconciliations B1–B5** above in the apply context, so no task
+- [x] 1.3 Record the **five binding reconciliations B1–B5** above in the apply context, so no task
       below implements the design's superseded copy or its three-category `UnattributedGrants`.
 
 ## Phase 2: WU2 — the read (PT1.1, .3, .4; PT4.2, .3, .4)
