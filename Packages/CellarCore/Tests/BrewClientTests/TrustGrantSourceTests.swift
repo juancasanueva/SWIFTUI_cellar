@@ -126,6 +126,7 @@ struct TrustGrantSourceTests {
     /// matching cannot make every expectation above pass vacuously.
     private static let coveredFiles: Set<String> = [
         "TrustGrantWire.swift",
-        "TrustGrantPayloadSource.swift"
+        "TrustGrantPayloadSource.swift",
+        "TrustGrantStore.swift"
     ]
 }

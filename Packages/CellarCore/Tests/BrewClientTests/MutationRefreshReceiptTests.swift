@@ -270,6 +270,55 @@ struct MutationRefreshReceiptTests {
         #expect(removal[1].invalidates == [.taps, .installedInventory])
     }
 
+    // MARK: - package-trust PT2 :164-170 — one refresh, two reads
+
+    /// The taps domain now answers for **two** reads. TM9's arithmetic is
+    /// unchanged — still exactly one refresh per declared domain — and this is
+    /// the statement that keeps it that way while the refresh does twice as
+    /// much: one `tap-info`, one `trust`, per terminal, never two of either.
+    ///
+    /// The three commands are the ones that change the grant ledger's own `taps`
+    /// namespace: trust, untrust, and the revocation TM7 pins behind an accepted
+    /// removal.
+    @MainActor
+    @Test(
+        "Every tap-trust terminal issues exactly one tap read and one grant read",
+        arguments: TapTerminal.allCases
+    )
+    func everyTapTrustTerminalIssuesOneTapReadAndOneGrantRead(
+        terminal: TapTerminal
+    ) async throws {
+        let removal = try #require(TapCommand.removal(of: "acme/tools"))
+        let commands: [(name: String, command: TapCommand)] = [
+            ("trust", try #require(TapCommand.trust("acme/tools"))),
+            ("untrust", try #require(TapCommand.untrust("acme/tools"))),
+            ("revocation behind an accepted removal", removal[1])
+        ]
+
+        // Positively anchored: the removal really is two commands and the second
+        // really is the revocation, so the third row is not the first one twice.
+        #expect(removal.count == 2)
+        #expect(removal[1].arguments == ["untrust", "acme/tools"])
+        #expect(commands.count == 3)
+
+        for entry in commands {
+            let reads = try await readCounts(for: entry.command, terminal: terminal)
+
+            #expect(
+                reads.tapDomain == 1,
+                "\(entry.name) refreshed taps \(reads.tapDomain) times on \(terminal.rawValue)"
+            )
+            #expect(
+                reads.tapReads == 1,
+                "\(entry.name) issued \(reads.tapReads) tap reads on \(terminal.rawValue)"
+            )
+            #expect(
+                reads.grantReads == 1,
+                "\(entry.name) issued \(reads.grantReads) grant reads on \(terminal.rawValue)"
+            )
+        }
+    }
+
     /// The four terminals TM9 enumerates, including the two that never spawn.
     enum TapTerminal: String, CaseIterable, Sendable {
         case success
@@ -346,6 +395,86 @@ struct MutationRefreshReceiptTests {
         await TestPoll.until(taps.value >= 1)
         await settle()
         return (taps.value, installed.value, services.value)
+    }
+
+    /// The same terminal drive as `refreshCounts`, with a real
+    /// `TapRefreshCoordinator` behind the taps gate so the **reads** that one
+    /// refresh issues can be counted rather than assumed.
+    ///
+    /// The two reads go through doubles, not the launcher, so the launcher's
+    /// record stays exactly what it was: the mutation spawns and nothing else.
+    @MainActor
+    private func readCounts(
+        for command: TapCommand,
+        terminal: TapTerminal
+    ) async throws -> (tapDomain: Int, tapReads: Int, grantReads: Int) {
+        let launcher = ControllableProcessLauncher()
+        let tapsGate = InstalledMutationGate()
+        let servicesGate = InstalledMutationGate()
+        let center = OperationCenter(
+            gates: MutationGates([(.taps, tapsGate), (.services, servicesGate)]),
+            launcherFactory: { _ in launcher }
+        )
+        center.attach(installation: TestInstallation.appleSilicon)
+
+        let tapSource = GatedTapPayloadSource([.payload("[]")])
+        let grantSource = FakeTrustGrantPayloadSource([
+            .payload("{\"taps\":[],\"formulae\":[],\"casks\":[],\"commands\":[]}")
+        ])
+        let coordinator = TapRefreshCoordinator(
+            store: TapStore(source: tapSource),
+            grants: TrustGrantStore(source: grantSource),
+            mutations: tapsGate
+        )
+        let runner = Task { await coordinator.run() }
+        defer { runner.cancel() }
+        let taps = Counter()
+        let watcher = Task { for await _ in tapsGate.terminals { taps.increment() } }
+        defer { watcher.cancel() }
+        await settle()
+
+        // The baseline refresh every launch performs. Counting from here makes
+        // the numbers below "what this terminal cost", not "what the app did".
+        await coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baselineTapReads = tapSource.callCount
+        let baselineGrantReads = grantSource.callCount
+        #expect(baselineTapReads == 1, "the baseline refresh issued \(baselineTapReads) tap reads")
+        #expect(baselineGrantReads == 1, "the baseline refresh issued \(baselineGrantReads) grant reads")
+
+        switch terminal {
+        case .success, .failure:
+            _ = center.submit(command)
+            await launcher.waitForLaunches(atLeast: 1)
+            launcher.launchedProcesses[0].terminate(
+                with: BrewExit(status: terminal == .success ? 0 : 1, reason: .exited)
+            )
+        case .launchFailure:
+            launcher.failLaunch(with: BrewValidationError.notExecutable(
+                URL(fileURLWithPath: "/configured/not-brew")
+            ))
+            _ = center.submit(command)
+        case .cancellationBeforeSpawn:
+            let blocker = try #require(ServiceCommand.start(service: "acme"))
+            _ = center.submit(blocker)
+            await launcher.waitForLaunches(atLeast: 1)
+            let pending = center.submit(command)
+            await settle()
+            center.cancel(pending)
+            await settle()
+            launcher.launchedProcesses[0].terminate(with: BrewExit(status: 0, reason: .exited))
+        }
+
+        await TestPoll.until(taps.value >= 1)
+        // Bounded wait for the refresh that terminal triggered to actually run,
+        // so a zero below is an absent read rather than a race.
+        await TestPoll.until(tapSource.callCount > baselineTapReads)
+        await settle()
+
+        return (
+            taps.value,
+            tapSource.callCount - baselineTapReads,
+            grantSource.callCount - baselineGrantReads
+        )
     }
 
     private func settle() async {

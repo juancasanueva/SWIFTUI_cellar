@@ -170,50 +170,50 @@ Plus one artifact commit, **first on the branch**, which **is** WU1:
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TrustGrantDecodeTests|TrustGrantSourceTests'`
 
-- [ ] 2.1 **RED.** New file `Packages/CellarCore/Tests/BrewClientTests/TrustGrantDecodeTests.swift` ·
+- [x] 2.1 **RED.** New file `Packages/CellarCore/Tests/BrewClientTests/TrustGrantDecodeTests.swift` ·
       `theVerbatimHomebrewPayloadDecodesEveryNamespace`: the fixture is the **verbatim obs `#7764`
       capture**, byte-for-byte — 1 tap, 9 formulae, 4 casks, `"commands": []`. Assert all four keys
       decode, entries are byte-identical to the payload, the URL-shaped
       `https://github.com/cloudmanic/spice-edit/spice-edit` survives, `nehir@rc` keeps its `@`, and an
       absent key is `[]`. **PR #67's lesson is binding: the fixture MUST NOT be invented.**
       **RED because** `TrustGrantLedger` does not exist. *(PT4.2, PT4.3)*
-- [ ] 2.2 **RED.** `TrustGrantDecodeTests · anUnansweredBrewIsUnreportedNotZeroGrants`: a non-zero exit
+- [x] 2.2 **RED.** `TrustGrantDecodeTests · anUnansweredBrewIsUnreportedNotZeroGrants`: a non-zero exit
       with an unknown-command message, a launch failure, blank output, malformed JSON and a non-object
       envelope each → `.unreported`; a decoded payload of empty arrays → `.noGrants`; the two compare
       **not equal**, and no case reports a count of `0` or an empty grant set. **RED because** the
       three-valued type does not exist. *(PT1.3, D-b, R4)*
-- [ ] 2.3 **RED.** `TrustGrantDecodeTests · anEmptyLedgerCannotBeGranted`: `TrustGrantState.reported`
+- [x] 2.3 **RED.** `TrustGrantDecodeTests · anEmptyLedgerCannotBeGranted`: `TrustGrantState.reported`
       over an empty ledger is `.noGrants`, and **no** construction path yields `.granted` carrying an
       empty ledger. **RED because** the canonical constructor does not exist. *(DD-1)*
-- [ ] 2.4 **RED — B5.** `TrustGrantDecodeTests · anUnmodelledNamespaceIsCountedNotDiscarded`: a payload
+- [x] 2.4 **RED — B5.** `TrustGrantDecodeTests · anUnmodelledNamespaceIsCountedNotDiscarded`: a payload
       carrying the four known keys **plus** an additional top-level key whose value is a list of
       qualified strings decodes successfully, the four known namespaces account as usual, and the
       extra key's entries are retained for the **other** category. A present-and-**empty** `commands`
       array is distinguishable from an **absent** `commands` key. **RED because** the design's
       four-`decodeIfPresent` shape discards unknown keys. *(PT4.4, PT4.3)*
-- [ ] 2.5 **RED.** New file `TrustGrantSourceTests.swift` ·
+- [x] 2.5 **RED.** New file `TrustGrantSourceTests.swift` ·
       `theGrantReadIsAConstantArgvWithNoQualifiedToken`: argv is exactly `["trust","--json","v1"]`,
       kind `.read`, **no element contains `/`**, none carries a package name, tap name or kind flag,
       and the source file's argv literal is a `static let` with no interpolation. **RED because** the
       source does not exist. *(PT1.1, D-f, DD-11)*
-- [ ] 2.6 **RED.** `TrustGrantSourceTests · noPathReadsATrustFileFromDisk`: scanning
+- [x] 2.6 **RED.** `TrustGrantSourceTests · noPathReadsATrustFileFromDisk`: scanning
       `TrustGrantPayloadSource.swift`, `TrustGrantWire.swift` and `TrustGrantStore.swift`, none
       contains `FileManager`, `trust.json`, `.homebrew`, `XDG_CONFIG_HOME` or a `URL(fileURLWithPath:`
       literal, on **every** path including each failure path; the only acquisition is the spawned
       `brew` read. **RED because** the files do not exist. *(PT1.4, `rules.apply`)*
-- [ ] 2.7 **Prove RED.** Run the focused command; 2.1–2.6 MUST fail, each for its stated reason. A
+- [x] 2.7 **Prove RED.** Run the focused command; 2.1–2.6 MUST fail, each for its stated reason. A
       green test here is a defect in the test.
-- [ ] 2.8 **GREEN.** New file
+- [x] 2.8 **GREEN.** New file
       `Packages/CellarCore/Sources/BrewClient/TrustGrantWire.swift` — `TrustGrantState` (with the
       canonical `reported(_:)`), `TrustGrantLedger` (`formulae`, `casks`, `taps`, `commands`, **plus
       `unmodelled: [String: [String]]` for B5**, and package-scoped `isEmpty` that ignores `taps`),
       `TrustGrantError`, and `@concurrent TrustGrantDecoder.decode` using a dynamic-key container so
       unknown list-of-string keys are retained rather than dropped.
-- [ ] 2.9 **GREEN.** New file `.../BrewClient/TrustGrantPayloadSource.swift` — `TrustGrantSourcing`
+- [x] 2.9 **GREEN.** New file `.../BrewClient/TrustGrantPayloadSource.swift` — `TrustGrantSourcing`
       and `BrewTrustGrantPayloadSource` with
       `static let command = BrewCommand.read(["trust", "--json", "v1"])`, cloning
       `BrewTapPayloadSource`'s `BrewRunner.start` → drain → exit body and its 12-line stderr tail.
-- [ ] 2.10 Focused command green; commit WU2
+- [x] 2.10 Focused command green; commit WU2
       (`feat(taps): read the per-package trust report Homebrew already publishes`).
 
 ## Phase 3: WU3 — the store and the concurrent refresh (PT2.1–.6)
