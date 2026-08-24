@@ -265,34 +265,34 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
 
 ## Phase 3: WU2 — the projection, GREEN
 
-- [ ] 3.1 **GREEN.** New file `Packages/CellarCore/Sources/BrewClient/TapPackageSearch.swift` —
+- [x] 3.1 **GREEN.** New file `Packages/CellarCore/Sources/BrewClient/TapPackageSearch.swift` —
       `public enum TapMatchRank: Int, Comparable, Sendable, CaseIterable { exactToken, namePrefix, nameSubstring }`
       and `public struct TapSearchHit: Sendable, Hashable, Identifiable` with
       `id: RowID { tapName, kind, name }`, `mutationTarget: PackageID`, `publishedName`, `displayName`,
       `tapName`, `state: TapPackageInstallState`, `stateCopy: String`, `alsoInCatalog: Bool`,
       `collisionNote: String?`, `rank: TapMatchRank`, `routableID: PackageID?` (**DD-1, DD-2**).
-- [ ] 3.2 **GREEN.** `public struct TapPackageSearch: Sendable` holding `inventory` + `installed`, with
+- [x] 3.2 **GREEN.** `public struct TapPackageSearch: Sendable` holding `inventory` + `installed`, with
       `init(inventory:installed:)`, `func hits(query:kinds:hideInstalled:isInCatalog:) -> [TapSearchHit]`
       and `static func isSectionVisible(query:outdatedOnly:tapState:) -> Bool`. Built from
       `TapProjection.thirdPartyTaps` (`:93`) and `TapProjection.packages(for:installed:)` (`:134-162`),
       reusing `bareToken` (`:208-211`) and `TapPackageInstallState` (`:25-30`). The `isInCatalog`
       predicate is a **parameter, never a stored closure** — a stored closure makes `Hashable`
       unrepresentable (**DD-1**).
-- [ ] 3.3 **GREEN, matching.** Rank over `PackageText.normalize` applied to **both** the bare token and
+- [x] 3.3 **GREEN, matching.** Rank over `PackageText.normalize` applied to **both** the bare token and
       the `publishedName`. `exactToken` = the normalised query equals the whole normalised string **or**
       one whole space-delimited token; `namePrefix` = whole-string **or** token prefix; otherwise
       `nameSubstring`. A hit matching **only** via `publishedName` is **capped at `nameSubstring`**
       (**DD-3**). Strongest class only; **no fourth class** — there is no description to scan.
-- [ ] 3.4 **GREEN, order and routing.** Sort by `(rank asc, normalised bare token asc, formula before
+- [x] 3.4 **GREEN, order and routing.** Sort by `(rank asc, normalised bare token asc, formula before
       cask, tapName asc)` — total. `routableID` is non-nil **iff** the hit is installed **and**
       `alsoInCatalog == false` **and** no other emitted hit shares its `PackageID` (**DD-4**).
-- [ ] 3.5 **GREEN, binding constraints** (each already asserted above, restated so no shortcut is taken):
+- [x] 3.5 **GREEN, binding constraints** (each already asserted above, restated so no shortcut is taken):
       **every** user-visible string on this surface originates in this file; `TapPackage.statusExplanation`
       is **not** reused (**DD-9**); **nonisolated by module default**, no annotation, no `@unchecked`, no
       actor (**DD-12**); no `Process`, no `FileManager`, no store, no clock, no SwiftUI import, no
       `#available` (**DD-13**); nothing is pushed into `PackageSearchIndex` and `SearchFilters` gains no
       member.
-- [ ] 3.6 Focused command green **and** every shipped `SearchIndexTests` / `FilterTests` /
+- [x] 3.6 Focused command green **and** every shipped `SearchIndexTests` / `FilterTests` /
       `TapProjectionTests` case still green; commit WU2
       (`feat(search): compose tap-published packages above the catalog index`).
 
