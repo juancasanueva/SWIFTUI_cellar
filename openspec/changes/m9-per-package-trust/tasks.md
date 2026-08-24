@@ -344,35 +344,35 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapProjectionTe
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'MutationCommandTests|TapShippingProofTests'`
 
-- [ ] 5.1 **RED — the one deliberate edit to a shipped guard.** `MutationCommandTests ·
+- [x] 5.1 **RED — the one deliberate edit to a shipped guard.** `MutationCommandTests ·
       anUntrustedTapNeverPreBlocksAMutation` (`:471-479`): the C1 ban list gains the **single prefix
       token `"TrustGrant"`** (covering all five new type names) **and `"grantsIndividually"`**, and
       `MutationCommand.swift` still contains none of them. Assert the list **covers** those names as a
       full name or shared prefix, so the assertion is about coverage rather than about prose. **RED
       because** the list names only the tap-trust types today. *(PM10.8, D-g, DD-11)*
-- [ ] 5.2 **RED.** `MutationCommandTests · aPerPackageGrantStateNeverPreBlocksAMutation`: the same
+- [x] 5.2 **RED.** `MutationCommandTests · aPerPackageGrantStateNeverPreBlocksAMutation`: the same
       package with its per-package state in turn `granted`, `noGrantRecorded` and `unreported`, plus a
       machine whose report **failed to load** — the mutation is built and submitted normally in every
       case, no affordance is disabled, no request is refused and **no warning is attached** on the
       basis of grant state. *(PM10.7)*
-- [ ] 5.3 **RED.** `MutationCommandTests · thePerPackageReadIsNotACommandOnTheMutationSpine`: the
+- [x] 5.3 **RED.** `MutationCommandTests · thePerPackageReadIsNotACommandOnTheMutationSpine`: the
       grant read is not one of the spine's command families, enqueues nothing, produces no activity
       item, declares no invalidation domain of its own, and the spine's qualified-token enumeration
       covers **exactly** the families it covered before. *(PM10.9, PT7.2)*
-- [ ] 5.4 **Prove RED** (three), then **GREEN**: extend the ban list at `MutationCommandTests.swift`
+- [x] 5.4 **Prove RED** (three), then **GREEN**: extend the ban list at `MutationCommandTests.swift`
       `:471-479` with the two tokens, and make 5.2/5.3 pass **without touching**
       `MutationCommand.swift` — the mutation surface must simply never consult the new types.
-- [ ] 5.5 **Binding, asserted not assumed.** `MutationCommandTests.swift:500-613`
+- [x] 5.5 **Binding, asserted not assumed.** `MutationCommandTests.swift:500-613`
       (`noPackagePositionEverCarriesAQualifiedToken`, **C2**) is **byte-identical**: verify with
       `git diff main -- Packages/CellarCore/Tests/BrewClientTests/MutationCommandTests.swift` that the
       only hunk is the ban-list edit. Widening C2 to cover the read would change its meaning — the read
       spine's absence is task 2.5's own test. *(PM10.5, D-f)*
-- [ ] 5.6 **Binding, asserted not assumed.**
+- [x] 5.6 **Binding, asserted not assumed.**
       `git diff --stat main -- Packages/CellarCore/Sources/BrewClient/MutationCommand.swift` →
       **empty output**. A **0-line diff**, as in `m7-tap-trust`. Also confirm
       `Packages/CellarCore/Sources/BrewClient/BrewMutating.swift` and `.../TapCommand.swift` are
       untouched — DD-3 removes the reason to touch either.
-- [ ] 5.7 Focused command green; commit WU5
+- [x] 5.7 Focused command green; commit WU5
       (`test(mutations): ban the per-package trust types from the mutation surface`).
 
 ## Phase 6: WU6 — the four surfaces and the DI wiring (PT5.4; PT7.1, .3; PD8.4; TM12.7)

@@ -22,6 +22,10 @@ struct PackageDetailView: View {
     /// Read only for the "Size on disk" fact — the same measurement Cleanup
     /// and the Search list show. Nothing here starts a scan.
     let diskUsage: DiskUsageStore
+    /// The per-package trust report, held as the `@Observable` store rather than
+    /// as a closure or a pre-computed `Bool`, so the marker appears the moment a
+    /// refresh answers (package-detail PD8, design DD-10).
+    let trustGrants: TrustGrantStore
     /// The cask artwork pipeline; `nil` — a preview, say — keeps the letter
     /// tile in the header (see `PackageIconTile`).
     var assets: CaskBrowseAssets?
@@ -554,7 +558,10 @@ struct PackageDetailView: View {
                 if let installedAs = installedAs(for: package.id) {
                     fact("Installed as", installedAs)
                 }
-                fact("Tap", package.tap, mono: true)
+                // The grant is a fact *about this origin*, so it is joined at
+                // presentation beside the tap it belongs to — never as a field
+                // of the catalog projection, whose field set PD7 keeps closed.
+                fact("Tap", package.tap, mono: true, note: grantMarker(for: package))
                 fact("Type", package.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
                 if let license = package.license {
                     fact("License", license)
@@ -576,14 +583,36 @@ struct PackageDetailView: View {
         }
     }
 
-    private func fact(_ label: String, _ value: String, mono: Bool = false) -> some View {
+    private func fact(
+        _ label: String,
+        _ value: String,
+        mono: Bool = false,
+        note: String? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             factLabel(label)
-            Text(value)
-                .font(mono ? Theme.mono(12.5) : .system(size: 12.5))
-                .foregroundStyle(mono ? Theme.textMono : Color.white.opacity(0.72))
-                .textSelection(.enabled)
+            HStack(spacing: 6) {
+                Text(value)
+                    .font(mono ? Theme.mono(12.5) : .system(size: 12.5))
+                    .foregroundStyle(mono ? Theme.textMono : Color.white.opacity(0.72))
+                    .textSelection(.enabled)
+                if let note {
+                    Text(note)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                        .accessibilityIdentifier("package-detail-grant-marker")
+                }
+            }
         }
+    }
+
+    /// The marker, or `nil`. Positive-only: `noGrantRecorded` and `unreported`
+    /// both render nothing at all, because absence from the report is not a fact
+    /// about this package (PD8 :54-57).
+    private func grantMarker(for package: CatalogPackage) -> String? {
+        TapProjection.grantsIndividually(package.id, publishedBy: package.tap, in: trustGrants.grants)
+            ? TapProjection.grantMarker
+            : nil
     }
 
     private func factLabel(_ label: String) -> some View {
@@ -838,6 +867,7 @@ private struct StatusNote: View {
                     .appendingPathComponent("preview-detail-disk-usage.json")
             )
         ),
+        trustGrants: TrustGrantStore(),
         id: nil,
         selection: $selection
     )

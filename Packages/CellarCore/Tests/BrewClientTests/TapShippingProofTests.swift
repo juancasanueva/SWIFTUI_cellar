@@ -300,6 +300,171 @@ struct TapShippingProofTests {
         }
     }
 
+    // MARK: - PT7 :383-421 — the whole surface grants and revokes nothing
+
+    /// **D-f.** The prohibition is a property of the surface, not of any one
+    /// screen, so it is asserted as an absence: this change adds **no action**,
+    /// and every value the per-package surface produces is a string.
+    @Test("No new control submits anything and the surface is display only")
+    func noNewControlSubmitsAnythingAndTheSurfaceIsDisplayOnly() async throws {
+        let launcher = RecordingProcessLauncher()
+        let center = OperationCenter(launcherFactory: { _ in launcher })
+        center.attach(installation: TestInstallation.appleSilicon)
+
+        // The action set is unchanged: eight, in TM11's order. This change adds
+        // no ninth, which is why `tap-management` TM11 needed no delta.
+        #expect(TapManagementAction.allCases.map(\.rawValue) == [
+            "refresh", "filter", "Installed handoff", "canonical add", "plain untap",
+            "eligible force untap", "trust", "untrust"
+        ])
+
+        // Every per-package surface, invoked. The enumeration is the four entry
+        // points this change adds, and it is asserted non-vacuous below.
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"],
+            caskTokens: ["acme/tools/desk"],
+            trust: .untrusted
+        )
+        let report = TrustGrantState.reported(TrustGrantLedger(
+            formulae: ["acme/tools/widget", "nobody/tools/lost"],
+            casks: ["acme/tools/desk"],
+            taps: ["ghost/tools"],
+            commands: ["acme/tools/thing"]
+        ))
+        var produced: [String] = []
+        let presentation = TapProjection.grants(for: tap, in: report)
+        produced.append(contentsOf: [presentation.countLine].compactMap(\.self))
+        produced.append(TapProjection.grantMarker)
+        let section = TapProjection.unattributedSection(in: report, taps: [tap])
+        produced.append(section.title)
+        produced.append(contentsOf: [section.sentence].compactMap(\.self))
+        produced.append(contentsOf: section.groups.flatMap { [$0.title] + $0.entries })
+        _ = TapProjection.grantsIndividually(
+            PackageID(kind: .cask, name: "desk"),
+            publishedBy: tap.name,
+            in: report
+        )
+        _ = TapProjection.accounting(
+            of: try #require(report.ledger),
+            taps: [tap]
+        )
+        await drain()
+
+        // Non-vacuous: the surface really did produce something.
+        #expect(produced.count >= 8, "the per-package surface enumeration collapsed")
+        #expect(produced.contains("2 trusted individually"))
+        #expect(produced.contains("Trusted individually"))
+        // …and nothing it did built or spawned a process.
+        #expect(launcher.launchCount == 0, "a per-package surface spawned a process")
+        #expect(launcher.specs.isEmpty, "a per-package surface constructed a process launch")
+
+        // The UI stays bounded to the same six static buttons, with no dynamic
+        // button anywhere — which is what makes "every interactive element is a
+        // navigation, filter, copy or refresh affordance" checkable at all.
+        try assertBoundedUIControls()
+    }
+
+    /// **PT6 :334-344, TM11, R3.** Every string is either the state brew
+    /// reported or an accounting of it. Nothing here inspects a package.
+    @Test("Every per-package string is positive and never a verdict")
+    func everyPerPackageStringIsPositiveAndNeverAVerdict() throws {
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"],
+            caskTokens: ["acme/tools/desk"]
+        )
+        let states: [TrustGrantState] = [
+            .unreported,
+            .reported(TrustGrantLedger(declaredNamespaces: ["formulae", "casks"])),
+            .reported(TrustGrantLedger(
+                formulae: ["acme/tools/widget", "nobody/tools/lost"],
+                casks: ["acme/tools/desk"],
+                taps: ["ghost/tools"],
+                commands: ["acme/tools/thing"]
+            ))
+        ]
+
+        var strings = [TapProjection.grantMarker]
+        for state in states {
+            strings.append(contentsOf: [TapProjection.grants(for: tap, in: state).countLine]
+                .compactMap(\.self))
+            let section = TapProjection.unattributedSection(in: state, taps: [tap])
+            strings.append(section.title)
+            strings.append(contentsOf: [section.sentence].compactMap(\.self))
+            strings.append(contentsOf: section.groups.map(\.title))
+        }
+
+        // Non-vacuous, and it really did reach all three report states.
+        #expect(strings.count >= 10, "the string enumeration collapsed to \(strings.count)")
+        #expect(strings.contains("This Homebrew does not report per-package trust."))
+        #expect(strings.contains("Homebrew records no packages trusted individually."))
+        #expect(strings.contains(
+            "Homebrew still records these grants. Cellar shows them; it does not remove them."
+        ))
+
+        for line in strings {
+            for negative in [
+                "untrusted", "unsafe", "unverified", "unprotected", "not trusted",
+                "risk", "danger", "warning", "should", "we suggest"
+            ] {
+                #expect(
+                    line.localizedCaseInsensitiveContains(negative) == false,
+                    "a per-package string is a judgement: \(line)"
+                )
+            }
+        }
+
+        // And no source behind those strings inspects, scores or recommends.
+        var sources = try tapUISources()
+        sources.append(contentsOf: try coreTrustSources())
+        sources.append(contentsOf: try perPackageSources())
+        #expect(sources.count == 8, "the per-package surface scan lost a file")
+        for source in sources {
+            for judgement in [
+                "score", "ranking", "recommend", "reputation", "verdict",
+                "suspicious", "malicious", "unsafe", "audit", "vetted", "reviewed"
+            ] {
+                #expect(
+                    source.code.localizedCaseInsensitiveContains(judgement) == false,
+                    "\(source.name) passes judgement on a package: \(judgement)"
+                )
+            }
+        }
+    }
+
+    /// The per-package sources this change adds, plus the one shipped view it
+    /// joins the marker onto.
+    private func perPackageSources() throws -> [TapUISource] {
+        let package = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let repository = package
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        var sources = try ["TrustGrantWire.swift", "TrustGrantPayloadSource.swift", "TrustGrantStore.swift"]
+            .map { file in
+                TapUISource(
+                    name: file,
+                    code: try String(
+                        contentsOf: package.appendingPathComponent("Sources/BrewClient/\(file)"),
+                        encoding: .utf8
+                    )
+                )
+            }
+        sources.append(TapUISource(
+            name: "PackageDetailView.swift",
+            code: try String(
+                contentsOf: repository.appendingPathComponent("cellar/Browse/PackageDetailView.swift"),
+                encoding: .utf8
+            )
+        ))
+        return sources
+    }
+
     /// Returns every command the action submits, in submission order — a list
     /// rather than one optional command, because an action is not the same thing
     /// as a command and TM7's removal is two of them.

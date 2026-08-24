@@ -40,6 +40,10 @@ struct ContentView: View {
     let services: ServicesStore
     let servicesRefresher: ServicesRefreshCoordinator
     let taps: TapStore
+    /// The per-package grant report, passed as the `@Observable` store rather
+    /// than as a pre-computed value so every marker updates when it refreshes
+    /// (package-trust DD-10).
+    let trustGrants: TrustGrantStore
     let diskUsage: DiskUsageStore
     let cleanup: CleanupStore
     let cleanupPreviewSource: any CleanupPreviewSourcing
@@ -417,6 +421,7 @@ struct ContentView: View {
         case .taps:
             TapsListView(
                 taps: taps,
+                trustGrants: trustGrants,
                 operations: operations,
                 selection: $tapSelection
             )
@@ -505,6 +510,7 @@ struct ContentView: View {
             return AnyView(
                 TapDetailView(
                     taps: taps,
+                    trustGrants: trustGrants,
                     installed: installed,
                     operations: operations,
                     tapName: tapSelection,
@@ -530,6 +536,7 @@ struct ContentView: View {
                     operations: operations,
                     metadata: metadata,
                     diskUsage: diskUsage,
+                    trustGrants: trustGrants,
                     assets: caskAssets,
                     iconLoader: caskIcons,
                     id: selection,
