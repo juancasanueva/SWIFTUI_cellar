@@ -121,14 +121,23 @@ Copy below is **pinned by the spec**, not left to apply.
 | 1 Identity | Type | `kind` | always |
 | 1 Identity | Homepage (link) | `homepage` | non-nil |
 | 2 Origin | **Tap** (+ PD8 marker) | `tap` | non-nil |
-| 3 Install state | Installed as | view: `installedAs(for:)` | installed (always here) |
-| 3 Install state | Size on disk | view: `sizeOnDisk(for:)` | the scan has answered (DD-7) |
 | 3 Install state | Version (formula) | `primaryKegVersion` | always — the primary keg, linked or not |
 | 3 Install state | Link state (formula) | `linkedKeg` | always: `Linked` / `Not linked` |
 | 3 Install state | Other versions (formula) | `kegs.count` | `> 1`: `N other versions installed`, singular `1 other version installed` |
 | 3 Install state | Pinned (formula) | `isPinned`, `pinnedVersion` | `isPinned` |
 | 3 Install state | Updates (cask) | `declaresAutoUpdates` | `true` ⇒ `Updates itself` (the shipped string, reused); `false` ⇒ `Updated by Homebrew`; `nil` ⇒ **no fact** |
+| 3 Install state | Installed as | view: `installedAs(for:)` | installed (always here) |
+| 3 Install state | Size on disk | view: `sizeOnDisk(for:)` | the scan has answered (DD-7) |
 | footer | Scoped catalog-miss copy | constant | always (DD-12) |
+
+> **Archive-time correction (`sdd-archive`, 2026-08-24 — verify-report S1 / apply-progress Deviation 4).**
+> The two view-side rows **Installed as** and **Size on disk** were originally listed *above* the
+> kind-specific facts, contradicting DD-7's own prose — "**appended** into the install-state group by the
+> pane" — and contradicting what shipped. `PackageDetailView+Receipt.swift`'s `receiptFacts` renders
+> `detail.installStateFacts` first and then joins `Installed as` and `Size on disk`
+> (`:116-128`). The table now matches the prose and the code; **no code, no test and no requirement moved**.
+> II15 mandates ordering only *between* the three groups, never within one, so nothing here was ever a
+> contract. Only these two table rows were reordered.
 
 `linkedKeg` is read directly rather than through `formulaLinkState`: that projection returns
 `.notApplicable` for casks, a runtime guard `KindState` makes unnecessary, and reading it would pull
@@ -230,5 +239,8 @@ untouched until archive.
       `Linked` / `Not linked`; `N other versions installed` (singular `1 other version installed`);
       cask `Updates itself` (true, the shipped string reused) / `Updated by Homebrew` (false) / no fact
       (nil). `sdd-apply` reproduces these strings; it does not choose them.
-- [ ] Whether `MutationMenu` sits left of the heart (header slot order) or the heart left of it
-      (`InstalledRow` order). Presentation-only; no requirement depends on it.
+- [x] **Closed by what shipped** (task 7.4, recorded at archive). Whether `MutationMenu` sits left of the
+      heart (header slot order) or the heart left of it (`InstalledRow` order): it sits in the header's
+      primary-button slot, **left of the heart** — the slot `EmptyView()` occupied, unchanged in
+      position (`PackageDetailView.swift:405` `primaryButton()` then `:407` `favoriteButton(for: id)`).
+      Presentation-only; no requirement depends on it.

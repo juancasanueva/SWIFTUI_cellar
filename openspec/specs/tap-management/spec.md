@@ -145,8 +145,12 @@ An absent tap MUST NOT be treated as equal to the selected tap, and MUST NOT be 
 empty string; `installed-inventory` owns preserving that absence. The middle state's copy MUST be
 scoped to the **tap** and MUST NOT state or imply that the package is untrusted, because a per-package
 grant can make a package loadable while its tap is not trusted. Tap packages MUST NOT enter the catalog
-snapshot, catalog search, or catalog detail; PD6 remains unchanged and selection MUST NOT create a
-third-party detail fallback.
+snapshot, catalog search, or catalog detail; PD6 remains unchanged. Selecting a tap package MUST NOT
+create a **catalog** record for it and MUST NOT perform a tap-source read to complete a package
+detail — that is the whole of this prohibition. It does not reach a detail composed **exclusively from
+the installed receipt**: **Show in Installed** already hands off by exact `PackageID` and lands on the
+reduced, receipt-backed detail `installed-inventory` owns, which synthesizes no catalog record, adds
+nothing to catalog search, and spawns no additional brew invocation.
 
 The inventory MUST be filterable by package name and kind. A large inventory MUST remain usable by
 presenting only the filtered/visible rows needed at a time rather than requiring every row to be
@@ -154,6 +158,9 @@ presented eagerly.
 (Previously: installed status came only from an exact `InstalledPackage.tap` equality, so a package
 installed from an untrusted tap — whose tap brew withholds — was *mandated* to read “Not installed.”,
 a false statement about this Mac.)
+(Previously: the catalog paragraph ended “…and selection MUST NOT create a third-party detail
+fallback.”, a bare phrase broad enough to read as a blanket ban on any detail for a tap package,
+including one built solely from the installed receipt.)
 
 #### Scenario: Only the selected tap prefix is normalized
 
@@ -216,6 +223,18 @@ a false statement about this Mac.)
 - GIVEN an uninstalled package published only by a third-party tap
 - WHEN catalog snapshot, search, and detail lookup are queried
 - THEN it is absent from snapshot and search and detail returns ordinary not-found
+- Verification: `unit`
+
+#### Scenario: The handoff lands on a receipt-backed detail, not on a catalog record
+
+- GIVEN selected tap `acme/tools` publishes formula `acme/tools/widget`
+- AND the installed snapshot reports formula `widget` with tap `acme/tools`, and the catalog carries no
+  record for it
+- WHEN **Show in Installed** is taken by exact `PackageID` and the resulting detail is resolved
+- THEN that detail is composed from the installed snapshot record alone
+- AND the catalog snapshot, catalog search and catalog detail lookup for `widget` are unchanged, with
+  the catalog lookup still returning the ordinary not-found result
+- AND no additional brew invocation is recorded
 - Verification: `unit`
 
 #### Scenario: Large inventory can be narrowed without eager presentation
@@ -822,4 +841,35 @@ reported as ordinary successful outcomes, not as errors and not as a Cellar defe
   - **One deferred follow-up from `m7-tap-trust` is now closed**: the per-package trust surface it
     recorded as deferred shipped as the `package-trust` capability. The other two — a trust column in
     the Brewfile diff, and trust state for official taps (TM4 keeps them non-mutable) — remain open.
+  - The archived delta spec is the verbatim audit trail.
+- **Amended by change `m10-third-party-detail`** (archived `2026-08-24` —
+  `openspec/changes/archive/2026-08-24-m10-third-party-detail/`), **1 MODIFIED (TM5), 0 added, 0
+  removed, 0 renamed** — **13 req / 57 sc → 13 req / 58 sc**. `rules.archive`'s destructive-delta
+  warning did not fire. TM1–TM4 and TM6–TM13 are **byte-identical**, TM5 was replaced in place under
+  its existing `<!-- TM5 -->` marker, and TM5's **nine existing scenarios are reproduced
+  byte-identical** — all verified at archive by byte-slicing against a pre-merge copy (empty diffs).
+  Delivered in PR **#75**, merged `2026-08-24` at `4063ae3`.
+  - **TM1 was mis-cited by `m9-per-package-trust`; the clause is TM5's.** The m9 archive states in at
+    least three places (`archive-report.md:440`, `tasks.md:72`, `specs/package-detail/spec.md:20`) that
+    **TM1** forbids a third-party detail fallback. **TM1 is unchanged and contains no such clause** — it
+    is a one-invocation rule about acquiring *tap* detail from `brew tap-info --installed --json`. The
+    clause lived in TM5's catalog paragraph, and this change narrowed it to its meaning. TM1's real
+    constraint on m10 — no additional brew invocation may be introduced to complete a detail — is
+    honoured and is asserted by TM5's added scenario. **Do not carry the TM1 citation forward.**
+  - **The delta's "strict superset" claim did not survive an independent byte check.** Diffing the
+    replaced range against its predecessor shows **two non-blank lines rewritten**, not merely added to:
+    "…PD6 remains unchanged and selection MUST NOT create a third-party detail fallback." became
+    "…PD6 remains unchanged. Selecting a tap package MUST NOT create a **catalog** record for it and
+    MUST NOT perform a tap-source read to complete a package detail — that is the whole of this
+    prohibition." **No rule was removed or weakened**: the prohibition survives in its stated meaning,
+    the old wording is preserved verbatim in the block's new `(Previously:)` note, and the clause gained
+    an explicit statement that it does not reach a detail composed exclusively from the installed
+    receipt. The claim was "strict superset"; the truth is "superset in rules, with one sentence
+    rescoped". Recorded because that is exactly the kind of difference a future reader would otherwise
+    assume away.
+  - **No shipped behaviour changed.** m10 adds no Taps navigation. **Show in Installed** already handed
+    off by exact `PackageID`; what moved is that the branch it lands on now renders a reduced,
+    receipt-backed detail instead of "No further details". TM5's added scenario asserts exactly that,
+    together with "no additional brew invocation is recorded" and an unchanged catalog snapshot, search
+    and lookup.
   - The archived delta spec is the verbatim audit trail.
