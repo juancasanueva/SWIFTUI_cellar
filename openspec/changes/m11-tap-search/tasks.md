@@ -300,20 +300,20 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'`
 
-- [ ] 4.1 **Fixture (not a behaviour).** Build a resident tap inventory of realistic size — **several
+- [x] 4.1 **Fixture (not a behaviour).** Build a resident tap inventory of realistic size — **several
       taps publishing ≈500 packages in total**, mixed formulae and casks, deterministic — alongside the
       **shipped PS6 catalog fixture**, reused as-is rather than re-created.
-- [ ] 4.2 **RED.** `theCombinedKeystrokeTurnStaysUnderTheCeiling`: **≥100** representative as-you-type
+- [x] 4.2 **RED.** `theCombinedKeystrokeTurnStaysUnderTheCeiling`: **≥100** representative as-you-type
       queries of varying length run the **catalog query and the tap composition on the same turn**;
       the **p95** of that combined duration is **below 8 ms**. **RED because** `hits(…)` does not exist
       at authoring time. *(ps12)*
-- [ ] 4.3 **Explicitly not a re-run of shipped PS6**, which never touches the tap inventory: this row
+- [x] 4.3 **Explicitly not a re-run of shipped PS6**, which never touches the tap inventory: this row
       measures the combined turn and must not replace, relax or re-baseline PS6's own scenario.
-- [ ] 4.4 **The ceiling is not negotiable.** If p95 misses, the fix is the projection (allocation per
+- [x] 4.4 **The ceiling is not negotiable.** If p95 misses, the fix is the projection (allocation per
       keystroke, repeated normalisation, an O(n·m) scan) — **never** a larger ceiling, a smaller
       inventory, fewer queries or a p90. A miss that survives optimisation is a **design deviation to
       report**, not to absorb.
-- [ ] 4.5 Focused command green; commit WU3
+- [x] 4.5 Focused command green; commit WU3
       (`test(search): pin the combined catalog and tap keystroke turn under 8 ms`).
 
 ## Phase 5: WU4 — the Browse surface (ps13–ps16)

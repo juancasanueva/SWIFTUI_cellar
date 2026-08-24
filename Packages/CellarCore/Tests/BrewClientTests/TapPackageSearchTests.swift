@@ -488,6 +488,119 @@ struct TapPackageSearchTests {
         #expect(hits([TapSearchFixture.acmeWidgets], "widget").count == 3)
     }
 
+    // MARK: - ps12 — the combined keystroke turn stays under the ceiling
+
+    /// The catalog query **and** the tap composition, on one turn, as the view
+    /// runs them.
+    ///
+    /// Explicitly **not** a re-run of the shipped PS6 measurement: that one
+    /// never touches the tap inventory, so it cannot observe the regression this
+    /// change could cause. The ceiling is not negotiable — a miss is fixed in
+    /// the projection, never by a larger number, a smaller inventory, fewer
+    /// queries or a p90.
+    @Test(
+        "The combined catalog and tap keystroke turn stays under the 8 ms ceiling",
+        .enabled(if: TapSearchBuildConfiguration.isRelease),
+        .timeLimit(.minutes(2))
+    )
+    func theCombinedKeystrokeTurnStaysUnderTheCeiling() {
+        let index = PackageSearchIndex(snapshot: TapSearchLatencyFixture.catalogSnapshot())
+        let taps = TapSearchLatencyFixture.tapInventory()
+        let installed = TapSearchLatencyFixture.installedInventory(from: taps)
+        let source = TapPackageSearch(inventory: taps, installed: installed)
+        let queries = TapSearchLatencyFixture.asYouTypePrefixes()
+
+        #expect(index.recordCount == TapSearchLatencyFixture.catalogRecordCount)
+        #expect(queries.count >= 100)
+
+        // Warm-up: first-touch page faults on a 1–2 MB buffer are not latency.
+        for _ in 0..<5 {
+            for query in queries { blackHole(turn(query, index: index, source: source)) }
+        }
+
+        var samples: [Duration] = []
+        samples.reserveCapacity(queries.count * 10)
+        let clock = ContinuousClock()
+        for _ in 0..<10 {
+            for query in queries {
+                let start = clock.now
+                let produced = turn(query, index: index, source: source)
+                samples.append(clock.now - start)
+                blackHole(produced)
+            }
+        }
+
+        #expect(samples.count == queries.count * 10)
+        let sorted = samples.sorted()
+        let p95 = sorted[Int(Double(sorted.count) * 0.95)]
+        let median = sorted[sorted.count / 2]
+
+        #expect(
+            p95 < Duration.milliseconds(8),
+            "combined p95 \(p95) exceeded the 8 ms ceiling (median \(median), max \(sorted.last!))"
+        )
+    }
+
+    /// One keystroke: what `BrowseView` does per render, in the same order.
+    private func turn(
+        _ query: String,
+        index: PackageSearchIndex,
+        source: TapPackageSearch
+    ) -> Int {
+        let catalog = index.search(query)
+        let catalogIDs = Set(catalog.map(\.id))
+        let tap = source.hits(
+            query: query,
+            kinds: [.formula, .cask],
+            hideInstalled: false,
+            isInCatalog: { catalogIDs.contains($0) }
+        )
+        return catalog.count + tap.count
+    }
+
+    @Test("The latency fixture is the size and shape the ceiling is claimed for")
+    func theCatalogFixtureIsTheOnePS6MeasuresOver() {
+        let snapshot = TapSearchLatencyFixture.catalogSnapshot()
+
+        // The shipped PS6 shape assertions, re-stated over the reproduced
+        // generator, so "the same fixture" is proven and not assumed.
+        #expect(snapshot.packages.count == TapSearchLatencyFixture.catalogRecordCount)
+        let nameLengths = snapshot.packages.map(\.name.count)
+        let descLengths = snapshot.packages.map { ($0.desc ?? "").count }
+        let meanName = Double(nameLengths.reduce(0, +)) / Double(nameLengths.count)
+        let meanDesc = Double(descLengths.reduce(0, +)) / Double(descLengths.count)
+        #expect((8.0...13.0).contains(meanName), "mean name length \(meanName)")
+        #expect((30.0...42.0).contains(meanDesc), "mean description length \(meanDesc)")
+        #expect(snapshot.packages.contains { ($0.desc ?? "").isEmpty })
+        #expect(Set(snapshot.packages.map(\.kind)) == [.formula, .cask])
+
+        // …and the tap half is the realistic size the scenario names, with both
+        // kinds and a query that really does reach it.
+        let taps = TapSearchLatencyFixture.tapInventory()
+        let published = taps.taps.reduce(0) { $0 + $1.formulaNames.count + $1.caskTokens.count }
+        #expect(published == TapSearchLatencyFixture.tapPackageCount)
+        #expect(taps.taps.count == TapSearchLatencyFixture.tapCount)
+        #expect(taps.taps.allSatisfy { $0.caskTokens.isEmpty == false })
+        let source = TapPackageSearch(
+            inventory: taps,
+            installed: TapSearchLatencyFixture.installedInventory(from: taps)
+        )
+        let reached = source.hits(
+            query: "wget",
+            kinds: [.formula, .cask],
+            hideInstalled: false,
+            isInCatalog: { _ in false }
+        )
+        #expect(reached.isEmpty == false, "no as-you-type query reaches the tap fixture")
+        #expect(source.installed.packages.isEmpty == false)
+    }
+
+    /// Keeps the optimiser from deleting the call it is timing.
+    @inline(never)
+    private func blackHole(_ value: Int) {
+        if value == Int.min { fatalError("unreachable") }
+    }
+
     // MARK: - ps16 at the unit layer — nothing to inject
 
     @Test("The projection takes no launcher, no catalog store and no refresh handle")
