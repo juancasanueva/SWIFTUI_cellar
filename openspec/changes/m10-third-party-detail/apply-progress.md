@@ -181,6 +181,22 @@ change** — `sdd-verify` must not wait for a manual harness.
 
 `verify-report.md` will add ~250–450 at verify time, landing the PR near **3,150–3,350 / 5,000**.
 
+**Corrected at round 2 — S4.** The table above is the measurement as it stood when it was written, and
+it understates the branch: its own 256 lines were still uncommitted at the time, so they counted as
+zero. The figure was never re-measured before the report was filed. The measured numbers at the close
+of round 2 are below; they supersede the row totals above, not the buckets' meaning.
+
+| Bucket | Round-1 figure | Measured at round-2 close | Why it moved |
+|---|---|---|---|
+| Code + tests (`cellar/`, `cellarTests/`, `Packages/`) | 1,280 | **1,423** (1,382 + / 41 −) | `apply-progress.md`'s own tables were written before its file was committed; round 2 then added 143 test lines |
+| SDD artifacts (`openspec/`) | 1,621 | **2,273** (+0 −) | `apply-progress.md` (256) and `verify-report.md` (396) are both committed now |
+| **Branch total** | 2,901 | **3,696** changed lines | — |
+| Governing budget | 5,000 | **74 %** | `single-pr` still stands: Low risk, no chain, no `size:exception` |
+
+Measured, not estimated: `git diff --shortstat main...HEAD` → `17 files changed, 3655 insertions(+),
+41 deletions(-)`, bucketed by `git diff --numstat main...HEAD`. This block's own commit adds ~60 more,
+landing the branch near **3,760 / 5,000**. The exact closing figure is in the Round 2 section below.
+
 ## Delivery (task 6.7 — drafted, PR not opened)
 
 `single-pr`, `chain_strategy: pending`, no `size:exception`. **The PR was deliberately not opened and
@@ -214,7 +230,11 @@ Three, all additive, none contradicting a recorded decision:
    for II15 sc1's central clause. `orderedFacts` is a computed concatenation in the requirement's
    order; it stores nothing and changes no other member.
 2. **Comment updated in `PerPackageTrustCompositionTests.swift`.** DD-11 pins "exactly 2 lines". The
-   real diff is **3 additions / 2 deletions**: the anchor line, the new path line, and a comma the
+   real diff is **4 additions / 3 deletions**
+   (**corrected at round 2 — S4/S5**; this line first said "3 additions / 2 deletions", which counted
+   the comment line the sentence below goes on to describe as if it were free. Measured:
+   `git diff --numstat main...HEAD -- cellarTests/PerPackageTrustCompositionTests.swift` → `4  3`):
+   the anchor line, the new path line, and a comma the
    preceding array element needs — plus one word in the comment above the anchor, which said "all
    three files" beside an assertion that now names four. Leaving a shipped guard's comment
    contradicting the line under it seemed worse than the extra line. **Reported, not absorbed.**
@@ -254,3 +274,181 @@ position. No requirement depends on it.
 ## Issues found
 
 None beyond the two pre-existing `cellarUITests` failures above, which are reported and untouched.
+
+---
+
+# Round 2 — verify remediation
+
+A second `sdd-apply` pass discharging the round-1 verify report
+(`verify-report.md`, `verdict: fail` on evidence completeness only — 0 blockers, 0 CRITICAL). Nothing
+shipped changed: **no production line was written in this round.** Both edits are test-side, and the
+two production files touched during the round were touched only as deliberate RED mutations and
+restored byte-identical before anything was committed (proved by an empty `git diff --stat` in both
+cases, recorded below).
+
+**Scope, as assigned**: W2, W3, S1, S2, S4, S5. **W1 not addressed** by maintainer decision. S3, S6,
+S7 accepted as follow-ups.
+
+## Commits
+
+| Hash | Subject | Discharges |
+|---|---|---|
+| `d5f51e1` | `test(installed): assert the withheld-tap marker absence and drop a vacuous launcher` | W2 (value half), W3 |
+| `177fe85` | `test(browse): pin the grant marker to the inside of the tap guard` | W2 (presentation half), S2 |
+| `1b71d4c` | `docs(sdd): record the m10-third-party-detail round-1 verify report` | the untracked report, committed as written |
+| this commit | `docs(sdd): correct the m10 line accounting and record the round-2 remediation` | S1, S4, S5 |
+
+No `Co-Authored-By` and no AI attribution. Nothing pushed; no PR opened; RDD disabled throughout.
+
+## W2 — II15 sc7's second THEN now has a covering assertion
+
+The scenario's second THEN is "AND it carries no per-package grant marker, no placeholder for either,
+and no explanatory note", under a GIVEN that includes "a grant report granting a package of the same
+kind and name under some tap". Round 1 asserted only the first THEN.
+
+The round-1 report judged the clause "partly unassertable as classified" because the projection has no
+marker member. That reading is half right and it is the half that matters: **a forbidden member is not
+an unassertable absence, it is a structural one** — the same shape DD-2's asymmetry is proved in, with
+`Mirror`. So the clause splits cleanly across the two established classes and needs **no
+reclassification of sc7 and no spec-delta edit**:
+
+| Half of the THEN | Class | Test | What makes it non-vacuous |
+|---|---|---|---|
+| The **value** carries no marker, placeholder or note | `unit` | `InstalledDetailProjectionTests.aWithheldTapCarriesNoGrantMarkerEither` | The GIVEN's grant report is asserted to really grant `acme/tools/widget` **before** anything is denied, so "no marker" can never be the report's own silence |
+| The **pane** resolves no marker without a tap | `unit-app` | `ReceiptDetailCompositionTests.theReceiptPaneResolvesTheMarkerOnlyUnderTheTapGuard` | Brace-depth containment inside the one `if let`, anchored on that guard being found at all |
+
+**Recorded for the compliance matrix**: II15 sc7 is covered by `unit` **and** `unit-app`. Its declared
+`- Verification: unit` line is unchanged and still honest — the `unit` case alone covers the whole
+scenario as a statement about the projection; the `unit-app` case covers the additional claim the
+*pane* makes, which is where a marker could otherwise appear. No delta spec file was edited.
+
+What the `unit` case asserts, beyond the report's existence: the projection's member list is exactly
+`["description", "identity", "tapOfOrigin", "kindState"]` and no member name contains `grant`, `trust`,
+`marker` or `badge`; `Fact`'s member list is exactly `["label", "value", "style"]`, so there is no note
+member for the forbidden "explanatory note" to live in; and no emitted fact's label or value is, or
+mentions, `TapProjection.grantMarker`. Triangulated against the receipt that *does* earn a marker.
+
+## W2/S2 — the presentation half, and the binding sc10 left open
+
+S2 folded into the same case, as the report suggested. The `unit-app` case asserts four things the
+shipped sc10 case could not: the marker is resolved in **exactly one** place; that place is lexically
+inside `if let tap = snapshot.tap, let origin = detail.tapOfOrigin` (by brace depth from the guard, not
+by textual proximity); the resolver's tap parameter is non-optional (`publishedBy tap: String)` present,
+`String?` absent), so an absent tap cannot reach it even in principle; and the resolved marker is
+**bound to the origin fact as its note** rather than resolved and discarded.
+
+## W3 — the vacuous assertion is gone
+
+`theHandoffLandsOnAReceiptBackedDetail` built a `RecordingProcessLauncher` at old `:394` and never
+injected it into anything, so `launchCount == 0` and `specs.isEmpty` at old `:442-443` held no matter
+what production did. **Both assertions and the launcher are deleted.** In their place, two assertions
+this layer genuinely can make — the inventory hands back the byte-identical record it already held
+(`resolved == receipt`), and a name it does not hold stays a miss — plus a comment naming where the
+clause **is** proved: II15 sc2's per-token source scan of both files, and the projection's single
+`InstalledPackage` parameter, which is why there is no seam to inject a launcher into.
+
+TM5 sc10's coverage is unchanged by this: the clause was never carried by the deleted pair.
+
+## TDD Cycle Evidence — round 2
+
+Both new cases assert behaviour that already shipped correctly, so RED could not come from absent
+production code. It was produced the only honest way available: **mutate production, observe the new
+case fail, restore, observe it pass.** Every mutation was reverted with `cp` from a pre-edit copy and
+confirmed byte-identical with `git diff --stat` before any commit.
+
+| Task | Test file | Layer | Safety net | RED (mutation → observed failure) | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| W2 value half | `InstalledDetailProjectionTests.swift` | `unit` | ✅ 1,837/1,837 core | ✅ added `public let trustNote: String?` + a `Fact(label: "Trust", value: "Trusted individually")` to `InstalledDetailProjection` → **5 distinct issues** at `:332`, `:335`, `:351`, `:354`, `:355` | ✅ restored → passed | ✅ withheld **vs** granted-tap receipt, both against the same report | ➖ none needed |
+| W3 | same | `unit` | ✅ same | ✅ made `InstalledInventory.package(_:)` "complete" the record it returns → the **two replacement** assertions failed at `:521`, `:522` (the deleted pair could not have) | ✅ restored → passed | ➖ the case is already triangulated | ✅ two vacuous assertions removed |
+| W2 presentation half + S2 | `cellarTests/ReceiptDetailCompositionTests.swift` | `unit-app` | ✅ 245/245 | ✅ hoisted the marker call above the guard in `PackageDetailView+Receipt.swift` → the new case **failed** while all six shipped cases in the file **passed** | ✅ restored → passed | ✅ the mutation is itself the second data point | ➖ none needed |
+
+The third row is the round's most useful evidence and is worth stating plainly: under a mutation that
+resolves the marker for a package whose tap is withheld, sc10's shipped
+`theReceiptPaneResolvesTheMarkerThroughTheOneProjection` **still passed**. That is exactly the gap S2
+named, measured rather than argued.
+
+### Test summary — round 2
+
+- Tests written: **2** (1 `unit`, 1 `unit-app`). Tests deleted: **0**. Vacuous assertions deleted: **2**.
+- `swift test --package-path Packages/CellarCore` → **1,838 tests / 216 suites passed**, 0 failures,
+  the same 1 pre-existing known issue. Was 1,837 → **+1**.
+- `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`**, **246 distinct tests**,
+  0 failures. Was 245 → **+1**. Counted as `' passed on'` lines (255 → **256**); the naive
+  `sort -u` reads 245 because of the truncation gotcha this file already records at Phase 0 — the run
+  was reconciled by listing the file's ids, which show all **7** `ReceiptDetailCompositionTests` cases.
+- Change total across both rounds: **20 tests** (13 `unit`, 7 `unit-app`).
+
+## Work Unit Evidence — round 2
+
+| Unit | Focused command and exact result | Runtime harness | Rollback boundary |
+|---|---|---|---|
+| W2 + W3 (`unit`) | `swift test --package-path Packages/CellarCore --filter 'InstalledDetailProjectionTests'` → **13 tests / 1 suite passed** | N/A — a total, pure `init` over one resident record; no runtime boundary exists | Revert `d5f51e1`; the launcher and its two assertions return |
+| W2 + S2 (`unit-app`) | `xcodebuild test … -only-testing:cellarTests/ReceiptDetailCompositionTests` → **`** TEST SUCCEEDED **`**, 7/7 | Full `cellarTests` target: **`** TEST SUCCEEDED **`**, 246 distinct, 0 failures | Revert `177fe85`; one test case disappears, nothing else moves |
+
+## S1 — the unrecorded deviation, now recorded
+
+**Deviation 4 (round 2): install-state fact ordering.** The pane renders the install-state group as
+`Version, Link state, Other versions, Pin state, Installed as, Size on disk`. The design's Fact
+inventory table lists `Installed as` and `Size on disk` **before** the kind-specific facts.
+
+**Recorded, not aligned — and the code is what stays.** Three reasons, in order of weight:
+
+1. DD-7's operative verb is "**appended** into the install-state group by the pane", which is what the
+   code does. The design's own table and its own prose disagree; the prose is the decision.
+2. II15 mandates ordering only *between* the three groups (identity → origin → install state), never
+   within one. No spec clause breaks either way, so this is a presentation choice, not a contract.
+3. Aligning the code would mean interleaving two view-side facts ahead of the projection's own —
+   changing shipped rendering order to satisfy a table, with no requirement asking for it. That is a
+   behavioural change made for a document, which is the wrong direction of repair.
+
+`design.md` is a prior-phase artifact and was **not** edited in this round. The fact-inventory table's
+row order is the thing to correct at archive; it is now recorded here so the correction has a source.
+
+## Accepted follow-ups — not addressed in this round
+
+- **W1 — the two pre-existing `cellarUITests` failures: tracked separately; full-scheme runner known
+  red on `main` (Taps UI tests `:209`, `:231`).** Maintainer decision, taken: a separate PR. Neither
+  case is on a surface m10 touches, `cellarUITests/` holds a zero-line diff across the whole branch,
+  and round 1 reproduced both on unmodified `main` @ `5a0860b`. Not this change's to fix and not fixed
+  here.
+- **S3 — SwiftLint advisories.** SwiftLint is not wired into this project (no `.swiftlint.yml`, no lint
+  build phase), so these are default-rule advisories rather than gate failures. Round 2 adds ~143 lines
+  to `InstalledDetailProjectionTests.swift`, which deepens the pre-existing `file_length` advisory on
+  that file; it introduces no new rule class. Informational, deliberately not chased — wiring a linter
+  into the project is its own change with its own baseline decision.
+- **S6 — two design size estimates overrun.** Unchanged, and round 2 widens the test file further.
+  Harmless: the estimates were a planning aid, not a constraint any requirement rests on.
+- **S7 — one cross-work-unit cosmetic spill in `65a65cb`.** Historical; rewriting a landed commit to
+  move seven cosmetic lines would cost more history than it buys clarity.
+- **W4 — task 6.7 (open the PR)** remains open, unchanged and by instruction: this round was again
+  forbidden to push or open a PR. The drafted (a)–(d) body above still stands, and W1 must be disclosed
+  in it.
+
+## Line accounting at the close of round 2 (S4)
+
+Measured, not estimated.
+
+| Bucket | Insertions | Deletions | Changed |
+|---|---|---|---|
+| Code + tests | 1,382 | 41 | **1,423** |
+| SDD artifacts (`openspec/`) | 2,273 | 0 | **2,273** |
+| **Branch total** | **3,655** | **41** | **3,696** |
+
+`git diff --shortstat main...HEAD` at the moment the three round-2 commits above were in: `17 files
+changed, 3655 insertions(+), 41 deletions(-)`. This section's own commit adds the rest; the closing
+measured figure is **3,894** changed lines against `review_budget_lines: 5000`
+(**78 %**). `single-pr` stands: no chain, no `size:exception`.
+
+Round 2's own contribution to the code+tests bucket is **143 lines** (+146 / −3 across the two test
+files), which is the number to weigh against the 400-line reviewer budget for the remediation itself.
+
+## Round 2 gotchas, recorded
+
+1. **`-only-testing:` with a single Swift Testing case name silently ran nothing** and still reported
+   `** TEST SUCCEEDED **`. The first RED attempt for the `unit-app` case looked like a *pass* under a
+   mutation that should have broken it. Filtering at the **suite** level
+   (`-only-testing:cellarTests/ReceiptDetailCompositionTests`) selects correctly. A green
+   `xcodebuild` run proves nothing until the case is seen by name in the output.
+2. `AppSecuritySources.stripComments` preserves the newline that ends a `//` comment, so line-indexed
+   scanning over the stripped text is sound for a file that uses `///` doc comments — which is why the
+   brace-depth containment assertion can index lines at all.
