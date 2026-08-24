@@ -49,15 +49,14 @@ does not carry. What this requirement continues to forbid is a **catalog** recor
 detail result for a package the catalog does not cover — including one synthesized from an installed
 record — and that prohibition is unchanged.
 
-The same boundary binds a **search surface**. A section of a search surface fed **exclusively by the
-resident tap inventory** is not catalog search: it is composed above the index rather than pushed into
-it, it creates no catalog record, it adds nothing to the snapshot and nothing to the index, and it
-spawns no additional brew invocation — so it neither satisfies nor violates this requirement. Such a
-section MAY read the catalog for **membership alone** — to report that a hit's bare token is also
-carried by the catalog — and that read produces no catalog result for the tap package, creates no
-catalog record, and adds nothing to the snapshot or to the index; it draws no catalog value into the
-hit beyond the fact of that collision. `package-search` owns that composed section and states its own
-rules for it. What this requirement continues to forbid is unchanged and unweakened: no tap package MUST
+The same boundary binds a **search surface**. A search surface fed **exclusively by the resident tap
+inventory** is not catalog search: it is composed above the index rather than pushed into it, it
+creates no catalog record, it adds nothing to the snapshot and nothing to the index, and it spawns no
+additional brew invocation — so it neither satisfies nor violates this requirement. Such a surface MAY
+read the catalog for **membership alone** — to report that a hit's bare token is also carried by the
+catalog — and that read produces no catalog result for the tap package, creates no catalog record, and
+adds nothing to the snapshot or to the index; it draws no catalog value into the hit beyond the fact of
+that collision. `package-search` owns that composed surface and states its own rules for it. What this requirement continues to forbid is unchanged and unweakened: no tap package MUST
 enter the snapshot or the index, and no **catalog** result — nothing the catalog snapshot, the catalog
 index or the catalog detail lookup itself returns — MUST exist for a package the catalog does not cover.
 The clause "MUST NOT appear in search results" continues to bind every result the catalog projection
@@ -90,10 +89,10 @@ tap package, including one composed above the index from the resident tap invent
 - AND no catalog record exists for it, synthesized or otherwise
 - Verification: `unit`
 
-#### Scenario: A composed tap section leaves catalog search unchanged
+#### Scenario: A composed tap surface leaves catalog search unchanged
 
-- GIVEN an installed third-party tap publishing a package the catalog does not carry, and a search
-  surface section composed exclusively from that tap inventory for the same query
+- GIVEN an installed third-party tap publishing a package the catalog does not carry, and a separate
+  search surface composed exclusively from that tap inventory for the same query
 - WHEN the catalog snapshot, the catalog index's search for that query, and the catalog detail lookup
   for that package are queried with the tap inventory resident
 - THEN the search results are identical to those returned with no tap inventory present, and the detail

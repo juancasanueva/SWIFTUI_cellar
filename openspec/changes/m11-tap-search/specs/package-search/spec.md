@@ -2,8 +2,8 @@
 
 Existing capability — `openspec/specs/package-search/spec.md` (**7 requirements / 19 scenarios**,
 established by `2026-08-01-m1-catalog-browse` and extended by `2026-08-02-m2-catalog-hardening`). This
-delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **16 scenarios** are added, taking the
-capability to **8 requirements / 35 scenarios**.
+delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **17 scenarios** are added, taking the
+capability to **8 requirements / 36 scenarios**.
 
 Nothing is removed, modified or renamed here, so `rules.archive`'s destructive-delta warning does not
 fire and PS1–PS7 stay byte-identical. In particular the index keeps its identity rule, its
@@ -23,26 +23,34 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 `delivery_strategy=single-pr`, `review_budget_lines=5000`, `strict_tdd=true`. RDD disabled.
 
 **Binding decisions consumed** (maintainer/orchestrator, 2026-08-24, Engram
-`sdd/m11-tap-search/state` obs `#7795`): Approach A; the section renders **below** the catalog rows;
-the collision note is a neutral statement of Homebrew's resolution with no nudge; the row shows the
-tap name only and no trust badge; "Hide installed" subtracts from the tap section; the Outdated chip
-hides the section entirely; the search prompt keeps counting catalog records only; a not-installed hit
-is non-selectable and an installed hit routes to the m10 receipt pane.
+`sdd/m11-tap-search/state` obs `#7795`): Approach A; the collision note is a neutral statement of
+Homebrew's resolution with no nudge; the row shows the tap name only and no trust badge; "Hide
+installed" subtracts from the tap results; a not-installed hit is non-selectable and an installed hit
+routes to the m10 receipt pane.
+
+**Maintainer scope change, 2026-08-25 — binding, and this revision's reason.** The tap packages get
+their **own surface**, not a section inside Browse. Browse stays **catalog-only** and its file carries
+a **zero-line diff**. The new surface is its own sidebar entry titled “Search our taps”, laid out as a
+visual copy of Browse. Three behaviours changed with it: an **empty query lists every published
+package** (mirroring PS5 for the catalog) instead of yielding nothing; there is **no Outdated
+control** on the surface, so the outdated-hides-everything rule is gone rather than restated; and an
+unavailable tap inventory renders an **ordinary empty state with pinned copy** rather than an absent
+section. The string “From your taps” is withdrawn — it named a section that no longer exists.
 
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
 | `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **12** |
-| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **4** |
+| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **5** |
 
 ## ADDED Requirements
 
 ### Requirement: Packages published by installed third-party taps are searchable as a composed source
 
-A package published by an installed third-party tap MUST be findable from the same query surface that
-searches the catalog, presented as a **distinct source** rather than as a catalog result. That source
-MUST be **composed above the search index and never pushed into it**, on exactly the discipline
+A package published by an installed third-party tap MUST be findable by query, on **its own surface**,
+distinct from catalog search and **never interleaved with catalog results**. That source MUST be
+**composed above the search index and never pushed into it**, on exactly the discipline
 `installed-inventory` II8 already applies to installed state. The index's identity rule, its
 normalisation, its ranking order, its declared filter set, its build and its results MUST be
 unchanged, and no tap package MUST enter the catalog snapshot, the index or any catalog result
@@ -86,19 +94,30 @@ tap name ascending, so the order is **total and reproducible**. Tap hits MUST NO
 the catalog's ranked order: PS3's order is defined over catalog records and broken by 365-day install
 count, which a tap package does not have, so the two orders MUST remain independent.
 
-The composed source MUST be produced **only for a non-empty query**. Where PS5 makes an empty catalog
-query return the whole filtered catalog, an empty or whitespace-only query MUST here yield **no tap
-source at all** rather than the whole tap inventory, and MUST NOT throw. Where the tap inventory is
-unavailable — brew absent, or its refresh failed — the source MUST simply be **absent**: never an
-error, never a banner on the query surface, and never a reason a catalog result changes.
+An **empty or whitespace-only query MUST list every package published by every installed third-party
+tap**, in the deterministic order below, exactly as PS5 makes an empty catalog query return the whole
+filtered catalog. It MUST NOT return an error, MUST NOT return zero results while packages are
+published, and MUST NOT throw. A query that matches nothing MUST return an empty result set, again as
+PS5 requires of the catalog.
 
-The query's declared **kind** filter MUST restrict the composed source exactly as it restricts catalog
-results, and the declared filter set MUST NOT gain a member (PS4). Installed-state controls MUST be
-composed above this source on II8's terms: a hide-installed subtraction MUST remove its installed hits
-exactly as it removes installed catalog rows, and while an outdated-only mode is active the composed
-source MUST be **absent in whole**, because a tap hit carries no version and can therefore never
-satisfy an outdated predicate. The record count presented as the query field's prompt MUST continue to
-count **catalog records only**, because that is what the index answers for.
+Where the tap inventory is unavailable — brew absent, or its refresh failed — the surface MUST present
+an **ordinary empty state and never an error**: no error banner, no failure copy, no retry demand, and
+no claim that something went wrong. That state MUST carry the exact copy “No packages from your
+taps.”. Where the inventory is available but no installed third-party tap publishes anything, the
+surface MUST carry the exact copy “Your taps publish nothing yet.”, so an unavailable inventory and an
+empty one are not presented as the same fact. A non-empty query that matches nothing MUST use the same
+ordinary no-match empty state the catalog query surface already uses; no new copy is pinned for it.
+Neither state MUST change a catalog result, and catalog search MUST remain fully usable while the tap
+inventory is unavailable.
+
+The query's declared **kind** filter MUST restrict this source exactly as it restricts catalog results,
+and the declared filter set MUST NOT gain a member (PS4). Installed-state controls MUST be composed
+above this source on II8's terms: a hide-installed subtraction MUST remove its installed hits exactly
+as it removes installed catalog rows. The surface MUST offer **no outdated control**, because a tap hit
+carries no version and could never answer one; an enabled control that cannot change the visible
+results is what II8 forbids. The surface's own prompt MUST NOT present a catalog record count, and the
+catalog query surface's prompt MUST continue to count **catalog records only** — this source changes
+neither.
 
 A tap hit's **row identity** MUST be distinct from any catalog row's identity, formed from the tap of
 origin, the kind and the bare token, so two rows for the same `(kind, name)` remain separately
@@ -141,11 +160,16 @@ A **not-installed** hit MUST NOT be selectable either: the catalog carries no re
 exists, and the tap-source read that would supply a description or a version is forbidden, so there is
 nothing honest to present in a detail pane.
 
-The composed source MUST be presented as a titled section carrying the exact title “From your taps”,
-positioned **after** the catalog results rather than interleaved with them. Composing it runs on the
-same keystroke turn as the catalog query, so PS6's measured ceiling MUST continue to hold with the
-section composed: p95 MUST remain below 8 milliseconds. The ceiling is not relaxed and MUST NOT be
-regressed by this source.
+This source MUST be presented on its **own surface**, reachable as its own entry in the application's
+section list, carrying the exact title “Search our taps” in both that entry and the surface's own
+title. It MUST NOT be composed into the catalog query surface: that surface stays **catalog-only**, and
+this requirement MUST NOT add a row, a section, a control or a store to it.
+
+The two surfaces answer **separate keystroke turns**, so PS6's ceiling is not shared and MUST NOT be
+restated as a combined budget. Instead: composing this source for **one keystroke** over a resident tap
+inventory of realistic size MUST hold p95 below the **same 8 millisecond ceiling** PS6 sets for the
+catalog, and PS6's own measurement over the catalog index MUST be **unchanged** — same fixture, same
+method, same ceiling, unaffected by this source's existence.
 
 #### Scenario: A tap package the catalog does not carry is found by a non-empty query
 
@@ -196,19 +220,23 @@ regressed by this source.
 - AND the declared filter set is unchanged, with no member added for this source
 - Verification: `unit`
 
-#### Scenario: An empty query composes no tap source
+#### Scenario: An empty query lists everything the installed taps publish
 
-- GIVEN an installed tap publishing forty packages
+- GIVEN installed taps `acme/tools` and `bravo/tools` publishing forty packages between them
 - WHEN the query is the empty string, and again a whitespace-only string
-- THEN no tap hit is produced in either case and nothing is thrown
+- THEN all forty are returned in both cases, ordered by bare token, then kind, then tap name
+- AND nothing is thrown and no result is withheld
 - Verification: `unit`
 
-#### Scenario: An unavailable tap inventory is an absence, not an error
+#### Scenario: An unavailable or empty inventory is an ordinary empty state, never an error
 
-- GIVEN a tap inventory unavailable because brew is absent, and separately one whose refresh failed
-- WHEN a non-empty query that would otherwise match a published package is composed in each case
-- THEN no tap hit is produced, no error is raised and no error state is reported for the query surface
-- AND the catalog results for the same query are unchanged
+- GIVEN a tap inventory unavailable because brew is absent, separately one whose refresh failed, and
+  separately an available inventory in which no installed third-party tap publishes anything
+- WHEN the surface's state is composed for an empty query in each case
+- THEN the first two carry exactly “No packages from your taps.” and the third exactly “Your taps
+  publish nothing yet.”
+- AND no error, failure copy or retry demand is produced in any case, and the catalog results for the
+  same query are unchanged
 - Verification: `unit`
 
 #### Scenario: A catalog collision is reported on the hit and never suppressed
@@ -244,30 +272,34 @@ regressed by this source.
   target
 - Verification: `unit`
 
-#### Scenario: Installed-state controls compose above the tap source
+#### Scenario: Hide-installed composes above the tap source, and no outdated control exists
 
 - GIVEN a non-empty query matching one installed and one not-installed tap package
-- WHEN a hide-installed subtraction is applied, and separately an outdated-only mode is active
-- THEN the first case returns only the not-installed hit
-- AND the second case returns no tap hit at all
+- WHEN a hide-installed subtraction is applied
+- THEN only the not-installed hit is returned
+- AND the controls this surface offers are enumerated and contain no outdated predicate, so no enabled
+  control is inert
 - Verification: `unit`
 
-#### Scenario: The keystroke latency ceiling is not regressed
+#### Scenario: The tap surface holds the same ceiling on its own turn
 
-- GIVEN the realistic fixture PS6 measures over, and a resident tap inventory of realistic size —
-  several taps publishing approximately 500 packages in total
-- WHEN at least 100 representative as-you-type queries of varying length run the catalog query and
-  compose the tap source on the same turn
-- THEN the 95th-percentile duration of that combined turn is below 8 milliseconds
+- GIVEN a resident tap inventory of realistic size — several taps publishing approximately 500
+  packages in total
+- WHEN at least 100 representative as-you-type queries of varying length each compose this source once,
+  on their own keystroke turn
+- THEN the 95th-percentile duration of composing it is below 8 milliseconds
+- AND PS6's own catalog measurement runs over its own fixture, unchanged in fixture, method and
+  ceiling, with no tap inventory in its turn
 - Verification: `unit`
 
-#### Scenario: The tap section is titled, positioned last, and inert when not installed
+#### Scenario: The tap surface is its own titled entry, and its not-installed rows are inert
 
-- GIVEN the source of the surface that presents the composed tap source
-- WHEN its section title, its position relative to the catalog results, and the selectability of a
-  not-installed hit are inspected
-- THEN the title is exactly “From your taps”, the section is presented after the catalog results, and
-  a not-installed hit is not selectable
+- GIVEN the source of the surface that presents this source and the application's section list
+- WHEN the surface's title, its section-list entry, and the selectability of a not-installed hit are
+  inspected
+- THEN the section-list entry and the surface title are both exactly “Search our taps”
+- AND the surface is its own entry rather than a section of the catalog query surface, and a
+  not-installed hit is not selectable
 - Verification: `unit-app`
 
 #### Scenario: An installed tap hit opens the receipt-backed detail
@@ -296,10 +328,20 @@ regressed by this source.
 - GIVEN the source of the projection that answers the composed source and the source of the surface
   that presents it
 - WHEN both are scanned for any reference to the brew-process execution layer, to `Process`, or to a
-  store refresh triggered by presenting the section
+  store refresh triggered by presenting the surface
 - THEN neither contains one
 - AND the composition takes only already-resident values as its input, with no process-launcher
   dependency to inject
+- Verification: `unit-app`
+
+#### Scenario: The catalog query surface is untouched by this source
+
+- GIVEN the source of the catalog query surface, as it stands before this change and after it
+- WHEN it is compared against its base revision and scanned for any reference to this source's
+  projection or to its surface
+- THEN the two revisions are identical, with a zero-line difference
+- AND it contains no reference to the projection or to the surface, so nothing from this source is
+  composed into catalog search
 - Verification: `unit-app`
 
 ## Notes for archive
@@ -324,5 +366,15 @@ regressed by this source.
   direction (`BrewClient` may import `Catalog`, never the reverse), II8 supplies the
   composed-above-the-index discipline this requirement extends, and II15 supplies the receipt-backed
   detail an installed tap hit lands on.
-- PS6's own scenario keeps its M1 text byte-for-byte; the non-regression scenario here is an
-  additional measurement over the combined turn, not a restatement or a relaxation of the ceiling.
+- PS6's own scenario keeps its M1 text byte-for-byte. The measurement here is a **separate** one over
+  this source's own keystroke turn against the same 8 ms ceiling — not a combined budget, and not a
+  relaxation. The two surfaces no longer share a turn, which is why the earlier combined-turn wording
+  was withdrawn in revision 3.
+- **The untouched-catalog-surface scenario is concrete in the app target.** `rules.specs` keeps view
+  names out of scenario text, so it names "the catalog query surface"; the assertion is over
+  `cellar/Browse/BrowseView.swift` — a zero-line diff against the base revision, and no reference to
+  the tap search projection or its view. This is the structural guarantee that Browse stays
+  catalog-only.
+- **The string “From your taps” is withdrawn** by the 2026-08-25 scope change and appears nowhere in
+  this delta: it named a Browse section that no longer exists. The surface title “Search our taps” and
+  the two empty-state strings replace it, all three **new copy** with no shipped precedent.

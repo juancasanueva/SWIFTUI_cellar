@@ -263,7 +263,7 @@ is the source — including a query surface owned by `package-search` and an ins
 - **Numbering drift.** `explore.md` §4.4/§4.5 and `proposal.md` call the adjacent-capabilities
   requirement TM10 and the trust-presentation requirement TM11; the file's markers are `<!-- TM11 -->`
   and `<!-- TM12 -->`. The archive should record the marker numbers, not the explore numbers.
-- **TM12 needs no delta.** The Browse tap section presents the tap name as a plain fact and no trust
+- **TM12 needs no delta.** The tap search surface presents the tap name as a plain fact and no trust
   badge or control at all, so TM12's "exactly one projection supplies the trust presentation" rule
   gains no third consumer. `package-search` PS8 asserts that badge and control absence directly.
 - Neither narrowing changes shipped behaviour on the Taps surface: no action is added, no navigation is
