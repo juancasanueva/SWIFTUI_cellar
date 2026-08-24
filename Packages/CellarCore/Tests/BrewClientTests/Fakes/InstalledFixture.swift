@@ -76,6 +76,58 @@ enum InstalledFixture {
         return InstalledInventory(packages: ordered)
     }
 
+    /// One receipt record assembled member by member.
+    ///
+    /// The builder below answers "an installed package of this identity"; this
+    /// one answers "a receipt with *these* kegs, *this* tap and *this*
+    /// tri-state", which is what a rule about the record's own shape needs.
+    /// Every parameter defaults to the shape a plain single-keg formula has, so
+    /// a caller states only the member its rule is about.
+    ///
+    /// `primaryKeg` follows `InstalledDecoder`'s rule exactly: the linked keg
+    /// when one is named, otherwise the newest install.
+    static func receipt(
+        _ kind: PackageKind,
+        _ name: String,
+        displayName: String? = nil,
+        desc: String? = nil,
+        homepage: URL? = nil,
+        tap: String? = "acme/tools",
+        kegVersions: [String] = [installedVersion],
+        linkedKeg: String? = nil,
+        isPinned: Bool = false,
+        pinnedVersion: String? = nil,
+        declaresAutoUpdates: Bool? = nil,
+        onRequest: Bool = true
+    ) -> InstalledPackage {
+        // Oldest first, so "newest last" and "newest by timestamp" agree.
+        let kegs = kegVersions.enumerated().map { offset, version in
+            InstalledKeg(
+                version: version,
+                installedAt: date(1_000 + TimeInterval(offset)),
+                installedOnRequest: onRequest
+            )
+        }
+        let primary = linkedKeg.flatMap { linked in kegs.first { $0.version == linked } }
+            ?? kegs[kegs.count - 1]
+        return InstalledPackage(
+            kind: kind,
+            name: name,
+            displayName: displayName ?? name,
+            desc: desc,
+            homepage: homepage,
+            tap: tap,
+            catalogVersion: primary.version,
+            kegs: kegs,
+            primaryKeg: primary,
+            snapshotOutdated: false,
+            isPinned: isPinned,
+            pinnedVersion: pinnedVersion,
+            declaresAutoUpdates: declaresAutoUpdates,
+            linkedKeg: linkedKeg
+        )
+    }
+
     static func package(
         _ id: PackageID,
         catalogVersion: String,

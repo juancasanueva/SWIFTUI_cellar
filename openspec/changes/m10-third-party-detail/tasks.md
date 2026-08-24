@@ -180,59 +180,59 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'InstalledDetailProjectionTests'`
 
-- [ ] 3.1 **Test support (not a behaviour).** Extend
+- [x] 3.1 **Test support (not a behaviour).** Extend
       `Packages/CellarCore/Tests/BrewClientTests/Fakes/InstalledFixture.swift` with the shapes the RED
       rows need: multi-keg (3 kegs, one linked), **unlinked** multi-keg (2 kegs, `linkedKeg: nil`),
       single-keg unlinked, `declaresAutoUpdates` `true` / `false` / `nil`, `tap: nil`, `desc: nil` +
       `homepage: nil`, and `isPinned` with `pinnedVersion` present **and** absent. Shipped fixture
       signatures stay source-compatible for their existing callers.
-- [ ] 3.2 **RED.** New file `Packages/CellarCore/Tests/BrewClientTests/InstalledDetailProjectionTests.swift` ·
+- [x] 3.2 **RED.** New file `Packages/CellarCore/Tests/BrewClientTests/InstalledDetailProjectionTests.swift` ·
       `aReceiptOnlyPackageIsDetailedFromItsSnapshotAlone`: a formula from `acme/tools` with desc,
       homepage and one keg ⇒ facts appear in group order **identity → origin → install state**, every
       value equals the snapshot's, and the type references no catalog value. **RED because**
       `InstalledDetailProjection` does not exist. *(II15 sc1)*
-- [ ] 3.3 **RED.** `theGroupsKeepTheirOrderAndNoLabelRepeats`: the three groups keep their order across
+- [x] 3.3 **RED.** `theGroupsKeepTheirOrderAndNoLabelRepeats`: the three groups keep their order across
       both kinds and no label appears twice. *(II15 sc1)*
-- [ ] 3.4 **RED.** `factsDoNotCrossBetweenFormulaAndCask`: enumerating every fact of a formula and of a
+- [x] 3.4 **RED.** `factsDoNotCrossBetweenFormulaAndCask`: enumerating every fact of a formula and of a
       cask, the formula exposes **no** auto-updates declaration and the cask exposes **no** keg count, no
       primary-keg version, no linked-keg state and no link state — unrepresentable via `KindState`
       (**DD-2**), not merely unwritten. *(II15 sc3)*
-- [ ] 3.5 **RED.** `aCaskAutoUpdatesTriStateStaysThreeAnswers`: `true` ⇒ exactly `Updates itself`,
+- [x] 3.5 **RED.** `aCaskAutoUpdatesTriStateStaysThreeAnswers`: `true` ⇒ exactly `Updates itself`,
       `false` ⇒ exactly `Updated by Homebrew`, `nil` ⇒ **no fact at all**; the three outcomes are
       pairwise distinguishable, so “not declared” is never “declared false”. *(II15 sc4, II2)*
-- [ ] 3.6 **RED.** `aMultiKegFormulaShowsItsPrimaryKegAndACountOfTheRest`: 3 kegs, one linked ⇒ exactly
+- [x] 3.6 **RED.** `aMultiKegFormulaShowsItsPrimaryKegAndACountOfTheRest`: 3 kegs, one linked ⇒ exactly
       `Linked`, the primary keg's version named, and exactly `2 other versions installed`; nothing
       truncates or drops the other kegs. *(II15 sc5)*
-- [ ] 3.7 **RED.** `anUnlinkedFormulaStillNamesItsPrimaryKeg`: 2 kegs with **no** linked keg ⇒ exactly
+- [x] 3.7 **RED.** `anUnlinkedFormulaStillNamesItsPrimaryKeg`: 2 kegs with **no** linked keg ⇒ exactly
       `Not linked`, the primary keg's version **still named**, and exactly `1 other version installed`
       **in the singular**; a second unlinked single-keg formula exposes **no** other-versions fact.
       **RED because** carrying the version inside `LinkState` would lose it when unlinked. *(II15 sc6)*
-- [ ] 3.8 **RED.** `aFormulaReportsBothLinkStates` and
+- [x] 3.8 **RED.** `aFormulaReportsBothLinkStates` and
       `aPinnedFormulaReportsItsPinWithAndWithoutAVersion`: both link states render; `.pinned(version:
       nil)` is distinguishable from `.pinned(version: "1.2.3")` and from `.notPinned`. *(II15 sc6,
       install-state group)*
-- [ ] 3.9 **RED.** `aWithheldTapProducesNoOriginFact`: `tap == nil` ⇒ `tapOfOrigin == nil`, no origin
+- [x] 3.9 **RED.** `aWithheldTapProducesNoOriginFact`: `tap == nil` ⇒ `tapOfOrigin == nil`, no origin
       fact, no placeholder, no explanatory note — and, per PT3, no marker is derivable downstream.
       *(II15 sc7, PD8, PT3)*
-- [ ] 3.10 **RED.** `absentDescriptionAndHomepageAreOmittedNotEmptied`: `desc`/`homepage` nil ⇒
+- [x] 3.10 **RED.** `absentDescriptionAndHomepageAreOmittedNotEmptied`: `desc`/`homepage` nil ⇒
       `description == nil` and no Homepage fact; **every** emitted `Fact.value` across every fixture is
       non-empty and is never `""`, `unknown` or a dash. The absence set is enumerated, not sampled.
       *(II15 sc8, DD-3)*
-- [ ] 3.11 **Prove RED.** Run the focused command; 3.2–3.10 MUST fail, each for its stated reason. A
+- [x] 3.11 **Prove RED.** Run the focused command; 3.2–3.10 MUST fail, each for its stated reason. A
       green test here is a defect in the test.
-- [ ] 3.12 **GREEN.** New file `Packages/CellarCore/Sources/BrewClient/InstalledDetailProjection.swift` —
+- [x] 3.12 **GREEN.** New file `Packages/CellarCore/Sources/BrewClient/InstalledDetailProjection.swift` —
       `public struct InstalledDetailProjection: Sendable, Hashable` with `Fact` (`label`, non-empty
       `value`, `Style.plain|.mono|.link(URL)`), `FormulaState` (`primaryKegVersion`, `LinkState`,
       `otherKegCount`, `Pin`), `CaskState(autoUpdates: Bool?)`, `enum KindState`, `description: String?`,
       `identity: [Fact]`, `tapOfOrigin: Fact?`, and a **computed** `installStateFacts` derived from
       `kindState`. One total `public init(_ package: InstalledPackage)`.
-- [ ] 3.13 **GREEN, binding constraints** (each already asserted above, restated so no shortcut is
+- [x] 3.13 **GREEN, binding constraints** (each already asserted above, restated so no shortcut is
       taken): **no** `Latest version`/`Outdated` fact (**DD-5**); **no** install-date fact (**DD-6**);
       **no** display name and **no** version story (the shared header owns both); read `linkedKeg`
       **directly**, never `formulaLinkState` (its `.notApplicable` is a runtime guard `KindState` makes
       unnecessary and it would pull `DiskUsage` in); **nonisolated by module default**, no annotation,
       no `@unchecked`, no actor (**DD-10**); no `Process`, `FileManager`, store, clock or SwiftUI import.
-- [ ] 3.14 Focused command green; commit WU3
+- [x] 3.14 Focused command green; commit WU3
       (`feat(installed): derive a reduced detail from one installed receipt`).
 
 ## Phase 4: WU4 — the catalog stays untouched (PD6 sc3, TM5 sc10)
