@@ -9,7 +9,7 @@ import Testing
 /// surface as a **composed source** (`package-search` PS8).
 ///
 /// Everything here is a claim about a pure value: the ladder, the total order,
-/// the collision fact, the routability rule, the section-visibility rule and
+/// the collision fact, the routability rule, the presentation states and
 /// **every user-visible string the surface shows**. Nothing in this suite builds
 /// a store, a launcher or a view, because the projection takes none of them —
 /// which is itself one of the claims.
@@ -714,34 +714,43 @@ struct TapPackageSearchTests {
         )
     }
 
-    // MARK: - ps12 — the combined keystroke turn stays under the ceiling
+    // MARK: - ps12 — each surface holds the ceiling on its own turn
 
-    /// The catalog query **and** the tap composition, on one turn, as the view
-    /// runs them.
+    /// This surface's own keystroke turn: `hits(…)` plus `presentation(…)`,
+    /// once, as the view runs them per render.
     ///
-    /// Explicitly **not** a re-run of the shipped PS6 measurement: that one
-    /// never touches the tap inventory, so it cannot observe the regression this
-    /// change could cause. The ceiling is not negotiable — a miss is fixed in
-    /// the projection, never by a larger number, a smaller inventory, fewer
-    /// queries or a p90.
+    /// **No longer a combined turn.** The 2026-08-25 scope change took the tap
+    /// results out of Browse, so nothing is added to the catalog's budget and
+    /// the two surfaces answer separate keystrokes. The catalog half is
+    /// measured on its own in the row below.
+    ///
+    /// The ceiling is not negotiable — a miss is fixed in the projection, never
+    /// by a larger number, a smaller inventory, fewer queries or a p90.
     @Test(
-        "The combined catalog and tap keystroke turn stays under the 8 ms ceiling",
+        "The tap surface's keystroke turn stays under the 8 ms ceiling",
         .enabled(if: TapSearchBuildConfiguration.isRelease),
         .timeLimit(.minutes(2))
     )
-    func theCombinedKeystrokeTurnStaysUnderTheCeiling() {
-        let index = PackageSearchIndex(snapshot: TapSearchLatencyFixture.catalogSnapshot())
+    func theTapSurfaceKeystrokeTurnStaysUnderTheCeiling() {
         let taps = TapSearchLatencyFixture.tapInventory()
         let installed = TapSearchLatencyFixture.installedInventory(from: taps)
         let source = TapPackageSearch(inventory: taps, installed: installed)
-        let queries = TapSearchLatencyFixture.asYouTypePrefixes()
+        // The empty query is deliberately first and deliberately included: with
+        // DD-16 it is the **worst case**, because every published package
+        // matches it. A measurement that skipped it would claim the ceiling for
+        // the cheapest turn the surface has.
+        let queries = [""] + TapSearchLatencyFixture.asYouTypePrefixes()
 
-        #expect(index.recordCount == TapSearchLatencyFixture.catalogRecordCount)
         #expect(queries.count >= 100)
+        #expect(
+            source.hits(query: "", kinds: [.formula, .cask], hideInstalled: false, isInCatalog: { _ in false })
+                .count == TapSearchLatencyFixture.tapPackageCount,
+            "the empty query does not reach every package, so the worst case is not being measured"
+        )
 
         // Warm-up: first-touch page faults on a 1–2 MB buffer are not latency.
         for _ in 0..<5 {
-            for query in queries { blackHole(turn(query, index: index, source: source)) }
+            for query in queries { blackHole(turn(query, source: source, tapState: .loaded, inventory: taps)) }
         }
 
         var samples: [Duration] = []
@@ -750,7 +759,7 @@ struct TapPackageSearchTests {
         for _ in 0..<10 {
             for query in queries {
                 let start = clock.now
-                let produced = turn(query, index: index, source: source)
+                let produced = turn(query, source: source, tapState: .loaded, inventory: taps)
                 samples.append(clock.now - start)
                 blackHole(produced)
             }
@@ -763,25 +772,82 @@ struct TapPackageSearchTests {
 
         #expect(
             p95 < Duration.milliseconds(8),
-            "combined p95 \(p95) exceeded the 8 ms ceiling (median \(median), max \(sorted.last!))"
+            "tap p95 \(p95) exceeded the 8 ms ceiling (median \(median), max \(sorted.last!))"
+        )
+        // The empty query is ten samples in a thousand, so a p95 alone could
+        // step over the very turn DD-16 makes the worst one. The maximum
+        // necessarily contains it.
+        #expect(
+            sorted.last! < Duration.milliseconds(8),
+            "the slowest turn — the empty query lists every package — took \(sorted.last!)"
         )
     }
 
-    /// One keystroke: what `BrowseView` does per render, in the same order.
+    /// PS6's own measurement, re-run over its own fixture with **no tap
+    /// inventory in its turn**.
+    ///
+    /// The honest form of R6 after the scope change: `BrowseView` and
+    /// `PackageSearchIndex` are untouched, so this number must be unchanged. A
+    /// regression here means something leaked into the catalog's keystroke.
+    @Test(
+        "The catalog keystroke turn is unchanged by this source",
+        .enabled(if: TapSearchBuildConfiguration.isRelease),
+        .timeLimit(.minutes(2))
+    )
+    func theCatalogKeystrokeTurnIsUnchanged() {
+        let index = PackageSearchIndex(snapshot: TapSearchLatencyFixture.catalogSnapshot())
+        let queries = TapSearchLatencyFixture.asYouTypePrefixes()
+
+        #expect(index.recordCount == TapSearchLatencyFixture.catalogRecordCount)
+        #expect(queries.count >= 100)
+
+        for _ in 0..<5 {
+            for query in queries { blackHole(index.search(query).count) }
+        }
+
+        var samples: [Duration] = []
+        samples.reserveCapacity(queries.count * 10)
+        let clock = ContinuousClock()
+        for _ in 0..<10 {
+            for query in queries {
+                let start = clock.now
+                let hits = index.search(query)
+                samples.append(clock.now - start)
+                blackHole(hits.count)
+            }
+        }
+
+        let sorted = samples.sorted()
+        let p95 = sorted[Int(Double(sorted.count) * 0.95)]
+        let median = sorted[sorted.count / 2]
+
+        #expect(
+            p95 < Duration.milliseconds(8),
+            "catalog p95 \(p95) exceeded PS6's own 8 ms ceiling (median \(median), max \(sorted.last!))"
+        )
+    }
+
+    /// One keystroke on the tap surface: what `TapSearchView` does per render,
+    /// in the same order.
     private func turn(
         _ query: String,
-        index: PackageSearchIndex,
-        source: TapPackageSearch
+        source: TapPackageSearch,
+        tapState: TapLoadState,
+        inventory: TapInventory
     ) -> Int {
-        let catalog = index.search(query)
-        let catalogIDs = Set(catalog.map(\.id))
-        let tap = source.hits(
+        let found = source.hits(
             query: query,
             kinds: [.formula, .cask],
             hideInstalled: false,
-            isInCatalog: { catalogIDs.contains($0) }
+            isInCatalog: { _ in false }
         )
-        return catalog.count + tap.count
+        let shown = TapPackageSearch.presentation(
+            tapState: tapState,
+            inventory: inventory,
+            query: query,
+            hitCount: found.count
+        )
+        return found.count + (shown == .content ? 1 : 0)
     }
 
     @Test("The latency fixture is the size and shape the ceiling is claimed for")
