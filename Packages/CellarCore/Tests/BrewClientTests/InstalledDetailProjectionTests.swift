@@ -255,10 +255,9 @@ struct InstalledDetailProjectionTests {
         #expect(notPinned.installStateFacts.contains { $0.label == "Pin state" } == false)
 
         // Three states, all distinguishable on the value itself.
-        let pins = try [withVersion, withoutVersion, notPinned].map { detail -> InstalledDetailProjection.FormulaState.Pin in
-            guard case .formula(let state) = detail.kindState else {
-                throw PinUnavailable()
-            }
+        typealias Pin = InstalledDetailProjection.FormulaState.Pin
+        let pins = try [withVersion, withoutVersion, notPinned].map { detail -> Pin in
+            guard case .formula(let state) = detail.kindState else { throw PinUnavailable() }
             return state.pin
         }
         #expect(pins == [.pinned(version: "1.2.3"), .pinned(version: nil), .notPinned])

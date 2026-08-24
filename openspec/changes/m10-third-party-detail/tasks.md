@@ -262,40 +262,40 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 > `cellar/` and `cellarTests/` are `PBXFileSystemSynchronizedRootGroup`s (`project.pbxproj` :46, :51),
 > so both new files join their targets with a **0-line `project.pbxproj` diff**.
 
-- [ ] 5.1 **RED.** New file `cellarTests/ReceiptDetailCompositionTests.swift` ·
+- [x] 5.1 **RED.** New file `cellarTests/ReceiptDetailCompositionTests.swift` ·
       `composingTheReducedDetailReachesNoProcessLayer`: scanning `InstalledDetailProjection.swift` **and**
       `PackageDetailView+Receipt.swift` finds no brew-process reference, no `Process`, and no store
       refresh triggered by presenting the detail; the composition takes **exactly one**
       `InstalledPackage`, with no launcher dependency to inject. **RED because** the view file does not
       exist. *(II15 sc2)*
-- [ ] 5.2 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneResolvesTheMarkerThroughTheOneProjection`:
+- [x] 5.2 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneResolvesTheMarkerThroughTheOneProjection`:
       the pane contains `TapProjection.grantsIndividually(` and `TapProjection.grantMarker`, and contains
       **no** `"Trusted individually"` literal of its own. *(II15 sc10, PD8, PT5)*
-- [ ] 5.3 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneOffersNoTrustControl`: the pane contains
+- [x] 5.3 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneOffersNoTrustControl`: the pane contains
       no `"Trust` string literal and no `TapCommand`; nothing on it grants, revokes or alters a tap trust
       or a per-package grant, and no copy states or implies untrusted, unverified, unsigned or
       unnotarized. *(II15 sc11, PT6, PT7 asserted as an absence)*
-- [ ] 5.4 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneOffersTheSameVerbsAsTheRow`: the pane
+- [x] 5.4 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneOffersTheSameVerbsAsTheRow`: the pane
       contains `MutationMenu(center:` with `catalog: nil` and constructs **no** `MutationCommand` of its
       own — the verbs arrive from the same shared surface `InstalledRow.swift:61` uses. *(II15 sc11,
       DD-8)*
-- [ ] 5.5 **RED.** `ReceiptDetailCompositionTests · theScopedCatalogMissCopyIsUnchanged`: the exact
+- [x] 5.5 **RED.** `ReceiptDetailCompositionTests · theScopedCatalogMissCopyIsUnchanged`: the exact
       sentence `This installed package is not in Cellar’s core/cask catalog.` is present **with its
       U+2019 apostrophe**, compared byte-for-byte against `PackageDetailView.swift:384`; the phrase
       `third-party` is **absent** from the pane. *(II15 sc12, R2, DD-12)*
-- [ ] 5.6 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneRendersNoInstallDate`: neither the pane
+- [x] 5.6 **RED.** `ReceiptDetailCompositionTests · theReceiptPaneRendersNoInstallDate`: neither the pane
       nor the projection contains `"Installed on"` or `installedAt`, and no exposed value derives from the
       Unix epoch. *(II15 sc9, DD-6)*
-- [ ] 5.7 **RED — DD-11, the one edit to a shipped guard.** `cellarTests/PerPackageTrustCompositionTests.swift`:
+- [x] 5.7 **RED — DD-11, the one edit to a shipped guard.** `cellarTests/PerPackageTrustCompositionTests.swift`:
       add `"cellar/Browse/PackageDetailView+Receipt.swift"` to `PerPackageTrustSources.views()` (:186-190)
       and extend the sorted-name anchor (:31-32) to
       `["PackageDetailView+Receipt.swift", "PackageDetailView.swift", "TapDetailView.swift", "TapsListView.swift"]`
       — `+` (U+002B) sorts **before** `.` (U+002E), so the new name comes **first**. **Exactly 2 lines.**
       Do **not** add a private second scanner in the new test file. *(R3)*
-- [ ] 5.8 **Prove RED** (5.1–5.7 all fail, each for its stated reason), then **GREEN**: new file
+- [x] 5.8 **Prove RED** (5.1–5.7 all fail, each for its stated reason), then **GREEN**: new file
       `cellar/Browse/PackageDetailView+Receipt.swift` — an extension on `PackageDetailView` replacing the
       body of `uncatalogedContent(for:)`. It calls the **WU2 internal** helpers; it duplicates none.
-- [ ] 5.9 **GREEN, composition** (order is the spec's, copy is the pinned table's): the shared
+- [x] 5.9 **GREEN, composition** (order is the spec's, copy is the pinned table's): the shared
       `header(id:displayName:versionStory:installed:primaryButton:)` with its `EmptyView()` slot filled by
       `MutationMenu(center: operations, entry: PackageEntry(installed: snapshot, catalog: nil, id: snapshot.id))`
       · the description block · `identity` facts (`factLink` for Homepage) · `tapOfOrigin` with the marker
@@ -304,10 +304,10 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
       `installedAs(for:)` and `sizeOnDisk(for:)` (**DD-7**) · `PackageMetadataSection(entry:metadata:)`
       **unchanged** · the footer copy. Built **synchronously in `body`**: no `Task`, no `.task {}`, no
       `await` (**DD-10**). **No new DI line** — `ContentView.swift:533-544` already wires all six stores.
-- [ ] 5.10 **GREEN.** `PackageDetailView.swift` — remove the `ContentUnavailableView` body of
+- [x] 5.10 **GREEN.** `PackageDetailView.swift` — remove the `ContentUnavailableView` body of
       `uncatalogedContent(for:)` now that the extension supplies it. Nothing else in that file changes
       beyond WU2's refactor.
-- [ ] 5.11 Runner green — the Phase 0 baseline **plus** the six new cases, and
+- [x] 5.11 Runner green — the Phase 0 baseline **plus** the six new cases, and
       `PerPackageTrustCompositionTests` **both** tests still green with only the 2-line edit. Commit WU5
       (`feat(browse): show a receipt-backed detail for packages the catalog does not carry`).
 

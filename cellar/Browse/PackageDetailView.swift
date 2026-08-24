@@ -363,32 +363,6 @@ struct PackageDetailView: View {
         }
     }
 
-    /// The header alone, for an installed package the catalog does not list.
-    /// No tabs and no primary verb — the catalog record those need is exactly
-    /// what is absent — but the identity row and the heart still stand.
-    @ViewBuilder
-    private func uncatalogedContent(for snapshot: InstalledPackage) -> some View {
-        VStack(spacing: 0) {
-            header(
-                id: snapshot.id,
-                displayName: snapshot.displayName,
-                versionStory: versionStory(installed: snapshot),
-                installed: snapshot
-            ) {
-                EmptyView()
-            }
-            .padding(EdgeInsets(top: 24, leading: 30, bottom: 0, trailing: 30))
-            ContentUnavailableView(
-                "No further details",
-                systemImage: "shippingbox",
-                description: Text("This installed package is not in Cellar’s core/cask catalog.")
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(Theme.windowBackground)
-        .navigationTitle(snapshot.displayName)
-    }
-
     /// The one identity row both paths render: tile, name, version story, kind,
     /// status and the heart — fed by the catalog record when there is one and
     /// by the snapshot alone when there is not.
