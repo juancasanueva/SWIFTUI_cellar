@@ -181,7 +181,7 @@ behaviour they verify.
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'`
 
-- [ ] 2.1 **Test support (not a behaviour).** Add the fixture shapes the RED rows need to
+- [x] 2.1 **Test support (not a behaviour).** Add the fixture shapes the RED rows need to
       `Packages/CellarCore/Tests/BrewClientTests/Fakes/` (extend the shipped tap/installed fixtures;
       shipped signatures stay source-compatible): a third-party tap publishing `widget`, `widget-cli`,
       `superwidget`; a tap publishing `gentle-ai`; **two** taps each publishing formula **and** cask
@@ -190,77 +190,77 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
       carries (`wget`); an **official** tap; the three install states (same-tap installed record ·
       withheld tap under an `untrusted` publishing tap · no installed record); and `.brewAbsent` /
       `.failed` tap states.
-- [ ] 2.2 **RED.** New file `Packages/CellarCore/Tests/BrewClientTests/TapPackageSearchTests.swift` ·
+- [x] 2.2 **RED.** New file `Packages/CellarCore/Tests/BrewClientTests/TapPackageSearchTests.swift` ·
       `aTapPackageIsFoundByANonEmptyQuery`: query `widget` over `acme/tools` returns `widget`,
       `widget-cli`, `superwidget` in exactly that order — exact, then prefix, then substring — each
       reporting tap of origin `acme/tools` and its published qualified name. **RED because**
       `TapPackageSearch` does not exist. Add `theLadderConvergesWithTheCatalogIndexOnOneFixture` (the
       same fixture ranks identically under `PackageSearchIndex`'s classes) and
       `officialTapsNeverEnterTheSection` (**DD-5**, source is `TapProjection.thirdPartyTaps`). *(ps1)*
-- [ ] 2.3 **RED.** `aHyphenatedNameMatchesByTokenAtEveryRung`: `gentle-ai` normalises to `gentle ai`, so
+- [x] 2.3 **RED.** `aHyphenatedNameMatchesByTokenAtEveryRung`: `gentle-ai` normalises to `gentle ai`, so
       `ai` ⇒ `exactToken` (**not** substring), `gent` ⇒ `namePrefix`, `tle` ⇒ `nameSubstring` — three
       **distinct** ranks. Add `aTapNameQueryMatchesThroughThePublishedName`: `gentleman` matches only via
       the normalised `publishedName` and is **capped at `nameSubstring`** (**DD-3**), so a tap-name match
       never outranks a genuine bare-token hit. *(ps2)*
-- [ ] 2.4 **RED.** `theOrderIsTotalAndReproducible`: two taps × two kinds, all in one class, composed
+- [x] 2.4 **RED.** `theOrderIsTotalAndReproducible`: two taps × two kinds, all in one class, composed
       twice ⇒ `acme` formula, `bravo` formula, `acme` cask, `bravo` cask **both times** — bare token asc,
       then formula before cask, then tap name asc. No install count is read or faked (**DD-5**). *(ps3)*
-- [ ] 2.5 **RED — the row the design's table omits (reconciliation gap).**
+- [x] 2.5 **RED — the row the design's table omits (reconciliation gap).**
       `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse`: enumerating every member of `TapSearchHit` for a
       cask hit yields exactly kind, bare token, published name, tap of origin, install state, `stateCopy`,
       and `collisionNote` **only when colliding** — plus the projection-internal `id`, `mutationTarget`,
       `alsoInCatalog`, `rank`, `routableID`. **No** description, version, homepage, license, dependency
       list, install count, deprecation flag, disabled flag or size is **representable**, and no emitted
       value is `""`, `-`, `unknown` or any other placeholder standing for absence. *(ps4)*
-- [ ] 2.6 **RED.** `theKindFilterIsHonoured`: one formula and one cask both named `widget`, query
+- [x] 2.6 **RED.** `theKindFilterIsHonoured`: one formula and one cask both named `widget`, query
       restricted to `cask` ⇒ exactly one hit, kind `cask`; and `SearchFilters` gains **no** member for
       this source (PS4 — asserted against the shipped declared-filter set). *(ps5)*
-- [ ] 2.7 **RED.** `theSectionIsAbsentForAnEmptyOrWhitespaceQuery`: `""` and `"   "` ⇒ zero hits, nothing
+- [x] 2.7 **RED.** `theSectionIsAbsentForAnEmptyOrWhitespaceQuery`: `""` and `"   "` ⇒ zero hits, nothing
       thrown, over a tap publishing forty packages. *(ps6)*
-- [ ] 2.8 **RED.** `absentOrFailedTapStateHidesTheSectionWithoutAnError`: `.brewAbsent` and, separately,
+- [x] 2.8 **RED.** `absentOrFailedTapStateHidesTheSectionWithoutAnError`: `.brewAbsent` and, separately,
       a failed refresh ⇒ zero hits, **no error raised, no error state reported**, and the catalog results
       for the same query are byte-identical to the no-tap-inventory run. Exercised through
       `TapPackageSearch.isSectionVisible(query:outdatedOnly:tapState:)` (**DD-6**). *(ps7)*
-- [ ] 2.9 **RED.** `aCollidingHitIsShownAndIsNotRoutable`: catalog carries formula `wget`, `acme/tools`
+- [x] 2.9 **RED.** `aCollidingHitIsShownAndIsNotRoutable`: catalog carries formula `wget`, `acme/tools`
       publishes `acme/tools/wget` ⇒ the hit is **present**, `alsoInCatalog == true`, `routableID == nil`,
       its `RowID` differs from the catalog row's identity, and `mutationTarget` is the **bare**
       `PackageID(kind: .formula, name: "wget")`. Add `everyMutationTargetIsBare` (no `/` in any emitted
       target, PM10) and `theCollisionNoteIsPresentExactlyWhenItIsTrue` — `collisionNote` is non-nil
       **exactly when** `alsoInCatalog`, carrying byte-for-byte
       `Also in the catalog. Homebrew installs the catalog package.` *(ps8)*
-- [ ] 2.10 **RED.** `theThreeInstallStatesCarryTheirExactCopy`: the three states stay **distinct values**,
+- [x] 2.10 **RED.** `theThreeInstallStatesCarryTheirExactCopy`: the three states stay **distinct values**,
       never collapsed into two, and `stateCopy` is byte-exactly `Installed.`,
       `Installed. Homebrew withholds its tap while this tap is untrusted.` and `Not installed.`
       respectively. **RED because** `TapPackage.statusExplanation` returns `nil` for `.installed`
       (`TapProjection.swift:52-58`) — this row is the guard on that trap (**DD-9**). *(ps9)*
-- [ ] 2.11 **RED.** `anAmbiguousInstalledHitIsNotRoutable` — **both causes**: (a) an installed hit whose
+- [x] 2.11 **RED.** `anAmbiguousInstalledHitIsNotRoutable` — **both causes**: (a) an installed hit whose
       bare token the catalog also carries for the same kind; (b) two installed hits from **different**
       taps carrying the same `PackageID` (`twoTapsPublishingOneNameAreBothUnroutable`). Each reports
       `routableID == nil`, stays **presented** and stays **installable** with the bare target. Add
       `anInstalledUnambiguousHitIsRoutable` (`routableID == mutationTarget`, the exact `PackageID`
       handoff, `openspec/specs/tap-management/spec.md:133-138`) and `aNotInstalledHitIsNeverRoutable`.
       *(ps10, DD-4)*
-- [ ] 2.12 **RED.** `hideInstalledSubtractsFromTheSection` and `theOutdatedChipHidesTheSection`: with one
+- [x] 2.12 **RED.** `hideInstalledSubtractsFromTheSection` and `theOutdatedChipHidesTheSection`: with one
       installed and one not-installed match, `hideInstalled: true` ⇒ only the not-installed hit;
       `outdatedOnly` ⇒ **no tap hit at all**, via `isSectionVisible`, **not** by filtering `hits(…)`
       (**DD-6**: a version-less hit filtered by outdatedness would emit zero hits and read as the false
       claim “your taps have nothing”). *(ps11)*
-- [ ] 2.13 **RED.** `theProjectionTakesNoLauncherAndNoCatalogStore`: the parameter surface of
+- [x] 2.13 **RED.** `theProjectionTakesNoLauncherAndNoCatalogStore`: the parameter surface of
       `init(inventory:installed:)` and `hits(query:kinds:hideInstalled:isInCatalog:)` admits **no**
       process launcher, **no** `CatalogStore` and **no** refresh handle — the catalog enters **only** as
       the `isInCatalog` membership predicate, which is a **parameter, never stored** (**DD-1**, mirroring
       `InstalledFilterMode.swift:62-65`). *(supports ps16 at the `unit` layer)*
-- [ ] 2.14 **RED.** `aComposedTapSearchLeavesTheIndexUnchanged`: with a **real** `PackageSearchIndex` over
+- [x] 2.14 **RED.** `aComposedTapSearchLeavesTheIndexUnchanged`: with a **real** `PackageSearchIndex` over
       a snapshot that does not carry the tap package, composing hits leaves the snapshot, `search` and
       `package(_:)` **identical** to the no-tap-inventory run and still answering not-found, and **no
       `CatalogPackage` exists** for that id anywhere. *(PD6 sc4)*
-- [ ] 2.15 **RED.** `theTapInventoryFeedsASurfaceOutsideTapManagement`: the same resident inventory feeds
+- [x] 2.15 **RED.** `theTapInventoryFeedsASurfaceOutsideTapManagement`: the same resident inventory feeds
       the composed source with **zero** brew invocations recorded by a fake launcher, **no** refresh
       started or awaited, and **no** tap formula/cask source read. *(TM5 sc11)*
-- [ ] 2.16 **RED.** `aTapPackageFoundHereAddsNoTapManagementAction`: the enumerated tap-management action
+- [x] 2.16 **RED.** `aTapPackageFoundHereAddsNoTapManagementAction`: the enumerated tap-management action
       set is **unchanged** by this source — finding a tap package on the query surface adds no action to
       the Taps surface, and the projection constructs no `TapCommand`. *(TM11 sc3)*
-- [ ] 2.17 **Prove RED.** Run the focused command; 2.2–2.16 MUST fail, each for its stated reason. A
+- [x] 2.17 **Prove RED.** Run the focused command; 2.2–2.16 MUST fail, each for its stated reason. A
       green test here is a defect in the test.
 
 ## Phase 3: WU2 — the projection, GREEN
