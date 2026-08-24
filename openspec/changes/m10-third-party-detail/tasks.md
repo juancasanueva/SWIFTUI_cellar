@@ -315,10 +315,11 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 
 - [x] 6.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline **plus**
       every new case, **0 failures**. Assert counts, never a bare success line.
-- [x] 6.2 Full app target:
-      `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'`
-      → baseline plus the new composition cases, 0 failures. `cellarUITests` gains **no** new test — this
-      change adds no new UI-test-flagged store.
+- [x] 6.2 App target (scoped runner, per the maintainer's verify round-1 W1 decision):
+      `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`
+      → baseline plus the new composition cases, 0 failures (246 distinct). `cellarUITests` gains **no** new
+      test and has a zero-line diff on this branch. The full-scheme runner is known red on `main` @ 5a0860b
+      from two pre-existing Taps UI failures (`cellarUITests.swift:209`, `:231`), tracked for a separate PR.
 - [x] 6.3 **Bindings proof.**
       `git diff --stat main -- cellar.xcodeproj/project.pbxproj scripts/ .github/workflows/ Packages/CellarCore/Sources/BrewClient/MutationCommand.swift Packages/CellarCore/Sources/BrewClient/TapCommand.swift Packages/CellarCore/Sources/BrewClient/InstalledDecoder.swift Packages/CellarCore/Sources/BrewClient/InstalledModels.swift`
       → **empty output**. A non-zero `project.pbxproj` diff means the file-system-synchronized group
