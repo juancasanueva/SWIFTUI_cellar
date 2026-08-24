@@ -2,7 +2,7 @@
 
 **New capability.** No main spec exists at `openspec/specs/package-trust/spec.md`; this ADDED-only
 delta establishes it, on the house precedent by which `package-detail`, `package-mutation` and
-`tap-management` were each established by an ADDED-only delta. **8 ADDED requirements / 32 scenarios**,
+`tap-management` were each established by an ADDED-only delta. **8 ADDED requirements / 33 scenarios**,
 0 modified, 0 removed, 0 renamed, so `rules.archive`'s destructive-delta warning does not fire.
 
 **Purpose.** Reading, storing, attributing and surfacing Homebrew's **per-package** trust grants,
@@ -29,8 +29,16 @@ entry is not always `owner/repo/name` — `https://github.com/cloudmanic/spice-e
 observed on a real Mac; the **same** qualified identifier can appear in both `formulae` and `casks`
 (`gentleman-programming/tap/engram`), so the namespaces are **not disjoint**; a package name can carry
 `@` (`guria/tap/nehir@rc`); `commands` can be present and **empty**; the bare read is **side-effect
-free** (`trust.json` byte-identical before and after); per-package grants are independent of tap grants
-and **survive an untap**; naming a `/`-qualified package to brew's trust machinery **is** the grant.
+free** (`trust.json` byte-identical before and after); a per-package grant is independent of a tap grant
+**in effect**, though not in lifecycle (below); naming a `/`-qualified package to brew's trust
+machinery **is** the grant.
+
+**One m7-era belief was overturned by live measurement** (2026-08-24, Homebrew 6.0.18; Engram `#7775`,
+transcript `evidence/me2-transcript.txt`): `brew untrust <tap>` **cascades** to that tap's per-package
+grants, so Cellar's TM7 untap flow removes them too (`guria/tap` took both its cask grants with it,
+`63ed7c9d…` → `1150051f…`). A grant survives only an untap performed **outside** Cellar, which is how
+the orphan this capability shows (`nkzw-tech/tap/codiff`) came to exist. Only PT8's premise moved, and
+it moved in the safe direction.
 
 ## Verification classes
 
@@ -39,7 +47,7 @@ Every scenario below declares exactly one verification class.
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
 | `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **30** |
-| `manual-evidence` | no harness can exist — the fact is a property of a real `trust.json` written by a real `brew` on a real Mac | the maintainer, on a Mac running Homebrew 6; transcript captured in the verify report. **Binding: never run `brew upgrade` without `--dry-run` on that Mac** | **2** |
+| `manual-evidence` | no harness can exist — the fact is a property of a real `trust.json` written by a real `brew` on a real Mac | the maintainer, on a Mac running Homebrew 6; transcript captured in the verify report. **Binding: never run `brew upgrade` without `--dry-run` on that Mac** | **3** |
 
 What stays **design-owned and is deliberately absent here**: view hierarchy, section placement and
 ordering, rendered styling of any marker or line, which type holds each projection, and the wording of
@@ -423,9 +431,20 @@ source-scanning absence to the type names introduced here.
 ### Requirement: Orphan grants are surfaced plainly, and the surface does not claim to close them
 
 A `taps` entry for a tap that is not installed MUST be presented as an **orphan grant**, in the
-unattributed section, with the tap it names. Per-package grants survive an untap, so `tap-management`
-TM7's revocation — which exists precisely so that a re-tap cannot silently re-arm a dormant grant —
-does not reach them, and a later re-tap re-arms an orphan grant without new consent.
+unattributed section, with the tap it names.
+
+Orphans arise from an untap performed **outside** Cellar. `tap-management` TM7's revocation —
+`brew untrust <tap>` after the untap, which exists precisely so that a re-tap cannot silently re-arm a
+dormant grant — was **measured to cascade** to that tap's per-package grants, so the in-Cellar path
+leaves no orphan behind and closes the dormant-grant hole at package granularity too. That is stronger
+than `m7-tap-trust` recorded, and it is the opposite of what this requirement asserted before the
+measurement (2026-08-24, Engram `#7775`). An untap performed outside Cellar carries no such follow-up,
+so its grants remain recorded, a later re-tap re-arms them without new consent, and the surface MUST
+show them.
+
+Cellar MUST NOT claim the cascade for grants it did not remove, and MUST NOT infer from it that an
+orphan is closed: the orphan on the measured Mac (`nkzw-tech/tap/codiff`) is a grant no Cellar action
+ever touched.
 
 The surface MUST say that plainly rather than implying it has closed the hole. Its exact copy MUST be
 “Homebrew still records these grants. Cellar shows them; it does not remove them.” It MUST NOT offer,
@@ -448,12 +467,22 @@ inactive or harmless.
 - AND no control it offers would remove, revoke or alter a grant
 - Verification: `unit`
 
-#### Scenario: A per-package grant survives an untap on a real Mac
+#### Scenario: A grant whose tap was untapped outside Cellar is still listed, and is surfaced
 
-- GIVEN a Mac running Homebrew 6 with a third-party tap installed and one of its packages granted individually, listed by `brew trust --json v1`
-- WHEN that tap is untapped from inside Cellar and the report is read again
-- THEN the package entry is still listed
+- GIVEN a Mac running Homebrew 6 whose `brew trust --json v1` lists a per-package grant for a tap the installed tap snapshot does not contain, because that tap was untapped outside Cellar with no follow-up untrust
+- WHEN the report is read and the unattributed section is presented
+- THEN the entry is still listed by brew
 - AND Cellar presents it as an orphan or unmatched grant rather than dropping it
+- AND the transcript and the screenshot of that section appear in the verify report
+- Verification: `manual-evidence`
+
+#### Scenario: An untap performed inside Cellar removes that tap's per-package grants
+
+- GIVEN a Mac running Homebrew 6 with a third-party tap installed and two of its packages granted individually, listed by `brew trust --json v1`
+- WHEN that tap is untapped from inside Cellar, so TM7's `brew untrust <tap>` follows the untap, and the report is read again
+- THEN neither package entry is listed any more, and the ledger's digest changed
+- AND no orphan grant is created for that tap, so the in-Cellar path re-arms nothing on a later re-tap
+- AND the before and after payloads, both digests and the restoration appear in the verify report
 - Verification: `manual-evidence`
 
 ## Notes for archive
@@ -471,6 +500,14 @@ inactive or harmless.
   expensive to re-derive: the namespaces are **not disjoint**, a package name can carry `@`, a
   namespace can be present-and-empty, and the bare read is side-effect free. The captured payload is
   the apply-phase fixture; it MUST NOT be re-invented.
+- Record that this change **overturned an `m7-tap-trust` belief** by measurement, and record it where a
+  future reader will meet it: `brew untrust <tap>` cascades to that tap's per-package grants, so TM7's
+  untap flow closes the dormant-grant hole at package granularity and only an untap performed
+  **outside** Cellar leaves an orphan behind. The m7 archive's R7 claim that per-package grants survive
+  that path is false for the in-Cellar path and MUST NOT be carried forward unqualified. Evidence:
+  Engram `#7775` and `evidence/me2-transcript.txt`, which is filed in this change rather than
+  paraphrased. The `brew untrust --cask <qualified>` probe is still **unmeasured** — the cascade says
+  nothing about whether naming a qualified package to `untrust` registers a grant before removing it.
 - The `README.md:44-47` qualified-token sweep folded into this change is **doc-only**. It writes no
   spec delta: `release-distribution` D-2's canonical three-line install is untouched, and no requirement
   in that capability is added, modified, removed or renamed by it.

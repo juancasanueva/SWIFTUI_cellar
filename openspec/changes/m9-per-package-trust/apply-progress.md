@@ -4,12 +4,12 @@
 **Artifact store**: hybrid (this file + Engram `sdd/m9-per-package-trust/apply-progress`, project `swiftui_cellar`).
 **Delivery**: **single PR with `size:exception` recorded** (maintainer decision, Engram obs `#7768`).
 No chain strategy applies; WU1–WU7 land on one branch, `feat/m9-per-package-trust`.
-**Batch**: round 1 (WU1–WU7) plus **discharge round 1**, a focused maintainer-authorized unit that
-closed the two evidence gaps `verify-report.md` named. See "Discharge round 1" below.
+**Batch**: round 1 (WU1–WU7), **discharge round 1** (the two evidence gaps `verify-report.md` named),
+and **discharge round 2** (the spec amendment the live ME2 run forced). See both sections below.
 
-**73 / 82 tasks complete.** The nine that remain are not apply work: 8.7 (open the PR — the
-orchestrator's), 9.2 / 11.4 (a real untap on the maintainer's Mac), and 10.1–10.6 (archive-phase
-promotion, whose obligations are recorded below so `sdd-archive` does not re-derive them).
+**79 / 86 tasks complete.** The seven that remain are not apply work: 8.7 (open the PR — the
+orchestrator's) and 10.1–10.6 (archive-phase promotion, whose obligations are recorded below so
+`sdd-archive` does not re-derive them). ME2 is **executed and discharged** (round 2).
 
 ## Baseline (task 0.1, measured — not inherited)
 
@@ -264,10 +264,11 @@ Payload (both runs byte-identical to each other and to the apply fixture):
 - **Open Question 3, answered opportunistically**: every entry in this payload is qualified — an
   unqualified entry remains theoretical. No extra section sentence is needed, and no code change.
 
-**ME2 (task 9.2, PT8.3) — NOT executed.** It requires untapping a real third-party tap from inside
-Cellar on the maintainer's machine, which is a mutation this apply run must not perform unasked. It is
-not a merge blocker (the spec classifies it `manual-evidence`) and the behaviour it observes is pinned
-by `aGrantForAnUninstalledTapIsSurfacedNotDropped` and `theAccountingPartitionsTheDecodedSet`.
+**ME2 (task 9.2, PT8.3 + PT8.4) — EXECUTED by the maintainer, 2026-08-24** (see "Discharge round 2"
+below). It was not executed *during apply*, because untapping a real tap on the maintainer's machine is
+a mutation this run must not perform unasked. When it ran, **its premise proved false** and the
+scenario was amended to the measurement. The behaviour the amended PT8.3 observes is still pinned by
+`aGrantForAnUninstalledTapIsSurfacedNotDropped` and `theAccountingPartitionsTheDecodedSet`.
 
 **Task 9.3** — `package-mutation` PM10's two `manual-evidence` scenarios (formula refusal wording; a
 real refusal rendering the typed outcome) were captured in `m7-tap-trust` Phase 9, survive
@@ -365,12 +366,30 @@ so it cannot pass vacuously.
 diff, C2 stays byte-identical, `InvalidationScope` still has four members, and no shipped guard moved.
 The whole discharge diff is one test hunk plus artifact prose.
 
+## Discharge round 2 (ME2 executed; PT8 amended to measured reality)
+
+The maintainer ran ME2 live on 2026-08-24 (Engram `#7775`; transcript at `evidence/me2-transcript.txt`).
+**It falsified PT8.3's premise**, so the spec was amended to the measurement — the measurement is not
+negotiable and the implementation is not at fault: Cellar rendered exactly what the report said and
+refreshed the section through the `.taps` ride, as DD-3/DD-4 designed. **No code, no test and no other
+delta was touched.** The edits are itemised in `tasks.md` Phase 12 and are not restated here.
+
+Measured: `brew untrust <tap>` **cascades** to that tap's per-package grants, so an in-Cellar untap
+leaves **no** orphan; the orphan is evidenced instead by `nkzw-tech/tap/codiff`, untapped **outside**
+Cellar. The consequence is a **strengthening** — the cascade closes the dormant-grant hole at package
+granularity too, better than `m7-tap-trust` recorded.
+
+Core suite unchanged (**1,825 / 215, exit 0**); app suite not re-run because nothing executable moved.
+Rollback: revert the PT8 block and the header paragraph. **Version note** — the transcript records
+Homebrew **6.0.18-182-ga963211** (auto-updated to 6.0.19 during restoration); the brief and obs `#7775`
+say 6.0.15, so the spec records the transcript's 6.0.18.
+
 ## Remaining
 
 - [ ] **8.7** Open the PR — the orchestrator's step. The body must state: (a) this change **grants and
-      revokes nothing**; (b) a per-package grant **survives an untap**, so an orphan re-arms on a re-tap
-      and Cellar shows it without claiming to close it (R7); (c) on a Homebrew without the `trust` verb
-      every surface renders **nothing**, never "0 grants" (R4). Label `size:exception` (5,405 authored
-      lines vs the 5,000 budget, inside the 5,612 forecast ceiling).
-- [ ] **9.2** ME2 — needs a real untap on the maintainer's Mac.
+      revokes nothing**; (b) **corrected by measurement** — TM7's untap flow *does* remove that tap's
+      per-package grants (the untrust cascades), so only an untap performed **outside** Cellar leaves an
+      orphan, and Cellar shows those without claiming to close them; (c) on a Homebrew without the
+      `trust` verb every surface renders **nothing**, never "0 grants" (R4). Label `size:exception`
+      (5,405 authored lines vs the 5,000 budget, inside the 5,612 forecast ceiling).
 - [ ] **10.1 – 10.6** archive-phase promotion; obligations recorded above.

@@ -6,8 +6,9 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 `strict_tdd=true`. RDD disabled.
 
 Inputs: the four spec deltas **rev 2, post-correction** (`specs/{package-trust,tap-management,package-mutation,package-detail}/spec.md`
-— **54 scenarios**: 32 / 7 / 11 / 4; corrected in task 11.2 from the 53 the `package-mutation` delta
-header's own arithmetic defect propagated here), `design.md` (**DD-1…DD-12**), `proposal.md` (obs `#7760`),
+— **55 scenarios**: 33 / 7 / 11 / 4; 53 → 54 in task 11.2, then 54 → 55 in task 12.1 when the measured
+ME2 result split PT8's one manual-evidence scenario into two), `design.md` (**DD-1…DD-12**),
+`proposal.md` (obs `#7760`),
 maintainer scope decisions (obs `#7759`), gate decisions (obs `#7766`), and the **MEASURED** probe
 results (obs `#7764`).
 
@@ -34,7 +35,7 @@ deduplicate, displace or mask the other (PT4 sc2) — and a package name can car
 
 ## Scenario map (IDs used by every task below)
 
-**`package-trust` — 32 (30 `unit`, 2 `manual-evidence`), all new.**
+**`package-trust` — 33 (30 `unit`, 3 `manual-evidence`), all new.**
 **PT1** .1 constant argv names nothing · .2 three distinct values · .3 no trust verb → unreported,
 never zero · .4 no trust file read from disk. **PT2** .1 concurrent refreshes coalesce · .2 failed
 refresh keeps last good · .3 stale answer not adopted · .4 no per-package invalidation domain ·
@@ -49,7 +50,9 @@ count line · .3 the count is scoped to its own tap · .4 the marker is additive
 reported-empty distinguishable in copy · .4 nothing derives a verdict. **PT7** .1 no path submits a
 package trust command · .2 no argv element gains a second `/` · .3 the surface exposes display only.
 **PT8** .1 an uninstalled tap's grant is an orphan · .2 the orphan copy is exact and offers nothing ·
-.3 a per-package grant survives an untap *(`manual-evidence`)*.
+.3 a grant whose tap was untapped **outside** Cellar is still listed and surfaced
+*(`manual-evidence`)* · .4 an untap performed **inside** Cellar removes that tap's per-package grants
+*(`manual-evidence`, amended in task 12.1 — the original .3 asserted the opposite and was measured false)*.
 
 **`tap-management` — 7 (TM12 MODIFIED).** .1–.5 **survive byte-identical from `m7-tap-trust`**
 (decode three-valued · unreported controls · badge follows state · one projection · copy about the
@@ -70,7 +73,8 @@ today's shipped surface** (PD6 keeps third-party packages out of catalog detail)
 bare-name hazard is impossible to ship, per obs `#7766` gate decision 2.
 
 **New RED work: 39 `unit` scenarios** (30 PT + 2 TM + 3 PM + 4 PD). **13 shipped scenarios are
-regression guards that must never go red.** **2 new `manual-evidence`** (PT4.5, PT8.3) are not
+regression guards that must never go red.** **3 new `manual-evidence`** (PT4.5, PT8.3, PT8.4 — .4
+added in task 12.1 after the live ME2 run) are not
 RED/GREEN tasks — no `--filter` or `-only-testing:` invocation can reach them, and `sdd-verify` MUST
 NOT wait for a harness the spec itself declares cannot exist.
 
@@ -160,7 +164,8 @@ Plus one artifact commit, **first on the branch**, which **is** WU1:
       `docs(sdd): record the m9-per-package-trust proposal, spec deltas, design and tasks`.
       **Acceptance**: `specs/tap-management/spec.md` scopes the single-source clause to the tap's own
       trust state and states that **only two** of the clause's four prohibitions are taken.
-- [x] 1.2 Confirm the delta's arithmetic before moving on: package-trust **8 ADDED / 32 scenarios**;
+- [x] 1.2 Confirm the delta's arithmetic before moving on: package-trust **8 ADDED / 32 scenarios**
+      *(now **33** — task 12.1 added PT8.4)*;
       tap-management **1 MODIFIED, 7 scenarios replacing 5** → 13 req / 57 sc; package-mutation
       **1 MODIFIED, 10 scenarios replacing 7** → 10 req / 63 sc; package-detail **1 ADDED / 4
       scenarios** → 8 req / 30 sc. A mismatch is a spec defect to report, not to patch here.
@@ -457,10 +462,11 @@ and `… -only-testing:cellarUITests/PerPackageTrustUITests`.
       (2,736–3,312 and 1,900–2,300). A large miss is information for the next forecast, not a failure.
       **This is the m7 learning-E follow-through: the artifact bucket is measured separately.**
 - [ ] 8.7 Open the PR(s) per the resolved chain decision. The body states up front: (a) this change
-      **grants and revokes nothing** — it shows what `brew trust --json v1` already reports; (b) a
-      per-package grant **survives an untap**, so an orphan grant re-arms on a re-tap and Cellar shows
-      it without claiming to close it (R7); and (c) on a Homebrew without the `trust` verb every
-      surface renders **nothing**, never “0 grants” (R4).
+      **grants and revokes nothing** — it shows what `brew trust --json v1` already reports; (b)
+      **corrected by the live ME2 run (task 12.1)** — TM7's untap flow removes that tap's per-package
+      grants because `brew untrust <tap>` cascades, so only an untap performed **outside** Cellar leaves
+      an orphan that a re-tap re-arms, and Cellar shows those without claiming to close them; and (c) on
+      a Homebrew without the `trust` verb every surface renders **nothing**, never “0 grants” (R4).
 
 ## Phase 9: `manual-evidence` (maintainer's Mac, Homebrew 6 — not merge blockers, not test tasks)
 
@@ -473,10 +479,12 @@ this repository.
       compare the payload's entry count with the count Cellar's accounting produces: they MUST be
       equal. Hash and stat `trust.json` before and after: **byte-identical**, so the read granted
       nothing. Both counts and the captured payload go in the verify report.
-- [ ] 9.2 **ME2 — PT8.3.** With a third-party tap installed and one of its packages granted
-      individually and listed by `brew trust --json v1`: untap that tap from inside Cellar, read the
-      report again, and confirm the package entry is **still listed** and that Cellar presents it as an
-      orphan or unmatched grant rather than dropping it.
+- [x] 9.2 **ME2 — PT8.3 + PT8.4. EXECUTED** 2026-08-24, Homebrew **6.0.18** (auto-updated to 6.0.19
+      during restoration only). Transcript `evidence/me2-transcript.txt`; Engram `#7775`. **The
+      scenario's premise was false, so the scenario was amended, not the measurement** — see task 12.1.
+      Bonus evidence: `brew untap jnsahaj/lumen` refused (installed formula) and Cellar surfaced exactly
+      one failed activity item, so m7's D4 narrowing held. State fully restored; the final report is
+      content-identical to the obs `#7764` fixture.
 - [x] 9.3 **Not re-run here.** `package-mutation` PM10's two `manual-evidence` scenarios (the formula
       refusal wording; a real refusal rendering the typed outcome) were captured in `m7-tap-trust`
       Phase 9 and survive **byte-identical** in this delta. Record that they are carried forward, and
@@ -545,4 +553,24 @@ arithmetic, and the totals downstream of it). Runner:
 - [x] 11.3 Suites re-run after both edits: core **1,825 tests / 215 suites, exit 0** (Phase 8.1's 1,824
       plus 11.1); app-unit **248 passing results, `** TEST SUCCEEDED **`, exit 0** — which also
       reconciles WARNING-4, where `apply-progress.md` had reported 249.
-- [ ] 11.4 ME2 (task 9.2) stays open; the maintainer executes it separately. This unit did not touch it.
+- [x] 11.4 ME2 (task 9.2) — executed by the maintainer after this round; discharged in Phase 12 below.
+
+## Phase 12: Verify-finding discharge (round 2; maintainer-authorized spec amendment)
+
+The live ME2 run (task 9.2) **falsified PT8.3's premise**. Amending the spec to the measurement is the
+only honest exit: the measurement is not negotiable and the implementation is not at fault. No code, no
+test and no other delta is touched.
+
+- [x] 12.1 **PT8 amended.** PT8.3 rewritten as *"A grant whose tap was untapped outside Cellar is still
+      listed, and is surfaced"* — the case the transcript and screenshots evidence
+      (`nkzw-tech/tap/codiff`). **PT8.4 added** for the measured TM7 cascade. Both `manual-evidence`,
+      both discharged by the one filed transcript. PT8's prose no longer asserts that grants survive an
+      untap; the header's measured-facts paragraph records the overturned belief with its evidence.
+- [x] 12.2 **Recorded as a strengthening.** The cascade closes the dormant-grant hole at package
+      granularity too — stronger than `m7-tap-trust`, whose R7 claim is false for the in-Cellar path.
+      Added to the delta's archive notes. `brew untrust --cask <qualified>` remains **unmeasured**. Task
+      8.7's PR-body claim (b) corrected here and in `apply-progress.md`, since it would otherwise have
+      published the falsified statement.
+- [x] 12.3 Counts kept correct: package-trust **8 ADDED / 33** (30 `unit`, **3** `manual-evidence`);
+      total **55 scenarios / 11 delta requirements** (33 / 7 / 11 / 4). Core suite re-run as a no-change
+      confirmation: **1,825 tests / 215 suites, exit 0**.
