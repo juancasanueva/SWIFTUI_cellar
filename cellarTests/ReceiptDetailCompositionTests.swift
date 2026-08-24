@@ -90,6 +90,70 @@ struct ReceiptDetailCompositionTests {
         #expect(TapProjection.grantMarker == "Trusted individually")
     }
 
+    // MARK: - II15 sc7 second THEN, sc10, PD8, PT3 — resolved only under the guard
+
+    /// The presentation half of sc7's "and it carries no per-package grant
+    /// marker": a receipt whose tap Homebrew withholds yields neither the origin
+    /// fact nor a marker, because both come out of the **same** `if let` and
+    /// there is no second path to either.
+    ///
+    /// This is the class that can say it. The value cannot: PD8 forbids the
+    /// projection a marker member, so its half of the THEN is the absence
+    /// `InstalledDetailProjectionTests.aWithheldTapCarriesNoGrantMarkerEither`
+    /// asserts. What is left is a claim about *where the call site sits*, and a
+    /// claim about a call site is a claim about the source.
+    ///
+    /// It also closes the binding this file's sc10 case left open: a refactor
+    /// that resolved the marker and then dropped it instead of handing it to the
+    /// origin fact would satisfy "mentions `grantMarker`" and fail here.
+    @Test("The receipt pane resolves the marker only under the tap guard")
+    func theReceiptPaneResolvesTheMarkerOnlyUnderTheTapGuard() throws {
+        let pane = try ReceiptDetailSources.pane()
+        let lines = pane.code.components(separatedBy: "\n")
+
+        let tapGuard = try #require(
+            lines.firstIndex {
+                $0.contains("if let tap = snapshot.tap, let origin = detail.tapOfOrigin")
+            },
+            "the pane's one tap guard moved, so the containment below anchors on nothing"
+        )
+        let callSites = lines.indices.filter { lines[$0].contains("marker(for:") }
+        #expect(callSites.count == 1, "the marker is resolved in \(callSites.count) places, not one")
+        let callSite = try #require(callSites.first)
+
+        // Lexically inside that guard's block: walking from the guard, brace
+        // depth returns to zero only after the call. A marker resolved above the
+        // guard, or after it closed, fails here — which is the only way a
+        // withheld tap could produce one.
+        var depth = 0
+        var closing: Int?
+        for index in tapGuard..<lines.count {
+            depth += lines[index].filter { $0 == "{" }.count
+            depth -= lines[index].filter { $0 == "}" }.count
+            if depth == 0 {
+                closing = index
+                break
+            }
+        }
+        let closes = try #require(closing, "the tap guard's block never closes")
+        #expect(callSite > tapGuard, "the marker is resolved before the tap is unwrapped")
+        #expect(callSite < closes, "the marker is resolved after the tap guard closed")
+
+        // …and no absent tap can reach the resolver even in principle: it takes
+        // a non-optional tap, so `snapshot.tap` arrives unwrapped or not at all.
+        #expect(pane.code.contains("publishedBy tap: String)"))
+        #expect(pane.code.contains("publishedBy tap: String?") == false)
+
+        // The resolved marker is bound to the origin fact rather than resolved
+        // and discarded: it travels as that fact's note, beside the tap it is
+        // a fact about.
+        #expect(
+            lines[callSite]
+                .contains("receiptFact(origin, note: marker(for: snapshot.id, publishedBy: tap))"),
+            "the resolved marker no longer reaches the origin fact as its note"
+        )
+    }
+
     // MARK: - II15 sc11, PT6, PT7 — no trust control, asserted as an absence
 
     @Test("The receipt pane offers no trust control")
