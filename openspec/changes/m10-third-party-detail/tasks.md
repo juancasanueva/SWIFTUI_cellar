@@ -116,11 +116,11 @@ behaviour they verify.
 
 ## Phase 0: Preflight (sequential; no behaviour changes)
 
-- [ ] 0.1 Measure and record the green baseline; do not re-derive it later and do not assume the m9
+- [x] 0.1 Measure and record the green baseline; do not re-derive it later and do not assume the m9
       numbers still hold. Run `swift test --package-path Packages/CellarCore` and
       `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`.
       Count **distinct** passing test ids; `Executed 0 tests` is meaningless for Swift Testing bundles.
-- [ ] 0.2 Confirm every anchor the design pins is still where it says — a moved anchor is a deviation to
+- [x] 0.2 Confirm every anchor the design pins is still where it says — a moved anchor is a deviation to
       **report, not absorb**: `PackageDetailView.swift` :370-390 (`uncatalogedContent`, incl. the
       `EmptyView()` slot at :377-379 and the footer sentence at :384) · :396-402 (`header(id:…)`) ·
       :463 (`versionStory(installed:)`) · :569-577 (the inline homepage block `factLink` is extracted
@@ -129,24 +129,24 @@ behaviour they verify.
       :186-190 (`PerPackageTrustSources.views()`) · `InstalledModels.swift` :29-97 (`InstalledPackage`
       members: `desc`, `homepage`, `tap`, `kegs`, `primaryKeg`, `linkedKeg`, `isPinned`, `pinnedVersion`,
       `declaresAutoUpdates`) · `InstalledFixture.swift` :79-103 (`package(…)`).
-- [ ] 0.3 `git checkout -b feat/m10-third-party-detail main`.
-- [ ] 0.4 **Collapse the forecast band.** `git log --oneline -- openspec/changes/m10-third-party-detail`
+- [x] 0.3 `git checkout -b feat/m10-third-party-detail main`.
+- [x] 0.4 **Collapse the forecast band.** `git log --oneline -- openspec/changes/m10-third-party-detail`
       and `git status --short openspec/changes/m10-third-party-detail`: record whether the 1,256 artifact
       lines already sit on `main` (⇒ only `tasks.md` + `verify-report.md` land in this PR, ~1,710 total)
       or are new to this branch (⇒ ~4,130). Record the answer; do not re-estimate it at task 8.6.
 
 ## Phase 1: WU1 — the deltas land first (R1)
 
-- [ ] 1.1 Commit the SDD artifacts, **PD6's and TM5's MODIFIED blocks included**, before any Swift file
+- [x] 1.1 Commit the SDD artifacts, **PD6's and TM5's MODIFIED blocks included**, before any Swift file
       changes: `docs(sdd): record the m10-third-party-detail proposal, spec deltas, design and tasks`.
       **Acceptance**: `specs/package-detail/spec.md` binds PD6's prohibition to the **catalog
       projection**, and `specs/tap-management/spec.md` binds TM5's to a **catalog record + tap-source
       read**, so a receipt-only rendering neither satisfies nor violates either.
-- [ ] 1.2 Confirm the delta arithmetic before moving on: `installed-inventory` **1 ADDED / 12 scenarios**
+- [x] 1.2 Confirm the delta arithmetic before moving on: `installed-inventory` **1 ADDED / 12 scenarios**
       → 15 req / 79 sc; `package-detail` **1 MODIFIED, 3 scenarios replacing 2** → 8 req / 31 sc;
       `tap-management` **1 MODIFIED, 10 scenarios replacing 9** → 13 req / 58 sc. A mismatch is a spec
       defect to report, not to patch here.
-- [ ] 1.3 Record the **m9 provenance correction** in the apply context (`specs/README.md:62-75`): the
+- [x] 1.3 Record the **m9 provenance correction** in the apply context (`specs/README.md:62-75`): the
       “no third-party detail fallback” clause is **TM5**'s, not TM1's, despite three m9 citations. TM1's
       genuine constraint — **no additional brew invocation to complete a detail** — is honoured and
       asserted by II15 sc2 and TM5 sc10.
@@ -159,21 +159,21 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 > GREEN for behavioural tasks, and a visibility relaxation is neither. Its guard is that **every existing
 > test stays green and the catalog pane renders byte-identically**.
 
-- [ ] 2.1 In `cellar/Browse/PackageDetailView.swift`, drop `private` from exactly these five helpers,
+- [x] 2.1 In `cellar/Browse/PackageDetailView.swift`, drop `private` from exactly these five helpers,
       making them **internal**: `header(id:displayName:versionStory:installed:primaryButton:)`,
       `versionStory(installed:)`, `fact(_:_:mono:note:)`, `sizeOnDisk(for:)`, `installedAs(for:)`.
       **`favoriteButton`, `statusBadge`, `factLabel`, `headerPrimaryButton`, `facts(for:)` and
       `header(for:)` stay `private`** — only `header`'s callers cross the file boundary, not its callees.
-- [ ] 2.2 Extract a **new internal** `factLink(_ label: String, _ url: URL)` from the inline homepage
+- [x] 2.2 Extract a **new internal** `factLink(_ label: String, _ url: URL)` from the inline homepage
       block at `:569-577` and call it from `facts(for:)` in place of that block. `@Environment private
       var theme` stays **private** — `factLink` is what keeps it so.
-- [ ] 2.3 **Binding, asserted not assumed.** `git diff main -- cellar/Browse/PackageDetailView.swift`
+- [x] 2.3 **Binding, asserted not assumed.** `git diff main -- cellar/Browse/PackageDetailView.swift`
       shows **only** six visibility keywords removed, the `factLink` extraction, and the homepage block
       replaced by its call. **No copy string changes.** The catalog pane's rendered facts are unchanged.
-- [ ] 2.4 **Forbidden, stated so no later task does it**: do **not** duplicate any of the six helpers in
+- [x] 2.4 **Forbidden, stated so no later task does it**: do **not** duplicate any of the six helpers in
       the WU5 extension file. A second copy is the PT5 drift the one-projection rule exists to prevent,
       and would place a second grant-marker renderer in the tree (**DD-9**).
-- [ ] 2.5 Runner green at the Phase 0 baseline, `xcodebuild build …` compiles; commit WU2
+- [x] 2.5 Runner green at the Phase 0 baseline, `xcodebuild build …` compiles; commit WU2
       (`refactor(browse): share the detail header helpers across both panes`).
 
 ## Phase 3: WU3 — the projection (II15 sc1, sc3–sc8)
