@@ -197,10 +197,10 @@ Measured, not estimated: `git diff --shortstat main...HEAD` → `17 files change
 41 deletions(-)`, bucketed by `git diff --numstat main...HEAD`. This block's own commit adds ~60 more,
 landing the branch near **3,760 / 5,000**. The exact closing figure is in the Round 2 section below.
 
-## Delivery (task 6.7 — drafted, PR not opened)
+## Delivery (task 6.7 — done: PR #75 opened by the maintainer)
 
-`single-pr`, `chain_strategy: pending`, no `size:exception`. **The PR was deliberately not opened and
-nothing was pushed**: the launch brief for this run forbids both. Task 6.7 is the only open task.
+`single-pr`, `chain_strategy: pending`, no `size:exception`. Pushed and opened as
+https://github.com/juancasanueva/SWIFTUI_cellar/pull/75 after verify round 2 (52 / 52 tasks).
 
 PR title: `feat(installed): detail a package the catalog does not carry from its receipt`.
 

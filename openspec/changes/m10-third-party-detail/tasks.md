@@ -337,7 +337,7 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 - [x] 6.6 `git diff --stat main` for the whole branch — record the authored total **split into the
       code+test bucket and the artifact bucket**, and compare each against its own forecast (1,201–2,167
       and the band task 0.4 fixed). A large miss is information for the next forecast, not a failure.
-- [ ] 6.7 **Delivery — one PR** (`single-pr`, forecast Low against 5,000; no `size:exception`, no chain).
+- [x] 6.7 **Delivery — one PR** (`single-pr`, forecast Low against 5,000; no `size:exception`, no chain).
       The body states up front: (a) the pane **adds no brew invocation and no store** — it composes data
       already resident; (b) it **grants and revokes nothing** — the marker is display-only, from the one
       `package-trust` projection; (c) it makes **no claim about a third-party tap** — the footer stays a
