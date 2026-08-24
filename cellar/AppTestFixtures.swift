@@ -30,6 +30,9 @@ enum AppTestFixtures {
             || arguments.contains("--ui-testing-m5-health")
             || arguments.contains("--ui-testing-m6-updates")
             || arguments.contains("--ui-testing-m7-tap-trust")
+            || arguments.contains("--ui-testing-m9-per-package-trust")
+            || arguments.contains("--ui-testing-m9-per-package-trust-empty")
+            || arguments.contains("--ui-testing-m9-per-package-trust-unreported")
     }
 
     /// A launch whose tap snapshot carries one tap in each of TM12's three trust
@@ -37,6 +40,36 @@ enum AppTestFixtures {
     /// depending on what this Mac has tapped.
     nonisolated static var isTapTrustEnabled: Bool {
         ProcessInfo.processInfo.arguments.contains("--ui-testing-m7-tap-trust")
+    }
+
+    // MARK: - M9 per-package trust
+
+    /// Which per-package trust report this launch answers with.
+    ///
+    /// Three modes rather than one, because the whole point of the three-valued
+    /// state is that a Homebrew which cannot answer and a Homebrew answering
+    /// with nothing are different facts on screen (package-trust PT6).
+    nonisolated enum TrustGrantMode: Sendable, Equatable {
+        /// A decoded report with one attributed grant and one orphan tap grant.
+        case granted
+        /// A decoded report carrying no entry at all.
+        case empty
+        /// A brew with no `trust` verb.
+        case unreported
+        /// Not a per-package launch at all.
+        case off
+    }
+
+    nonisolated static var trustGrantMode: TrustGrantMode {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--ui-testing-m9-per-package-trust-empty") { return .empty }
+        if arguments.contains("--ui-testing-m9-per-package-trust-unreported") { return .unreported }
+        if arguments.contains("--ui-testing-m9-per-package-trust") { return .granted }
+        return .off
+    }
+
+    nonisolated static var isPerPackageTrustEnabled: Bool {
+        trustGrantMode != .off
     }
 
     // MARK: - M6 Updates
@@ -362,6 +395,28 @@ struct AppTestTapPayloadSource: TapPayloadSourcing {
             return Data(
                 #"[{"name":"homebrew/core","repo":"homebrew-core","formula_names":[],"cask_tokens":[]},{"name":"homebrew/cask","repo":"homebrew-cask","formula_names":[],"cask_tokens":[]},{"name":"acme/tools","user":"acme","repo":"tools","remote":"https://example.com/acme/tools","formula_names":["acme/tools/widget"],"cask_tokens":["widget-app"],"last_commit":"2026-08-04"}]"#.utf8
             )
+        }
+    }
+}
+
+/// The per-package trust report a UI-test launch answers with.
+///
+/// Three fixed payloads and one refusal, so the three report states are each
+/// reachable from a launch argument without depending on what this Mac has
+/// granted (package-trust PT6, PT8).
+struct AppTestTrustGrantPayloadSource: TrustGrantSourcing {
+    func payload(using installation: BrewInstallation) async throws(TrustGrantError) -> Data {
+        switch AppTestFixtures.trustGrantMode {
+        case .granted:
+            // One grant attributable to `acme/untrusted`, and one `taps` entry
+            // for a tap this fixture does not install — an orphan.
+            return Data(
+                #"{"taps":["ghost/tools"],"formulae":["acme/untrusted/widget"],"casks":[],"commands":[]}"#.utf8
+            )
+        case .empty:
+            return Data(#"{"taps":[],"formulae":[],"casks":[],"commands":[]}"#.utf8)
+        case .unreported, .off:
+            throw .commandFailed(status: 1, message: "Error: Unknown command: trust")
         }
     }
 }

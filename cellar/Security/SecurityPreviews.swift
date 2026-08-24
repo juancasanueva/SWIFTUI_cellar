@@ -57,6 +57,7 @@ import SwiftUI
         services: services,
         servicesRefresher: ServicesRefreshCoordinator(store: services),
         taps: TapStore(),
+        trustGrants: TrustGrantStore(),
         diskUsage: DiskUsageStore(
             cache: DiskUsageCache(
                 fileURL: FileManager.default.temporaryDirectory

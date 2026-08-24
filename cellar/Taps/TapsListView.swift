@@ -4,6 +4,9 @@ import SwiftUI
 
 struct TapsListView: View {
     let taps: TapStore
+    /// The per-package grant report. Read only: this view shows what Homebrew
+    /// records and offers no control that would change it (package-trust PT7).
+    let trustGrants: TrustGrantStore
     let operations: OperationCenter
     @Binding var selection: String?
 
@@ -49,9 +52,24 @@ struct TapsListView: View {
                                     TapTrustBadge(text: badge, identifier: "tap-row-trust-badge")
                                 }
                             }
-                            Text(TapProjection.packageSummary(for: tap))
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.white.opacity(0.38))
+                            HStack(spacing: 5) {
+                                Text(TapProjection.packageSummary(for: tap))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.white.opacity(0.38))
+                                // An **added** component beside the summary, from
+                                // the same projection value the detail header
+                                // reads. It never replaces the summary and never
+                                // touches the badge (TM12 :70-75).
+                                if let countLine = grants(for: tap).countLine {
+                                    Text("·")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Color.white.opacity(0.25))
+                                    Text(countLine)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Color.white.opacity(0.38))
+                                        .accessibilityIdentifier("tap-row-grant-count")
+                                }
+                            }
                         }
                         .padding(.vertical, 2)
                         .tag(tap.name)
@@ -64,6 +82,37 @@ struct TapsListView: View {
                     }
                 } header: {
                     sectionHeader("Third-party taps")
+                }
+
+                // Everything the report records that no installed tap accounts
+                // for. Shown rather than only counted, because a grant that
+                // survived an untap is exactly the one worth seeing (PT4, PT8).
+                if grantSection.sentence != nil || !grantSection.groups.isEmpty {
+                    Section {
+                        if let sentence = grantSection.sentence {
+                            Text(sentence)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.white.opacity(0.38))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("tap-grant-section-sentence")
+                        }
+                        ForEach(grantSection.groups) { group in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(group.title)
+                                    .font(.system(size: 10.5, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                                ForEach(group.entries, id: \.self) { entry in
+                                    Text(entry)
+                                        .font(Theme.mono(11.5))
+                                        .foregroundStyle(Theme.textMono)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    } header: {
+                        sectionHeader(grantSection.title)
+                    }
                 }
             }
             .overlay { blockingState }
@@ -142,6 +191,16 @@ struct TapsListView: View {
         case .loading(hasLastGood: true), .content, .error(_, hasLastGood: true):
             EmptyView()
         }
+    }
+
+    /// The one projection value this row and the detail header both read, so
+    /// the two cannot drift (package-trust PT5, DD-6).
+    private func grants(for tap: TapRecord) -> TapProjection.TapGrantPresentation {
+        TapProjection.grants(for: tap, in: trustGrants.grants)
+    }
+
+    private var grantSection: TrustGrantSection {
+        TapProjection.unattributedSection(in: trustGrants.grants, taps: taps.inventory.taps)
     }
 
     private var projection: TapProjection {

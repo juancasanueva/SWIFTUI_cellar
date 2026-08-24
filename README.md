@@ -42,9 +42,16 @@ brew install --cask home-cellar
 That installs `/Applications/Home-Cellar.app`, the same notarized build the releases
 page serves. Homebrew 6 refuses to load a cask from a third-party tap until the
 tap is trusted, which is what the middle line does; it grants nothing beyond
-this tap. If another tap ever claims the `home-cellar` token, the
-fully-qualified `brew install --cask juancasanueva/cellar/home-cellar` is the
-unambiguous form.
+this tap.
+
+A word about the fully-qualified form, `juancasanueva/cellar/home-cellar`: on
+Homebrew 6, naming a qualified token on a command line **is** a per-package
+trust grant, so it is not a neutral way to disambiguate a token collision. The
+tap line above is. Cellar never builds a qualified token — every command it
+spawns names the bare token and lets the trusted tap resolve it — and Cellar
+grants and revokes nothing for an individual package. It shows the per-package
+grants `brew trust --json v1` already reports, and it says so plainly when a
+Homebrew reports none.
 
 **Already have `Home-Cellar.app` in `/Applications`?** Homebrew refuses to
 overwrite an app it did not place (`It seems there is already an App at

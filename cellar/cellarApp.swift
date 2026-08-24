@@ -47,6 +47,9 @@ struct cellarApp: App {
     /// Owns cadence: launch, activation, and debounced external changes.
     @State private var refresher: InstalledRefreshCoordinator
     @State private var taps: TapStore
+    /// The per-package grant report. A sixth store, read-only, refreshed with
+    /// the taps domain rather than one of its own (package-trust PT2, DD-3).
+    @State private var trustGrants: TrustGrantStore
     @State private var tapsRefresher: TapRefreshCoordinator
     @State private var diskUsage: DiskUsageStore
     @State private var diskMutations: InstalledMutationGate
@@ -203,8 +206,12 @@ struct cellarApp: App {
         let tapSource: any TapPayloadSourcing = isUITesting
             ? AppTestTapPayloadSource()
             : BrewTapPayloadSource()
+        let grantSource: any TrustGrantSourcing = isUITesting
+            ? AppTestTrustGrantPayloadSource()
+            : BrewTrustGrantPayloadSource()
         let installed = InstalledStore(source: installedSource)
         let taps = TapStore(source: tapSource)
+        let trustGrants = TrustGrantStore(source: grantSource)
         let mutations = InstalledMutationGate()
         let serviceMutations = InstalledMutationGate()
         let tapMutations = InstalledMutationGate()
@@ -253,6 +260,7 @@ struct cellarApp: App {
         _cleanup = State(initialValue: CleanupStore(source: cleanupPreviewSource))
         self.cleanupPreviewSource = cleanupPreviewSource
         _taps = State(initialValue: taps)
+        _trustGrants = State(initialValue: trustGrants)
         self.refreshRegistry = refreshRegistry
         _metadata = State(initialValue: stores.metadata)
         _history = State(initialValue: stores.history)
@@ -413,6 +421,7 @@ struct cellarApp: App {
         _tapsRefresher = State(
             initialValue: TapRefreshCoordinator(
                 store: taps,
+                grants: trustGrants,
                 mutations: tapMutations,
                 refreshRegistry: refreshRegistry
             )
@@ -466,6 +475,7 @@ struct cellarApp: App {
                 services: services,
                 servicesRefresher: servicesRefresher,
                 taps: taps,
+                trustGrants: trustGrants,
                 diskUsage: diskUsage,
                 cleanup: cleanup,
                 cleanupPreviewSource: cleanupPreviewSource,

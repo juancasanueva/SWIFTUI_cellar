@@ -1,0 +1,161 @@
+=== ME2 TRANSCRIPT — PT8.3 manual evidence — 2026-08-24 16:34:06 +0200 ===
+Mac: 26.5.2 arm64; Homebrew: Homebrew 6.0.18-182-ga963211
+
+--- BEFORE: brew tap ---
+agavra/tap
+cloudmanic/spice-edit
+gentleman-programming/tap
+guria/tap
+jnsahaj/lumen
+juancasanueva/cellar
+kitlangton/tap
+letstri/tap
+modem-dev/tap
+
+--- BEFORE: brew trust --json v1 ---
+{
+  "taps": [
+    "juancasanueva/cellar"
+  ],
+  "formulae": [
+    "gentleman-programming/tap/engram",
+    "gentleman-programming/tap/gentle-ai",
+    "gentleman-programming/tap/gentleman-dots",
+    "gentleman-programming/tap/gga",
+    "https://github.com/cloudmanic/spice-edit/spice-edit",
+    "jnsahaj/lumen/lumen",
+    "kitlangton/tap/ghui",
+    "letstri/tap/druk",
+    "modem-dev/tap/hunk"
+  ],
+  "casks": [
+    "gentleman-programming/tap/engram",
+    "guria/tap/nehir",
+    "guria/tap/nehir@rc",
+    "nkzw-tech/tap/codiff"
+  ],
+  "commands": []
+}
+
+--- BEFORE: trust.json sha256 ---
+63ed7c9db32e4912806350e82ff10feed843c0485e67ec465425e5738a233eee  /Users/juancasanueva/.homebrew/trust.json
+
+--- ATTEMPT 1: untap jnsahaj/lumen from inside Cellar (16:38:43) ---
+Result: Homebrew REFUSED (exit 1): 'Refusing to untap jnsahaj/lumen because it contains the following installed formulae: jnsahaj/lumen/lumen'.
+Cellar presented the refusal as a single failed activity item (screenshot captured by maintainer, 16.37.46).
+Pre-untap UI state confirmed by maintainer screenshots: 'jnsahaj/lumen — 1 formula · 1 trusted individually' on row and header; lumen package row carries 'Trusted individually' marker; 'Other trusted packages' section already surfaces pre-existing orphan nkzw-tech/tap/codiff (tap not installed) and unattributed URL-shaped formula https://github.com/cloudmanic/spice-edit/spice-edit.
+
+--- PIVOT: guria/tap selected for the live untap (granted casks nehir + nehir@rc are NOT installed; untap permitted by Homebrew) ---
+
+--- AFTER: untap guria/tap from inside Cellar succeeded (16:39:50); Cellar also ran 'brew untrust guria/tap' (TM7) ---
+--- AFTER: brew tap ---
+agavra/tap
+cloudmanic/spice-edit
+gentleman-programming/tap
+jnsahaj/lumen
+juancasanueva/cellar
+kitlangton/tap
+letstri/tap
+modem-dev/tap
+
+--- AFTER: brew trust --json v1 ---
+{
+  "taps": [
+    "juancasanueva/cellar"
+  ],
+  "formulae": [
+    "gentleman-programming/tap/engram",
+    "gentleman-programming/tap/gentle-ai",
+    "gentleman-programming/tap/gentleman-dots",
+    "gentleman-programming/tap/gga",
+    "https://github.com/cloudmanic/spice-edit/spice-edit",
+    "jnsahaj/lumen/lumen",
+    "kitlangton/tap/ghui",
+    "letstri/tap/druk",
+    "modem-dev/tap/hunk"
+  ],
+  "casks": [
+    "gentleman-programming/tap/engram",
+    "nkzw-tech/tap/codiff"
+  ],
+  "commands": []
+}
+
+--- AFTER: trust.json sha256 ---
+1150051fa010f48edf62814ba59e8cf750290b82ca3334567d1bdc54ec505070  /Users/juancasanueva/.homebrew/trust.json
+
+--- RESTORATION (16:40:30) ---
+==> Auto-updating Homebrew...
+Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+==> Auto-updated Homebrew!
+==> Updated Homebrew from 6.0.18 (a96321140e) to 6.0.19 (533246d16f).
+Updated 3 taps (letstri/tap, homebrew/core and homebrew/cask).
+==> New Formulae
+gffcompare: Compare, merge and annotate GFF/GTF transcript files
+leaves: Text-mode disk usage visualization utility
+mysql-client@9.7: Open source relational database management system
+mysql@9.7: Open source relational database management system
+robotcode: Ultimate Robot Framework Toolset
+==> New Casks
+amethyst-nostr: Nostr client
+anarlog: AI notepad for meetings
+android-performance-analyzer: Toolchain for profiling apps and games
+riverscript: AI platform for recording and transcribing system audio from any app
+skills-manager: Manage, sync, and organise AI agent skills across coding tools
+
+You have 7 outdated formulae and 1 outdated cask installed.
+
+
+The 6.0.19 changelog can be found at:
+  https://github.com/Homebrew/brew/releases/tag/6.0.19
+==> Tapping guria/tap
+Cloning into '/opt/homebrew/Library/Taps/guria/homebrew-tap'...
+Tapped 2 casks (16 files, 58.0KB).
+Trusted cask: guria/tap/nehir
+Trusted cask: guria/tap/nehir@rc
+--- RESTORED: brew trust --json v1 ---
+{
+  "taps": [
+    "juancasanueva/cellar"
+  ],
+  "formulae": [
+    "gentleman-programming/tap/engram",
+    "gentleman-programming/tap/gentle-ai",
+    "gentleman-programming/tap/gentleman-dots",
+    "gentleman-programming/tap/gga",
+    "https://github.com/cloudmanic/spice-edit/spice-edit",
+    "jnsahaj/lumen/lumen",
+    "kitlangton/tap/ghui",
+    "letstri/tap/druk",
+    "modem-dev/tap/hunk"
+  ],
+  "casks": [
+    "gentleman-programming/tap/engram",
+    "guria/tap/nehir",
+    "guria/tap/nehir@rc",
+    "nkzw-tech/tap/codiff"
+  ],
+  "commands": []
+}
+--- RESTORED: brew tap ---
+agavra/tap
+cloudmanic/spice-edit
+gentleman-programming/tap
+guria/tap
+jnsahaj/lumen
+juancasanueva/cellar
+kitlangton/tap
+letstri/tap
+modem-dev/tap
+
+=== ADDENDUM (orchestrator, post-round-2-verify, 2026-08-24) ===
+Clarifications to the capture above, without altering it:
+1. RESTORATION ran THREE distinct commands whose outputs are merged in the block above:
+   'brew tap guria/tap', then 'brew trust --cask guria/tap/nehir', then 'brew trust --cask guria/tap/nehir@rc'.
+   Re-tapping alone re-armed NOTHING; both cask grants required explicit re-grant commands.
+   This is consistent with PT8.4: the in-Cellar untap path leaves no grant for a re-tap to re-arm.
+2. Homebrew auto-updated during restoration: the measurement ran on 6.0.18-182-ga963211; the
+   final RESTORED payload read ran on 6.0.19. The payload content is identical to the pre-untap capture.
+3. The screenshots referenced in the capture were viewed live by the orchestrator and maintainer but
+   were not archived; the repository evidence for PT8.3/PT8.4 is this transcript alone.

@@ -468,15 +468,153 @@ struct MutationCommandTests {
         // The trust *machinery*, not the English word: a shipped comment at
         // `MutationCommand.swift:104` says "a future reader would trust it",
         // and banning the bare word would make this guard about prose.
-        for gate in [
+        //
+        // Extended for **per-package** grants (PM10 :152-158): a store that did
+        // not exist when this list was written is exactly how a pre-launch gate
+        // comes back. One prefix token covers every type the per-package wire,
+        // source and store introduce, because they all share it.
+        let gates = [
             "TapTrustState", ".untrusted", ".trusted", ".trust", "TapRecord",
-            "TapInventory", "TapProjection", "trustableTap", "UntrustedTapRecovery"
-        ] {
+            "TapInventory", "TapProjection", "trustableTap", "UntrustedTapRecovery",
+            "TrustGrant", "grantsIndividually"
+        ]
+        for gate in gates {
             #expect(
                 mutation.contains(gate) == false,
                 "the package mutation surface consults tap trust: \(gate)"
             )
         }
+
+        // …and the list **covers** the per-package vocabulary, asserted as
+        // coverage rather than as prose: each name is either on the list or
+        // shares a prefix with something on it.
+        let perPackageNames = [
+            "TrustGrantState", "TrustGrantLedger", "TrustGrantError", "TrustGrantDecoder",
+            "TrustGrantSourcing", "BrewTrustGrantPayloadSource", "TrustGrantPayload",
+            "TrustGrantStore", "TrustGrantLoadState", "TrustGrantSection",
+            "grantsIndividually"
+        ]
+        for name in perPackageNames {
+            #expect(
+                gates.contains { name.contains($0) },
+                "the per-package trust type \(name) is not covered by the ban list"
+            )
+        }
+        // The two projection values the list does not name are unreachable
+        // without one that it does: `TapGrantPresentation` is nested in
+        // `TapProjection`, and the only producer of `UnattributedGrants` is
+        // `TapProjection.accounting`. Both spellings carry a banned token.
+        for reachedThroughTheProjection in ["TapGrantPresentation", "UnattributedGrants"] {
+            #expect(mutation.contains(reachedThroughTheProjection) == false)
+        }
+        #expect(gates.contains("TapProjection"))
+
+        // Positively anchored: the list is not vacuous — the names really do
+        // exist, and they really are absent from this one file.
+        let projection = try Self.brewClientSource("TapProjection.swift")
+        #expect(projection.contains("grantsIndividually"))
+        #expect(projection.contains("UnattributedGrants"))
+        #expect(try Self.brewClientSource("TrustGrantStore.swift").contains("TrustGrantStore"))
+    }
+
+    // MARK: - PM10 :144-150 — a per-package grant state never pre-blocks either
+
+    /// **The same defect in a new place.** A `noGrantRecorded` state is not a
+    /// prediction of refusal: a package under a trusted tap needs no individual
+    /// grant, and an `unreported` report is not evidence of anything at all.
+    /// Gating on either would refuse exactly what brew allows.
+    @Test("A per-package grant state never pre-blocks a mutation")
+    func aPerPackageGrantStateNeverPreBlocksAMutation() throws {
+        let widget = PackageID(kind: .cask, name: "widget")
+        let target = try #require(PackageTarget(widget))
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            caskTokens: ["acme/tools/widget"],
+            trust: .untrusted
+        )
+        // `granted`, `noGrantRecorded` and `unreported` in turn, plus a machine
+        // whose report failed to load — which is `unreported` reached the other
+        // way, and is listed separately because it is a different history.
+        let states: [(name: String, state: TrustGrantState)] = [
+            ("granted", .reported(TrustGrantLedger(casks: ["acme/tools/widget"]))),
+            ("noGrantRecorded", .reported(TrustGrantLedger(casks: ["other/tools/desk"]))),
+            ("reported empty", .reported(TrustGrantLedger(declaredNamespaces: ["casks"]))),
+            ("unreported", .unreported),
+            ("failed to load", TrustGrantState.settled(
+                .failure(.commandFailed(status: 1, message: "Error: Unknown command: trust")),
+                keeping: .unreported
+            ))
+        ]
+
+        // Positively anchored: the states really are different, and the first
+        // really does record a grant for this exact package.
+        #expect(states.count == 5)
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: tap.name, in: states[0].state))
+        #expect(TapProjection.grantsIndividually(widget, publishedBy: tap.name, in: states[1].state) == false)
+
+        let expected: [MutationCommand] = [
+            .install(target), .uninstall(target), .upgrade(target), .reinstall(target)
+        ]
+        for entry in states {
+            for command in expected {
+                // Built and submitted normally in every case: same argv, same
+                // confirmation, same declared domains, same disclosure. Nothing
+                // is disabled, refused, or warned about on the strength of a
+                // grant state.
+                #expect(command.arguments.contains("widget"), "\(entry.name) changed the argv")
+                #expect(command.arguments.contains { $0.contains("/") } == false)
+                #expect(command.requiresConfirmation == (command.verb == "uninstall"))
+                #expect(command.invalidates == [.installedInventory, .diskUsage])
+                #expect(command.packageID == widget, "\(entry.name) changed the target")
+            }
+        }
+    }
+
+    // MARK: - PM10 :160-167 — the read is not a command on the spine
+
+    @Test("The per-package read is not a command on the mutation spine")
+    func thePerPackageReadIsNotACommandOnTheMutationSpine() throws {
+        // It is a `read`, and a `BrewCommand` — not a `BrewMutating` conformer,
+        // so it cannot be enqueued, cannot produce an activity item, and has no
+        // `invalidates` to declare.
+        let read = BrewTrustGrantPayloadSource.command
+        #expect(read.kind == .read)
+        #expect((read as Any) is (any BrewMutating) == false)
+        #expect(read.arguments == ["trust", "--json", "v1"])
+
+        // The spine's families are exactly the ones it covered before: every
+        // `*Command.swift` that declares `invalidates`, and no more.
+        let declaring = try Self.commandFiles()
+            .filter { $0.value.contains("var invalidates: InvalidationScope") }
+            .keys
+            .sorted()
+        #expect(declaring == [
+            "CleanupCommand.swift", "ServiceCommand.swift", "TapCommand.swift"
+        ], "the spine's command families changed: \(declaring)")
+        // `MutationCommand`'s own declaration lives in `BrewMutating.swift`,
+        // which is why it is not in the list above and is asserted here instead.
+        #expect(try Self.brewClientSource("BrewMutating.swift")
+            .contains("extension MutationCommand: BrewMutating"))
+
+        // No `TrustGrant…` file is a command family at all.
+        #expect(try Self.commandFiles().keys.contains { $0.hasPrefix("TrustGrant") } == false)
+        for name in ["TrustGrantPayloadSource.swift", "TrustGrantStore.swift", "TrustGrantWire.swift"] {
+            let source = try Self.brewClientSource(name)
+            #expect(source.contains("BrewMutating") == false, "\(name) reaches for the mutation spine")
+            #expect(source.contains("InvalidationScope") == false, "\(name) declares an invalidation domain")
+            #expect(source.contains("ActivityItem") == false, "\(name) produces an activity item")
+            #expect(source.contains("OperationCenter") == false, "\(name) enqueues on the spine")
+        }
+    }
+
+    private static func brewClientSource(_ name: String) throws -> String {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/BrewClient")
+        return try String(contentsOf: sources.appendingPathComponent(name), encoding: .utf8)
     }
 
     // MARK: - PM10 :359-365 — the argv prohibition, as an absence over the surface

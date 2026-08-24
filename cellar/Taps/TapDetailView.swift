@@ -4,6 +4,9 @@ import SwiftUI
 
 struct TapDetailView: View {
     let taps: TapStore
+    /// The per-package grant report. Read only: the header states a count and
+    /// the rows carry a marker, and neither offers a control (package-trust PT7).
+    let trustGrants: TrustGrantStore
     let installed: InstalledStore
     let operations: OperationCenter
     let tapName: String?
@@ -62,6 +65,15 @@ struct TapDetailView: View {
                     Text("Third-party tap")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.textSecondary)
+                    // The same projection value the list row reads, added as a
+                    // component rather than folded into the summary (DD-6).
+                    if let countLine = grants(for: tap).countLine {
+                        Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
+                        Text(countLine)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textSecondary)
+                            .accessibilityIdentifier("tap-detail-grant-count")
+                    }
                 }
             }
             .padding(.top, 3)
@@ -158,6 +170,15 @@ struct TapDetailView: View {
                             .font(Theme.mono(12.5))
                             .foregroundStyle(Theme.textPrimary)
                         kindBadge(package.id.kind)
+                        // Additive: the row keeps its install-state copy and its
+                        // Show in Installed handoff, and gains one positive fact
+                        // (package-trust PT5 :296-302).
+                        if grants(for: tap).marked.contains(package.id) {
+                            Text(TapProjection.grantMarker)
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(Theme.textSecondary)
+                                .accessibilityIdentifier("tap-package-grant-marker")
+                        }
                     }
                     if let explanation = package.statusExplanation {
                         Text(explanation)
@@ -177,6 +198,11 @@ struct TapDetailView: View {
         }
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("tap-package-list")
+    }
+
+    /// The one projection value the header and every package row read.
+    private func grants(for tap: TapRecord) -> TapProjection.TapGrantPresentation {
+        TapProjection.grants(for: tap, in: trustGrants.grants)
     }
 
     private func kindBadge(_ kind: PackageKind) -> some View {
