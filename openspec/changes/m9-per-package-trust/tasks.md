@@ -436,22 +436,22 @@ and `… -only-testing:cellarUITests/PerPackageTrustUITests`.
 
 ## Phase 8: Verification and bindings
 
-- [ ] 8.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline
+- [x] 8.1 Full core suite: `swift test --package-path Packages/CellarCore` → the Phase 0 baseline
       **plus** every new case, **0 failures**. Assert counts, never a bare success line.
-- [ ] 8.2 App target:
+- [x] 8.2 App target:
       `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`
       → the Phase 0 baseline plus the new composition cases, 0 failures.
-- [ ] 8.3 `xcodebuild test … -only-testing:cellarUITests/PerPackageTrustUITests` → green.
-- [ ] 8.4 **Bindings proof.**
+- [x] 8.3 `xcodebuild test … -only-testing:cellarUITests/PerPackageTrustUITests` → green.
+- [x] 8.4 **Bindings proof.**
       `git diff --stat main -- Packages/CellarCore/Sources/BrewClient/MutationCommand.swift Packages/CellarCore/Sources/BrewClient/BrewMutating.swift Packages/CellarCore/Sources/BrewClient/TapCommand.swift scripts/ .github/workflows/ cellar.xcodeproj/project.pbxproj`
       → **empty output**. `MutationCommand.swift` is a **0-line diff**; any line there means a gate or a
       new domain was added. Confirm no new `InvalidationScope` member exists anywhere. A deviation is
       reported before merge, never absorbed.
-- [ ] 8.5 **Regression guards that must never have moved**: `MutationCommandTests:500-613` (C2,
+- [x] 8.5 **Regression guards that must never have moved**: `MutationCommandTests:500-613` (C2,
       byte-identical), `TapProjection.trust(for:)` and `packageSummary(for:)` output, the shipped
       TM12.1–.5 and PM10.1–.6 assertions, `TapShippingProofTests`' `Button {` ban and
       `staticButtonLabels` set.
-- [ ] 8.6 `git diff --stat main` for the whole branch — record the authored total, **split into the
+- [x] 8.6 `git diff --stat main` for the whole branch — record the authored total, **split into the
       code+test bucket and the artifact bucket**, and compare each with its own forecast
       (2,736–3,312 and 1,900–2,300). A large miss is information for the next forecast, not a failure.
       **This is the m7 learning-E follow-through: the artifact bucket is measured separately.**
@@ -468,7 +468,7 @@ and `… -only-testing:cellarUITests/PerPackageTrustUITests`.
 Each transcript is captured **verbatim into the verify report** — the artifact that carries evidence in
 this repository.
 
-- [ ] 9.1 **ME1 — PT4.5.** Capture the raw `brew trust --json v1` payload, run the read again, and
+- [x] 9.1 **ME1 — PT4.5.** Capture the raw `brew trust --json v1` payload, run the read again, and
       compare the payload's entry count with the count Cellar's accounting produces: they MUST be
       equal. Hash and stat `trust.json` before and after: **byte-identical**, so the read granted
       nothing. Both counts and the captured payload go in the verify report.
@@ -476,11 +476,11 @@ this repository.
       individually and listed by `brew trust --json v1`: untap that tap from inside Cellar, read the
       report again, and confirm the package entry is **still listed** and that Cellar presents it as an
       orphan or unmatched grant rather than dropping it.
-- [ ] 9.3 **Not re-run here.** `package-mutation` PM10's two `manual-evidence` scenarios (the formula
+- [x] 9.3 **Not re-run here.** `package-mutation` PM10's two `manual-evidence` scenarios (the formula
       refusal wording; a real refusal rendering the typed outcome) were captured in `m7-tap-trust`
       Phase 9 and survive **byte-identical** in this delta. Record that they are carried forward, and
       do **not** re-execute them for this change.
-- [ ] 9.4 Record that the probe blocking design Open Question 2 is **already CLEARED** by measurement
+- [x] 9.4 Record that the probe blocking design Open Question 2 is **already CLEARED** by measurement
       (obs `#7764`, 2026-08-24) and MUST NOT be re-run as a gate. Open Question 3 (does the report ever
       publish an **unqualified** entry?) is answered opportunistically by 9.1's payload; if unqualified
       entries turn out to be common rather than theoretical, the section copy needs one more sentence
