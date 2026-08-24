@@ -415,6 +415,71 @@ struct TapProjectionTests {
         #expect(TapProjection.publishes(PackageID(kind: .formula, name: "stranger"), in: tap) == false)
     }
 
+    // MARK: - package-trust PT1 :83-89 — the three package-level answers
+
+    /// **PT1.2.** The scenario stages a triple — a cask the report lists, a
+    /// formula the *same* report does not list, and a machine with no decoded
+    /// report at all — and requires that no two of the three compare equal.
+    ///
+    /// The package-level API answers with a `Bool`, so the third value lives one
+    /// level up, in the `TrustGrantState` that answer is read against. That is a
+    /// deliberate shape rather than a collapse: `noGrantRecorded` and
+    /// `unreported` are two facts about the **report**, not about the package,
+    /// and PT6 :383-388 requires both to contribute nothing for the package. So
+    /// a package's state is the pair, and this pins that the pair really does
+    /// carry three distinct answers — and that dropping either half loses one.
+    @Test("A package's per-package state reads as three distinct answers")
+    func aPackagesPerPackageStateReadsAsThreeDistinctAnswers() {
+        // GIVEN a decoded report listing cask `acme/tools/widget`…
+        let ledger = TrustGrantLedger(casks: ["acme/tools/widget"])
+        let reported = TrustGrantState.reported(ledger)
+        let widget = PackageID(kind: .cask, name: "widget")
+        // …the same report for formula `acme/tools/helper`, which it does not list…
+        let helper = PackageID(kind: .formula, name: "helper")
+        // …and a machine with no decoded report at all.
+        let unreported = TrustGrantState.unreported
+
+        // Positively anchored: the report really carries the one entry and
+        // really does not carry the other, so the answers below are not three
+        // refusals from an empty fixture.
+        #expect(ledger.casks == ["acme/tools/widget"])
+        #expect(ledger.formulae.isEmpty)
+        #expect(reported.entryCount == 1)
+
+        // WHEN each package's per-package state is read.
+        func perPackageState(
+            _ id: PackageID,
+            in report: TrustGrantState
+        ) -> (marked: Bool, report: TrustGrantState) {
+            (TapProjection.grantsIndividually(id, publishedBy: "acme/tools", in: report), report)
+        }
+        let granted = perPackageState(widget, in: reported)
+        let noGrantRecorded = perPackageState(helper, in: reported)
+        let unreportedState = perPackageState(widget, in: unreported)
+
+        // THEN they are `granted`, `noGrantRecorded` and `unreported`, respectively.
+        #expect(granted.marked)
+        #expect(granted.report == .granted(ledger))
+        #expect(noGrantRecorded.marked == false)
+        #expect(noGrantRecorded.report == .granted(ledger))
+        #expect(unreportedState.marked == false)
+        #expect(unreportedState.report == .unreported)
+
+        // AND no two of the three compare equal.
+        #expect(granted != noGrantRecorded)
+        #expect(granted != unreportedState)
+        #expect(noGrantRecorded != unreportedState)
+
+        // …and neither half carries all three on its own: the bool cannot tell
+        // the last two apart, and the report cannot tell the first two apart.
+        // Dropping either one collapses the triple into a pair, which is the
+        // reduction PT1 :62-73 forbids.
+        #expect(noGrantRecorded.marked == unreportedState.marked)
+        #expect(granted.report == noGrantRecorded.report)
+        #expect(reported.entryCount != nil)
+        #expect(unreported.entryCount == nil)
+    }
+
     // MARK: - package-trust PT3 :180-194 — attribution, and what it refuses
 
     /// **DD-5, R6.** Two conditions, both required. Prefix alone would attribute

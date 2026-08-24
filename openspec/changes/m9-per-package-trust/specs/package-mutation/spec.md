@@ -2,13 +2,13 @@
 
 Existing capability — `openspec/specs/package-mutation/spec.md` (**10 requirements / 60 scenarios**,
 established by `2026-08-02-m2-mutations-activity` and amended by later changes, most recently
-`2026-08-23-m7-tap-trust`). This delta is **1 MODIFIED, 0 added, 0 removed, 0 renamed**: **10
-scenarios** replace the 7 the modified block (PM10) carries today, taking the capability to
+`2026-08-23-m7-tap-trust`). This delta is **1 MODIFIED, 0 added, 0 removed, 0 renamed**: **11
+scenarios** replace the 8 the modified block (PM10) carries today, taking the capability to
 **10 requirements / 63 scenarios**.
 
 Nothing is removed and no requirement is renamed, so `rules.archive`'s destructive-delta warning does
 not fire. The MODIFIED block is a whole-block replacement copied from the main spec and then edited;
-it is a strict superset of the text it replaces — **zero lines deleted**, and all seven existing
+it is a strict superset of the text it replaces — **zero lines deleted**, and all eight existing
 scenarios survive byte-identical.
 
 **What this delta does not do, stated first.** It does **not** relax the argv prohibition. PM10's
@@ -26,7 +26,7 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
-| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **8** |
+| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **9** |
 | `manual-evidence` | no harness can exist — a real refusal from a real `brew` on a real Mac | the maintainer; transcript captured in the verify report. **Binding: never run `brew upgrade` without `--dry-run` on that Mac** | **2** |
 
 ## MODIFIED Requirements

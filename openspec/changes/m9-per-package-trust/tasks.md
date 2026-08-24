@@ -6,7 +6,8 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 `strict_tdd=true`. RDD disabled.
 
 Inputs: the four spec deltas **rev 2, post-correction** (`specs/{package-trust,tap-management,package-mutation,package-detail}/spec.md`
-— **53 scenarios**: 32 / 7 / 10 / 4), `design.md` (**DD-1…DD-12**), `proposal.md` (obs `#7760`),
+— **54 scenarios**: 32 / 7 / 11 / 4; corrected in task 11.2 from the 53 the `package-mutation` delta
+header's own arithmetic defect propagated here), `design.md` (**DD-1…DD-12**), `proposal.md` (obs `#7760`),
 maintainer scope decisions (obs `#7759`), gate decisions (obs `#7766`), and the **MEASURED** probe
 results (obs `#7764`).
 
@@ -55,7 +56,7 @@ package trust command · .2 no argv element gains a second `/` · .3 the surface
 tap) — they are **regression guards, never RED**. **.6 the tap's own state still comes from one
 source** and **.7 the count line is additive and never touches the badge** are **new**.
 
-**`package-mutation` — 10 (PM10 MODIFIED).** .1–.6 **survive byte-identical from `m7-tap-trust`** —
+**`package-mutation` — 11 (PM10 MODIFIED).** .1–.6 **survive byte-identical from `m7-tap-trust`** —
 regression guards, never RED; **.7 a per-package grant state never pre-blocks a mutation**,
 **.8 the source-scanning absence names the per-package trust types** and **.9 the per-package read is
 not a command on the mutation spine** are **new**. .10/.11 are the two `manual-evidence` scenarios
@@ -511,3 +512,37 @@ this repository.
 - [ ] 10.6 Record the **five binding reconciliations B1–B5** as design-vs-spec deviations resolved in
       the spec's favour, so a future reader does not mistake `design.md`'s superseded copy and
       three-category accounting for the shipped shape.
+
+## Phase 11: Verify-finding discharge (round 1; maintainer-authorized, `sdd-apply` focused unit)
+
+Discharges the two items the `verify-report.md` round-1 `fail` names as *evidence completeness*, not
+defects: WARNING-1 (PT1.2 covered by no task) and WARNING-2/-3 (the `package-mutation` delta's header
+arithmetic, and the totals downstream of it). Runner:
+`swift test --package-path Packages/CellarCore --filter 'aPackagesPerPackageStateReadsAsThreeDistinctAnswers'`.
+
+- [x] 11.1 **PT1.2 — the covering test.** `TapProjectionTests ·
+      aPackagesPerPackageStateReadsAsThreeDistinctAnswers` stages the scenario's exact triple — a
+      decoded report listing cask `acme/tools/widget`, the **same** report for formula
+      `acme/tools/helper` which it does not list, and a machine with no decoded report — and asserts
+      the three package-level answers are `granted`, `noGrantRecorded` and `unreported`, with **no two
+      comparing equal**. A package's answer is the pair
+      `(TapProjection.grantsIndividually(_:publishedBy:in:), TrustGrantState)`: the `Bool` cannot
+      separate the last two and the report cannot separate the first two, so the test pins that
+      dropping either half collapses the triple. **No honest RED exists** — the behaviour is already
+      correct and the only RED would be inventing a package-level three-valued API this unit is not
+      authorized to add — so it is anchored the way task 6.1 was: positively (the ledger really
+      carries the one entry and really does not carry the other) and **proven non-vacuous by two
+      reverted mutations** (`grantsIndividually` forced to `false` → 2 failures;
+      `TrustGrantState.entryCount` for `.unreported` forced to `0` → 1 failure). Production is
+      byte-identical after both. *(PT1.2, WARNING-1)*
+- [x] 11.2 **`package-mutation` delta arithmetic.** Corrected the delta header's three wrong numbers
+      against an independent re-count: shipped PM10 carries **8** scenarios (header said 7), the delta
+      carries **11** (header said 10) of which **9** are `unit` (class table said 8), and all **eight**
+      shipped scenarios survive byte-identical. **No scenario content changed.** The stated end state
+      (60 − 8 + 11 = **63 scenarios / 10 requirements**) was already correct and is unchanged. The
+      inputs line above is corrected to the authoritative **54 / 11** for the same reason.
+      *(WARNING-2, WARNING-3)*
+- [x] 11.3 Suites re-run after both edits: core **1,825 tests / 215 suites, exit 0** (Phase 8.1's 1,824
+      plus 11.1); app-unit **248 passing results, `** TEST SUCCEEDED **`, exit 0** — which also
+      reconciles WARNING-4, where `apply-progress.md` had reported 249.
+- [ ] 11.4 ME2 (task 9.2) stays open; the maintainer executes it separately. This unit did not touch it.

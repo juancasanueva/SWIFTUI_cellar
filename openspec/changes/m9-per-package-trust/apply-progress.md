@@ -4,11 +4,12 @@
 **Artifact store**: hybrid (this file + Engram `sdd/m9-per-package-trust/apply-progress`, project `swiftui_cellar`).
 **Delivery**: **single PR with `size:exception` recorded** (maintainer decision, Engram obs `#7768`).
 No chain strategy applies; WU1–WU7 land on one branch, `feat/m9-per-package-trust`.
-**Batch**: first and only apply batch. No previous apply-progress existed.
+**Batch**: round 1 (WU1–WU7) plus **discharge round 1**, a focused maintainer-authorized unit that
+closed the two evidence gaps `verify-report.md` named. See "Discharge round 1" below.
 
-**70 / 78 tasks complete.** The eight that remain are not apply work: 8.7 (open the PR — the
-orchestrator's), 9.2 (a real untap on the maintainer's Mac), and 10.1–10.6 (archive-phase promotion,
-whose obligations are recorded below so `sdd-archive` does not re-derive them).
+**73 / 82 tasks complete.** The nine that remain are not apply work: 8.7 (open the PR — the
+orchestrator's), 9.2 / 11.4 (a real untap on the maintainer's Mac), and 10.1–10.6 (archive-phase
+promotion, whose obligations are recorded below so `sdd-archive` does not re-derive them).
 
 ## Baseline (task 0.1, measured — not inherited)
 
@@ -26,7 +27,7 @@ on re-run; it is recorded as an observation, not a defect of this change.
 | Suite | Result | Delta vs baseline |
 |---|---|---|
 | Core | **1,824 tests / 215 suites, 0 failures, 1 known issue** | **+31 tests, +5 suites** |
-| App (`cellarTests`) | **249 passing test results, TEST SUCCEEDED** | **+2** |
+| App (`cellarTests`) | **248 passing test results, TEST SUCCEEDED** | **+1** |
 | `cellarUITests/PerPackageTrustUITests` | **TEST SUCCEEDED** | new |
 | `xcodebuild build` | **BUILD SUCCEEDED** | — |
 
@@ -91,7 +92,8 @@ XCUITest, and is stated rather than claimed as an executed failure.
 - **New tests written**: 16 core (`swift test`), 2 app-unit, 1 XCUITest — plus 2 shipped suites extended
   (`MutationCommandTests` C1 + 2 new cases; `MutationRefreshReceiptTests` + 1 parameterized case).
 - **Core suite**: 1,793 → **1,824** (+31 counting parameterized cases), 210 → **215 suites**.
-- **App suite**: 247 → **249** passing results.
+- **App suite**: 247 → **248** passing results. *(Round 1 reported 249; re-measured at 248 in both the
+  verify phase and the discharge round below. Nothing regressed — the round-1 number was a miscount.)*
 - **Layers**: Unit (core) 16, Integration (core + app) 5, E2E 1.
 - **Approval tests**: none — no refactoring task in this change; `TapProjection` gained only additions.
 - **Pure functions created**: 5 (`TrustGrantState.reported`, `.settled`, `TapProjection.grants`,
@@ -301,6 +303,67 @@ byte-identical in this delta, and were **not re-executed** here.
 - **10.6** Record **B1–B5** as design-vs-spec deviations resolved in the spec's favour, plus deviation 1
   above (`isEmpty` is not package-scoped), so a future reader does not mistake `design.md`'s superseded
   copy and three-category accounting for the shipped shape.
+
+## Discharge round 1 (verify WARNING-1, -2, -3, -4 — maintainer-authorized `sdd-apply` unit)
+
+Round-1 verification returned `fail` on **evidence completeness only**: 0 blockers, 0 CRITICAL, both
+commands exit 0. This unit discharges the two items it named as actionable, and nothing else. It is
+**not** a defect fix — there was no defect to fix.
+
+| Item | What was done | Result |
+|---|---|---|
+| **WARNING-1** — PT1.2 covered by no task | Added `TapProjectionTests · aPackagesPerPackageStateReadsAsThreeDistinctAnswers` (tasks 11.1) | ✅ green, non-vacuity proven by two reverted mutations |
+| **WARNING-2** — `package-mutation` delta header arithmetic | Corrected 7→**8** shipped, 10→**11** delta, class table 8→**9** `unit`, "seven"→"**eight**" surviving (task 11.2) | ✅ no scenario content changed; end state 63/10 was already right and is unchanged |
+| **WARNING-3** — downstream totals | `tasks.md` inputs line 53→**54** (32 / 7 / **11** / 4) and the scenario map's `package-mutation` count 10→**11** | ✅ authoritative counts now agree with the delta files |
+| **WARNING-4** — app-unit count | Re-measured; the tables above corrected 249→**248** | ✅ reconciled; nothing regressed |
+| **WARNING-5** — ME2 (PT8.3) | Untouched. Task 9.2 / 11.4 stay open for the maintainer's Mac | ➖ out of this unit's scope |
+
+### PT1.2 — why there is no RED, and what stands in for it
+
+The scenario requires a *package's* per-package state to be three-valued with "no two of the three
+compare equal". The shipped package-level API answers with a `Bool`
+(`TapProjection.grantsIndividually(_:publishedBy:in:)`); the third value lives one level up, in the
+`TrustGrantState` that answer is read against. That is the shape the design chose deliberately — PT6
+:383-388 requires `noGrantRecorded` and `unreported` to contribute *nothing* for a package, so the two
+are indistinguishable in rendering by design — and it is already correct. The only honest RED would be
+to invent a package-level three-valued API, which is production surface this focused unit is not
+authorized to add and which the spec does not require beyond the model it already has.
+
+So the test follows the **task 6.1 house precedent**: green on arrival, disclosed as such, and anchored
+so it cannot pass vacuously.
+
+- **Positively anchored** — the fixture ledger really carries `acme/tools/widget` and really does not
+  carry a formula, asserted before the three answers are read.
+- **Mutation-proven** — production was temporarily broken twice and the test went red each time, then
+  restored byte-identical (`git diff -- Packages/CellarCore/Sources` → empty):
+  - `grantsIndividually` forced to always answer `false` → **2 failures**
+  - `TrustGrantState.entryCount` for `.unreported` forced from `nil` to `0` → **1 failure**
+- **Both halves pinned** — the test asserts that the `Bool` alone cannot separate the last two answers
+  and the report alone cannot separate the first two, so dropping either half collapses the triple into
+  the pair PT1 :62-73 forbids.
+
+### Discharge round TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 11.1 | `TapProjectionTests.swift` | Unit | ✅ 4/4 (`TrustGrantDecodeTests`) | ➖ **no honest RED exists** — behaviour already correct; substituted by 2 reverted production mutations, each observed red | ✅ passed | ✅ three staged answers + both single-half collapses | ➖ none needed |
+| 11.2 | — | Doc | N/A — spec/task prose | N/A | ✅ counts re-derived independently from the delta and shipped spec files | ➖ | ➖ |
+
+### Discharge round Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused command | `swift test --package-path Packages/CellarCore --filter 'aPackagesPerPackageStateReadsAsThreeDistinctAnswers'` → **1 test / 1 suite passed** |
+| Full core suite | `swift test --package-path Packages/CellarCore` → **1,825 tests / 215 suites, exit 0**, 1 known issue (pre-existing) — **+1 vs round 1's 1,824** |
+| App-unit suite | `xcodebuild test … -only-testing:cellarTests` → **248 passing results, `** TEST SUCCEEDED **`, exit 0** |
+| Runtime harness | N/A — the added test is a pure, total function over synthesised values; no runtime boundary exists for it. The capability's runtime paths were already exercised in WU3/WU6 and are untouched here |
+| Rollback boundary | Revert the one test hunk in `TapProjectionTests.swift` and the header numbers in the `package-mutation` delta. **No production file was changed**, so nothing else can regress |
+
+### Binding invariants re-confirmed after the discharge
+
+`git diff --stat -- Packages/CellarCore/Sources` is **empty**: `MutationCommand.swift` stays a 0-line
+diff, C2 stays byte-identical, `InvalidationScope` still has four members, and no shipped guard moved.
+The whole discharge diff is one test hunk plus artifact prose.
 
 ## Remaining
 
