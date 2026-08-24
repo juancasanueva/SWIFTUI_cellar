@@ -236,6 +236,17 @@ other tap MUST be absent from the snapshot, MUST NOT appear in search results, a
 for it MUST return the ordinary not-found result. Its absence MUST NOT be reported as a sync
 failure, a decode failure, or an error state.
 
+Every clause above binds the **catalog projection** this capability owns — the snapshot, catalog
+search, and the catalog detail lookup. A rendering fed **exclusively by the installed receipt** is not a
+catalog detail lookup: it creates no catalog record, adds nothing to the snapshot or to search, consults
+no catalog value, and spawns no additional brew invocation, so it neither satisfies nor violates this
+requirement. `installed-inventory` owns that reduced, receipt-backed detail for a package the catalog
+does not carry. What this requirement continues to forbid is a **catalog** record or a **catalog**
+detail result for a package the catalog does not cover — including one synthesized from an installed
+record — and that prohibition is unchanged.
+(Previously: the requirement stated only the catalog-scope clauses, and was being cited as a blanket ban
+on any third-party detail rendering, including one built solely from the installed receipt.)
+
 #### Scenario: A third-party tap package is a normal not-found
 
 - GIVEN a successful sync and a package name published only by a third-party tap
@@ -247,6 +258,16 @@ failure, a decode failure, or an error state.
 - GIVEN a successfully persisted snapshot
 - WHEN each record's tap is inspected
 - THEN every record reports `homebrew/core` or `homebrew/cask`
+
+#### Scenario: A receipt-backed detail creates no catalog record
+
+- GIVEN an installed package published only by a third-party tap, for which a reduced detail is
+  composed from the installed receipt
+- WHEN the catalog snapshot, catalog search and catalog detail lookup are queried for it
+- THEN it remains absent from the snapshot and from search results, and the detail lookup still returns
+  the ordinary not-found result
+- AND no catalog record exists for it, synthesized or otherwise
+- Verification: `unit`
 
 ### Requirement: No pre-install signature or notarization verdict
 
@@ -426,4 +447,36 @@ control: nothing on this surface MUST grant, revoke or alter a grant.
     correct for that change's one-shot lookup at press time.
   - `package-trust` **PT5** owns the marker's exact copy (“Trusted individually”) and its absence
     rules; this requirement owns where it sits and how identity is resolved.
+  - The archived delta spec is the verbatim audit trail.
+- **Amended by change `m10-third-party-detail`** (archived `2026-08-24` —
+  `openspec/changes/archive/2026-08-24-m10-third-party-detail/`), **1 MODIFIED (PD6), 0 added, 0
+  removed, 0 renamed** — **8 req / 30 sc → 8 req / 31 sc**. `rules.archive`'s destructive-delta warning
+  did not fire. PD1–PD5, PD7 and PD8 are **byte-identical**, and PD6's two existing scenarios are
+  reproduced **byte-identical** — both verified at archive by byte-slicing against a pre-merge copy
+  (empty diffs). The delta's **"strict superset" claim is byte-true here**: diffing the replaced range
+  against its predecessor returns **additions only, zero deletions**. Delivered in PR **#75**, merged
+  `2026-08-24` at `4063ae3`.
+  - **What moved is a boundary, not a permission.** Every PD6 clause binds the **catalog projection**
+    this capability owns — the snapshot, catalog search, and the catalog detail lookup. A rendering fed
+    exclusively by the installed receipt is not a catalog detail lookup: it creates no catalog record,
+    adds nothing to the snapshot or to search, consults no catalog value, and spawns no additional brew
+    invocation. The clause "MUST NOT appear in search results" is reproduced **verbatim** — search
+    absence is not weakened by one character — and synthesizing a catalog record from an installed one
+    is now forbidden **explicitly** rather than by implication.
+  - **The narrowing landed in the first work unit, before any line of code** (change risk R1), because
+    the `m9-per-package-trust` archive read PD6 as a blanket prohibition in three places. Shipping m10
+    against an unamended PD6 would have left a documented contradiction in the repository.
+  - **PD8 stopped rendering nothing, exactly as the entry above predicted.** That entry records PD8 as
+    "expected to render nothing on today's shipped surface, and that is the point … it becomes visible
+    only when a third-party detail surface arrives". m10 is that surface: the receipt-backed detail is
+    the first to render a tap-of-origin fact for a package the catalog does not carry, so PD8's marker
+    finally has its anchor. **PD8 was activated, not amended — m10 carries no `package-trust` delta**,
+    the marker is still not a field of any detail projection (design DD-4), and PD8's exact-identity
+    rule is what keeps the withheld-tap case marker-free.
+  - **Correction to that prior entry's citation.** It states that `tap-management` **TM1** "forbids a
+    third-party detail fallback". That is a **mis-citation**: TM1 is a one-invocation rule about
+    acquiring *tap* detail from `brew tap-info`, and the clause is **TM5's**. TM1's genuine constraint —
+    no additional brew invocation may be introduced to complete a detail — is honoured by m10 and
+    asserted by `installed-inventory` II15 sc2 and TM5's added scenario. The earlier entry is left
+    unedited as the audit trail of what was believed; this correction supersedes its citation.
   - The archived delta spec is the verbatim audit trail.
