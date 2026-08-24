@@ -239,20 +239,20 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'InstalledDetail
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'InstalledDetailProjectionTests'`
 
-- [ ] 4.1 **RED.** `InstalledDetailProjectionTests · aReceiptBackedDetailCreatesNoCatalogRecord`: with a
+- [x] 4.1 **RED.** `InstalledDetailProjectionTests · aReceiptBackedDetailCreatesNoCatalogRecord`: with a
       real `PackageSearchIndex` over a snapshot that does not carry the package, composing a reduced
       detail leaves the catalog snapshot, `search` and `package(_:)` **unchanged and still answering
       not-found**, and **no `CatalogPackage` exists** for that id anywhere. **RED because** the
       projection does not exist yet at authoring time; it stays meaningful afterwards as the ban on
       Approach C. *(PD6 sc3)*
-- [ ] 4.2 **RED.** `InstalledDetailProjectionTests · theHandoffLandsOnAReceiptBackedDetail`: **Show in
+- [x] 4.2 **RED.** `InstalledDetailProjectionTests · theHandoffLandsOnAReceiptBackedDetail`: **Show in
       Installed** resolved by **exact `PackageID`** composes from the snapshot record alone; the catalog
       snapshot, search and lookup are unchanged; **no additional brew invocation is recorded** (a fake
       launcher records zero) and **no tap-source read** occurs. *(TM5 sc10, TM1's genuine constraint)*
-- [ ] 4.3 **Prove RED**, then **GREEN** — GREEN here requires **no production line**: both scenarios are
+- [x] 4.3 **Prove RED**, then **GREEN** — GREEN here requires **no production line**: both scenarios are
       absences that the WU3 shape already satisfies. If either needs a production change, that is a
       design deviation to report, not to absorb.
-- [ ] 4.4 Focused command green **and** every shipped `CatalogTests` / `InstalledDeriveTests` case still
+- [x] 4.4 Focused command green **and** every shipped `CatalogTests` / `InstalledDeriveTests` case still
       green; commit WU4 (`test(installed): pin that a receipt-backed detail never touches the catalog`).
 
 ## Phase 5: WU5 — the pane and the composition guards (II15 sc2, sc9–sc12)

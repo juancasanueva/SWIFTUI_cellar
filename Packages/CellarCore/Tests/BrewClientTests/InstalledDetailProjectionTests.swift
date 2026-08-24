@@ -343,4 +343,124 @@ struct InstalledDetailProjectionTests {
         }
         #expect(everyShape.compactMap(\.description).allSatisfy { $0.isEmpty == false })
     }
+
+    // MARK: - PD6 sc3 — the catalog is not touched, and nothing is synthesized
+
+    @Test("A receipt-backed detail creates no catalog record")
+    func aReceiptBackedDetailCreatesNoCatalogRecord() throws {
+        let snapshot = Self.catalogSnapshot()
+        let index = PackageSearchIndex(snapshot: snapshot)
+        let widget = PackageID(kind: .formula, name: "widget")
+
+        // The catalog answers not-found before, and the index really answers:
+        // the package it *does* carry is found by the same three calls.
+        #expect(index.package(widget) == nil)
+        let missBefore = index.search("widget").map(\.id)
+        #expect(missBefore.isEmpty)
+        #expect(index.package(PackageID(kind: .formula, name: "curl"))?.name == "curl")
+        #expect(index.search("curl").map(\.id) == [PackageID(kind: .formula, name: "curl")])
+
+        let detail = InstalledDetailProjection(InstalledFixture.receipt(
+            .formula,
+            "widget",
+            desc: "A widget for acme things",
+            tap: "acme/tools",
+            kegVersions: ["1.4.0"],
+            linkedKeg: "1.4.0"
+        ))
+        #expect(detail.orderedFacts.isEmpty == false, "an empty detail would prove nothing below")
+
+        // …and it still answers not-found afterwards, from an unchanged index.
+        #expect(index.package(widget) == nil)
+        #expect(index.search("widget").map(\.id) == missBefore)
+        #expect(index.recordCount == snapshot.packages.count)
+        #expect(index.search("").map(\.id).count == snapshot.packages.count)
+
+        // No `CatalogPackage` for that identity exists anywhere — not in the
+        // snapshot, and not in the index's own record set. This is Approach C
+        // named and banned: a synthesized record one refactor away from search.
+        #expect(snapshot.packages.contains { $0.id == widget } == false)
+        let indexed = (0..<index.recordCount).map { index.package(at: $0).id }
+        #expect(indexed.contains(widget) == false)
+        #expect(indexed.count == 2)
+    }
+
+    // MARK: - TM5 sc10, TM1's genuine constraint — the handoff needs no probe
+
+    @Test("The handoff lands on a receipt-backed detail, not on a catalog record")
+    func theHandoffLandsOnAReceiptBackedDetail() throws {
+        // A launcher nothing in this flow is given: if any step needed a brew
+        // invocation to complete the detail, there would be a seam to hand it
+        // to, and this value could not stay at zero by construction.
+        let launcher = RecordingProcessLauncher()
+
+        let tap = TapRecord(
+            name: "acme/tools",
+            repository: "tools",
+            formulaNames: ["acme/tools/widget"],
+            caskTokens: [],
+            trust: .trusted
+        )
+        let receipt = InstalledFixture.receipt(
+            .formula,
+            "widget",
+            desc: "A widget for acme things",
+            homepage: try #require(URL(string: "https://acme.example/widget")),
+            tap: "acme/tools",
+            kegVersions: ["1.4.0"],
+            linkedKeg: "1.4.0"
+        )
+        let inventory = InstalledInventory(packages: [receipt])
+        let snapshot = Self.catalogSnapshot()
+        let index = PackageSearchIndex(snapshot: snapshot)
+        let widget = PackageID(kind: .formula, name: "widget")
+
+        // **Show in Installed**, by exact `PackageID`.
+        let row = try #require(
+            TapProjection.packages(for: tap, installed: inventory).first { $0.id == widget }
+        )
+        let handoff = try #require(row.installedHandoff)
+        #expect(handoff == widget)
+
+        let resolved = try #require(inventory.package(handoff))
+        let detail = InstalledDetailProjection(resolved)
+
+        // Composed from the snapshot record alone: the value is byte-identical
+        // to one built with no tap record in sight, so the tap source
+        // contributed nothing to it.
+        #expect(detail == InstalledDetailProjection(receipt))
+        #expect(detail.description == "A widget for acme things")
+        #expect(detail.tapOfOrigin?.value == "acme/tools")
+        #expect(detail.installStateFacts.map(\.value) == ["1.4.0", "Linked"])
+
+        // The catalog is exactly where it was, and still answers not-found.
+        #expect(index.package(widget) == nil)
+        #expect(index.search("widget").isEmpty)
+        #expect(index.recordCount == snapshot.packages.count)
+        #expect(snapshot.packages.contains { $0.id == widget } == false)
+
+        // No additional brew invocation was recorded for any of it.
+        #expect(launcher.launchCount == 0, "completing the detail spawned a process")
+        #expect(launcher.specs.isEmpty)
+    }
+
+    /// A catalog that carries `curl` and `git` and has never heard of `widget`.
+    private static func catalogSnapshot() -> CatalogSnapshot {
+        CatalogSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 1_000),
+            skippedRecordCount: 0,
+            packages: [catalogPackage("curl"), catalogPackage("git")]
+        )
+    }
+
+    private static func catalogPackage(_ name: String) -> CatalogPackage {
+        CatalogPackage(
+            kind: .formula, name: name, displayName: name, desc: nil, homepage: nil,
+            license: nil, version: "1.0.0", tap: "homebrew/core", dependencies: [],
+            buildDependencies: [], dependents: [], caveats: nil, deprecated: false,
+            deprecationReason: nil, deprecationDate: nil, disabled: false,
+            disableReason: nil, disableDate: nil, autoUpdates: false,
+            installCount365d: nil
+        )
+    }
 }
