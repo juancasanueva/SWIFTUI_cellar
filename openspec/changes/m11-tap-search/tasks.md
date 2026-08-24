@@ -630,10 +630,10 @@ a re-plan.
 
 ## Phase 0′: Preflight round 2 (sequential; no behaviour changes)
 
-- [ ] 0′.1 Re-measure the branch: `git diff --stat main` at `dbc5233` — record the authored total split
+- [x] 0′.1 Re-measure the branch: `git diff --stat main` at `dbc5233` — record the authored total split
       into **code+test** and **artifact** buckets. This replaces the derived ~1,907 above with a measured
       number, and is the base every later comparison uses.
-- [ ] 0′.2 Confirm the round-2 anchors — a moved anchor is a deviation to **report, not absorb**:
+- [x] 0′.2 Confirm the round-2 anchors — a moved anchor is a deviation to **report, not absorb**:
       `TapPackageSearch.swift` :125 (the `guard needle.isEmpty == false else { return [] }` DD-16
       removes), :88-123 (`hits(…)`), the `isSectionVisible` declaration DD-6 deletes ·
       `TapProjection.swift` :188-196 (`state(loadState:inventory:)`) · `TapProjectionTests.swift` :130-135
@@ -647,70 +647,70 @@ a re-plan.
       :150-156 (the AppSection-switch count), :195-200 (the `allCases` membership loop) ·
       `TapSearchCompositionTests.swift` :287-291 (`TapSearchSources.paths`) ·
       `PerPackageTrustCompositionTests.swift` :31-32, :186-201.
-- [ ] 0′.3 **Read the SF Symbol from Engram** — `mem_search("sdd/m11-tap-search/state")` →
+- [x] 0′.3 **Read the SF Symbol from Engram** — `mem_search("sdd/m11-tap-search/state")` →
       `mem_get_observation` — and record the **verified** symbol name in the apply context. Do **not**
       guess, and do **not** take a name from `design.md`'s open-question candidate list without
       re-verifying it against this SDK.
-- [ ] 0′.4 Record the **current** green baseline on the branch (both scoped runners, distinct passing
+- [x] 0′.4 Record the **current** green baseline on the branch (both scoped runners, distinct passing
       test ids). Round 1's Phase 0 numbers are for `main`, not for `dbc5233`.
 
 ## Phase 1′: WU5 — the amended artifacts land first
 
-- [ ] 1′.1 Commit `proposal.md` r2, `specs/**` r3, `design.md` r3 and this file before any Swift change:
+- [x] 1′.1 Commit `proposal.md` r2, `specs/**` r3, `design.md` r3 and this file before any Swift change:
       `docs(sdd): record the m11-tap-search scope change to its own tap search surface`.
       **Acceptance**: the specs pin `Search our taps`, the two empty-state strings, the empty-query
       listing rule, the absence of an outdated control, the per-surface latency ceiling and the
       zero-diff `BrowseView` claim — and **withdraw** `From your taps`.
-- [ ] 1′.2 Confirm the delta arithmetic against r3: `package-search` **1 ADDED / 17 scenarios** → 8 req /
+- [x] 1′.2 Confirm the delta arithmetic against r3: `package-search` **1 ADDED / 17 scenarios** → 8 req /
       36 sc; `package-detail` **1 MODIFIED, 4 replacing 3** → 8 req / 32 sc; `tap-management` **2
       MODIFIED, 11 replacing 10 and 3 replacing 2** → 13 req / 60 sc; **20 new scenarios total**. Then
       confirm the r3 prose amendments to **PD6, TM5 and TM11 did not move what the round-1 tests assert**
       — those three suites must still be green with **no edit**. A needed edit is a spec defect to
       report, not to patch here.
-- [ ] 1′.3 Record that `design.md` **does not quote** the two empty-state strings and that **the spec is
+- [x] 1′.3 Record that `design.md` **does not quote** the two empty-state strings and that **the spec is
       authoritative** for them (reconciliation finding 3), so no later task paraphrases them.
 
 ## Phase 2′: WU6 — the projection amendments (ps6, ps7, ps11's new half)
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'`
 
-- [ ] 2′.1 **RED by mutation.** In `TapPackageSearchTests.swift`, **rewrite**
+- [x] 2′.1 **RED by mutation.** In `TapPackageSearchTests.swift`, **rewrite**
       `theSectionIsAbsentForAnEmptyOrWhitespaceQuery` into `anEmptyQueryListsEveryTapPackage`: two taps
       publishing forty packages between them; `""` **and** `"   "` each return **all forty**, each at
       `.exactToken`, ordered by bare token, then kind, then tap name; nothing thrown, nothing withheld;
       official taps still excluded; `kinds` and `hideInstalled` still applied. **RED because** `:125`
       still returns `[]`. *(ps6, DD-16)*
-- [ ] 2′.2 **RED.** `theDefaultListingOrderMatchesTheSearchOrder`: the empty-query listing and a query
+- [x] 2′.2 **RED.** `theDefaultListingOrderMatchesTheSearchOrder`: the empty-query listing and a query
       that matches everything produce the **same sequence**, so one order governs both. *(ps6, DD-16)*
-- [ ] 2′.3 **RED.** `thePresentationDistinguishesEveryEmptyReason`: `.brewAbsent` ⇒ `.unavailable(absence)`;
+- [x] 2′.3 **RED.** `thePresentationDistinguishesEveryEmptyReason`: `.brewAbsent` ⇒ `.unavailable(absence)`;
       a failed refresh ⇒ `.failed(error)`; `.loaded` with no third-party tap ⇒ `.noTaps`; loaded with taps,
       a non-empty query and `hitCount == 0` ⇒ `.noMatch(query:)`; `hitCount > 0` ⇒ `.content`. Five
       **distinct** values, and **no absence is reported as an error value**. **RED because**
       `TapSearchPresentation` does not exist. *(ps7, DD-6)*
-- [ ] 2′.4 **RED.** `thePresentationKeepsStaleContentWhileRefreshing`: `.loading` over a non-empty
+- [x] 2′.4 **RED.** `thePresentationKeepsStaleContentWhileRefreshing`: `.loading` over a non-empty
       resident inventory does **not** collapse to `.loading` and hide rows — the `hasLastGood` rule is
       **inherited** from `TapProjection.state(…)` (`:188-196`, proven by
       `TapProjectionTests.presentationStatesRemainDistinct` `:130-135`), never re-derived from
       `TapLoadState`. A second opinion here is exactly the drift PT5's one-projection rule forbids.
       *(ps7, DD-6)*
-- [ ] 2′.5 **RED — the row the design's table places at the wrong class (reconciliation finding 1).**
+- [x] 2′.5 **RED — the row the design's table places at the wrong class (reconciliation finding 1).**
       `theTapSourceAdmitsNoOutdatedPredicate`: enumerate the projection's parameter surface — `hits(…)`
       takes `query`, `kinds`, `hideInstalled`, `isInCatalog` and **nothing else**; there is **no**
       `outdatedOnly` parameter and **no** `isSectionVisible` symbol left to carry one. `hideInstalled`
       still subtracts (the shipped `hideInstalledSubtractsFromTheSection` stays green). **RED because**
       `isSectionVisible` still exists. *(ps11, DD-6, DD-15)*
-- [ ] 2′.6 **RED.** `theEmptyStateCopyIsExact`: each `TapSearchPresentation` case maps to its pinned
+- [x] 2′.6 **RED.** `theEmptyStateCopyIsExact`: each `TapSearchPresentation` case maps to its pinned
       sentence **byte-for-byte** — `.unavailable` **and** `.failed` both to `No packages from your taps.`,
       `.noTaps` to `Your taps publish nothing yet.` — and none is empty. Copy comes from
       `specs/package-search/spec.md:236-237`, **not** from `design.md`, which does not quote it.
       *(ps7, DD-17)*
-- [ ] 2′.7 **RED.** `thePackageCountCountsThirdPartyTapsOnly`: `packageCount(inventory:)` equals the hit
+- [x] 2′.7 **RED.** `thePackageCountCountsThirdPartyTapsOnly`: `packageCount(inventory:)` equals the hit
       count for an empty query under default filters, and excludes `homebrew/core` / `homebrew/cask`.
       **RED because** the function does not exist. *(DD-17)*
-- [ ] 2′.8 **Delete, do not leave green.** Remove `theOutdatedChipHidesTheSection` — the behaviour is
+- [x] 2′.8 **Delete, do not leave green.** Remove `theOutdatedChipHidesTheSection` — the behaviour is
       withdrawn, and a passing test for a withdrawn rule is worse than no test.
-- [ ] 2′.9 **Prove RED.** 2′.1–2′.7 MUST fail, each for its stated reason.
-- [ ] 2′.10 **GREEN.** `TapPackageSearch.swift`: remove the `:125` empty-needle guard and assign an empty
+- [x] 2′.9 **Prove RED.** 2′.1–2′.7 MUST fail, each for its stated reason.
+- [x] 2′.10 **GREEN.** `TapPackageSearch.swift`: remove the `:125` empty-needle guard and assign an empty
       needle `.exactToken` for **every** package (**DD-16**, mirroring `PackageSearchIndex.swift:218-227`);
       **delete** `isSectionVisible(query:outdatedOnly:tapState:)`; add
       `public enum TapSearchPresentation: Sendable, Equatable { case loading, unavailable(InstalledAbsence),
@@ -718,11 +718,11 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
       `presentation(tapState:inventory:query:hitCount:)` built by **switching over**
       `TapProjection.state(loadState:inventory:)`, its pinned copy, and
       `static func packageCount(inventory:) -> Int`.
-- [ ] 2′.11 **GREEN, binding constraints**: matching, ladder, order, collision rule and every hit-level
+- [x] 2′.11 **GREEN, binding constraints**: matching, ladder, order, collision rule and every hit-level
       string stay **byte-unchanged** (**DD-1…DD-5, DD-7, DD-9** are shipped and must not be re-litigated);
       still `nonisolated` by module default, no annotation, no `@unchecked`, no actor (**DD-12**); no
       `Process`, `FileManager`, store, clock, SwiftUI import or `#available` (**DD-13**).
-- [ ] 2′.12 Focused command green **and** `TapProjectionTests` / `SearchIndexTests` / `FilterTests` still
+- [x] 2′.12 Focused command green **and** `TapProjectionTests` / `SearchIndexTests` / `FilterTests` still
       green; commit WU6 (`feat(search): list every tap package for an empty query and name each empty state`).
 
 ## Phase 3′: WU7 — the surface swap (nine wiring sites, one revert, one deletion)
@@ -732,54 +732,54 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 > `cellar/` and `cellarTests/` are `PBXFileSystemSynchronizedRootGroup`s (`project.pbxproj` :46, :51),
 > so both the new file **and the deletion** are a **0-line `project.pbxproj` diff**.
 
-- [ ] 3′.1 **Revert, do not hand-unpick**: `git checkout main -- cellar/Browse/BrowseView.swift`. A
+- [x] 3′.1 **Revert, do not hand-unpick**: `git checkout main -- cellar/Browse/BrowseView.swift`. A
       hand-revert is how a stray blank line survives and turns a zero-diff claim into a review argument.
       Then `git diff main -- cellar/Browse/BrowseView.swift` MUST print **empty output**. *(DD-8)*
-- [ ] 3′.2 `git rm cellar/Browse/TapSearchSection.swift`. No file may reference it afterwards; the two
+- [x] 3′.2 `git rm cellar/Browse/TapSearchSection.swift`. No file may reference it afterwards; the two
       scanner lists are updated in **this same commit** (3′.9, 4′.1) or their reads **throw**. *(DD-11)*
-- [ ] 3′.3 `cellar/ContentView.swift` — remove `taps: taps` from the `BrowseView(` call added in round 1.
+- [x] 3′.3 `cellar/ContentView.swift` — remove `taps: taps` from the `BrowseView(` call added in round 1.
       The store stays wired; `TapSearchView` consumes it now.
-- [ ] 3′.4 `cellar/Shell/AppSection.swift` — add `case tapSearch` **immediately after `.browse`** (`:28`),
+- [x] 3′.4 `cellar/Shell/AppSection.swift` — add `case tapSearch` **immediately after `.browse`** (`:28`),
       rawValue `"tapSearch"`. Sites 1–4: `title` ⇒ `Search taps`; **`sidebarTitle` ⇒ `Search our taps`
       — this arm has a `default:` (`:134-139`), so a missing case is SILENT and falls back to `title`;
       it is the one wiring site the compiler will not catch**; `systemImage` ⇒ the **Engram-recorded,
       SDK-verified** symbol (task 0′.3), distinct from `.browse`'s `magnifyingglass`; `sidebarGroups`
       ⇒ `("Overview", [.home, .browse, .tapSearch])`.
-- [ ] 3′.5 `cellar/ContentView.swift` — sites 5–8: add to `listSections` (`:156-159`); content switch
+- [x] 3′.5 `cellar/ContentView.swift` — sites 5–8: add to `listSections` (`:156-159`); content switch
       `case .tapSearch: TapSearchView(…)` (`:306`); **join** the existing `PackageDetailView` detail arm
       beside `.browse, .installed, .favorites, .updates` (`:530-546`) — **no new branch** (**DD-4**);
       join the `nil` arm of `shellTitleBarAccessories` (`:624-636`).
-- [ ] 3′.6 `cellar/ContentView.swift` — the two `Set` literals, **not** switches and therefore silent:
+- [x] 3′.6 `cellar/ContentView.swift` — the two `Set` literals, **not** switches and therefore silent:
       `pinnedHeaderSections` (`:594-599`, looped over `allCases` by
       `AppSectionPlacementTests.swift:195-200`) and `shellTitleBarSections` (`:603-606`). Plus
       `defaultListPaneWidth(for:)` (`:97-99`) → `.tapSearch` joins `.browse`'s **400** branch, and
       `countLabel` (`:204-206`) → the same shape over `TapPackageSearch.packageCount(inventory:)`
       (**DD-17**).
-- [ ] 3′.7 `cellar/Shell/SidebarView.swift:175-205` — site 9: join the no-badge arm (exhaustive, no
+- [x] 3′.7 `cellar/Shell/SidebarView.swift:175-205` — site 9: join the no-badge arm (exhaustive, no
       `default:`).
-- [ ] 3′.8 `cellar/Browse/CatalogFilterBar.swift` — add `var showsOutdatedChip = true` and
+- [x] 3′.8 `cellar/Browse/CatalogFilterBar.swift` — add `var showsOutdatedChip = true` and
       `var showsCatalogPredicates = true`. **Both MUST default**, because a non-defaulted parameter forces
       a `BrowseView.swift` edit and breaks 3′.1's zero diff outright. *(DD-15)*
-- [ ] 3′.9 **GREEN.** New file `cellar/Browse/TapSearchView.swift` — a visually exact sibling of Browse:
+- [x] 3′.9 **GREEN.** New file `cellar/Browse/TapSearchView.swift` — a visually exact sibling of Browse:
       `PaneSearchField` (prompt over `packageCount`, **never** a catalog record count),
       `CatalogFilterBar(showsOutdatedChip: false, showsCatalogPredicates: false, outdatedOnly: .constant(false))`,
       `List(selection:)` with the same row composition (`KindTag`, tap of origin, `hit.stateCopy`,
       `hit.collisionNote`, `MutationMenu(center:entry:)`, `.themedListSelection`), `.tag(hit.routableID)`
       with `.selectionDisabled()` for non-routable rows, and `@State private var selection: PackageID?`
       of its own. Built **synchronously in `body`** — no `Task`, no `.task {}`, no `await` (**DD-12**).
-- [ ] 3′.10 **GREEN.** In the same file, a **private** `TapSearchEmptyState` rendering
+- [x] 3′.10 **GREEN.** In the same file, a **private** `TapSearchEmptyState` rendering
       `TapSearchPresentation`. **Duplication is forced, not chosen** (**DD-10**): `EmptyResults` is
       `private` at `BrowseView.swift:173` and Swift `private` is file-scoped, so any reuse — or any
       extraction to a third file — edits `BrowseView.swift` and breaks 3′.1. **Relax no visibility
       anywhere.** The view renders the projection's strings; it composes none.
-- [ ] 3′.11 The app compiles and the runner is green at the 0′.4 baseline; commit WU7
+- [x] 3′.11 The app compiles and the runner is green at the 0′.4 baseline; commit WU7
       (`feat(taps): give tap package search its own sidebar surface`).
 
 ## Phase 4′: WU8 — the composition guards (ps13–ps17)
 
 Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`
 
-- [ ] 4′.1 **Path swap first, in both scanners** — a scanner pointed at a deleted path **throws**, which
+- [x] 4′.1 **Path swap first, in both scanners** — a scanner pointed at a deleted path **throws**, which
       reads as a suite-wide error rather than a clean failure: `TapSearchSources.paths`
       (`TapSearchCompositionTests.swift:287-291`) swaps `TapSearchSection.swift` → `TapSearchView.swift`
       and **keeps** `BrowseView.swift` (now as the subject of the zero-diff row);
@@ -787,35 +787,35 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
       because it is reverting to a file that never mentioned trust. Update the sorted anchor (`:31-32`)
       to `["PackageDetailView+Receipt.swift", "PackageDetailView.swift", "TapDetailView.swift", "TapSearchView.swift", "TapsListView.swift"]`
       — ASCII: `+` (U+002B) before `.` (U+002E), `TapD` < `TapSe` < `Taps`. *(DD-11)*
-- [ ] 4′.2 **RED.** `browseIsUntouchedByThisChange` — the load-bearing row: `BrowseView.swift` contains
+- [x] 4′.2 **RED.** `browseIsUntouchedByThisChange` — the load-bearing row: `BrowseView.swift` contains
       **none** of `TapPackageSearch`, `TapSearchHit`, `TapSearchSection`, `TapSearchView`, `TapStore`,
       `taps`, `tapHits`; it still declares `List(rows, selection: $selection)` and the single-source
       overlay `if rows.isEmpty {`; and `ContentView`'s `BrowseView(` call site carries no `taps:`.
       **Both** this row and the `git diff` in 3′.1 — the test is what protects the property after merge.
       *(ps17, DD-8)*
-- [ ] 4′.3 **RED.** `theTapSearchSectionFileIsGone`: no source under `cellar/` references
+- [x] 4′.3 **RED.** `theTapSearchSectionFileIsGone`: no source under `cellar/` references
       `TapSearchSection`, and the scanner path lists name `TapSearchView.swift`. *(ps17, removal plan)*
-- [ ] 4′.4 **RED.** `theTapSearchSurfaceIsWiredAtEveryAppSectionSite`: `AppSection.tapSearch` exists with
+- [x] 4′.4 **RED.** `theTapSearchSurfaceIsWiredAtEveryAppSectionSite`: `AppSection.tapSearch` exists with
       rawValue `"tapSearch"`, sits **immediately after `.browse`** in `allCases`, carries `Search taps`
       as `title` and **`Search our taps` as `sidebarTitle`** (asserted separately — the `default:` arm at
       `:134-139` makes a missing case silent), carries the SDK-verified `systemImage` distinct from
       `.browse`'s, appears in `sidebarGroups[0]` after `.browse`, and is a member of `listSections`,
       `pinnedHeaderSections` and `shellTitleBarSections`. *(ps13, DD-14)*
-- [ ] 4′.5 **RED.** `AppSectionPlacementTests.swift` amended, **not weakened**: `order.count` `21` → **22**
+- [x] 4′.5 **RED.** `AppSectionPlacementTests.swift` amended, **not weakened**: `order.count` `21` → **22**
       (`:34`); `"tapSearch"` added **after** `"browse"` in the rawValue anchor (`:52-60`); the Overview
       group literal updated; sidebar coverage still **exact**; and `ContentView.swift`'s AppSection-switch
       count still **3** (`:150-156`) — this change adds cases to existing switches, never a fourth switch.
       *(ps13, DD-14)*
-- [ ] 4′.6 **RED.** `theTapSurfaceMirrorsBrowsesComposition`: `TapSearchView.swift` composes
+- [x] 4′.6 **RED.** `theTapSurfaceMirrorsBrowsesComposition`: `TapSearchView.swift` composes
       `PaneSearchField(`, `CatalogFilterBar(`, `List(selection:`, `KindTag(`, `MutationMenu(center:` and
       `.themedListSelection(` — the same six Browse's list uses. And `theTapSurfaceOwnsItsSelectionLocally`:
       it declares `@State private var selection: PackageID?`, and `ContentView`'s detail arm resolves
       `.tapSearch` through the **shared** `PackageDetailView` with **no new branch**. *(ps13, ps14, DD-4)*
-- [ ] 4′.7 **RED.** `theTapFilterBarOffersNoInertControl`: the call passes `showsOutdatedChip: false` and
+- [x] 4′.7 **RED.** `theTapFilterBarOffersNoInertControl`: the call passes `showsOutdatedChip: false` and
       `showsCatalogPredicates: false`; `TapSearchView.swift` contains no `"Outdated"`, `"Hide deprecated"`
       or `"Hide disabled"` literal; and **both** new `CatalogFilterBar` parameters default to `true`, so
       the Browse call site needs no argument. *(ps11 view-side half, DD-15)*
-- [ ] 4′.8 **RED — retargeted scans** (mutation-based: the assertions exist, the subject file changes):
+- [x] 4′.8 **RED — retargeted scans** (mutation-based: the assertions exist, the subject file changes):
       `theBrowseTapSurfaceComposesNoTrustGateAndNoBadge`, `theSurfaceCopyLivesInTheProjectionNotTheView`
       (now: the **six** projection strings — four hit strings **plus** the two empty-state sentences —
       present in `TapPackageSearch.swift` and **absent** from `TapSearchView.swift`; `Search our taps`
@@ -823,11 +823,11 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
       `notInstalledTapRowsAreNotSelectable`, `theReceiptDetailIsReachedWithNoNewRoutingBranch`,
       `theGrantCopyGuardCoversTheNewSurface`. **Plus**: `From your taps` appears **nowhere** in the tree.
       *(ps14, ps15, ps16)*
-- [ ] 4′.9 **Delete, do not leave green**: `theTapSectionIsTitledAndPositionedLast`,
+- [x] 4′.9 **Delete, do not leave green**: `theTapSectionIsTitledAndPositionedLast`,
       `theEmptyStateYieldsToTapHits`, `catalogRowSelectionIsUnchanged`,
       `theSearchPromptStillCountsCatalogRecordsOnly` (Browse form),
       `browseComposesTheTapSectionFromTheResidentStore`.
-- [ ] 4′.10 **Prove RED**, then GREEN — GREEN here should require **no production change**: WU7 already
+- [x] 4′.10 **Prove RED**, then GREEN — GREEN here should require **no production change**: WU7 already
       satisfies these absences. If any row needs a production edit, that is a **design deviation to
       report**, not to absorb. Commit WU8
       (`test(taps): pin the new surface and prove Browse is untouched`).
@@ -836,33 +836,33 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 
 Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'`
 
-- [ ] 5′.1 **RED, restated from round 1.** `theTapSurfaceKeystrokeTurnStaysUnderTheCeiling`: a resident
+- [x] 5′.1 **RED, restated from round 1.** `theTapSurfaceKeystrokeTurnStaysUnderTheCeiling`: a resident
       inventory of **≈500 packages across several taps**, **≥100** as-you-type queries of varying length,
       each turn running `hits(…)` **plus** `presentation(…)` **once** — p95 **< 8 ms**. It is **no longer
       a combined turn**: Browse composes no tap hits, so nothing is added to the catalog's budget. Adapt
       round 1's combined-turn row rather than deleting its fixture.
-- [ ] 5′.2 **RED.** `theCatalogKeystrokeTurnIsUnchanged`: PS6's shipped catalog measurement is re-run over
+- [x] 5′.2 **RED.** `theCatalogKeystrokeTurnIsUnchanged`: PS6's shipped catalog measurement is re-run over
       **its own fixture, its own method, its own ceiling, with no tap inventory in its turn**, and must be
       **unchanged**. `BrowseView` and `PackageSearchIndex` are untouched, so a change here means something
       leaked. *(R6 in its new form)*
-- [ ] 5′.3 **The ceiling is not negotiable.** A miss is fixed in the projection — allocation per
+- [x] 5′.3 **The ceiling is not negotiable.** A miss is fixed in the projection — allocation per
       keystroke, repeated normalisation, an O(n·m) scan — **never** by a larger ceiling, a smaller
       inventory, fewer queries or a p90. A miss that survives optimisation is a design deviation to report.
       Note that DD-16 makes the **empty query the worst case** (every package matches), so measure it.
-- [ ] 5′.4 Focused command green; commit WU9
+- [x] 5′.4 Focused command green; commit WU9
       (`test(search): pin each surface's keystroke turn under its own 8 ms ceiling`).
 
 ## Phase 6′: Verification and bindings (round 2)
 
-- [ ] 6′.1 Full core suite: `swift test --package-path Packages/CellarCore` → the 0′.4 baseline **plus**
+- [x] 6′.1 Full core suite: `swift test --package-path Packages/CellarCore` → the 0′.4 baseline **plus**
       the new cases **minus** the deleted ones, **0 failures**. Assert counts, never a bare success line.
-- [ ] 6′.2 App target — **use the SCOPED runner**:
+- [x] 6′.2 App target — **use the SCOPED runner**:
       `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests`
       → 0 failures. **The full `-scheme cellar` runner is known red on `main` @ 5a0860b** from two
       **pre-existing** `cellarUITests` Taps failures (`cellarUITests.swift:209`, `:231`), tracked for a
       separate PR — it is **not** the gate for this change, and a red full-scheme run caused by those two
       cases is **not** an m11 regression. `cellarUITests` gains **no** new test and has a zero-line diff.
-- [ ] 6′.3 **Bindings proof.**
+- [x] 6′.3 **Bindings proof.**
       `git diff --stat main -- cellar/Browse/BrowseView.swift cellar.xcodeproj/project.pbxproj openspec/specs/ Packages/CellarCore/Sources/Catalog/PackageSearchIndex.swift Packages/CellarCore/Sources/BrewClient/MutationCommand.swift Packages/CellarCore/Sources/BrewClient/TapCommand.swift Packages/CellarCore/Sources/BrewClient/TapProjection.swift cellar/Browse/PackageDetailView.swift scripts/ .github/workflows/`
       → **empty output**. `BrowseView.swift` is now first in that list and is the round-2 headline claim;
       a non-zero `project.pbxproj` diff means the synchronized-group assumption broke; a non-zero
@@ -870,16 +870,16 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
       diff means the source was pushed **into** the index (Approach C, which PD6 forbids); a non-zero
       `MutationCommand.swift` diff means a new argv family was invented (PM10). Any of them is reported
       before merge, never absorbed.
-- [ ] 6′.4 **Regression guards that must never have moved**: `TapProjectionTests`, `TapShippingProofTests`,
+- [x] 6′.4 **Regression guards that must never have moved**: `TapProjectionTests`, `TapShippingProofTests`,
       `MutationCommandTests`, `MutationCommandTargetTests`, `SearchIndexTests`, `FilterTests`,
       `InstalledFilterCompositionTests`, `ReceiptDetailCompositionTests`, `PackageGraphTests`, and — with
       only their listed edits — `AppSectionPlacementTests` and `PerPackageTrustCompositionTests`.
-- [ ] 6′.5 **Spec-delta self-check before verify**: re-count the four deltas against 1′.2; confirm PD6's
+- [x] 6′.5 **Spec-delta self-check before verify**: re-count the four deltas against 1′.2; confirm PD6's
       three, TM5's ten and TM11's two shipped scenarios are still **byte-identical** to
       `openspec/specs/{package-detail,tap-management}/spec.md`; confirm every one of the **20** new
       scenarios has a task naming it — including **ps11's `unit` half**, whose row this amendment added —
       and that **no** delta introduces a new verification class.
-- [ ] 6′.6 `git diff --stat main` for the whole branch — record the authored total split into code+test
+- [x] 6′.6 `git diff --stat main` for the whole branch — record the authored total split into code+test
       and artifact buckets, and compare each against the Round 2 forecast (~2,057–2,107 and 3,361–3,561).
       Record the **measured** total against the maintainer's accepted 4,900–5,200 and against this
       forecast's 5,418–5,668. A miss is information for the next forecast, not a failure.
@@ -895,24 +895,24 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
 
 ## Phase 7′: Archive obligations (round 2 — replaces Phase 7 wholesale)
 
-- [ ] 7′.1 Promote the ADDED block as **PS8** with its **17** scenarios (→ 8 req / **36** sc; PS1–PS7
+- [x] 7′.1 Promote the ADDED block as **PS8** with its **17** scenarios (→ 8 req / **36** sc; PS1–PS7
       byte-identical). Promote PD6, TM5 and TM11 as **whole-block replacements** (→ 8 req / 32 sc and
       13 req / 60 sc). **Promote no verification-class table** — none of the three main specs carries one
       (precedent at `openspec/specs/installed-inventory/spec.md:1122-1184`); only the inline
       `- Verification:` lines promote. `package-search` and `package-detail` carry **no markers**; match
       by heading.
-- [ ] 7′.2 Record in provenance: **no `package-mutation` delta** (PM10 activated, argv enumeration gains
+- [x] 7′.2 Record in provenance: **no `package-mutation` delta** (PM10 activated, argv enumeration gains
       no family); **no `installed-inventory` delta** (II7/II8/II15 activated); **no `package-trust`
       delta**; **TM12 untouched**. Record the **TM10→TM11 / TM11→TM12 marker drift** once more, since
       `explore.md` still carries pre-promotion ordinals.
-- [ ] 7′.3 Record the **withdrawn** string `From your taps` and the **void** rev-2 decisions (section
+- [x] 7′.3 Record the **withdrawn** string `From your taps` and the **void** rev-2 decisions (section
       placement, the Outdated chip hiding a section, `isSectionVisible`), so a future reader does not
       resurrect them from the round-1 history above or from `explore.md`.
-- [ ] 7′.4 **PRD milestone: none closed.** `PRD.md` §7 ends at **M6**; the m7–m11 labels are session
+- [x] 7′.4 **PRD milestone: none closed.** `PRD.md` §7 ends at **M6**; the m7–m11 labels are session
       shorthand, not PRD milestones. Do **not** record a closed milestone — round 1's task 7.4 claimed
       "M11" and is **wrong**. Also record that the two pre-existing `cellarUITests` Taps failures
       (`:209`, `:231`) remain open and are **not** m11's to close.
-- [ ] 7′.5 Record the deferrals: a **name-only detail pane** for a not-installed hit (blocked by TM5's
+- [x] 7′.5 Record the deferrals: a **name-only detail pane** for a not-installed hit (blocked by TM5's
       tap-source-read ban); the **merged ranked list** stays rejected; **index ingestion** is forbidden by
       PD6's text; `SearchFilters` gains **no** member; and the tap surface knowingly holds a
       `SearchFilters` whose two exclusion predicates are dead (**DD-15**'s accepted cost).
