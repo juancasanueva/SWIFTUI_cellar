@@ -289,6 +289,62 @@ is enforced by the projection's shape rather than by a consumer's discipline.
 - THEN it carries no integrity, signature or notarization value of any kind
 - AND the projection declares no dependency on the capability that produces those results
 
+### Requirement: A per-package grant is shown beside the tap of origin, resolved by exact identity
+
+Where a package detail is presented and the `package-trust` capability reports that package's state as
+`granted`, the detail MUST carry the exact marker copy “Trusted individually”, positioned beside the
+existing tap-of-origin fact, because the grant is a fact *about that origin* and is unreadable apart
+from it.
+
+The state MUST be resolved by **exact identity** — kind, name and tap of origin together, matched
+against the grant entry's published qualified identity. A bare name MUST NOT match a qualified entry:
+a grant for `acme/tools/widget` MUST NOT mark `homebrew/core/widget`, and MUST NOT mark a package whose
+tap the detail does not know exactly. Where identity cannot be established exactly, the marker MUST be
+absent.
+
+The marker MUST be **positive-only**. A package whose state is `noGrantRecorded` or `unreported` MUST
+carry no marker, no placeholder, no muted variant and no note — absence from the report is not a fact
+about that package, and `unreported` is not zero.
+
+The marker MUST NOT become a field of the detail projection this capability owns: PD1's exposed field
+set is unchanged, and PD7's prohibition on a signature status, notarization status, signing identity,
+team identifier or trust verdict existing as a field MUST remain enforced by the projection's shape.
+The marker MUST NOT state or imply that the package's download was fetched, hashed, verified, signed or
+notarized; it states only that Homebrew records a grant for this exact package. It MUST offer no
+control: nothing on this surface MUST grant, revoke or alter a grant.
+
+#### Scenario: A grant marks only the exact package it names
+
+- GIVEN a report granting cask `acme/tools/widget`
+- WHEN details are resolved for a package named `widget` whose tap is `homebrew/cask`, and for a package named `widget` whose tap is `other/tools`
+- THEN neither carries the marker
+- AND the marker is produced only for a detail whose kind, name and tap of origin match the entry exactly
+- Verification: `unit`
+
+#### Scenario: No grant and no report both render nothing
+
+- GIVEN a package detail whose per-package state is in turn `noGrantRecorded` and `unreported`
+- WHEN the detail is presented
+- THEN neither renders a marker, a placeholder, a muted marker or an explanatory note
+- AND neither renders any string containing “trusted”
+- Verification: `unit`
+
+#### Scenario: The marker is not a projection field
+
+- GIVEN the package detail projection this capability owns
+- WHEN every field it exposes is enumerated, with a decoded grant report present
+- THEN the field set is exactly the one PD1 pins, unchanged
+- AND no field carries a trust state, a grant, a verdict, or a value whose meaning is “this download is verified”
+- Verification: `unit`
+
+#### Scenario: The marker states a grant and offers nothing
+
+- GIVEN a package detail whose state is `granted`
+- WHEN its marker copy and every control on that surface are read
+- THEN the copy is exactly “Trusted individually”
+- AND no control grants, revokes or alters a grant, and nothing states or implies that the download was verified, signed or notarized
+- Verification: `unit`
+
 ## Provenance
 
 - Established by change `m1-catalog-browse` (archived `2026-08-01`), ADDED-only delta — 6
@@ -337,3 +393,37 @@ is enforced by the projection's shape rather than by a consumer's discipline.
     an uninstalled package.
 - The archived delta spec is the verbatim audit trail; this file adds only the header, the
   `## Requirements` wrapper, and this provenance section.
+- **Amended by change `m9-per-package-trust`** (archived `2026-08-24` —
+  `openspec/changes/archive/2026-08-24-m9-per-package-trust/`), **1 ADDED, 0 modified, 0 removed, 0
+  renamed** — **7 req / 26 sc → 8 req / 30 sc**. The ADDED block is appended after PD7 and promoted as
+  **PD8**, *"A per-package grant is shown beside the tap of origin, resolved by exact identity"* (4
+  scenarios). `rules.archive`'s destructive-delta warning did not fire, and **PD1–PD7 are
+  byte-identical** to their prior text — verified at archive by byte-slicing the untouched range
+  against a pre-merge copy. Delivered in PR **#73**, merged `2026-08-24` at `ddb9661`.
+  - **PD8 is expected to render nothing on today's shipped surface, and that is the point.** PD6 keeps
+    third-party tap packages out of the catalog snapshot, search and detail, and `tap-management` TM1
+    forbids a third-party detail fallback — while per-package grants exist only for third-party
+    packages. So every package detail this view can currently resolve carries **no** marker. The
+    requirement was written anyway, and its scenarios are mostly negative, because the failure mode is
+    real and cheap to ship by accident: a bare-name match against a qualified grant entry would light
+    the marker on `homebrew/core/widget` the moment some unrelated tap's `widget` is granted. **PD8
+    exists to make that rendering impossible to get wrong, not to add a visible feature**, and it
+    should not be read as dead text when a third-party detail surface eventually arrives.
+  - **Why ADDED and not MODIFIED.** The marker is **not** a field of the catalog detail projection.
+    PD1's field set is unchanged and PD7's shape prohibition — no signature status, notarization
+    status, signing identity, team identifier or trust verdict may *exist* as a field — is unchanged
+    and stays enforced by shape. The marker is a value the `package-trust` capability produces from a
+    different read, joined at presentation beside the existing Tap fact. Folding it into PD1 would have
+    put a non-catalog value inside a catalog projection and quietly weakened PD7.
+  - **PD7 and PD6 need no delta, each verified against its own text.** PD8 restates the
+    download-verification disclaimer explicitly, so a reviewer meeting "trust verdict" in PD7 finds the
+    boundary drawn rather than assumed; and PD8's exact-identity rule is precisely what keeps a
+    third-party grant from reaching an official-tap record.
+  - **Delivered as `PackageDetailView`'s sixth store** (`trustGrants: TrustGrantStore`, beside
+    `diskUsage`), not an injected closure — design **DD-10**. The marker must update when the store
+    refreshes, so the view needs the `@Observable` reference; a closure or a pre-computed `Bool` would
+    not re-render. **Rejected:** the `m7-tap-trust` DD-12 `@MainActor` closure idiom, which stays
+    correct for that change's one-shot lookup at press time.
+  - `package-trust` **PT5** owns the marker's exact copy (“Trusted individually”) and its absence
+    rules; this requirement owns where it sits and how identity is resolved.
+  - The archived delta spec is the verbatim audit trail.

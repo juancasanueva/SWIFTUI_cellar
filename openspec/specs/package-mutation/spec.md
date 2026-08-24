@@ -651,10 +651,33 @@ a requalified retry would convert a refusal into silent execution of code the us
 run, while looking exactly like a bug fix. The shipped name-safety gate permits `/`, so this MUST be
 asserted as an **absence over the whole mutation surface** by a test, never left to review.
 
+This prohibition MUST NOT be weakened by the existence of a capability that *reads* per-package grants.
+`package-trust` acquires the report with compile-time-constant argv carrying no package identity, and
+that read is not a command on the shared mutation spine: it MUST NOT be added to the spine's argv
+enumeration, and the assertion proving the absence MUST remain unchanged by it.
+
 The refusal MUST NOT be converted into a pre-launch gate. This capability MUST NOT block a mutation
 because the package's tap is untrusted: with the tap withheld the inventory cannot prove the origin
 tap, and a per-package grant can make brew allow exactly what a tap-state gate would refuse. Only brew
 sees both grant kinds, so only brew decides.
+
+**The same prohibition MUST hold for per-package grant state.** This capability MUST NOT block,
+disable, hide, delay or pre-qualify a mutation, an affordance or a request because a package has, or
+lacks, an individual grant — and MUST NOT read the per-package trust report, store or projection to
+decide anything before launch. A `noGrantRecorded` state is not a prediction of refusal: a package
+under a trusted tap needs no individual grant, and an `unreported` report is not evidence of anything
+at all. Gating on it would refuse exactly what brew allows, which is the defect the tap-state gate was
+prohibited for.
+
+Because both prohibitions are absences, they MUST be enforced **structurally**: the shipped
+source-scanning assertion that fails when a trust type name appears in the mutation command surface
+MUST name the per-package trust types as well as the tap-trust ones. Keeping a new store out of that
+surface by accident MUST NOT be relied on; a type this capability must never consult MUST be on that
+list.
+(Previously: the no-pre-launch-gate rule named only the tap's trust state, and the source-scanning
+absence that enforces it listed only the tap-trust type names — so once a per-package grant store
+existed, a pre-launch gate could be reintroduced through a store the rule never mentioned, and the
+guard would not fire.)
 
 #### Scenario: A stderr refusal on a failed mutation is the typed outcome
 
@@ -701,6 +724,31 @@ sees both grant kinds, so only brew decides.
 - WHEN a mutation is requested for it
 - THEN it is built and submitted normally
 - AND no affordance was disabled and no request was refused on the basis of tap trust state
+- Verification: `unit`
+
+#### Scenario: A per-package grant state never pre-blocks a mutation
+
+- GIVEN the same package with its per-package state in turn `granted`, `noGrantRecorded` and `unreported`, and separately a machine whose per-package report failed to load
+- WHEN a mutation is requested in each case
+- THEN it is built and submitted normally in every case
+- AND no affordance was disabled, no request was refused, and no warning was attached on the basis of per-package grant state
+- Verification: `unit`
+
+#### Scenario: The source-scanning absence names the per-package trust types
+
+- GIVEN the shipped assertion that scans the mutation command surface for trust type names
+- WHEN the names it scans for are enumerated
+- THEN every per-package trust wire, store and projection type name is covered by them — whether as a full name or as a shared prefix — alongside the tap-trust names already listed
+- AND introducing any of those names into that surface makes the assertion fail
+- Verification: `unit`
+
+#### Scenario: The per-package read is not a command on the mutation spine
+
+- GIVEN the per-package trust read and every command family on the shared mutation spine
+- WHEN the spine's families are enumerated and the read is submitted
+- THEN the read is not one of those families, enqueues nothing, and produces no activity item
+- AND it declares no invalidation domain of its own, and no new invalidation domain value exists for the spine to declare
+- AND the spine's qualified-token enumeration covers exactly the families it covered before
 - Verification: `unit`
 
 #### Scenario: The formula refusal wording is captured before the classifier claims it
@@ -960,4 +1008,49 @@ sees both grant kinds, so only brew decides.
     `m7-tap-trust` is the first change to annotate these scenarios with an inline `- Verification:`
     line; untouched requirements deliberately keep none, and that asymmetry is recorded rather than
     "fixed".
+  - The archived delta spec is the verbatim audit trail.
+- **Amended by change `m9-per-package-trust`** (archived `2026-08-24` —
+  `openspec/changes/archive/2026-08-24-m9-per-package-trust/`), **1 MODIFIED, 0 added, 0 removed, 0
+  renamed** — **10 req / 60 sc → 10 req / 63 sc**. PM10 was replaced as a whole block: **11 scenarios**
+  replace the 8 it carried. The replacement is a **strict superset** — verified at archive by diffing
+  the replaced range against a pre-merge copy: **zero non-blank lines deleted**, and all eight shipped
+  scenarios survive byte-identical. `rules.archive`'s destructive-delta warning did not fire, and
+  **PM1–PM9 are byte-identical** to their prior text. Delivered in PR **#73**, merged `2026-08-24` at
+  `ddb9661`.
+  - **The argv prohibition was reaffirmed, not relaxed — and that is the load-bearing part.** The change
+    adds a per-package trust **read** and no per-package trust **command**. `MutationCommand.swift` is a
+    binding **0-line diff** across the whole change, and the shipped assertion proving the absence,
+    `MutationCommandTests · noPackagePositionEverCarriesAQualifiedToken`, is **byte-identical**
+    (`sha256:1561832f…` over the block on both `main` and the merged branch). PM10 now states
+    explicitly that a capability which *reads* per-package grants must not weaken it, and that the
+    read — compile-time-constant argv `trust --json v1`, carrying no package identity — **is not a
+    command on the shared mutation spine** and must not be added to the spine's argv enumeration.
+  - **The gap this closed was a real one, not a tidy-up.** The no-pre-launch-gate rule named only the
+    *tap's* trust state, and the source-scanning absence that enforces it listed only the tap-trust type
+    names. Once a per-package grant store existed, a pre-launch gate could have been reintroduced
+    through a store the rule never mentioned, and the guard would not have fired. PM10 now forbids
+    gating on per-package grant state on the same terms, with the reasoning stated: `noGrantRecorded` is
+    not a prediction of refusal — a package under a trusted tap needs no individual grant — and
+    `unreported` is not evidence of anything at all.
+  - **The C1 source-scanning ban list is the change's one deliberate edit to a shipped guard.** It gained
+    the single prefix token `"TrustGrant"` (covering all five new type names) plus `"grantsIndividually"`
+    — design **DD-11**. One prefix is stronger and shorter than five entries. C2 was deliberately **not**
+    widened to cover the read: it enumerates `BrewMutating` conformers, and the read is a
+    `BrewCommand.read`, so widening C2 would have changed its meaning. The read spine got its own
+    additive absence test instead. `MutationCommandTests.swift`'s whole diff is **one hunk**.
+  - **`MutationName.isSafe` was not narrowed**, on exactly the `m7-tap-trust` reasoning: `TapName.init?`
+    is expressed over the same gate and a tap name *is* `owner/repo`, so narrowing it would make every
+    `TapName` unconstructible. The prohibition stays an absence assertion over the whole argv surface.
+  - **What this deferred, and what gates it**: per-package grant/revoke controls remain out of scope
+    until the `brew untrust --formula|--cask <qualified>` probe answers whether the revocation **itself**
+    registers a grant through `explicitly_allowed?` before removing it. The `m9` measurement that
+    `brew untrust <tap>` **cascades** to per-package grants (Engram `#7775`) says nothing about the
+    qualified form, and makes assuming it safe more tempting rather than less.
+  - **PM10's two `manual-evidence` scenarios were not re-executed.** Both were captured in
+    `m7-tap-trust` Phase 9 and survive byte-identical here; the `m9` ME2 transcript additionally
+    re-observed the typed-refusal path live (a `brew untap jnsahaj/lumen` refusal surfaced as exactly
+    one failed activity item, corroborating the `m7` D4 narrowing on a real refusal).
+  - **PM10's rolling `(Previously:)` annotation was replaced, not lost**, per this spec's
+    one-rolling-note-per-block convention. PM10 carried none before this change; it now carries the note
+    about the tap-only gate rule, recorded above.
   - The archived delta spec is the verbatim audit trail.
