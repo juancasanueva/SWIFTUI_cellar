@@ -217,52 +217,225 @@ struct TapPackageSearchTests {
         #expect(declared == ["excludeDeprecated", "excludeDisabled", "kinds"])
     }
 
-    // MARK: - ps6 — an empty query composes no tap source
+    // MARK: - ps6 — an empty query lists everything the installed taps publish
 
-    @Test("An empty or whitespace-only query composes no tap source")
-    func theSectionIsAbsentForAnEmptyOrWhitespaceQuery() {
-        let taps = [TapSearchFixture.acmeForty]
-        #expect(TapSearchFixture.acmeForty.formulaNames.count == 40)
+    /// The rule inverted by the 2026-08-25 scope change (DD-16).
+    ///
+    /// The surface is reachable from the sidebar with no query typed, so an
+    /// empty query is the *default listing* rather than an absence — exactly as
+    /// `PackageSearchIndex.defaultOrder(filters:limit:)` answers an empty
+    /// catalog query with the whole filtered catalog at `.exactToken`.
+    @Test("An empty query lists everything the installed taps publish")
+    func anEmptyQueryListsEveryTapPackage() {
+        let taps = TapSearchFixture.fortyAcrossTwoTaps
+        #expect(TapSearchFixture.acmeTwentyFive.formulaNames.count == 25)
+        #expect(TapSearchFixture.bravoFifteen.caskTokens.count == 15)
 
         for query in ["", "   ", "\t\n"] {
-            #expect(hits(taps, query).isEmpty, "query \(query.debugDescription) composed a source")
+            let found = hits(taps, query)
             #expect(
-                TapPackageSearch.isSectionVisible(
-                    query: query,
-                    outdatedOnly: false,
-                    tapState: .loaded
-                ) == false
+                found.map(\.displayName) == TapSearchFixture.fortyInOrder,
+                "query \(query.debugDescription) did not list the forty in order"
             )
+            #expect(found.allSatisfy { $0.rank == .exactToken })
+            #expect(Set(found.map(\.id)).count == 40)
         }
-        // Triangulated: a real query over the same forty packages does compose.
-        #expect(hits(taps, "pkg1").isEmpty == false)
+
+        // Official taps stay excluded: the empty query lists what the *third
+        // party* taps publish, not what brew ships.
+        let withOfficial = taps + [TapSearchFixture.officialCore, TapSearchFixture.officialCask]
+        #expect(hits(withOfficial, "").map(\.displayName) == TapSearchFixture.fortyInOrder)
+
+        // …and the declared filters still restrict the listing.
+        let casksOnly = hits(taps, "", kinds: [.cask])
+        #expect(casksOnly.count == 15)
+        #expect(casksOnly.allSatisfy { $0.id.kind == .cask })
+
+        let installed = InstalledInventory(packages: [
+            InstalledFixture.receipt(.formula, "pkg7", tap: "acme/tools")
+        ])
+        let subtracted = hits(taps, "", installed: installed, hideInstalled: true)
+        #expect(subtracted.count == 39)
+        #expect(subtracted.contains { $0.displayName == "pkg7" } == false)
+
+        // Triangulated against a real query over the same inventory: a needle
+        // that matches six of the forty still returns exactly those six, the
+        // exact token ahead of the five it prefixes.
         #expect(
-            TapPackageSearch.isSectionVisible(query: "pkg1", outdatedOnly: false, tapState: .loaded)
+            hits(taps, "tok1").map(\.displayName)
+                == ["tok1", "tok10", "tok11", "tok12", "tok13", "tok14"]
         )
     }
 
-    // MARK: - ps7 — an unavailable tap inventory is an absence, not an error
+    @Test("The default listing order is the search order")
+    func theDefaultListingOrderMatchesTheSearchOrder() {
+        let taps = [TapSearchFixture.acmeTooling, TapSearchFixture.bravoTooling]
 
-    @Test("An absent or failed tap state hides the section without an error")
-    func absentOrFailedTapStateHidesTheSectionWithoutAnError() {
+        let listed = hits(taps, "")
+        let searched = hits(taps, "tool")
+
+        #expect(listed.count == 4)
+        #expect(listed.map(\.id) == searched.map(\.id))
+        #expect(
+            listed.map(\.displayName)
+                == ["tool-alpha", "tool-beta", "tool-charlie", "tool-delta"]
+        )
+        // Non-vacuous: the query really does class all four the same way, so
+        // the sequences match on the remaining keys rather than by accident of
+        // a rank tiebreak.
+        #expect(Set(searched.map(\.rank)) == [.exactToken])
+        #expect(Set(listed.map(\.rank)) == [.exactToken])
+    }
+
+    // MARK: - ps7 — an unavailable or empty inventory is an ordinary empty state
+
+    private func presentation(
+        _ tapState: TapLoadState,
+        _ taps: [TapRecord],
+        query: String,
+        hitCount: Int
+    ) -> TapSearchPresentation {
+        TapPackageSearch.presentation(
+            tapState: tapState,
+            inventory: TapSearchFixture.inventory(taps),
+            query: query,
+            hitCount: hitCount
+        )
+    }
+
+    @Test("The presentation distinguishes every empty reason")
+    func thePresentationDistinguishesEveryEmptyReason() {
+        let absence = InstalledAbsence.notInstalled(.standard)
+        let published = [TapSearchFixture.acmeWidgets]
+
+        let unavailable = presentation(.brewAbsent(absence), [], query: "", hitCount: 0)
+        let failed = presentation(
+            .failed(.commandFailed(status: 1, message: "boom")),
+            [],
+            query: "",
+            hitCount: 0
+        )
+        let noTaps = presentation(.loaded, [], query: "", hitCount: 0)
+        let noMatch = presentation(.loaded, published, query: "sprocket", hitCount: 0)
+        let content = presentation(.loaded, published, query: "widget", hitCount: 3)
+
+        #expect(unavailable == .unavailable(absence))
+        #expect(failed == .failed(.commandFailed(status: 1, message: "boom")))
+        #expect(noTaps == .noTaps)
+        #expect(noMatch == .noMatch(query: "sprocket"))
+        #expect(content == .content)
+        // Five values, and five *distinct* values: an absence is never folded
+        // into a neighbour and never reported as an error.
+        let every: [TapSearchPresentation] = [unavailable, failed, noTaps, noMatch, content]
+        for (leftIndex, left) in every.enumerated() {
+            for (rightIndex, right) in every.enumerated() where leftIndex != rightIndex {
+                #expect(left != right, "\(left) and \(right) are one value, not two")
+            }
+        }
+
+        // A loaded inventory carrying only official taps publishes nothing a
+        // third party owns, so it is the same "nothing yet" as no taps at all.
+        #expect(
+            presentation(
+                .loaded,
+                [TapSearchFixture.officialCore, TapSearchFixture.officialCask],
+                query: "",
+                hitCount: 0
+            ) == .noTaps
+        )
+        // …and so is a third-party tap that publishes nothing: the empty query
+        // lists everything, so zero hits with no needle is an empty shelf, not
+        // a failed search.
+        #expect(
+            presentation(.loaded, [TapSearchFixture.tap("acme/tools")], query: "", hitCount: 0)
+                == .noTaps
+        )
+    }
+
+    @Test("The presentation keeps stale content while a refresh is in flight")
+    func thePresentationKeepsStaleContentWhileRefreshing() {
+        let published = [TapSearchFixture.acmeWidgets]
+
+        // Inherited, not re-derived: `TapProjection.state(…)` is what decides
+        // that a resident inventory survives a refresh, and this folds the hit
+        // count on top of that answer rather than reading `TapLoadState` again.
+        #expect(
+            TapProjection.state(loadState: .loading, inventory: TapSearchFixture.inventory(published))
+                == .loading(hasLastGood: true)
+        )
+        #expect(presentation(.loading, published, query: "widget", hitCount: 3) == .content)
+        #expect(presentation(.loading, published, query: "", hitCount: 3) == .content)
+        // With nothing resident there is nothing stale to keep, so the refresh
+        // is the whole answer.
+        #expect(presentation(.loading, [], query: "widget", hitCount: 0) == .loading)
+        #expect(presentation(.idle, [], query: "widget", hitCount: 0) == .loading)
+
+        // The same inheritance on the failure path: a refresh that fails over a
+        // resident inventory still has rows to show, and claiming otherwise
+        // would be the false statement "no packages from your taps".
+        #expect(
+            presentation(.failed(.malformedJSON), published, query: "widget", hitCount: 3)
+                == .content
+        )
+        #expect(
+            presentation(.failed(.malformedJSON), [], query: "widget", hitCount: 0)
+                == .failed(.malformedJSON)
+        )
+    }
+
+    @Test("Each empty state carries its pinned sentence byte for byte")
+    func theEmptyStateCopyIsExact() throws {
+        let absence = InstalledAbsence.notInstalled(.standard)
+
+        #expect(
+            TapSearchPresentation.unavailable(absence).emptyStateCopy
+                == "No packages from your taps."
+        )
+        #expect(
+            TapSearchPresentation.failed(.malformedJSON).emptyStateCopy
+                == "No packages from your taps."
+        )
+        #expect(TapSearchPresentation.noTaps.emptyStateCopy == "Your taps publish nothing yet.")
+        // Distinct sentences for distinct facts: an unavailable inventory and
+        // an empty one are not presented as the same thing.
+        #expect(
+            TapSearchPresentation.unavailable(absence).emptyStateCopy
+                != TapSearchPresentation.noTaps.emptyStateCopy
+        )
+        for pinned in [
+            TapSearchPresentation.unavailable(absence),
+            .failed(.malformedJSON),
+            .noTaps
+        ] {
+            let copy = try #require(pinned.emptyStateCopy)
+            #expect(copy.isEmpty == false)
+        }
+        // The three states with nothing pinned: a no-match reuses the ordinary
+        // search empty state the catalog surface already owns, and neither a
+        // refresh nor a filled list has an empty state at all.
+        #expect(TapSearchPresentation.noMatch(query: "sprocket").emptyStateCopy == nil)
+        #expect(TapSearchPresentation.loading.emptyStateCopy == nil)
+        #expect(TapSearchPresentation.content.emptyStateCopy == nil)
+    }
+
+    @Test("An unavailable inventory is an empty state and never an error")
+    func anUnavailableInventoryIsAnEmptyStateNotAnError() {
         for state in [TapSearchFixture.brewAbsent, TapSearchFixture.refreshFailed] {
-            #expect(
-                TapPackageSearch.isSectionVisible(
-                    query: "widget",
-                    outdatedOnly: false,
-                    tapState: state
-                ) == false
-            )
-        }
-        for state in [TapLoadState.idle, .loading, .loaded] {
-            #expect(
-                TapPackageSearch.isSectionVisible(
-                    query: "widget",
-                    outdatedOnly: false,
-                    tapState: state
+            let shown = presentation(state, [], query: "", hitCount: 0)
+            #expect(shown.emptyStateCopy == "No packages from your taps.")
+            // Nothing about it is a failure the surface must report: no error
+            // banner, no retry demand, no failure copy.
+            for word in ["error", "failed", "retry", "try again", "went wrong"] {
+                #expect(
+                    shown.emptyStateCopy?.lowercased().contains(word) != true,
+                    "the empty state reports \(word)"
                 )
-            )
+            }
         }
+        // Composing over an unavailable inventory throws nothing and yields the
+        // ordinary empty result.
+        #expect(hits([], "").isEmpty)
+        #expect(hits([], "widget").isEmpty)
 
         // …and the catalog answers the same query identically either way: brew's
         // absence never reaches a catalog result (II7).
@@ -273,6 +446,38 @@ struct TapPackageSearchTests {
         let withoutTaps = index.search("widget")
         _ = hits([TapSearchFixture.acmeWidgets], "widget")
         #expect(index.search("widget") == withoutTaps)
+    }
+
+    // MARK: - DD-17 — the count behind the prompt and the shell's label
+
+    @Test("The package count counts third-party taps only")
+    func thePackageCountCountsThirdPartyTapsOnly() {
+        let taps = TapSearchFixture.fortyAcrossTwoTaps
+        let inventory = TapSearchFixture.inventory(taps)
+
+        #expect(TapPackageSearch.packageCount(inventory: inventory) == 40)
+        // The count is the listing's own size, by construction rather than by
+        // coincidence: it equals what an empty query under default filters
+        // returns.
+        #expect(TapPackageSearch.packageCount(inventory: inventory) == hits(taps, "").count)
+
+        // Official taps are excluded from both, so the two stay equal when one
+        // is added.
+        let withOfficial = TapSearchFixture.inventory(
+            taps + [TapSearchFixture.officialCore, TapSearchFixture.officialCask]
+        )
+        #expect(TapPackageSearch.packageCount(inventory: withOfficial) == 40)
+        #expect(
+            TapPackageSearch.packageCount(inventory: withOfficial)
+                == hits(taps + [TapSearchFixture.officialCore, TapSearchFixture.officialCask], "").count
+        )
+        // Triangulated at the ends: nothing published is zero, not a placeholder.
+        #expect(TapPackageSearch.packageCount(inventory: .empty) == 0)
+        #expect(
+            TapPackageSearch.packageCount(
+                inventory: TapSearchFixture.inventory([TapSearchFixture.acmeWidgets])
+            ) == 3
+        )
     }
 
     // MARK: - ps8 — a catalog collision is reported and never suppressed
@@ -471,21 +676,42 @@ struct TapPackageSearchTests {
         #expect(subtracted.allSatisfy { $0.state == .notInstalled })
     }
 
-    @Test("The outdated chip hides the section whole rather than emptying it")
-    func theOutdatedChipHidesTheSection() {
-        for query in ["widget", "wid"] {
-            #expect(
-                TapPackageSearch.isSectionVisible(
-                    query: query,
-                    outdatedOnly: true,
-                    tapState: .loaded
-                ) == false
-            )
-        }
-        // The distinction that matters: the hits themselves are unchanged, so
-        // the section is *hidden* rather than emitting zero rows and reading as
-        // the false claim "your taps have nothing" (DD-6).
-        #expect(hits([TapSearchFixture.acmeWidgets], "widget").count == 3)
+    /// ps11's second clause, at the class the spec gives it.
+    ///
+    /// The design answers it only with a view scan, and a view scan cannot
+    /// discharge a `unit` scenario. The honest `unit` form is the projection's
+    /// own parameter surface: an outdated predicate is not *representable*
+    /// here, so no surface built on it can offer an inert Outdated control.
+    @Test("The tap source admits no outdated predicate at all")
+    func theTapSourceAdmitsNoOutdatedPredicate() throws {
+        let sources = try BrewClientSources.load()
+        BrewClientSources.assertAnchored(sources)
+        let file = try #require(
+            sources.first { $0.name == "TapPackageSearch.swift" },
+            "the scan found no TapPackageSearch.swift"
+        )
+
+        // The composition's parameter labels, enumerated off the declaration
+        // itself rather than asserted one at a time.
+        let start = try #require(file.code.range(of: "public func hits("))
+        let end = try #require(
+            file.code.range(of: ") -> [TapSearchHit]", range: start.upperBound..<file.code.endIndex)
+        )
+        let labels = file.code[start.upperBound..<end.lowerBound]
+            .split(separator: ",")
+            .compactMap { $0.split(separator: ":").first?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        #expect(labels == ["query", "kinds", "hideInstalled", "isInCatalog"])
+
+        // …and the two symbols an outdated control would have to travel through
+        // are absent from the file entirely: not merely unused, unrepresentable.
+        #expect(
+            file.code.contains("outdatedOnly") == false,
+            "the projection still admits an outdated predicate"
+        )
+        #expect(
+            file.code.contains("isSectionVisible") == false,
+            "the visibility Bool the outdated chip rode on is still declared"
+        )
     }
 
     // MARK: - ps12 — the combined keystroke turn stays under the ceiling
@@ -615,7 +841,8 @@ struct TapPackageSearchTests {
         // The whole input surface, positively anchored.
         #expect(file.code.contains("public init(inventory: TapInventory, installed: InstalledInventory)"))
         #expect(file.code.contains("isInCatalog: (PackageID) -> Bool"))
-        #expect(file.code.contains("public static func isSectionVisible("))
+        #expect(file.code.contains("public static func presentation("))
+        #expect(file.code.contains("public static func packageCount(inventory: TapInventory) -> Int"))
         // The predicate is a parameter, never a stored member: a stored closure
         // makes `Hashable` unrepresentable and would drag `Catalog` into the
         // type's own state (DD-1).

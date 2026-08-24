@@ -72,10 +72,37 @@ enum TapSearchFixture {
     static let officialCore = tap("homebrew/core", formulae: ["wget"])
     static let officialCask = tap("homebrew/cask", casks: ["visual-studio-code"])
 
-    /// One tap publishing forty packages, for the empty-query rows.
-    static let acmeForty = tap(
+    /// Two taps publishing forty packages between them, for the empty-query
+    /// listing rows: twenty-five formulae from one and fifteen casks from the
+    /// other, so the default listing crosses both taps and both kinds.
+    static let acmeTwentyFive = tap(
         "acme/tools",
-        formulae: (0..<40).map { "acme/tools/pkg\($0)" }
+        formulae: (0..<25).map { "acme/tools/pkg\($0)" }
+    )
+    static let bravoFifteen = tap(
+        "bravo/tools",
+        casks: (0..<15).map { "bravo/tools/tok\($0)" }
+    )
+    static let fortyAcrossTwoTaps = [acmeTwentyFive, bravoFifteen]
+
+    /// The forty bare tokens in the order DD-5 puts them in — every `pkg`
+    /// before every `tok`, each group ascending — written out rather than
+    /// re-derived from the rule under test.
+    static let fortyInOrder =
+        (0..<25).map { "pkg\($0)" }.sorted() + (0..<15).map { "tok\($0)" }.sorted()
+
+    /// Four packages across two taps whose bare tokens all carry `tool` as a
+    /// whole normalised token, so one query classes all four identically. The
+    /// fixture that makes "the default listing order is the search order"
+    /// observable: with ranks equal, only the remaining keys can order them.
+    static let acmeTooling = tap(
+        "acme/tools",
+        formulae: ["acme/tools/tool-alpha", "acme/tools/tool-delta"]
+    )
+    static let bravoTooling = tap(
+        "bravo/tools",
+        formulae: ["bravo/tools/tool-beta"],
+        casks: ["bravo/tools/tool-charlie"]
     )
 
     // MARK: - The three install states

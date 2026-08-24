@@ -77,6 +77,48 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     }
 }
 
+/// Why the tap search surface shows what it shows (PS8, DD-6).
+///
+/// The surface it answers for is **always reachable from the sidebar**, so it
+/// can never hide the way a section could: it has to *say why* it is empty, and
+/// there are four distinct reasons. Folded from the shipped
+/// `TapProjection.state(loadState:inventory:)`, which already distinguishes the
+/// first three — including the rule that keeps a resident inventory visible
+/// while a refresh is in flight. Only `.noMatch` is new here, because only it
+/// depends on the hit count.
+public enum TapSearchPresentation: Sendable, Equatable {
+    /// Nothing resident yet and a read in flight.
+    case loading
+    /// Brew is absent. An **absence**, never an error (PS8).
+    case unavailable(InstalledAbsence)
+    /// The refresh failed with nothing good to fall back on. Still an ordinary
+    /// empty state: the surface reports no banner and demands no retry.
+    case failed(TapInventoryError)
+    /// Available, and no installed third-party tap publishes anything.
+    case noTaps
+    /// A query that matched nothing. Deliberately carries the query, because
+    /// the empty state the catalog surface already owns is worded around it.
+    case noMatch(query: String)
+    case content
+
+    /// The pinned sentence for this state, or `nil` where none is pinned.
+    ///
+    /// The whole point of the projection owning it: a `unit` test can reach
+    /// these bytes, and a second presenting surface cannot word the same fact
+    /// differently (DD-17). `.noMatch` reuses the ordinary search empty state
+    /// the catalog query surface already renders, so no copy is pinned for it.
+    public var emptyStateCopy: String? {
+        switch self {
+        case .unavailable, .failed: Self.unavailableCopy
+        case .noTaps: Self.noTapsCopy
+        case .loading, .noMatch, .content: nil
+        }
+    }
+
+    private static let unavailableCopy = "No packages from your taps."
+    private static let noTapsCopy = "Your taps publish nothing yet."
+}
+
 /// Packages published by installed third-party taps, composed **above** the
 /// search index and never pushed into it (PS8, `package-detail` PD6, TM5).
 ///
@@ -111,6 +153,13 @@ public struct TapPackageSearch: Sendable {
 
     /// The matching hits, ordered by `(rank, bare token, kind, tap name)`.
     ///
+    /// An **empty or whitespace-only query lists every published package** at
+    /// `.exactToken`, so the order falls entirely to the remaining three keys —
+    /// exactly as `PackageSearchIndex.defaultOrder(filters:limit:)` answers an
+    /// empty catalog query with the whole filtered catalog. One rule orders the
+    /// default listing and the search results, so a later reader has one order
+    /// to keep in step rather than two (DD-16).
+    ///
     /// `isInCatalog` is a **parameter, never a stored property**: storing the
     /// closure would make `Hashable` unrepresentable on the hit and would draw
     /// `Catalog` into this type's own state. It answers the collision fact
@@ -122,7 +171,6 @@ public struct TapPackageSearch: Sendable {
         isInCatalog: (PackageID) -> Bool
     ) -> [TapSearchHit] {
         let needle = PackageText.normalize(query)
-        guard needle.isEmpty == false else { return [] }
 
         var matches: [Match] = []
         for tap in TapProjection(inventory: inventory).thirdPartyTaps {
@@ -173,26 +221,53 @@ public struct TapPackageSearch: Sendable {
         }
     }
 
-    /// The four absence rules, in one pure place (DD-6).
+    /// Why the surface shows what it shows (DD-6).
     ///
-    /// `outdatedOnly` reaches **this** function and never `hits(_:)`: a tap hit
-    /// carries no version, so filtering by outdatedness would emit zero hits and
-    /// read as the false claim "your taps have nothing" rather than as "this
-    /// chip does not apply here". An unavailable inventory is an **absence**,
-    /// never an error and never a banner.
-    public static func isSectionVisible(
+    /// Built by **switching over the shipped `TapProjection.state(…)`** and
+    /// folding the hit count on top. Nothing here re-reads `TapLoadState`: that
+    /// projection already answers absence, failure, emptiness and the
+    /// last-good rule, and a second opinion on a question one projection
+    /// already answers is exactly the drift PT5's one-projection rule forbids.
+    public static func presentation(
+        tapState: TapLoadState,
+        inventory: TapInventory,
         query: String,
-        outdatedOnly: Bool,
-        tapState: TapLoadState
-    ) -> Bool {
-        guard outdatedOnly == false else { return false }
-        // Emptiness is judged on the **normalised** query, so a whitespace-only
-        // query behaves exactly as an empty one does.
-        guard PackageText.normalize(query).isEmpty == false else { return false }
-        switch tapState {
-        case .idle, .loading, .loaded: return true
-        case .brewAbsent, .failed: return false
+        hitCount: Int
+    ) -> TapSearchPresentation {
+        /// The half that depends on the hits rather than on the load state.
+        ///
+        /// With no needle the surface lists everything, so zero hits means
+        /// nothing is published rather than nothing matched (DD-16).
+        func resolved() -> TapSearchPresentation {
+            if hitCount > 0 { return .content }
+            return PackageText.normalize(query).isEmpty ? .noTaps : .noMatch(query: query)
         }
+
+        switch TapProjection.state(loadState: tapState, inventory: inventory) {
+        case .idle:
+            return .loading
+        case .loading(let hasLastGood):
+            return hasLastGood ? resolved() : .loading
+        case .unavailable(let absence):
+            return .unavailable(absence)
+        // A failed refresh over a resident inventory still has rows to show,
+        // and "No packages from your taps." would be false while they are on
+        // screen. The last-good rule is inherited, not re-litigated.
+        case .error(let error, let hasLastGood):
+            return hasLastGood ? resolved() : .failed(error)
+        case .content(let isThirdPartyEmpty):
+            return isThirdPartyEmpty ? .noTaps : resolved()
+        }
+    }
+
+    /// The number behind the surface's prompt and the shell's count label.
+    ///
+    /// Third-party taps only — the same set `hits(_:)` draws from, so the count
+    /// and the default listing can never disagree. A view-side sum would be the
+    /// same claim in a place no `unit` test can reach (DD-17).
+    public static func packageCount(inventory: TapInventory) -> Int {
+        TapProjection(inventory: inventory).thirdPartyTaps
+            .reduce(0) { $0 + $1.formulaNames.count + $1.caskTokens.count }
     }
 
     // MARK: - Matching
@@ -222,6 +297,10 @@ public struct TapPackageSearch: Sendable {
     }
 
     private static func rank(of haystack: [UInt8], needle: [UInt8]) -> TapMatchRank? {
+        // The default listing: an empty needle is carried by every name, at the
+        // strongest class, so the ladder stays uniform and DD-5's remaining
+        // three keys do the whole ordering (DD-16).
+        if needle.isEmpty { return .exactToken }
         if haystack == needle || hasToken(haystack, needle) { return .exactToken }
         if hasPrefix(haystack, needle) || hasTokenPrefix(haystack, needle) { return .namePrefix }
         return contains(haystack, needle) ? .nameSubstring : nil
