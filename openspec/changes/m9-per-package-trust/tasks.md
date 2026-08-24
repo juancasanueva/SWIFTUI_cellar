@@ -383,54 +383,54 @@ and `… -only-testing:cellarUITests/PerPackageTrustUITests`.
 `TapShippingProofTests` lives in `Packages/CellarCore/Tests/BrewClientTests/`, so it runs under
 `swift test`, **not** `xcodebuild`.
 
-- [ ] 6.1 **RED.** `TapShippingProofTests · noNewControlSubmitsAnythingAndTheSurfaceIsDisplayOnly`:
+- [x] 6.1 **RED.** `TapShippingProofTests · noNewControlSubmitsAnythingAndTheSurfaceIsDisplayOnly`:
       `TapManagementAction.allCases` and the pinned `staticButtonLabels` set are **unchanged** (this
       change adds **no action** — TM11 needs no delta); `Button {` is still absent; invoking every new
       surface spawns nothing; every interactive element the per-package surface offers is a navigation,
       filter, copy or refresh affordance and **none** grants, revokes, installs, upgrades or removes
       anything; the enumeration is asserted **non-vacuous**. *(PT7.1, PT7.3, D-f)*
-- [ ] 6.2 **RED.** `TapShippingProofTests · everyPerPackageStringIsPositiveAndNeverAVerdict`: every
+- [x] 6.2 **RED.** `TapShippingProofTests · everyPerPackageStringIsPositiveAndNeverAVerdict`: every
       string the new surfaces present states a grant Homebrew records or is an accounting of one; none
       is a verdict, ranking or recommendation; nothing inspects, scores or recommends for or against a
       package or a grant. *(PT6.1, PT6.4, TM11.2, R3)*
-- [ ] 6.3 **RED.** New file `cellarTests/PerPackageTrustCompositionTests.swift` ·
+- [x] 6.3 **RED.** New file `cellarTests/PerPackageTrustCompositionTests.swift` ·
       `rowHeaderAndRowsReadOneProjection`: the tap list row, the tap detail header **and** the tap
       detail package rows all call `TapProjection.grants(for:in:)`; none computes a count or a marker
       locally; `PackageDetailView` calls `grantsIndividually`. `cellarTests/` is a
       `PBXFileSystemSynchronizedRootGroup`, so the new file needs **no** `project.pbxproj` edit.
       *(PT5.1, DD-6, DD-10)*
-- [ ] 6.4 **RED.** `PerPackageTrustCompositionTests · theMarkerIsAdditiveOnThePackageRow`: a `granted`
+- [x] 6.4 **RED.** `PerPackageTrustCompositionTests · theMarkerIsAdditiveOnThePackageRow`: a `granted`
       **installed** row and a `granted` **withheld-tap** row each carry the exact marker copy
       **“Trusted individually”** *and* each still carries its own unchanged TM1 install-state copy and
       its **Show in Installed** handoff — the marker replaces, suppresses and rewords nothing.
       *(PT5.4, TM1 preserved)*
-- [ ] 6.5 **RED.** New file `cellarUITests/PerPackageTrustUITests.swift` (XCUITest, not Swift Testing) ·
+- [x] 6.5 **RED.** New file `cellarUITests/PerPackageTrustUITests.swift` (XCUITest, not Swift Testing) ·
       `theCountLineAndSectionAppearOnlyWhenReported`: the count line is present for `.granted` and
       absent for both `.noGrants` and `.unreported`; the “Other trusted packages” section renders its
       three distinct states; the **“Untrusted”** badge text is byte-unchanged in every case. *(TM12.7)*
-- [ ] 6.6 **Prove RED** across all three runners, then **GREEN**: `cellar/cellarApp.swift` — construct
+- [x] 6.6 **Prove RED** across all three runners, then **GREEN**: `cellar/cellarApp.swift` — construct
       `TrustGrantStore(source:)` (plus `AppTestTrustGrantPayloadSource` under the UI-test flag, mirroring
       the shipped tap idiom), pass it to `TapRefreshCoordinator(grants:)` and to `ContentView`.
-- [ ] 6.7 **GREEN.** `cellar/ContentView.swift` — thread the store to `TapsListView`, `TapDetailView`
+- [x] 6.7 **GREEN.** `cellar/ContentView.swift` — thread the store to `TapsListView`, `TapDetailView`
       and `PackageDetailView`. `PackageDetailView` takes `let trustGrants: TrustGrantStore` (**DD-10** —
       an `@Observable` reference, not a closure and not a pre-computed `Bool`, so the marker updates on
       refresh); update both construction sites, including `#Preview`.
-- [ ] 6.8 **GREEN.** `cellar/Taps/TapsListView.swift:52` — the count line as an **added `·` component**
+- [x] 6.8 **GREEN.** `cellar/Taps/TapsListView.swift:52` — the count line as an **added `·` component**
       beside the existing `packageSummary`, never replacing it; plus the “Other trusted packages”
       section rendering `TrustGrantSection`'s four cases (B1: `.noneRecorded` renders its own exact
       sentence — it does **not** render nothing).
-- [ ] 6.9 **GREEN.** `cellar/Taps/TapDetailView.swift` :57-65 (header meta component) and :149-180
+- [x] 6.9 **GREEN.** `cellar/Taps/TapDetailView.swift` :57-65 (header meta component) and :149-180
       (the `"Trusted individually"` marker on package rows), both from the one projection value.
       `cellar/Browse/PackageDetailView.swift:557` — the marker beside the existing `fact("Tap", …)`.
-- [ ] 6.10 All three runners green; commit WU6
+- [x] 6.10 All three runners green; commit WU6
       (`feat(taps): show individual grants on the tap row, the detail and package detail`).
 
 ## Phase 7: WU7 — the doc-only sweep
 
-- [ ] 7.1 `README.md` :44-47 — the qualified-token sweep. **Doc-only**: it writes no spec delta,
+- [x] 7.1 `README.md` :44-47 — the qualified-token sweep. **Doc-only**: it writes no spec delta,
       `release-distribution` D-2's canonical three-line install is **untouched**, and no requirement in
       that capability is added, modified, removed or renamed.
-- [ ] 7.2 Confirm the sweep changed nothing executable: `git diff main -- README.md` shows prose only,
+- [x] 7.2 Confirm the sweep changed nothing executable: `git diff main -- README.md` shows prose only,
       and the three-line install block is byte-identical. Commit WU7
       (`docs(readme): describe qualified tokens without implying Cellar grants trust`).
 
