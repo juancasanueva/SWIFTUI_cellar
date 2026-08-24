@@ -323,22 +323,22 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
 > `cellar/` and `cellarTests/` are `PBXFileSystemSynchronizedRootGroup`s (`project.pbxproj` :46, :51),
 > so both new files join their targets with a **0-line `project.pbxproj` diff**.
 
-- [ ] 5.1 **RED.** New file `cellarTests/TapSearchCompositionTests.swift` ·
+- [x] 5.1 **RED.** New file `cellarTests/TapSearchCompositionTests.swift` ·
       `browseComposesTheTapSectionFromTheResidentStore`: `BrowseView.swift` contains a `taps` store
       property and builds `TapPackageSearch(` from it; `ContentView.swift` passes `taps: taps` at the
       `BrowseView(…)` call site (`:307-315`). **RED because** neither exists yet. *(ps13)*
-- [ ] 5.2 **RED.** `theTapSectionIsTitledAndPositionedLast`: `TapSearchSection.swift` contains the
+- [x] 5.2 **RED.** `theTapSectionIsTitledAndPositionedLast`: `TapSearchSection.swift` contains the
       section title **byte-exact** — `From your taps` — and `BrowseView.swift` places that section
       **after** the catalog `ForEach` inside a single `List(selection:)`. *(ps13)*
-- [ ] 5.3 **RED.** `notInstalledTapRowsAreNotSelectable`: rows are tagged with `hit.routableID`, so a
+- [x] 5.3 **RED.** `notInstalledTapRowsAreNotSelectable`: rows are tagged with `hit.routableID`, so a
       `nil` routable id yields no selectable tag; the not-installed and ambiguous cases are the same
       code path. *(ps13, ps14, DD-4)*
-- [ ] 5.4 **RED.** `theSurfaceCopyLivesInTheProjectionNotTheView`: the four pinned strings —
+- [x] 5.4 **RED.** `theSurfaceCopyLivesInTheProjectionNotTheView`: the four pinned strings —
       `Also in the catalog. Homebrew installs the catalog package.`, `Installed.`,
       `Installed. Homebrew withholds its tap while this tap is untrusted.`, `Not installed.` — are
       present in `TapPackageSearch.swift` and **absent** from `TapSearchSection.swift`, which renders
       `hit.stateCopy` and `hit.collisionNote` instead. *(ps15, PS8's copy-ownership clause)*
-- [ ] 5.5 **RED.** `theBrowseTapSurfaceComposesNoTrustGateAndNoBadge`: scanning **both**
+- [x] 5.5 **RED.** `theBrowseTapSurfaceComposesNoTrustGateAndNoBadge`: scanning **both**
       `TapSearchSection.swift` and the `BrowseView.swift` tap surface finds no `TrustGrantStore`, no
       `TrustGrantState`, no `TapProjection.trust(`, no `TapCommand`, no `"Untrusted"` and no `"Trust`
       literal; the install affordance is offered for **every** hit whatever the origin tap's trust
@@ -346,20 +346,20 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
       `PackageEntry(installed: nil, catalog: nil, id: hit.mutationTarget)` — which renders exactly
       Install + Copy install command (`MutationMenu.swift:32-40`, via
       `InstalledFilterMode.swift:54`). *(ps15, PM10, TM12 gains no consumer)*
-- [ ] 5.6 **RED.** `theReceiptDetailIsReachedWithNoNewRoutingBranch`: `PackageDetailView.swift` has a
+- [x] 5.6 **RED.** `theReceiptDetailIsReachedWithNoNewRoutingBranch`: `PackageDetailView.swift` has a
       **zero-line diff** — no new branch, no tap import, no `TapSearchHit` reference — and selection
       stays `PackageID?`, so an unambiguous installed hit lands on the m10 receipt-backed detail through
       the **existing** resolution order. *(ps14, DD-4)*
-- [ ] 5.7 **RED.** `neitherTapSearchFileReachesTheProcessLayer`: scanning **both** new/modified Browse
+- [x] 5.7 **RED.** `neitherTapSearchFileReachesTheProcessLayer`: scanning **both** new/modified Browse
       files finds no brew-process reference, no `Process`, and no store refresh triggered by presenting
       the section; the composition takes only already-resident values, with no launcher dependency to
       inject. *(ps16)*
-- [ ] 5.8 **RED.** `theSearchPromptStillCountsCatalogRecordsOnly`: `PaneSearchField`'s prompt still reads
+- [x] 5.8 **RED.** `theSearchPromptStillCountsCatalogRecordsOnly`: `PaneSearchField`'s prompt still reads
       `Search \(catalog.packageCount.formatted()) packages…` — unchanged, tap hits uncounted
       (`BrowseView.swift:45-48`). And `theEmptyStateYieldsToTapHits`: the overlay condition becomes
       `rows.isEmpty && tapHits.isEmpty`, so a query matching only tap packages shows the section rather
       than `EmptyResults` (`:74-78`). *(ps13, PS8's prompt clause, R5)*
-- [ ] 5.9 **RED — DD-11a, the one edit to a shipped guard.** `cellarTests/PerPackageTrustCompositionTests.swift`:
+- [x] 5.9 **RED — DD-11a, the one edit to a shipped guard.** `cellarTests/PerPackageTrustCompositionTests.swift`:
       add `"cellar/Browse/BrowseView.swift"` and `"cellar/Browse/TapSearchSection.swift"` to
       `PerPackageTrustSources.views()` (`:186-201`) and extend the sorted-name anchor (`:31-32`) to
       `["BrowseView.swift", "PackageDetailView+Receipt.swift", "PackageDetailView.swift", "TapDetailView.swift", "TapSearchSection.swift", "TapsListView.swift"]`
@@ -367,19 +367,19 @@ Runner: `xcodebuild test -project cellar.xcodeproj -scheme cellar -destination '
       lines.** Both new files then inherit the shipped `for source in sources` guards (`:60-75`): no
       `"Trusted individually"`, no `trusted individually`, no locally derived section case. Do **not**
       add a private second scanner in the new test file. *(ps15, R3)*
-- [ ] 5.10 **Prove RED** (5.1–5.9 all fail, each for its stated reason), then **GREEN**: new file
+- [x] 5.10 **Prove RED** (5.1–5.9 all fail, each for its stated reason), then **GREEN**: new file
       `cellar/Browse/TapSearchSection.swift` — the row is name, `KindTag(kind:)`, tap of origin,
       `hit.stateCopy`, `hit.collisionNote`, and `MutationMenu` over the bare-target `PackageEntry`
       (**DD-9**). No copy literal of its own beyond the section title.
-- [ ] 5.11 **GREEN.** `cellar/Browse/BrowseView.swift` — the flat `List(rows, selection: $selection)`
+- [x] 5.11 **GREEN.** `cellar/Browse/BrowseView.swift` — the flat `List(rows, selection: $selection)`
       (`:59-78`) becomes `List(selection: $selection) { ForEach(rows) { … }; TapSearchSection(…) }`. The
       catalog rows move into a **bare `ForEach` with no header** (**DD-8**); the row builder, `.tag(entry.id)`
       and `.themedListSelection` move **byte-unchanged**. `tapHits` is built **synchronously in `body`** —
       no `Task`, no `.task {}`, no `await` (**DD-12**) — gated by `TapPackageSearch.isSectionVisible(…)`.
       **No `private` is relaxed anywhere** (**DD-10**, unlike m10's DD-9): `EmptyResults` stays private.
-- [ ] 5.12 **GREEN.** `cellar/ContentView.swift:307-315` — add **one** argument, `taps: taps`. Nothing
+- [x] 5.12 **GREEN.** `cellar/ContentView.swift:307-315` — add **one** argument, `taps: taps`. Nothing
       else in that file changes; the store is already wired.
-- [ ] 5.13 Runner green — the Phase 0 baseline **plus** the new composition cases, and
+- [x] 5.13 Runner green — the Phase 0 baseline **plus** the new composition cases, and
       `PerPackageTrustCompositionTests` **both** tests still green with only the 3-line edit. Commit WU4
       (`feat(browse): show packages published by your taps below the catalog results`).
 

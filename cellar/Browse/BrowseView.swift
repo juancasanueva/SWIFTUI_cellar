@@ -25,6 +25,10 @@ struct BrowseView: View {
     /// Read only for the per-row size metric — the same measurement Cleanup
     /// shows. Nothing here starts a scan.
     let diskUsage: DiskUsageStore
+    /// The tap inventory this Mac already has resident, from the refresh
+    /// `tap-management` performs. Read, never refreshed: composing the section
+    /// costs no brew invocation (package-search PS8).
+    let taps: TapStore
     /// The cask artwork pipeline; `nil` — a preview, say — keeps the letter
     /// tile for every row (see `PackageIconTile`).
     var assets: CaskBrowseAssets?
@@ -36,6 +40,9 @@ struct BrowseView: View {
 
     var body: some View {
         @Bindable var catalog = catalog
+        // Composed once per render and read three times below, rather than
+        // recomputed at each use.
+        let tapHits = self.tapHits
 
         VStack(spacing: 0) {
             SyncBanner(status: catalog.syncStatus, packageCount: catalog.packageCount) {
@@ -56,23 +63,38 @@ struct BrowseView: View {
             .padding(EdgeInsets(top: 11, leading: 13, bottom: 11, trailing: 13))
             HairlineDivider()
 
-            List(rows, selection: $selection) { entry in
-                HStack(spacing: 6) {
-                    PackageRow(
-                        entry: entry,
-                        sizeOnDisk: sizesOnDisk[entry.id],
-                        assets: assets,
-                        iconLoader: iconLoader
-                    )
-                    Spacer(minLength: 0)
-                    MutationMenu(center: operations, entry: entry)
+            // One list, two sources. The catalog rows keep a bare `ForEach`
+            // with no header of their own — a "Catalog" heading is a visual
+            // change nobody asked for — and the tap section is composed after
+            // them rather than interleaved into their ranked order.
+            List(selection: $selection) {
+                ForEach(rows) { entry in
+                    HStack(spacing: 6) {
+                        PackageRow(
+                            entry: entry,
+                            sizeOnDisk: sizesOnDisk[entry.id],
+                            assets: assets,
+                            iconLoader: iconLoader
+                        )
+                        Spacer(minLength: 0)
+                        MutationMenu(center: operations, entry: entry)
+                    }
+                    .tag(entry.id)
+                    .themedListSelection(isSelected: selection == entry.id)
                 }
-                .tag(entry.id)
-                .themedListSelection(isSelected: selection == entry.id)
+                if tapHits.isEmpty == false {
+                    TapSearchSection(
+                        hits: tapHits,
+                        operations: operations,
+                        selection: selection
+                    )
+                }
             }
             .scrollContentBackground(.hidden)
             .overlay {
-                if rows.isEmpty {
+                // Both sources guard it: a query matching only tap packages
+                // shows the section rather than "no results".
+                if rows.isEmpty, tapHits.isEmpty {
                     EmptyResults(query: catalog.query, isReady: catalog.isReady)
                 }
             }
@@ -102,6 +124,31 @@ struct BrowseView: View {
             sizes[id] = usage.observation.allocatedBytes
         }
         return sizes
+    }
+
+    /// Packages published by installed third-party taps, matching the same
+    /// query.
+    ///
+    /// Built **synchronously in `body`**: both inputs are already resident, so
+    /// an async hop would only add a frame where the section is empty for a
+    /// value that was never absent, plus a cache to invalidate. The whole
+    /// absence rule — empty query, outdated-only, brew absent, refresh failed —
+    /// lives in the projection, so this property has no condition of its own.
+    private var tapHits: [TapSearchHit] {
+        guard
+            TapPackageSearch.isSectionVisible(
+                query: catalog.query,
+                outdatedOnly: outdatedOnly,
+                tapState: taps.state
+            )
+        else { return [] }
+        return TapPackageSearch(inventory: taps.inventory, installed: installed.inventory)
+            .hits(
+                query: catalog.query,
+                kinds: catalog.filters.kinds,
+                hideInstalled: hideInstalled,
+                isInCatalog: { catalog.package($0) != nil }
+            )
     }
 
     private var rows: [PackageEntry] {
@@ -154,6 +201,7 @@ private struct EmptyResults: View {
                     .appendingPathComponent("preview-disk-usage.json")
             )
         ),
+        taps: TapStore(),
         selection: $selection
     )
 }

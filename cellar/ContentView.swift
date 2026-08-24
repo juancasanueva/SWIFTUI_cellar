@@ -309,6 +309,7 @@ struct ContentView: View {
                 installed: installed,
                 operations: operations,
                 diskUsage: diskUsage,
+                taps: taps,
                 assets: caskAssets,
                 iconLoader: caskIcons,
                 selection: $selection

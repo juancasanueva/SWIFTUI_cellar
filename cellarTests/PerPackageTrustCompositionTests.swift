@@ -29,7 +29,7 @@ struct PerPackageTrustCompositionTests {
 
         // Positively anchored: the scan really did find all four files.
         #expect(sources.map(\.name).sorted()
-            == ["PackageDetailView+Receipt.swift", "PackageDetailView.swift", "TapDetailView.swift", "TapsListView.swift"])
+            == ["BrowseView.swift", "PackageDetailView+Receipt.swift", "PackageDetailView.swift", "TapDetailView.swift", "TapSearchSection.swift", "TapsListView.swift"])
 
         for name in ["TapsListView.swift", "TapDetailView.swift"] {
             let code = try #require(sources.first { $0.name == name }?.code)
@@ -188,7 +188,9 @@ nonisolated enum PerPackageTrustSources {
             "cellar/Taps/TapsListView.swift",
             "cellar/Taps/TapDetailView.swift",
             "cellar/Browse/PackageDetailView.swift",
-            "cellar/Browse/PackageDetailView+Receipt.swift"
+            "cellar/Browse/PackageDetailView+Receipt.swift",
+            "cellar/Browse/BrowseView.swift",
+            "cellar/Browse/TapSearchSection.swift"
         ].map { relative in
             ViewSource(
                 name: URL(fileURLWithPath: relative).lastPathComponent,
