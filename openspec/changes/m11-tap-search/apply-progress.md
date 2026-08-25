@@ -678,3 +678,178 @@ whole-file `rg -o "Test case '[^']+'" | sort -u | wc -l`, per the round-4 measur
 still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
 pull request. Round 4's ledger is unchanged at 22 of 22, round 3's at 24 of 24, round 2's at 55 of 56,
 and round 1's 59 boxes are unchanged history with `6.7` void.
+
+---
+
+# Round 6 — minimal detail for not-installed tap hits
+
+**Maintainer product decision (binding, 2026-08-25).** The 2026-08-24 rule "a not-installed hit is
+non-selectable" is **reversed**. An unambiguous not-installed hit is selectable and opens a minimal
+detail composed **exclusively** from the resident tap inventory. Ambiguity is untouched: a colliding
+bare token or a duplicate `PackageID` still withholds the route in **either** install state.
+
+**Delivery.** `single-pr` with `size:exception` **accepted** (maintainer, 2026-08-25). Measured totals
+are reported below and are **not** trimmed. RDD disabled. Strict TDD active throughout.
+
+## Phase 0⁵ — baselines, measured at `cbd13cb`
+
+| Runner | Baseline |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,873 tests / 217 suites**, 1 known issue **+ 1 flake** |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 259 distinct test ids** |
+| Working tree | clean after discarding `cellar/InfoPlist.xcstrings` churn |
+
+Two baseline notes, reported rather than absorbed:
+
+1. **The core flake recurred, with the same identity round 5 recorded.** `Every tap terminal refreshes
+   its declared domains exactly once … terminal → .cancellationBeforeSpawn at
+   MutationRefreshReceiptTests.swift:214:13`. It has no path to tap search — the branch touches no
+   refresh terminal — and it did **not** recur in either post-GREEN whole-suite run.
+2. **259, where round 5 recorded 260.** Same command, same extraction (`> log 2>&1`, then
+   `rg -o "Test case '[^']+'" | sort -u | wc -l`). All 14 shipped `TapSearchCompositionTests` ids were
+   present and the run was green, so nothing of this change's is missing. The one-id divergence is
+   **unexplained** and is recorded rather than reconciled away; this round's own arithmetic is measured
+   against **259**, the number this run actually produced.
+
+## Commits
+
+| Unit | Commit | What |
+|---|---|---|
+| WU21 | `1c0ced9` | `docs(sdd): amend m11-tap-search for a minimal detail on not-installed tap packages` — PS8's rewritten selectability clause and its inventory-fed detail paragraphs, two amended scenarios and two new ones, PD6's added clause + scenario, TM5's reaffirmation + scenario, `specs/README.md` revision 7, `design.md` (**DD-21**, **DD-22**, round-6 file table and RED rows), `tasks.md` Round 6. **Delta specs only; `openspec/specs/**` untouched** |
+| WU21′ | `2c69422` | `docs(sdd): correct the m11 round-6 pane contract to projection-owned copy and no collision note` — two contract corrections found while implementing, recorded before the code that depends on them (deviation 1 below) |
+| WU22 | `74560ae` | `feat(search): resolve a not-installed tap package to its one publishing tap for a minimal detail` — `routableID` drops its install-state conjunct; new `TapInventoryDetail` with `resolve(_:in:installed:)` |
+| WU23 | `12d1242` | `feat(browse): open a name-only detail for a tap package that is not installed` — `PackageDetailView`'s third branch, its `taps:` parameter, the widened `versionStory`, the new pane file, the `ContentView` call site, the restated inert-row comment, and the pane added to `PerPackageTrustSources.views()` |
+| WU24 | `05b7b48` | `test(browse): pin the name-only tap detail and the selection rule` — the selection row renamed and re-reasoned, the new pane-composition row, the shared-detail row narrowed |
+| — | (this record) | `docs(sdd): record the m11-tap-search round 6 apply progress` |
+
+## Key design decisions — DD-21 and DD-22
+
+**DD-21 — routability is a fact about identity.** `routable` becomes `collides == false && unique`; the
+`isInstalled` conjunct is deleted. Resolution lives in a new pure `TapInventoryDetail.resolve(_:in:installed:)`
+that walks `TapProjection.thirdPartyTaps`, keeps the taps `TapProjection.publishes(id, in:)` answers
+for, and returns a value **only when exactly one** does. Three choices carry it:
+
+1. **The exactly-one rule is the safety property, and it lives where a test can reach it.** Zero
+   publishers have no origin to name; several have no *single* origin, and picking one would put a
+   wrong tap on the pane. Letting the view walk `TapStore.inventory` would have made that rule
+   unobservable at the `unit` layer — the same objection DD-20 raised against a view-side receipt
+   lookup.
+2. **It also refuses any identity this Mac holds a receipt for**, keyed on the same
+   `installed.package(id)` question the receipt branch asks. That is what keeps `stateCopy` honest: the
+   value cannot exist for an installed package, so it can never say “Not installed.” about one. The
+   withheld-tap case is why this is keyed on the **receipt** and not on the tap projection's install
+   state — Homebrew withholds the tap, the record's `tap` is absent, and the record still decides.
+3. **The branch sits third.** Catalog, then receipt, then inventory — asserted by range comparison, not
+   argued. An installed tap package therefore still reaches its m10 receipt pane, and this branch
+   answers only for a package this Mac does not have, which is exactly the case the receipt branch
+   cannot answer.
+
+**DD-22 — the pane composes nothing.** `PackageDetailView+TapInventory.swift` mirrors
+`PackageDetailView+Receipt.swift`: it **calls** the shared header, the shared `fact(_:_:)` and the shared
+`MutationMenu`, and declares no verb, no argv, no mutation target and — round 6's own addition — **no
+sentence**. Both of its strings are the projection's `stateCopy` and `footerCopy`, rendered as values, so
+neither appears anywhere in the app target at all.
+
+The one genuinely new thing is the header's **widened `versionStory: String?`**. It was forced, not
+preferred: a pane with no version must render **no version line**, and `String` cannot express that.
+`versionStory: ""` was rejected outright — it draws an empty `Text` and a dangling separator dot, which
+is a placeholder standing in for an absent fact, the thing PD1 keeps off this pane. Both shipped call
+sites pass a `String` and are **source-identical**; the compiler proved it. `installed: nil` needed no
+change at all: that parameter has been optional since m10, and the header's own status badge already
+reads the absence and draws `Not installed`.
+
+## Work unit evidence — round 6
+
+| Unit | Commit | Focused command and exact result | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU21** | `1c0ced9` | N/A — artifacts only; 6 files, **+387 / −42** | N/A — no behaviour changes | `git revert 1c0ced9`; the branch returns to `cbd13cb` |
+| **WU21′** | `2c69422` | N/A — artifacts only | N/A | `git revert 2c69422`; the contract returns to WU21's wording |
+| **WU22** | `74560ae` | `swift test … --filter 'TapPackageSearchTests'` → **35 tests / 1 suite passed**; `--filter 'TapInventoryDetailTests'` → **5 tests / 1 suite passed**; whole core suite **1,878 / 218 passed, 1 known issue** | **Deferred to WU23** — the pane's rendering is the app harness's; what the `unit` layer proves is the resolution rule itself, over four refusal cases and their triangulations | Revert one commit across `TapPackageSearch.swift`, the new `TapInventoryDetail.swift` and two test files. `TapInventoryDetail` is **new**, so nothing else stops compiling; `routableID`'s type is unchanged |
+| **WU23** | `12d1242` | `xcodebuild build …` → **`** BUILD SUCCEEDED **`** | **Deferred to delivery** — launching the app is the one harness this run could not execute headlessly. What it would observe is pinned by runners: the branch order by range comparison over `PackageDetailView.swift`, the pane's field set by source scan, and the resolution itself by five `unit` rows | Revert one commit across five app files. The `taps:` parameter is **added**, never renamed; the widened `versionStory` is source-compatible with both shipped call sites |
+| **WU24** | `05b7b48` | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`, 260 distinct ids** | N/A — source-scan suite; the app harness is WU23's | Revert one test commit; no production line is its own |
+
+## TDD cycle evidence — round 6
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 2⁵.1–2⁵.2 `routableID` | `Packages/CellarCore/Tests/BrewClientTests/TapPackageSearchTests.swift` | `unit` | ✅ 1,873 / 217 at `cbd13cb` | ✅ **assertion** failures, 3 across 2 ids — `aNotInstalledHitIsRoutableWhenItsIdentityIsUnambiguous` at `:912` and `:913`, `anAmbiguousHitIsNotRoutableInEitherInstallState` at `:850` (`unambiguousAbsent.routableID → nil`) | ✅ filtered **35 / 1 suite passed** | ✅ 5 cases in one row — installed-and-colliding, not-installed-and-colliding, duplicate identity, and an unambiguous positive of **each** install state. The last two are the triangulation that matters: without them the three `nil`s would also pass under the retired rule | ➖ none needed — one conjunct deleted |
+| 2⁵.3–2⁵.4 `TapInventoryDetail` | `Packages/CellarCore/Tests/BrewClientTests/TapInventoryDetailTests.swift` (new) | `unit` | N/A (new file) | ✅ **compile** failure, `TapInventoryDetailTests.swift:26:10: error: cannot find type 'TapInventoryDetail' in scope` (and 3 more sites) | ✅ filtered **5 / 1 suite passed**; whole core suite **1,878 / 218 passed** | ✅ 5 cases — one publisher, a cask on the same rule, zero/several/official publishers, a held receipt (installed **and** withheld), each with its own inverted triangulation | ✅ the resolution reads `TapProjection.publishes` and `packages(for:)` rather than re-deriving either; `kind` computed off `id` rather than stored beside it |
+| 3⁵.1–3⁵.6 the app surface | — | build | ✅ `** BUILD SUCCEEDED **` at `74560ae` | ✅ **compile** failure at the preview call site — `cannot use explicit 'return' statement in the body of result builder 'ViewBuilder'`, the compiler's phrasing for the missing `taps:` argument | ✅ `** BUILD SUCCEEDED **` | ➖ single construction site | ✅ `PackageMetadataSection` removed after review against PS8's closed list (deviation 3) |
+| 4⁵.1–4⁵.2 the composition guards | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ 259 distinct ids at `cbd13cb` | ✅ **two reversible mutations**: (a) `fact("Homepage", published.tapName)` in the pane → `theNameOnlyTapDetailComposesNothingItCannotKnow` **failed**; (b) `let routable = true` in the projection → **4** `unit` ids failed with 6 issues. Both restored and verified `shasum -a 256 -c` → both files `OK` | ✅ **`** TEST SUCCEEDED **`, 260 distinct ids** | ➖ single scenario | ✅ the scan made case-insensitive after mutation (a) exposed the gap (deviation 2) |
+
+**Test summary — round 6.** 6 tests written (5 `unit` in the new `TapInventoryDetailTests`, 1 `unit-app`),
+2 existing `unit` tests replaced by reversed equivalents, 2 existing `unit-app` tests renamed/narrowed.
+Layers: `unit` 5, `unit-app` 1. No approval tests — no refactoring task. Pure functions created: 1
+(`TapInventoryDetail.resolve(_:in:installed:)`).
+
+## Phase 6⁵ — verification and bindings
+
+| Check | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,878 tests / 218 suites passed, 1 known issue** (baseline 1,873 / 217 → **+5 tests, +1 suite**; the flake did not recur in either post-GREEN run) |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 260 distinct test ids** (baseline 259 → **+1**, the one new `unit-app` test; no shipped id lost) |
+| `cellar/Browse/BrowseView.swift` vs `main` | **byte-identical** (`git diff --quiet` clean) — **fifth** round running |
+| `project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`, `MutationCommand.swift`, `MutationMenu.swift`, `cellarUITests/` vs `main` | **all empty** |
+| `PackageRow.swift`, `StatusPill.swift` vs `cbd13cb` | **empty** — round 6 changes no mark and no pill |
+| `cellar/Browse/PackageDetailView.swift` vs `main` | **NO LONGER ZERO-DIFF** — 5 hunks, **+37 / −9**: the `taps: TapStore` property, the third `body` branch, the header's doc comment and `versionStory: String?`, the conditional version line, and `taps: TapStore()` in the `#Preview`. Nothing else in the file moved; the catalog and receipt branches are untouched |
+| `git diff --shortstat main...HEAD` | **30 files changed, 9,085 insertions(+), 64 deletions(-)** — reported, not trimmed, under the accepted `size:exception` |
+| `git diff --shortstat main...HEAD -- ':!openspec'` | **20 files changed, 4,089 insertions(+), 64 deletions(-)** — the code-only half of the same total |
+| `git diff --shortstat cbd13cb..HEAD -- ':!openspec'` | **10 files changed, 787 insertions(+), 43 deletions(-)** — round 6's own code cost |
+| Working tree | clean at every commit; `cellar/InfoPlist.xcstrings` churn discarded, never committed |
+
+Full `-scheme cellar` was **not** run: it is red on `main` from two pre-existing `cellarUITests` Taps
+failures and is not this change's gate.
+
+**The shortstat above is measured at `05b7b48`, before this record's own commit** — the same point every
+earlier round measured at. Including this file, the branch total is **30 files changed, 9,256
+insertions(+), 64 deletions(-)**. Both numbers are stated so neither has to be inferred.
+
+## Deviations — round 6 (reported, not absorbed)
+
+1. **The maintainer's projection sketch did not survive contact, and the contract was corrected before
+   the code rather than after.** Two things changed, both in commit `2c69422`:
+   - **`kind` is computed, not stored.** The brief listed it among the projection's members, but `id`
+     already carries it and `id` is itself enumerated by `Mirror`. Storing a second copy would give one
+     fact two homes and one chance to disagree — the drift DD-19's "stored, not computed" reasoning does
+     **not** apply to, because that reasoning is about facts `Mirror` would otherwise miss.
+   - **The collision note is not rendered, and its absence is asserted.** The brief allowed for it "only
+     when applicable". It is applicable **never**: a colliding bare token is carried by the catalog, so
+     `PackageDetailView`'s **first** branch resolves it and this third one is never reached. Rendering it
+     would have been unreachable presentation — worse than none, because it could never be seen to be
+     wrong. What the pane's "two copy strings" turned out to be is the install state and the footer.
+2. **My first version of the field scan was case-sensitive, and the first mutation walked straight past
+   it.** `fact("Homepage", …)` is not caught by a scan for `homepage`. The mutation exposed it, the scan
+   now lowercases both sides, and the re-run failed as it should. Caught by the process, at the cost of
+   one run — which is the process working.
+3. **`PackageMetadataSection` was written into the pane and then removed.** Mirroring the receipt pane
+   put the private-note section there by reflex. It is not a tap-published value and would have been
+   defensible, but PS8 **enumerates** what this pane presents and closes the list, so adding a section
+   to it is a product decision to take deliberately rather than inherit from a neighbouring file. Removed
+   before the pane was committed, and the reason recorded in the file. The **favourite heart** is the one
+   affordance that does arrive anyway: it belongs to the shared identity header the brief requires the
+   pane to reuse.
+4. **A shipped `unit-app` guard forbade `TapInventory` in `PackageDetailView.swift` and had to be
+   narrowed.** `theTapSurfaceResolvesThroughTheSharedDetail` asserted the shared detail grew no branch
+   for the tap surface — a claim round 6 partly overturns. It was **narrowed, not dropped**: the three
+   tap-*search* tokens stay forbidden, and the one permitted inventory reference is now pinned positively
+   (`TapInventoryDetail.resolve(` present, and the file naming `TapInventory` exactly once) so the
+   narrowing cannot quietly widen. Caught by the runner.
+5. **A function-level `-only-testing:` filter ran zero tests and reported success.**
+   `-only-testing:cellarTests/TapSearchCompositionTests/theNameOnlyTapDetailComposesNothingItCannotKnow`
+   matched no Swift Testing id, compiled everything, ran nothing, and exited `0` — which briefly read as
+   a mutation surviving. The launch brief's rule ("suite-level filters for RED proofs") is exactly right
+   and is why the discrepancy was checked rather than believed. Every RED and GREEN gate in this round is
+   suite-level or whole-suite.
+6. **The `cellarTests` baseline measured 259 where round 5 recorded 260**, by the same command and the
+   same extraction. Reported above and not reconciled away; this round's arithmetic uses the number this
+   run measured.
+7. **`swift test --filter` was used for the RED/GREEN cycle and the whole package for the gate.** The
+   filter is at **suite** level (`TapPackageSearchTests`, `TapInventoryDetailTests`), never function
+   level, per the launch brief.
+
+## Task ledger
+
+**Round 6: 25 of 25 complete.** Round 6 has **no** delivery task — the branch's one open delivery box is
+still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
+pull request. Round 5's ledger is unchanged at 19 of 19, round 4's at 22 of 22, round 3's at 24 of 24,
+round 2's at 55 of 56, and round 1's 59 boxes are unchanged history with `6.7` void.

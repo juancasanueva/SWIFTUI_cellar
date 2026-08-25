@@ -1287,23 +1287,23 @@ measured total; never trim. RDD disabled. Strict TDD active.
       construction site, and the footer literal in exactly **one** place across the app sources.
 - [x] 4⁵.2 Prove RED by **reversible mutation**: render a `Homepage` fact in the pane, and separately make
       an ambiguous hit routable. Restore byte-identically and verify with `shasum -a 256 -c`.
-- [ ] 4⁵.3 Commit `test(browse): pin the name-only tap detail and the selection rule`.
+- [x] 4⁵.3 Commit `test(browse): pin the name-only tap detail and the selection rule`.
 
 ## Phase 6⁵: Verification and bindings (round 6)
 
-- [ ] 6⁵.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁵ baseline.
-- [ ] 6⁵.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+- [x] 6⁵.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁵ baseline.
+- [x] 6⁵.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
       phase-0⁵ baseline. **Redirect with `> log 2>&1`, never `tee`.** The full `-scheme cellar` runner is
       **not** the gate — it is red on `main` from two pre-existing `cellarUITests` Taps failures.
-- [ ] 6⁵.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+- [x] 6⁵.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
       `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
       `MutationCommand.swift`, `cellar/Activity/MutationMenu.swift` and `cellarUITests/` must print
       **nothing** under `git diff --stat main --`. **`PackageDetailView.swift` is no longer zero-diff**:
       show its full hunk and confirm it is limited to the third branch, the `taps:` parameter and the
       widened `versionStory`.
-- [ ] 6⁵.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+- [x] 6⁵.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
-- [ ] 6⁵.5 Merge the round-6 section into `apply-progress.md`, re-mirror it to Engram topic
+- [x] 6⁵.5 Merge the round-6 section into `apply-progress.md`, re-mirror it to Engram topic
       `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks` — the
       tasks mirror went stale in an earlier round and must not again.
-- [ ] 6⁵.6 Commit `docs(sdd): record the m11-tap-search round 6 apply progress`.
+- [x] 6⁵.6 Commit `docs(sdd): record the m11-tap-search round 6 apply progress`.
