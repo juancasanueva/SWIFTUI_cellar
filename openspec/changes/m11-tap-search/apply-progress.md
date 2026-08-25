@@ -294,3 +294,93 @@ This section describes the delta from `dbc5233`.
 
 **Round 2: 55 of 56 complete.** Open: **6′.7**, delivery, deferred by instruction; its content is
 drafted above. Round 1's 59 boxes are unchanged history, with `6.7` void.
+
+---
+
+# Round 3 — INSTALLED badge (2026-08-25)
+
+Maintainer UI feedback, observed in the running app: a tap row carried a third text line reading
+`Installed.` or `Not installed.`, where a catalog row carries the green **Installed** pill and shows
+nothing at all when the package is not installed. The tap rows now mirror the catalog rows. This section
+is the delta from `8f233b1`; rounds 1 and 2 above are unchanged history. Delivery is unchanged:
+**single-pr**, **`size:exception` accepted (maintainer, 2026-08-25)**, RDD disabled.
+
+## Phase 0″ — baselines, measured at `8f233b1`
+
+| Runner | Baseline |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,870 tests / 217 suites passed, 1 known issue** |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 256 distinct test ids** |
+
+One preflight action: `cellar/InfoPlist.xcstrings` carried working-tree churn and was discarded before
+any work, per the launch brief. The tree was clean at the first commit.
+
+## Work unit evidence — round 3
+
+| Unit | Commit | Focused command and exact result | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU10** | `8f33b1f` | N/A — artifacts only; 4 files, **+230 / −31** | N/A — no behaviour changes | `git revert 8f33b1f`; the branch returns to `8f233b1` |
+| **WU11** | `9714cfc` | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` → **32 tests / 1 suite passed**; whole core suite **1,870 / 217 passed, 1 known issue** | N/A — a pure projection over resident values; there is no runtime to exercise | Revert one commit in `TapPackageSearch.swift` + its test file. **Not independently revertible from WU12** — see deviation 1 |
+| **WU12** | `30608ab` | `xcodebuild build …` → **`** BUILD SUCCEEDED **`**; `git diff --stat main -- cellar/Browse/BrowseView.swift cellar.xcodeproj/project.pbxproj` → **empty** | **Deferred to delivery** — launching the app is the one harness this run could not execute headlessly. Everything it would observe is pinned by a runner: the pill's component, its gate, its position after the kind chip, the absent state line and the surviving withheld note are all asserted over the composed sources | `git checkout 8f233b1 -- cellar/Browse/` restores all three files and drops the new one |
+| **WU13** | `88898d0` | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`, 257 distinct ids** | N/A — source-scan suite; the app harness is WU12's | Revert one test commit; no production line is its own |
+
+## TDD cycle evidence — round 3
+
+| Task | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| 2″.1/2″.2 ps4, ps9 | `TapPackageSearchTests.swift` | Unit | ✅ 1,870/1,870 | ✅ **genuine compile failure** — `value of type 'TapSearchHit' has no member 'isInstalled'` and `… has no member 'stateNote'`, at 8 sites | ✅ 32/32, then 1,870/217 | ✅ three states × `isInstalled` × `stateNote`, plus both withdrawn strings enumerated as absences and the surviving note asserted as the **only** one emitted | ✅ |
+| 3″.1–3″.3 DD-18 | — (production) | — | ✅ build | ➖ proven by WU13's rows below, per the round-2 precedent | ✅ `** BUILD SUCCEEDED **` | ➖ | ✅ the private method is **deleted**, not left beside its replacement |
+| 4″.1 ps15 (copy) | `TapSearchCompositionTests.swift` | Unit-app | ✅ 256/256 | ✅ **reversible mutation** — the tap row's `StatusPill.installed` replaced by `Text("Installed.")`; `theSurfaceCopyLivesInTheProjectionNotTheView` **and** `bothSearchSurfacesDrawTheOneSharedPill` both failed | ✅ | ✅ withdrawn strings scanned as **complete literals** over both files, plus the four surviving pinned sentences | ✅ |
+| 4″.1 ps15 (pill, catalog half) | same | Unit-app | ✅ | ✅ **reversible mutation** — `git show HEAD~1:cellar/Browse/PackageRow.swift` restored the private `statusPill`; `bothSearchSurfacesDrawTheOneSharedPill` failed | ✅ | ✅ label declared once, both surfaces anchored, the predecessor asserted gone, `BrowseView` asserted free of both spellings | ✅ |
+| 4″.1 ps15 (position + projection) | same | Unit-app | ✅ | ✅ **reversible mutation** — the pill moved **above** `KindTag` in the tap row, and `private static let notInstalledCopy = "Not installed."` revived in the projection; both rows failed | ✅ | ✅ order asserted on **both** surfaces by range comparison, not by one | ✅ |
+| 4″.2 DD-4 | same | Unit-app | ✅ | ➖ amendment, not a new claim — see deviation 2 | ✅ | ✅ `occurrences` added to the forbidden list; the two reads asserted **separately** | ✅ |
+
+**Every mutation was restored byte-identically and verified**: `shasum -a 256 -c` reported `OK` for
+`TapSearchView.swift`, `PackageRow.swift`, `StatusPill.swift` and `TapPackageSearch.swift` after each of
+the three mutation runs, and `git status --porcelain` showed only the test file modified before the WU13
+commit.
+
+## Phase 6″ — verification and bindings
+
+| Task | Result |
+|---|---|
+| **6″.1** core suite | `swift test --package-path Packages/CellarCore` → **1,870 tests / 217 suites passed, 1 known issue** — unchanged, because round 3 **renames and restates** one row rather than adding or deleting any. One non-reproducing extra issue in one of four runs; the other three were the baseline. Its identity was not captured, and it did not recur — the same shape of flake round 2 recorded at 0′.4 and attributed to the shipped, timing-sensitive `OperationCenterCancelTests` row. Not absorbed, and not claimed to be that row without evidence |
+| **6″.2** app target, scoped | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`**, **257** distinct test ids (baseline **256**; **+1** — `bothSearchSurfacesDrawTheOneSharedPill`, confirmed present and passing in the log). The raw `Test case … passed` line count reads **267** in both runs because roughly ten ids are reported twice under parallel execution; that number is an artefact of the reporter, not a count, and the distinct-id count is the honest one. Round 2's record of "267 / 257" used the same coarse line count for the first figure. The full `-scheme cellar` runner is **not** the gate: it is red on `main` from two pre-existing `cellarUITests` Taps failures (`:209`, `:231`) |
+| **6″.3** bindings proof | `git diff --stat main --` over `cellar/Browse/BrowseView.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`, `MutationCommand.swift`, `PackageDetailView.swift` and `cellarUITests/` → **empty output**. `BrowseView.swift` is still byte-identical to `main` **after** the pill extraction, which is the load-bearing claim of DD-18, and `cellarUITests.swift:226`'s shipped `app.staticTexts["Not installed."]` assertion is untouched because it reads the **tap-detail** rows TM5 governs, not this surface |
+| **6″.4** branch total | `git diff --shortstat main...HEAD` → **25 files, +6,748 / −53 = 6,801 authored lines** measured before this file's round-3 section, and **25 files, +6,838 / −53 = 6,891** with it. Round 3's own delta is `git diff --shortstat 8f233b1...HEAD` → **10 files, +527 / −103 = 630 lines** before this section and **11 files, +617 / −103 = 720** with it, split **code+test 400** and **artifacts 320**. Measured against the 5,000-line project budget and the maintainer's accepted 4,900–5,200: the branch is **above both**, and the excess is reported rather than trimmed, under the accepted **`size:exception`** |
+| **6″.5** this record | Committed as `docs(sdd): record the m11-tap-search round 3 apply progress`. **Delivery is not a round-3 task**: it stays round 2's open `6′.7`, still deferred by this run's explicit instruction not to push and not to open a pull request. Round 2's drafted PR body stands, with two corrections — statement 6's line count is superseded by 6″.4's measurement, and one statement should be added: the two search surfaces now draw **one** installed pill component, asserted structurally |
+
+## Deviations — round 3 (reported, not absorbed)
+
+1. **WU11 leaves the app target non-compiling until WU12**, exactly as round-2 deviation 9 recorded for
+   WU6/WU7. `stateCopy` is renamed, and `TapSearchView.swift` renders it. The rollback order
+   (WU13 → WU12 → WU11 → WU10) already requires reverse-order rollback, so nothing is unsafe; the unit's
+   "independently revertible" framing is what would be wrong, and the table above says so instead.
+   `swift test` for `CellarCore` is green at WU11.
+2. **`hit.isInstalled` was removed from `notInstalledTapRowsAreNotSelectable`'s forbidden list.** This is
+   a guard being narrowed, so it is reported rather than buried. The guard's subject is **routability**,
+   and the row now legitimately reads installed-ness to draw the pill. A `Bool` about installation cannot
+   express routability, which additionally requires the hit to be uncollided and unique — and those two
+   facts stay forbidden (`alsoInCatalog`, `hit.state ==`, `== .notInstalled`, plus `occurrences`, newly
+   added). Two positive assertions were added in compensation: the pill's gate and the selection's gate
+   are asserted **separately**, so a future edit that gated selection on installed-ness fails.
+3. **`StatusPill.swift` does not join `PerPackageTrustSources.views()`.** Task 4″.3 asked for the
+   decision to be made and recorded. That scanner guards surfaces that present **per-package trust**
+   copy; the pill presents install state and names no trust concept. Adding it would make the suite's
+   sorted anchor assert something the file has no relationship to. Nothing was retargeted.
+4. **`TapPackage.statusExplanation` is now the shape DD-9 originally wanted, and is still not reused.**
+   DD-9 refused it in round 1 because it is `nil` for `.installed` and would have left an installed row
+   silent. After round 3 that is exactly right — but it answers `"Not installed."` for the third state,
+   which this surface withdrew, and it is a projection over `TapPackage`, not over a hit. `TapPackageSearch`
+   keeps its own `note(for:)`. Recorded so a later reader does not "simplify" the two into one.
+5. **The round-2 record's app-target figure "267 passing / 257 distinct" mixed two metrics.** The 267 is
+   a `Test case … passed` line count that double-reports about ten ids under parallel execution; the
+   distinct-id count at that commit was **256**. Round 3 measures **257** distinct after adding one row.
+   Information for the next verify, not a re-measurement of round 2.
+
+## Task ledger
+
+**Round 3: 24 of 24 complete.** Round 3 has **no** delivery task — the branch's one open delivery box is
+still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
+pull request. Round 2's ledger is otherwise unchanged at 55 of 56. Round 1's 59 boxes are unchanged
+history, with `6.7` void.

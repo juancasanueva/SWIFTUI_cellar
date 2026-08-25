@@ -1006,17 +1006,17 @@ sc), `package-detail` and `tap-management` are untouched by round 3. Nothing new
       state. Retarget nothing.
 - [x] 4″.4 Prove RED for every new row by **reversible mutation** of the production files, restored
       byte-identically and `shasum -a 256 -c` verified.
-- [ ] 4″.5 Commit `test(taps): pin the shared Installed pill and the withdrawn row copy`.
+- [x] 4″.5 Commit `test(taps): pin the shared Installed pill and the withdrawn row copy`.
 
 ## Phase 6″: Verification and bindings (round 3)
 
-- [ ] 6″.1 `swift test --package-path Packages/CellarCore` — record the total against the 1,870 baseline.
-- [ ] 6″.2 `xcodebuild test … -only-testing:cellarTests` — record against the 267 baseline. The full
+- [x] 6″.1 `swift test --package-path Packages/CellarCore` — record the total against the 1,870 baseline.
+- [x] 6″.2 `xcodebuild test … -only-testing:cellarTests` — record against the 267 baseline. The full
       `-scheme cellar` runner is **not** the gate: it is red on `main` from two pre-existing
       `cellarUITests` Taps failures (`:209`, `:231`).
-- [ ] 6″.3 Bindings proof — `git diff --stat main --` over `cellar/Browse/BrowseView.swift`,
+- [x] 6″.3 Bindings proof — `git diff --stat main --` over `cellar/Browse/BrowseView.swift`,
       `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
       `MutationCommand.swift`, `PackageDetailView.swift` and `cellarUITests/` must print **nothing**.
-- [ ] 6″.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+- [x] 6″.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
-- [ ] 6″.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 3 apply progress`.
+- [x] 6″.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 3 apply progress`.
