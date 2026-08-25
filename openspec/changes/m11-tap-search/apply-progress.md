@@ -386,3 +386,150 @@ commit.
 still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
 pull request. Round 2's ledger is otherwise unchanged at 55 of 56. Round 1's 59 boxes are unchanged
 history, with `6.7` void.
+
+---
+
+# Round 4 — UPDATE pill (2026-08-25)
+
+Maintainer UI feedback, observed in the running app: round 3 gave the tap rows the catalog row's green
+**Installed** pill and stopped there. An installed tap package whose own receipt already reports it
+outdated — `druk` at `1.21.1` against the offered `1.22.1` — read as merely installed on "Search our
+taps" while the same package read as updatable on the catalog surface and in the Installed list. The tap
+rows now carry the **same shared orange UPDATE pill**, after the Installed pill. This section is the
+delta from `03be818`; rounds 1–3 above are unchanged history. Delivery is unchanged: **single-pr**,
+**`size:exception` accepted (maintainer, 2026-08-25)**, RDD disabled.
+
+## Phase 0‴ — baselines, measured at `03be818`
+
+| Runner | Baseline |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,870 tests / 217 suites passed, 1 known issue** |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 258 distinct test ids** (268 raw `Test case … passed` lines) |
+
+One preflight action: `cellar/InfoPlist.xcstrings` carried working-tree churn and was discarded before
+any work, per the launch brief. The tree was clean at the first commit.
+
+**The 258 is a correction of this run's own first measurement, and it vindicates verify round 4.** The
+first baseline count read **257**, and the discrepancy against verify's 258 at `9894a6a` was chased to a
+cause rather than reported as flake: the baseline log was captured through `tee`, and xcodebuild's
+concurrent status block interleaved itself **into the middle of a `Test case …` line** —
+`app-baseline.log:821` reads `…theBoundedControlGuardSeesAnUnbulkedV` followed by three
+`IDETestOperationsObserverDebug` lines and then `erb(): passed`. A line-based `rg` scan cannot match
+across that break, so it silently dropped one shipped, branch-untouched `BulkActionBarTests` id. A
+whole-file scan finds it. Round 3's "257 → the raw count is 267" figures came from the same line-based
+method over a `tee`d log and are therefore **one low on the same footing**; nothing about round 3's
+work changes, only how it was counted. Round 4's runs redirect with `> log 2>&1` and two independent
+runs produced **identical** 259-id sets.
+
+## Commits
+
+| Unit | Commit | What |
+|---|---|---|
+| WU14 | `1e47f86` | `docs(sdd): amend m11-tap-search for the shared update pill on tap rows` — PS8 six-facts / offered-version / update-pill clauses, two new scenarios, `specs/README.md` (rev 5), `design.md` (**DD-19** new, round-4 file table, flow lines, RED rows), `tasks.md` Round 4 phase. Delta specs only; `openspec/specs/**` untouched |
+| WU15 | `52c4011` | `feat(search): expose the offered version for an outdated installed tap package` — stored `TapSearchHit.nextVersion: String?` + `offeredVersion(for:)`; `InstalledFixture.receipt(outdatedTo:)`; `TapSearchFixture.fourStateTaps` / `fourStateOutdatedInstalled` |
+| WU16 | `04122b1` | `feat(taps): mark outdated tap packages with the shared update pill` — `TapSearchView.swift` draws `UpdateTag(nextVersion:)` after `StatusPill.installed`. **`PackageRow.swift` untouched** |
+| WU17 | `baff212` | `test(taps): pin the shared update pill on outdated tap rows` — `bothSearchSurfacesDrawTheOneSharedUpdatePill` |
+| — | (this record) | `docs(sdd): record the m11-tap-search round 4 apply progress` |
+
+## Key design decision — DD-19
+
+The offered version is read from the **installed receipt the projection already holds**, never from the
+tap and never from the catalog, so PD6 and TM5 are untouched and no brew invocation is added. Two
+choices carry the round:
+
+1. **Keyed off `TapPackage.installedHandoff`, not off `package.id`.** `TapProjection.installState`
+   deliberately answers `.notInstalled` for a receipt whose `tap` names a *different* tap, so a lookup
+   by bare identity would hang an UPDATE pill on a row this surface calls not installed. Both installed
+   states answer, because both **are** installed. `aReceiptFromAnotherTapOffersNoVersion` pins it.
+2. **Stored, not computed** — unlike round 3's `isInstalled`. `Mirror` enumerates stored properties, and
+   PS8's facts scenario reads that enumeration: a computed offer would be a fact the type carries and
+   the enumeration denies. The scenario, the requirement and the test are amended to say **six** facts.
+
+**`UpdateTag` needed no extraction, which is the round's cheapest fact.** It is already `internal` at
+`PackageRow.swift:114`, already drawn by the Installed and Updates lists, and already takes the version
+as a **value** — the exact shape DD-18 had to *create* for the installed pill. Round 4 therefore costs
+`PackageRow.swift`, `StatusPill.swift` and `BrowseView.swift` a **zero-line diff** each.
+
+## Work unit evidence — round 4
+
+| Unit | Commit | Focused command and exact result | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU14** | `1e47f86` | N/A — artifacts only; 4 files, **+248 / −20** | N/A — no behaviour changes | `git revert 1e47f86`; the branch returns to `03be818` |
+| **WU15** | `52c4011` | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` → **34 tests / 1 suite passed** (was 32); whole core suite **1,872 / 217 passed, 1 known issue** | N/A — a pure projection over resident values; there is no runtime to exercise | Revert one commit across the projection, two fixtures and the test file. **Independently revertible from WU16 this round** — the member is *added*, never renamed, and `xcodebuild build …` was run at this commit and returned `** BUILD SUCCEEDED **` to prove it, which is what round 3's WU11 could not claim |
+| **WU16** | `04122b1` | `xcodebuild build …` → **`** BUILD SUCCEEDED **`**; `git diff --stat 03be818 -- cellar/Browse/PackageRow.swift cellar/Browse/StatusPill.swift` → **empty**; `git diff --stat main -- cellar/Browse/BrowseView.swift` → **empty** | **Deferred to delivery** — launching the app is the one harness this run could not execute headlessly. Everything it would observe is pinned by a runner: the component's identity, its uniqueness, its gate, its position after the Installed pill, and the absence of any update literal in the view are all asserted over the composed sources | `git checkout 03be818 -- cellar/Browse/TapSearchView.swift` — one file |
+| **WU17** | `baff212` | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`, 259 distinct ids** | N/A — source-scan suite; the app harness is WU16's | Revert one test commit; no production line is its own |
+
+## TDD cycle evidence — round 4
+
+| Task | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| 2‴.1–2‴.3 ps4, ps9b | `TapPackageSearchTests.swift` | Unit | ✅ 1,870/1,870 | ✅ **genuine compile failure** — `value of type 'TapSearchHit' has no member 'nextVersion'` at **9 sites**, and no other error | ✅ 34/34, then 1,872/217 | ✅ four states × offered version (outdated ⇒ its own version, withheld+outdated ⇒ its own **distinct** version, installed-and-current ⇒ `nil`, not-installed ⇒ `nil`), plus the whole up-to-date inventory re-run as a second fixture, plus the wrong-tap receipt as its own row | ✅ |
+| 2‴.2 fixtures | `InstalledFixture.swift`, `TapSearchFixture.swift` | Unit (arrangement) | ✅ every shipped call site source-identical (defaulted parameter) | ➖ arrangement | ✅ | ✅ two **distinct** offered versions, so a hit reading its neighbour's offer fails | ✅ `outdatedTo:` sets the version and the flag **together**, so an incoherent receipt is unrepresentable |
+| 3‴.1 DD-19 (view) | — (production) | — | ✅ build | ➖ proven by WU17's row below, per the round-2 and round-3 precedent | ✅ `** BUILD SUCCEEDED **` | ➖ | ➖ nine lines added, nothing to clean |
+| 4‴.1–4‴.2 the shared pill | `TapSearchCompositionTests.swift` | Unit-app | ✅ 258/258 | ✅ **two reversible mutations**, each failing `bothSearchSurfacesDrawTheOneSharedUpdatePill`: (a) `UpdateTag(nextVersion: next)` → a local `Text("UPDATE")`; (b) the chip moved **above** `StatusPill.installed` | ✅ | ✅ component uniqueness asserted by a **tree walk**, both surfaces anchored, both positions asserted by range comparison, the gate asserted, three re-derivation routes forbidden, and the label's home positively anchored | ✅ |
+
+**Both mutations were restored byte-identically and verified**: `shasum -a 256 -c` reported
+`cellar/Browse/TapSearchView.swift: OK` after each, and `git status --porcelain` showed only the test
+file modified before the WU17 commit.
+
+**Measurement gotcha discovered and recorded.** `-only-testing:cellarTests/TapSearchCompositionTests/bothSearchSurfacesDrawTheOneSharedUpdatePill`
+— a **function-level** filter — selects **nothing** for a Swift Testing test and exits
+`** TEST SUCCEEDED **`. The first mutation-(a) run reported success for exactly that reason and was not
+believed; re-running at **suite** level produced the real `** TEST FAILED **`. A function-level
+`-only-testing:` filter must never be used as a RED gate: it cannot distinguish "passed" from "never ran".
+
+## Phase 6‴ — verification and bindings
+
+| Task | Result |
+|---|---|
+| **6‴.1** core suite | `swift test --package-path Packages/CellarCore` → **1,872 tests / 217 suites passed, 1 known issue** (baseline **1,870**; **+2** — `onlyAnOutdatedInstalledHitOffersAVersion` and `aReceiptFromAnotherTapOffersNoVersion`. The facts row was **renamed**, not added: `aHitCarriesItsFiveFacts…` → `aHitCarriesItsSixFacts…`). Run **five** times: four green at that exact total, one reporting one extra non-reproducing issue whose identity was **not captured** — the same shape round 3 recorded at 6″.1 and round 2 at 0′.4. Not absorbed, and not attributed to any row without evidence |
+| **6‴.2** app target, scoped | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`**, **259** distinct test ids (baseline **258**; **+1**). Two independent runs produced byte-identical id sets; `comm` over the two sets against the baseline shows **exactly one id added** — `TapSearchCompositionTests/bothSearchSurfacesDrawTheOneSharedUpdatePill()` — and **none removed**. Raw `Test case … passed` lines: 268 → 269; that number is a reporter artefact, not a count. The full `-scheme cellar` runner is **not** the gate: it is red on `main` from two pre-existing `cellarUITests` Taps failures (`:209`, `:231`) |
+| **6‴.3** bindings proof | `git diff --stat main --` over `cellar/Browse/BrowseView.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`, `MutationCommand.swift`, `PackageDetailView.swift` and `cellarUITests/` → **empty output**. Round 4 adds two of its own: `git diff --stat 03be818 -- cellar/Browse/PackageRow.swift cellar/Browse/StatusPill.swift` → **empty**. `BrowseView.swift` is byte-identical to `main` for the third round running, and this round the *catalog row itself* is untouched too — the strongest form DD-8 has taken yet |
+| **6‴.4** branch total | `git diff --shortstat main...HEAD` → **26 files, +7,314 / −55 = 7,369 authored lines** measured before this section. Round 4's own delta is `git diff --shortstat 03be818...HEAD` → **10 files, +520 / −31 = 551 lines**, split **code+test 280** (6 files, +269 / −11) and **artifacts 271** (4 files, +251 / −20). Measured against the 5,000-line project budget and the maintainer's accepted 4,900–5,200: the branch is **above both**, and the excess is reported rather than trimmed, under the accepted **`size:exception`** |
+| **6‴.5** this record | Committed as `docs(sdd): record the m11-tap-search round 4 apply progress`. **Delivery is not a round-4 task**: it stays round 2's open `6′.7`, still deferred by this run's explicit instruction not to push and not to open a pull request |
+
+## Deviations — round 4 (reported, not absorbed)
+
+1. **The "no version" prohibition had to be narrowed, in the spec and in the test.** PS8's five-facts
+   paragraph forbade a version outright, and the facts test enforced it with a token scan
+   (`labels.contains { $0.lowercased().contains("version") }`) that `nextVersion` trips. Both are
+   amended to forbid a **published** version and to enumerate the one version-shaped member by name:
+   `#expect(labels.filter { $0.lowercased().contains("version") } == ["nextVersion"])`. That is a
+   **stronger** claim than the bare token — it fails on a second version member, which the token scan
+   also would, and additionally fails if `nextVersion` is renamed or removed.
+2. **The facts test was renamed, so the core suite's id set changed by more than its count.**
+   `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse` → `aHitCarriesItsSixFactsAndItsCopyAndNothingElse`,
+   with its display name. Keeping the old name would have left the row asserting six facts under a name
+   claiming five. The count arithmetic (+2) is unaffected because the rename is one id out and one in.
+3. **The Outdated control's *reason* is now false as written, and was rewritten rather than left.** PS8
+   said the surface offers no outdated control "because a tap hit carries no version and could never
+   answer one". After round 4 a tap hit *can* carry one. The rule is unchanged — there is still no
+   control — but its reason is restated honestly: the fact exists only for a hit this Mac has installed
+   **and** whose receipt reports it outdated, so an Outdated chip would not filter the listing but
+   **replace** it, silently collapsing every published package this Mac does not have. Leaving the old
+   sentence would have left a false premise in a promoted requirement.
+4. **`UpdateTag` is declared inside `PackageRow.swift`, so round 3's symmetric copy-ownership claim
+   cannot be restated for it.** The round-3 pill row asserts "neither presenting surface composes the
+   label" over both files, which works because `StatusPill` has a file of its own. Here the catalog
+   surface **is** the declaring file, so the assertion is made where it is true — the tap surface
+   carries no `"UPDATE"`/`"Update"` literal — and the other half is carried by a **tree walk** proving
+   `struct UpdateTag: View` is declared exactly once across `cellar/`, `cellarTests/` and
+   `Packages/CellarCore/Sources`. Extracting `UpdateTag` to its own file for symmetry was rejected: it
+   would be a diff on a file with no reason to change, and `internal` already makes "the same
+   component" representable — which was DD-18's entire problem and is not this round's.
+5. **This run's first app-target baseline was wrong, and the error was in the measurement, not the
+   suite.** Reported at Phase 0‴ above: 257 was a `tee`-interleaving artefact, the true baseline is
+   **258**, verify round 4's 258 at `9894a6a` was right, and round 3's own recorded 257/267 figures
+   share the same one-low method. Recorded here because the next reader will otherwise re-derive the
+   same wrong number the same way.
+6. **A core-suite flake recurred and was not identified.** One of five full runs reported one extra
+   non-reproducing issue; the run was piped to `tail -2`, so only the summary line survived and the
+   failing row's identity was lost. The remaining four runs were the exact baseline. Reported as an
+   unidentified flake of the shape rounds 2 and 3 already recorded, not attributed and not absorbed.
+
+## Task ledger
+
+**Round 4: 22 of 22 complete.** Round 4 has **no** delivery task — the branch's one open delivery box is
+still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
+pull request. Round 3's ledger is unchanged at 24 of 24, round 2's at 55 of 56, and round 1's 59 boxes
+are unchanged history with `6.7` void.

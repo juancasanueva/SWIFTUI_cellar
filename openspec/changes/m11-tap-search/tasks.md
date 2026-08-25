@@ -1102,20 +1102,20 @@ round 4. No new copy is pinned — the pill's wording belongs to the shared comp
 
 ## Phase 6‴: Verification and bindings (round 4)
 
-- [ ] 6‴.1 `swift test --package-path Packages/CellarCore` — record the total against the **1,870**
+- [x] 6‴.1 `swift test --package-path Packages/CellarCore` — record the total against the **1,870**
       baseline measured at `03be818`.
-- [ ] 6‴.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+- [x] 6‴.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
       **258** baseline measured at `03be818`. Never quote the raw `Test case … passed` line count as an
       id count: parameterized tests print one line per case. **Redirect with `> log 2>&1`, never `tee`**
       — see the round-4 measurement gotcha; a `tee`d log interleaves xcodebuild's status block into a
       `Test case …` line, and a line-based scan then drops that id and under-counts by one. The full
       `-scheme cellar` runner is **not** the gate — it is red on `main` from two pre-existing
       `cellarUITests` Taps failures.
-- [ ] 6‴.3 Bindings proof — `git diff --stat main --` over `cellar/Browse/BrowseView.swift`,
+- [x] 6‴.3 Bindings proof — `git diff --stat main --` over `cellar/Browse/BrowseView.swift`,
       `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
       `MutationCommand.swift`, `PackageDetailView.swift` and `cellarUITests/` must print **nothing**.
       `cellar/Browse/PackageRow.swift` and `cellar/Browse/StatusPill.swift` must have a zero diff
       against `03be818`.
-- [ ] 6‴.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+- [x] 6‴.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
-- [ ] 6‴.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 4 apply progress`.
+- [x] 6‴.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 4 apply progress`.
