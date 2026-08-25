@@ -354,16 +354,53 @@ struct TapSearchCompositionTests {
                 "the name-only pane composes a trust presentation: \(trust)"
             )
         }
-        // 4. It declares no verb, no argv and no mutation target of its own: the
-        //    shared spine takes an entry with neither record and the bare token.
-        #expect(pane.code.contains("MutationMenu(center: operations"))
+        // 4. Round 8 (DD-24): the verbs are the **catalog pane's own Actions
+        //    section**, called with this pane's entry and placed last, and the
+        //    header's primary slot is empty. The entry itself is **unchanged** —
+        //    round 8 changes where and how the verbs are presented, never which
+        //    records reach them.
+        #expect(pane.code.contains("actionsSection(for: publishedEntry(for: published))"))
         #expect(pane.code.contains("PackageEntry(installed: nil, catalog: nil, id: published.id)"))
-        for local in ["MutationCommand", "PackageTarget(", "submit(", "FormulaID", "CaskID"] {
+        #expect(pane.code.contains("EmptyView()"), "the header slot is not empty")
+        #expect(
+            pane.code.contains("MutationMenu(") == false,
+            "the name-only pane still hangs the row's menu in its header"
+        )
+        // Last, after the facts and the footer — where the catalog pane puts it.
+        let footerCall = try #require(pane.code.range(of: "publishedFooter(published)"))
+        let actionsCall = try #require(
+            pane.code.range(of: "actionsSection(for: publishedEntry(for: published))")
+        )
+        #expect(
+            footerCall.upperBound < actionsCall.lowerBound,
+            "the Actions section is not the last block of the pane"
+        )
+        for local in [
+            "MutationCommand", "PackageTarget(", "submit(", "FormulaID", "CaskID",
+            "SectionHeader(\"Actions\")"
+        ] {
             #expect(
                 pane.code.contains(local) == false,
                 "the name-only pane builds its own \(local)"
             )
         }
+        // No verb label is worded here either: they live in the one section, and
+        // `ReceiptDetailCompositionTests` asserts they live there exactly once.
+        for verb in [
+            "\"Upgrade\"", "\"Reinstall\"", "\"Pin version\"", "\"Unpin\"",
+            "\"Uninstall…\"", "\"Uninstall and Zap…\"", "\"Install\""
+        ] {
+            #expect(
+                pane.code.contains(verb) == false,
+                "the name-only pane words the verb \(verb) locally"
+            )
+        }
+        // The `⋯` menu is untouched where the maintainer kept it — on the rows.
+        let rowSurface = try TapSearchSources.surface()
+        #expect(
+            rowSurface.code.contains("MutationMenu(center:"),
+            "the tap row lost the shared menu, so the pane's absence proves nothing"
+        )
         // 5. Both sentences are the projection's, rendered as values. Neither
         //    appears in the app's own sources at all.
         #expect(pane.code.contains("published.stateCopy"))
