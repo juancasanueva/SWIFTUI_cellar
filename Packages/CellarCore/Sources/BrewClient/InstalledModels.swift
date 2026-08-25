@@ -9,11 +9,15 @@ import Foundation
 public struct InstalledKeg: Sendable, Hashable {
     public let version: String
     /// From the record's install timestamp, interpreted as Unix epoch seconds.
-    public let installedAt: Date
+    /// `nil` when the receipt carries none — an older brew's cask, or a keg
+    /// whose receipt predates the field. The absence is preserved rather than
+    /// collapsed to the epoch, so no surface can state "1 January 1970" as a
+    /// fact about this Mac (installed-inventory II15).
+    public let installedAt: Date?
     /// Whether this keg was installed because the user asked for it.
     public let installedOnRequest: Bool
 
-    public init(version: String, installedAt: Date, installedOnRequest: Bool) {
+    public init(version: String, installedAt: Date?, installedOnRequest: Bool) {
         self.version = version
         self.installedAt = installedAt
         self.installedOnRequest = installedOnRequest
@@ -99,8 +103,8 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
     /// The version currently in use.
     public var installedVersion: String { primaryKeg.version }
 
-    /// When the primary keg was installed.
-    public var installedAt: Date { primaryKeg.installedAt }
+    /// When the primary keg was installed, or `nil` when its receipt does not say.
+    public var installedAt: Date? { primaryKeg.installedAt }
 
     // MARK: - Derived state (design D4)
 

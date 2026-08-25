@@ -251,7 +251,7 @@ struct InstalledDeriveTests {
         let pinned = inventory.packages.filter(\.isPinned)
 
         #expect(pinned.map(\.name).sorted() == ["docker-desktop", "python@3.12"])
-        #expect(inventory.packages.allSatisfy { $0.installedAt.timeIntervalSince1970 > 0 })
+        #expect(inventory.packages.allSatisfy { ($0.installedAt?.timeIntervalSince1970 ?? 0) > 0 })
         #expect(launcher.launchCount == 1)
         #expect(launcher.specs.allSatisfy { !$0.arguments.contains("--pinned") })
     }

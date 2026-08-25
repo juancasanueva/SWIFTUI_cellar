@@ -120,16 +120,20 @@ public enum InstalledDecoder {
     ///
     /// `linked_keg` is authoritative even when an older keg: it names the
     /// version actually on `PATH`, which is the one the user is running.
+    /// Among unlinked kegs an undated one ranks below every dated one: the
+    /// receipt could not say when it was installed, so it cannot claim to be
+    /// the newest.
     private static func primaryKeg(
         of kegs: [InstalledKeg],
         linked: String?
     ) -> InstalledKeg? {
         if let linked, let match = kegs.first(where: { $0.version == linked }) { return match }
-        return kegs.max { $0.installedAt < $1.installedAt }
+        return kegs.max { ($0.installedAt ?? .distantPast) < ($1.installedAt ?? .distantPast) }
     }
 
-    private static func date(_ epochSeconds: TimeInterval?) -> Date {
-        Date(timeIntervalSince1970: epochSeconds ?? 0)
+    /// A missing timestamp stays missing. It is never the epoch.
+    private static func date(_ epochSeconds: TimeInterval?) -> Date? {
+        epochSeconds.map { Date(timeIntervalSince1970: $0) }
     }
 
     private static func url(_ string: String?) -> URL? {
