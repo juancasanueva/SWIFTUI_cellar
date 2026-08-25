@@ -317,10 +317,14 @@ struct TapSearchCompositionTests {
     // MARK: - ps15, PM10 — no trust gate, no badge, no control
 
     @Test("The tap search surface composes no trust gate and no badge")
-    func theBrowseTapSurfaceComposesNoTrustGateAndNoBadge() throws {
-        let scanned = [try TapSearchSources.browse(), try TapSearchSources.surface()]
+    func theTapSearchSurfaceComposesNoTrustGateAndNoBadge() throws {
+        // PS8 sc15 names both the projection and the surface: neither may read
+        // or present tap trust. Browse is byte-identical to main and has its
+        // own scan, so it is not one of the two.
+        let projection = try TapSearchSources.projection()
+        let surface = try TapSearchSources.surface()
 
-        for source in scanned {
+        for source in [projection, surface] {
             for forbidden in [
                 "TrustGrantStore", "TrustGrantState", "TapProjection.trust(", "TapCommand",
                 "\"Untrusted\"", "\"Trust", "grantsIndividually", "grantMarker"
@@ -330,18 +334,20 @@ struct TapSearchCompositionTests {
                     "\(source.name) reads or presents tap trust through \(forbidden)"
                 )
             }
-            // Nothing about trust reaches this surface at all, in either
-            // granularity — the prohibition is the whole surface's, not one
-            // symbol's (PM10).
-            #expect(
-                source.code.lowercased().contains("trust") == false,
-                "\(source.name) still names trust in code"
-            )
         }
+
+        // Nothing about trust reaches the surface at all, in either
+        // granularity — the prohibition is the whole surface's, not one
+        // symbol's (PM10). The projection is exempt from this whole-file sweep
+        // only because it carries TM5's pinned copy "…while this tap is
+        // untrusted."; every trust identifier is still forbidden in it above.
+        #expect(
+            surface.code.lowercased().contains("trust") == false,
+            "\(surface.name) still names trust in code"
+        )
 
         // The install affordance is offered unconditionally, through the shared
         // menu, over an entry with neither an installed nor a catalog record.
-        let surface = try TapSearchSources.surface()
         #expect(surface.code.contains("MutationMenu(center:"))
         #expect(surface.code.contains("PackageEntry(installed: nil, catalog: nil"))
         #expect(surface.code.contains("id: hit.mutationTarget"))
