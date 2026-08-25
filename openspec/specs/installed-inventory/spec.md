@@ -744,10 +744,14 @@ at all** — never the empty string, never `unknown`, never a dash or any other 
 particular, a record whose tap Homebrew withholds MUST expose **no origin fact**, and a record with no
 published description or homepage MUST expose neither.
 
-The reduced detail MUST NOT expose an install date or install timestamp. This capability's decoder
-currently collapses a missing timestamp to the Unix epoch, so an install-date fact would state
-1 January 1970 as though it were a fact about this Mac. Until that absence is preserved through the
-decoder, no such fact may exist.
+The reduced detail MUST expose the primary keg's **install date** as a date value when the receipt
+records an install timestamp, and **no such value at all** when it does not. The presenting surface
+MUST format that value in the user's locale and MUST NOT derive an install date from anything else —
+no epoch arithmetic, no fallback, no placeholder. The decoder preserves a missing timestamp as
+absence rather than collapsing it to the Unix epoch, which is what makes this fact honest: 1 January
+1970 MUST never be stated as a fact about this Mac.
+(Previously: the reduced detail MUST NOT expose an install date, because the decoder collapsed a
+missing timestamp to the Unix epoch. Amended directly on 2026-08-25, once that collapse was removed.)
 
 Where the reduced detail is presented:
 
@@ -853,14 +857,20 @@ Where the reduced detail is presented:
 - AND no exposed value is the empty string, `unknown`, or any other placeholder standing for absence
 - Verification: `unit`
 
-#### Scenario: No fact reports an install date
+#### Scenario: The install date is the receipt's own, or absent
 
 - GIVEN the source of the type that composes the reduced detail and the source of the surface that
-  presents it, and an installed package whose receipt omits its install timestamp
-- WHEN both sources are scanned for an install-date fact and every exposed fact is enumerated
-- THEN no label, no value and no source line reports an install date or an install timestamp
-- AND no exposed value derives from the Unix epoch
+  presents it, an installed package whose receipt records an install timestamp, and one whose receipt
+  omits it
+- WHEN both sources are scanned for timestamp arithmetic and the reduced detail is composed for each
+  package
+- THEN the detail of the recorded receipt exposes that timestamp as its install date and the surface
+  presents it as `Installed on`, formatted in the user's locale
+- AND the detail of the omitting receipt exposes no install date and the surface presents no row
+- AND no source line derives a value from a timestamp or from the Unix epoch
 - Verification: `unit-app`
+  (Previously: "No fact reports an install date" — both sources were forbidden any install-date fact
+  while the decoder collapsed a missing timestamp to the Unix epoch. Amended directly on 2026-08-25.)
 
 #### Scenario: The grant marker sits beside the origin fact and is never composed locally
 

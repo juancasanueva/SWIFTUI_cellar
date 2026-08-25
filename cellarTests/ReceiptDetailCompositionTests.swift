@@ -292,23 +292,26 @@ struct ReceiptDetailCompositionTests {
         #expect(pane.raw.lowercased().contains("third party") == false)
     }
 
-    // MARK: - II15 sc9, DD-6 — no install date, on either source
+    // MARK: - II15 sc9 — the install date is the receipt's, or absent
 
-    @Test("The receipt pane renders no install date")
-    func theReceiptPaneRendersNoInstallDate() throws {
+    /// The surface reports the date the projection carries and derives nothing
+    /// from a timestamp itself: no epoch arithmetic, no `Date(` construction,
+    /// no formatter of its own beyond the locale-aware `formatted` call on the
+    /// value it was handed. A receipt with no timestamp yields no row.
+    @Test("The receipt pane reports the install date from the projection, never from a timestamp")
+    func theReceiptPaneReportsTheInstallDateFromTheProjection() throws {
         let sources = try ReceiptDetailSources.load()
         try ReceiptDetailSources.assertAnchored(sources)
 
+        let pane = try ReceiptDetailSources.source(at: "cellar/Browse/PackageDetailView+Receipt.swift")
+        #expect(pane.code.contains("\"Installed on\""), "the pane has no install-date row")
+        #expect(
+            pane.code.contains("if let installedAt = detail.installedAt"),
+            "the row is not guarded on the projection's own optional"
+        )
+
         for source in sources {
-            for forbidden in ["Installed on", "installedAt", "installed_on", "Install date"] {
-                #expect(
-                    source.code.contains(forbidden) == false,
-                    "\(source.name) reports an install date: \(forbidden)"
-                )
-            }
-            // No exposed value derives from the epoch the decoder collapses a
-            // missing timestamp to.
-            for forbidden in ["timeIntervalSince1970", "epoch", "Date(", "DateFormatter"] {
+            for forbidden in ["timeIntervalSince1970", "1970", "Date(", "DateFormatter", "epoch"] {
                 #expect(
                     source.code.contains(forbidden) == false,
                     "\(source.name) derives a value from a timestamp: \(forbidden)"
@@ -316,23 +319,24 @@ struct ReceiptDetailCompositionTests {
             }
         }
 
-        // …and the value itself carries no such fact for a receipt that has one
-        // to report, so the absence is the projection's rule and not the
-        // fixture's silence.
-        let detail = InstalledDetailProjection(Self.receipt())
-        #expect(detail.orderedFacts.isEmpty == false)
-        #expect(detail.orderedFacts.contains { $0.label.lowercased().contains("install") } == false)
-        #expect(detail.orderedFacts.contains { $0.value.contains("1970") } == false)
+        // The value is the keg's own, and its absence is preserved as absence.
+        let dated = InstalledDetailProjection(Self.receipt())
+        #expect(dated.installedAt == Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(dated.orderedFacts.contains { $0.value.contains("1970") } == false)
+        let undated = InstalledDetailProjection(Self.receipt(installedAt: nil))
+        #expect(undated.installedAt == nil)
     }
 
     // MARK: - Arrangement
 
     /// A receipt with an install timestamp to report, so the absence of an
     /// install-date fact above is a rule rather than missing input.
-    private static func receipt() -> InstalledPackage {
+    private static func receipt(
+        installedAt: Date? = Date(timeIntervalSince1970: 1_700_000_000)
+    ) -> InstalledPackage {
         let keg = InstalledKeg(
             version: "1.4.0",
-            installedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            installedAt: installedAt,
             installedOnRequest: true
         )
         return InstalledPackage(

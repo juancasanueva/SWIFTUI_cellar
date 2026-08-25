@@ -113,6 +113,12 @@ public struct InstalledDetailProjection: Sendable, Hashable {
     /// marker from the one guard (package-detail PD8, design DD-4).
     public let tapOfOrigin: Fact?
     public let kindState: KindState
+    /// When the primary keg was installed, or `nil` when its receipt does not
+    /// say. A **value rather than a fact**: locale belongs to the presenting
+    /// surface, and this type consults no calendar. Never derived from the
+    /// Unix epoch — the decoder preserves a missing timestamp as `nil`, which
+    /// is what lets this fact exist at all (installed-inventory II15).
+    public let installedAt: Date?
 
     /// Group 3 — derived from `kindState` rather than stored, so the structured
     /// value a test asserts and the copy a pane renders cannot drift.
@@ -120,8 +126,8 @@ public struct InstalledDetailProjection: Sendable, Hashable {
     /// Note what is absent and stays absent: no "latest", "current" or
     /// "published" version (the receipt's current-version value falls back to
     /// the installed keg's own, so such a row would assert a claim the receipt
-    /// never made — design DD-5), and no install date (the decoder collapses a
-    /// missing timestamp to the Unix epoch — design DD-6).
+    /// never made — design DD-5). The install date is not a row here either:
+    /// it is `installedAt`, a value the surface formats in its own locale.
     public var installStateFacts: [Fact] {
         switch kindState {
         case .formula(let state):
@@ -176,6 +182,7 @@ public struct InstalledDetailProjection: Sendable, Hashable {
         tapOfOrigin = Self.present(package.tap).map {
             Fact(label: "Tap", value: $0, style: .mono)
         }
+        installedAt = package.installedAt
 
         switch package.kind {
         case .formula:

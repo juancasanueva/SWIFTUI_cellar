@@ -131,6 +131,13 @@ extension PackageDetailView {
                 if let size = sizeOnDisk(for: snapshot.id) {
                     fact("Size on disk", size.formatted(.byteCount(style: .file)), mono: true)
                 }
+                // The receipt's own install date, formatted here in the user's
+                // locale and nowhere else. No row when the receipt carries no
+                // timestamp: the projection preserves that absence, and this
+                // surface never manufactures a date (II15).
+                if let installedAt = detail.installedAt {
+                    fact("Installed on", installedAt.formatted(date: .abbreviated, time: .omitted))
+                }
             }
             .frame(maxWidth: 820, alignment: .leading)
         }
