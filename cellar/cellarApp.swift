@@ -30,7 +30,7 @@ struct cellarApp: App {
     /// points it at an empty temporary directory, which is what makes a genuine
     /// **first run** reachable from a UI test on a machine that already has a
     /// synced catalog. Nothing else about the store changes.
-    @State private var catalog = CatalogStore(directory: AppTestFixtures.catalogDirectory)
+    @State private var catalog: CatalogStore
 
     /// What this machine has installed.
     @State private var installed: InstalledStore
@@ -158,8 +158,9 @@ struct cellarApp: App {
     /// The accent choice every tinted surface derives from.
     @State private var theme = ThemeStore()
 
-    /// The vendored cask category catalog, decoded once for every cask surface.
-    @State private var caskAssets = CaskBrowseAssets()
+    /// The vendored cask category catalog, decoded once for every cask surface,
+    /// wired in `init` to the package catalog for the artwork origin gate.
+    @State private var caskAssets: CaskBrowseAssets
     /// The cask artwork pipeline. Constructed here and nowhere else, so the
     /// session is a composition decision — and a UI-test launch disables it
     /// outright, which is what keeps those runs at zero network.
@@ -250,6 +251,14 @@ struct cellarApp: App {
             : CleanupPreviewSource()
         // One container, opened once, shared by both stores.
         let stores = LocalStores()
+        // The artwork ladder asks the catalog whether `homebrew/cask` publishes
+        // a token before it fetches anything: a third-party tap's cask has no
+        // icon in either registry, so it must never cost a request.
+        let catalog = CatalogStore(directory: AppTestFixtures.catalogDirectory)
+        _catalog = State(initialValue: catalog)
+        _caskAssets = State(initialValue: CaskBrowseAssets(publishesCask: { token in
+            catalog.package(PackageID(kind: .cask, name: token)) != nil
+        }))
         _brewDetection = State(initialValue: BrewDetectionStore(locator: locator))
         _installed = State(initialValue: installed)
         _mutations = State(initialValue: mutations)

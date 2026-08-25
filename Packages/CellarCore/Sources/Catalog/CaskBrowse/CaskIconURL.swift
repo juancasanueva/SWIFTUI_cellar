@@ -21,11 +21,21 @@ public enum CaskIconURL {
 
     /// Every URL worth trying, in order.
     ///
+    /// `isPublishedByHomebrew` is the origin gate: CaskFlow and App-Fair both
+    /// index `homebrew/cask` and nothing else, so a cask a third-party tap
+    /// publishes has no rung anywhere — every URL would be a guaranteed 404
+    /// that hands the tap's token to GitHub for nothing. The ladder is empty.
+    ///
     /// `isKnownToken` is the manifest gate — `CaskCategoryCatalog.iconTokens`
     /// membership. A token outside the manifest has no CaskFlow icon, so those
-    /// URLs would be guaranteed 404s and are skipped; App-Fair is always the
-    /// last resort.
-    public static func candidateURLs(for token: String, isKnownToken: Bool) -> [URL] {
+    /// URLs would be guaranteed 404s and are skipped; App-Fair is the last
+    /// resort for a `homebrew/cask` cask.
+    public static func candidateURLs(
+        for token: String,
+        isKnownToken: Bool,
+        isPublishedByHomebrew: Bool
+    ) -> [URL] {
+        guard isPublishedByHomebrew else { return [] }
         var urls = isKnownToken ? caskFlowIconURLs(for: token) : []
         if let appFair = appFairIconURL(for: token) {
             urls.append(appFair)

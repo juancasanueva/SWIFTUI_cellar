@@ -56,14 +56,23 @@ final class CaskIconLoader {
 
     /// The icon for a token, from memory, disk, or the network — or `nil`,
     /// which the views answer with the letter tile.
-    func icon(for token: String, isKnownToken: Bool) async -> NSImage? {
-        guard !isDisabled else { return nil }
+    ///
+    /// A cask no `homebrew/cask` record publishes answers `nil` before the
+    /// disk or the network is consulted: neither registry can hold it, so
+    /// there is nothing to fetch, nothing to cache and no miss to stamp.
+    func icon(for token: String, isKnownToken: Bool, isPublishedByHomebrew: Bool) async -> NSImage? {
+        guard !isDisabled, isPublishedByHomebrew else { return nil }
         if let cached = memory.object(forKey: token as NSString) { return cached }
         if let running = inFlight[token] { return await running.value }
 
         let session = self.session
         let task = Task {
-            await Self.loadOffMain(token: token, isKnownToken: isKnownToken, session: session)
+            await Self.loadOffMain(
+                token: token,
+                isKnownToken: isKnownToken,
+                isPublishedByHomebrew: isPublishedByHomebrew,
+                session: session
+            )
         }
         inFlight[token] = task
         let image = await task.value
@@ -79,6 +88,7 @@ final class CaskIconLoader {
     private static func loadOffMain(
         token: String,
         isKnownToken: Bool,
+        isPublishedByHomebrew: Bool,
         session: URLSession
     ) async -> NSImage? {
         let directory = cacheDirectory()
@@ -96,7 +106,11 @@ final class CaskIconLoader {
             return nil
         }
 
-        for url in CaskIconURL.candidateURLs(for: token, isKnownToken: isKnownToken) {
+        for url in CaskIconURL.candidateURLs(
+            for: token,
+            isKnownToken: isKnownToken,
+            isPublishedByHomebrew: isPublishedByHomebrew
+        ) {
             guard
                 let (data, response) = try? await session.data(from: url),
                 (response as? HTTPURLResponse)?.statusCode == 200,

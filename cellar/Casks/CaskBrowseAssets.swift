@@ -23,6 +23,16 @@ final class CaskBrowseAssets {
     /// first load instead of decoding the asset again.
     private var hasStartedLoading = false
 
+    /// Whether a `homebrew/cask` record publishes a token — the origin gate the
+    /// artwork ladder asks before it fetches anything. The app wires this to
+    /// the catalog store; the default answers `false` for every token, so a
+    /// preview or a store nobody wired stays at zero network.
+    private let publishesCaskToken: @MainActor (String) -> Bool
+
+    init(publishesCask: @escaping @MainActor (String) -> Bool = { _ in false }) {
+        publishesCaskToken = publishesCask
+    }
+
     /// Called from the browse view's `.task`; idempotent by design.
     func load() async {
         guard !hasStartedLoading else { return }
@@ -48,5 +58,13 @@ final class CaskBrowseAssets {
     /// manifest gate `CaskIconURL.candidateURLs` asks about.
     func isKnownIconToken(_ token: String) -> Bool {
         catalog?.iconTokens.contains(token) ?? false
+    }
+
+    /// Whether the synced catalog carries a `homebrew/cask` record for this
+    /// token. A third-party tap's cask answers `false`, and so does every
+    /// token while the catalog is cold — the letter tile is the answer then,
+    /// and the row asks again when the catalog arrives.
+    func publishesCask(_ token: String) -> Bool {
+        publishesCaskToken(token)
     }
 }

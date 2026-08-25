@@ -20,6 +20,12 @@ struct CaskIconView: View {
     /// would only buy a guaranteed miss per row — the letter tile *is* the
     /// designed answer there, not a fallback.
     var loadsRemote: Bool = true
+    /// Whether a `homebrew/cask` record publishes this token. The Discover
+    /// pages draw catalog casks only, so their default is `true`; the mixed
+    /// lists compute it, and a third-party tap's cask gets the letter tile
+    /// with **no request at all** — both registries index `homebrew/cask`
+    /// and nothing else (see `CaskIconURL.candidateURLs`).
+    var isPublishedByHomebrew: Bool = true
 
     @State private var icon: NSImage?
 
@@ -51,9 +57,15 @@ struct CaskIconView: View {
             }
         }
         .frame(width: size, height: size)
-        .task(id: token) {
+        // Keyed on the origin answer too: a catalog that arrives after the
+        // row first drew promotes a letter tile to artwork on the next pass.
+        .task(id: "\(token)|\(isPublishedByHomebrew)") {
             guard loadsRemote else { return }
-            icon = await iconLoader.icon(for: token, isKnownToken: isKnownToken)
+            icon = await iconLoader.icon(
+                for: token,
+                isKnownToken: isKnownToken,
+                isPublishedByHomebrew: isPublishedByHomebrew
+            )
         }
     }
 }
@@ -79,7 +91,8 @@ struct PackageIconTile: View {
                 token: id.name,
                 size: size,
                 isKnownToken: assets?.isKnownIconToken(id.name) ?? false,
-                iconLoader: iconLoader
+                iconLoader: iconLoader,
+                isPublishedByHomebrew: assets?.publishesCask(id.name) ?? false
             )
         } else if id.kind == .formula {
             FormulaIconTile(size: size)
