@@ -26,6 +26,11 @@ struct PackageDetailView: View {
     /// as a closure or a pre-computed `Bool`, so the marker appears the moment a
     /// refresh answers (package-detail PD8, design DD-10).
     let trustGrants: TrustGrantStore
+    /// The tap inventory this Mac already has resident, from the refresh
+    /// `tap-management` performs. Read for the **third** body branch alone, and
+    /// never refreshed: composing that pane costs no brew invocation
+    /// (package-search PS8 round 6, design DD-21).
+    let taps: TapStore
     /// The cask artwork pipeline; `nil` — a preview, say — keeps the letter
     /// tile in the header (see `PackageIconTile`).
     var assets: CaskBrowseAssets?
@@ -54,6 +59,19 @@ struct PackageDetailView: View {
                 // still carries the identity row, so the package can be
                 // favorited without a catalog entry (installed-inventory II7).
                 uncatalogedContent(for: snapshot)
+            } else if let published = TapInventoryDetail.resolve(
+                id,
+                in: taps.inventory,
+                installed: installed.inventory
+            ) {
+                // No catalog record and no receipt, but exactly one installed
+                // third-party tap publishes this identity — so Cellar knows its
+                // name, its kind and where it came from, and can say so. The
+                // branch sits **third** on purpose: an installed package always
+                // reaches its receipt above, and this one answers only for a
+                // package this Mac does not have (package-search PS8 round 6,
+                // design DD-21).
+                tapInventoryContent(for: published)
             } else {
                 ContentUnavailableView(
                     "Package details unavailable",
@@ -120,7 +138,7 @@ struct PackageDetailView: View {
         analytics(for: package)
         PackageMetadataSection(entry: entry(for: package), metadata: metadata)
         caveats(for: package)
-        actionsSection(for: package)
+        actionsSection(for: entry(for: package))
     }
 
     @ViewBuilder
@@ -184,10 +202,18 @@ struct PackageDetailView: View {
     /// command underneath, danger kept visibly apart. Every submission goes
     /// through `submit(_:)`, so the confirmation rule is applied in exactly one
     /// place — the same discipline `MutationMenu` follows on the list rows.
+    ///
+    /// Built from a `PackageEntry` rather than from a `CatalogPackage` because
+    /// that is every input it ever had: an identity and an installed record.
+    /// `internal` for the same reason `header(id:…)` and `fact(_:_:)` are — the
+    /// two tap-backed panes are extensions in **other** files, Swift `private`
+    /// is file-scoped, and "the same Actions section" is only representable if
+    /// there is exactly one of it (installed-inventory II15, package-search PS8,
+    /// design DD-24). Everything it calls stays `private`: those calls are in
+    /// this file.
     @ViewBuilder
-    private func actionsSection(for package: CatalogPackage) -> some View {
-        if let target = PackageTarget(package.id) {
-            let entry = entry(for: package)
+    func actionsSection(for entry: PackageEntry) -> some View {
+        if let target = PackageTarget(entry.id) {
             let installedPackage = entry.installed
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader("Actions")
@@ -201,7 +227,7 @@ struct PackageDetailView: View {
                         quietButton("Reinstall", identifier: "detail-action-reinstall") {
                             submit(.reinstall(target))
                         }
-                        if let formula = FormulaID(package.id) {
+                        if let formula = FormulaID(entry.id) {
                             quietButton(
                                 installedPackage.isPinned ? "Unpin" : "Pin version",
                                 identifier: "detail-action-pin"
@@ -213,7 +239,7 @@ struct PackageDetailView: View {
                         dangerButton("Uninstall…", identifier: "detail-action-uninstall") {
                             submit(.uninstall(target))
                         }
-                        if let cask = CaskID(package.id) {
+                        if let cask = CaskID(entry.id) {
                             dangerButton("Uninstall and Zap…", identifier: "detail-action-zap") {
                                 submit(.zap(cask))
                             }
@@ -227,11 +253,11 @@ struct PackageDetailView: View {
                 }
                 .disabled(!operations.isAvailable)
                 HStack(spacing: 8) {
-                    Text(primaryCommand(for: package, target: target).displayCommand)
+                    Text(primaryCommand(for: entry, target: target).displayCommand)
                         .font(Theme.mono(11))
                         .foregroundStyle(Theme.textFaint)
                         .textSelection(.enabled)
-                    CopyCommandButton(text: primaryCommand(for: package, target: target).displayCommand)
+                    CopyCommandButton(text: primaryCommand(for: entry, target: target).displayCommand)
                 }
                 if let guidance = operations.unavailableGuidance {
                     Text(guidance)
@@ -243,8 +269,8 @@ struct PackageDetailView: View {
     }
 
     /// The command the caption shows: what the most likely button would run.
-    private func primaryCommand(for package: CatalogPackage, target: PackageTarget) -> MutationCommand {
-        guard let installedPackage = installed.inventory.package(package.id) else {
+    private func primaryCommand(for entry: PackageEntry, target: PackageTarget) -> MutationCommand {
+        guard let installedPackage = entry.installed else {
             return .install(target)
         }
         return installedPackage.isOutdated ? .upgrade(target) : .reinstall(target)
@@ -363,14 +389,22 @@ struct PackageDetailView: View {
         }
     }
 
-    /// The one identity row both paths render: tile, name, version story, kind,
-    /// status and the heart — fed by the catalog record when there is one and
-    /// by the snapshot alone when there is not.
+    /// The one identity row every path renders: tile, name, version story, kind,
+    /// status and the heart — fed by the catalog record when there is one, by
+    /// the snapshot alone when there is not, and by the tap inventory alone when
+    /// there is neither.
+    ///
+    /// `versionStory` is **optional** because the third caller has no version to
+    /// tell a story about: a tap publishes a name, not a version, and reading one
+    /// would need the tap-source read `tap-management` TM5 forbids. An absent
+    /// story takes the line and its separator with it rather than drawing an
+    /// empty `Text` and a dangling dot — a placeholder for an absent fact is
+    /// exactly what `package-detail` PD1 keeps off this pane (design DD-22).
     @ViewBuilder
     func header(
         id: PackageID,
         displayName: String,
-        versionStory: String,
+        versionStory: String?,
         installed installedPackage: InstalledPackage?,
         @ViewBuilder primaryButton: () -> some View
     ) -> some View {
@@ -390,10 +424,12 @@ struct PackageDetailView: View {
                     .foregroundStyle(Theme.textPrimary)
                     .textSelection(.enabled)
                 HStack(spacing: 9) {
-                    Text(versionStory)
-                        .font(Theme.mono(12))
-                        .foregroundStyle(Theme.textSecondary)
-                    Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
+                    if let versionStory {
+                        Text(versionStory)
+                            .font(Theme.mono(12))
+                            .foregroundStyle(Theme.textSecondary)
+                        Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
+                    }
                     Text(id.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.textSecondary)
@@ -852,6 +888,7 @@ private struct StatusNote: View {
             )
         ),
         trustGrants: TrustGrantStore(),
+        taps: TapStore(),
         id: nil,
         selection: $selection
     )

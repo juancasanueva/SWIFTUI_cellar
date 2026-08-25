@@ -30,8 +30,10 @@ struct AppSectionPlacementTests {
         // the three formula-discovery pages that mirror the cask ones, minus
         // the original Discover section: the maintainer retired it
         // (2026-08-17) once the two Discover groups covered its job with
-        // live analytics rather than a static curated list.
-        #expect(order.count == 21)
+        // live analytics rather than a static curated list, plus the tap
+        // search surface the 2026-08-25 scope change gave its own row beside
+        // Search catalog.
+        #expect(order.count == 22)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -50,7 +52,7 @@ struct AppSectionPlacementTests {
         #expect(AppSection.health.rawValue == "health")
         // The sidebar identifier a UI test queries by.
         #expect(order.map(\.rawValue) == [
-            "home", "browse",
+            "home", "browse", "tapSearch",
             "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
             "caskCategory",
             "formulaBrowse", "formulaFeatured", "formulaTopCharts",
@@ -100,6 +102,9 @@ struct AppSectionPlacementTests {
         // "between Services and Security": Services closes the group before it,
         // Security follows it.
         #expect(AppSection.sidebarGroups[4].sections == [.health, .security, .cleanup])
+        // Overview gained the tap search surface beside Search catalog: two
+        // query surfaces, siblings, in the group a user lands in.
+        #expect(AppSection.sidebarGroups[0].sections == [.home, .browse, .tapSearch])
     }
 
     /// Home keeps its place at the head of the sidebar, and now holds the

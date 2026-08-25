@@ -86,6 +86,13 @@ enum InstalledFixture {
     ///
     /// `primaryKeg` follows `InstalledDecoder`'s rule exactly: the linked keg
     /// when one is named, otherwise the newest install.
+    ///
+    /// `outdatedTo` names the version brew currently **offers**, and sets the
+    /// published version and the snapshot's outdated flag **together**: a
+    /// receipt that claims to be outdated toward the version it already has is
+    /// not representable through this builder, which is the whole reason the
+    /// two members are not exposed separately. Pass a version the record does
+    /// not already carry.
     static func receipt(
         _ kind: PackageKind,
         _ name: String,
@@ -94,6 +101,7 @@ enum InstalledFixture {
         homepage: URL? = nil,
         tap: String? = "acme/tools",
         kegVersions: [String] = [installedVersion],
+        outdatedTo: String? = nil,
         linkedKeg: String? = nil,
         isPinned: Bool = false,
         pinnedVersion: String? = nil,
@@ -117,10 +125,10 @@ enum InstalledFixture {
             desc: desc,
             homepage: homepage,
             tap: tap,
-            catalogVersion: primary.version,
+            catalogVersion: outdatedTo ?? primary.version,
             kegs: kegs,
             primaryKeg: primary,
-            snapshotOutdated: false,
+            snapshotOutdated: outdatedTo != nil,
             isPinned: isPinned,
             pinnedVersion: pinnedVersion,
             declaresAutoUpdates: declaresAutoUpdates,

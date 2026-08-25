@@ -27,6 +27,16 @@ struct CatalogFilterBar: View {
     /// False when there is no inventory, which makes the toggle inert rather
     /// than wrong — so it is disabled instead.
     let isInstalledFilterEnabled: Bool
+    /// Whether the Outdated chip is offered at all.
+    ///
+    /// A tap hit carries no version, so outdatedness is a question that source
+    /// could never answer; an enabled control that cannot change the visible
+    /// results is what design D8d forbids. Defaulted so the catalog call site
+    /// keeps a byte-identical argument list (DD-15).
+    var showsOutdatedChip = true
+    /// Whether the two published-index predicates — Hide deprecated and Hide
+    /// disabled — are offered. The tap inventory publishes neither flag.
+    var showsCatalogPredicates = true
 
     var body: some View {
         HStack(spacing: 5) {
@@ -39,15 +49,17 @@ struct CatalogFilterBar: View {
                 FilterChip(label: "Casks", isOn: kindSelection.wrappedValue == .cask) {
                     kindSelection.wrappedValue = .cask
                 }
-                if isInstalledFilterEnabled {
+                if showsOutdatedChip, isInstalledFilterEnabled {
                     FilterChip(label: "Outdated", isOn: outdatedOnly) {
                         outdatedOnly.toggle()
                     }
                 }
                 Spacer(minLength: 0)
                 Menu {
-                    Toggle("Hide deprecated", isOn: $filters.excludeDeprecated)
-                    Toggle("Hide disabled", isOn: $filters.excludeDisabled)
+                    if showsCatalogPredicates {
+                        Toggle("Hide deprecated", isOn: $filters.excludeDeprecated)
+                        Toggle("Hide disabled", isOn: $filters.excludeDisabled)
+                    }
                     Toggle("Hide installed", isOn: $hideInstalled)
                         // Without an inventory nothing is known to be
                         // installed, so the toggle would be inert rather than
@@ -61,7 +73,11 @@ struct CatalogFilterBar: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help("Deprecated, disabled and installed packages")
+                .help(
+                    showsCatalogPredicates
+                        ? "Deprecated, disabled and installed packages"
+                        : "Installed packages"
+                )
         }
     }
 

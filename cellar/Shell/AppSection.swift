@@ -26,6 +26,13 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// (2026-08-17) once the Discover Casks and Discover Formulae groups
     /// covered its job with live analytics rather than a static curated list.
     case browse
+    /// Packages published by the taps this Mac has installed, searched on their
+    /// own surface.
+    ///
+    /// Beside `.browse` in Overview rather than under Manage: it is the
+    /// counterpart to Search catalog, and filing a *search* surface under *tap
+    /// administration* is the boundary `tap-management` TM11 draws (DD-14).
+    case tapSearch
     /// The CaskHub-style cask storefront: a house pick, curated shelves, and a
     /// grid of app cards. Its own group in the sidebar because it browses one
     /// kind of package by category rather than the whole catalog by query.
@@ -105,6 +112,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "Home"
         case .browse: "Search"
+        case .tapSearch: "Search taps"
         case .caskBrowse: "Browse"
         case .caskFeatured: "Featured"
         case .caskTopCharts: "Top Charts"
@@ -134,7 +142,18 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     var sidebarTitle: String {
         switch self {
         case .browse: "Search catalog"
-        default: title
+        case .tapSearch: "Search our taps"
+        // Exhaustive rather than `default:`, and deliberately so. A one-case
+        // switch is not recognised as an `AppSection` switch by the placement
+        // suite's detector; a second wording brings this one into its scope,
+        // and the rule it enforces there — no `default:` — is the right rule:
+        // a `default:` is what would let a new section ship with the toolbar's
+        // wording in the sidebar without anyone deciding that.
+        case .health, .home, .caskBrowse, .caskFeatured, .caskTopCharts,
+             .caskRecentlyAdded, .caskCategory, .formulaBrowse, .formulaFeatured,
+             .formulaTopCharts, .installed, .favorites, .updates, .taps, .services,
+             .cleanup, .security, .brewfile, .history, .settings:
+            title
         }
     }
 
@@ -142,6 +161,9 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "house"
         case .browse: "magnifyingglass"
+        // Verified against this SDK before use, like the calendar variant
+        // below: a plausible symbol name that does not exist renders nothing.
+        case .tapSearch: "sparkle.magnifyingglass"
         case .caskBrowse: "square.grid.2x2"
         case .caskFeatured: "star"
         case .caskTopCharts: "chart.line.uptrend.xyaxis"
@@ -171,7 +193,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// The design's four labelled groups, in its order. `settings` is not in
     /// any group: it lives in the sidebar's footer.
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
-        ("Overview", [.home, .browse]),
+        ("Overview", [.home, .browse, .tapSearch]),
         ("Discover Casks", [.caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory]),
         ("Discover Formulae", [.formulaBrowse, .formulaFeatured, .formulaTopCharts]),
         ("Packages", [.installed, .favorites, .updates, .services]),

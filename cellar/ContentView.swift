@@ -92,10 +92,10 @@ struct ContentView: View {
     /// so an existing user's dragged width carries over.
     @State private var listPaneWidths: [AppSection: Double] = [:]
 
-    /// The design's 342 — except Search catalog, whose rows carry state chips
-    /// and a trailing metric that 342 truncates; it opens at 400.
+    /// The design's 342 — except the two search surfaces, whose rows carry
+    /// state chips and a trailing menu that 342 truncates; they open at 400.
     private static func defaultListPaneWidth(for section: AppSection) -> Double {
-        section == .browse ? 400 : 342
+        section == .browse || section == .tapSearch ? 400 : 342
     }
 
     private static let legacyListPaneWidthKey = "shell.listPaneWidth"
@@ -154,7 +154,7 @@ struct ContentView: View {
     /// a fourth `AppSection` switch on purpose: the placement suite pins the
     /// shell to exactly two exhaustive switches (content and detail).
     private static let listSections: Set<AppSection> = [
-        .browse, .caskCategory, .installed, .favorites, .updates,
+        .browse, .tapSearch, .caskCategory, .installed, .favorites, .updates,
         .taps,
     ]
 
@@ -201,9 +201,7 @@ struct ContentView: View {
                         // lands on says the same.
                         ShellTitleBar(
                             title: section.sidebarTitle,
-                            countLabel: section == .browse
-                                ? "\(catalog.packageCount.formatted()) packages"
-                                : nil,
+                            countLabel: countLabel,
                             shellControls: shellHeaderControls,
                             leadingAccessories: shellTitleBarLeadingAccessories,
                             accessories: shellTitleBarAccessories
@@ -309,6 +307,16 @@ struct ContentView: View {
                 installed: installed,
                 operations: operations,
                 diskUsage: diskUsage,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                selection: $selection
+            )
+        case .tapSearch:
+            TapSearchView(
+                taps: taps,
+                installed: installed,
+                catalog: catalog,
+                operations: operations,
                 assets: caskAssets,
                 iconLoader: caskIcons,
                 selection: $selection
@@ -526,9 +534,14 @@ struct ContentView: View {
             // No detail column: the dashboard embeds the integrity section
             // and opens a finding in a sheet.
             return nil
-        case .browse, .installed, .favorites, .updates:
+        case .browse, .tapSearch, .installed, .favorites, .updates:
             // The same detail view for all of them: a package is a package,
-            // and the catalog record is the thing worth reading about it.
+            // and the catalog record is the thing worth reading about it. A
+            // routable tap hit lands here through the *existing* resolution
+            // order, by its exact `PackageID` — still no arm of its own here
+            // (DD-4). Round 6 adds the tap inventory as an input, because that
+            // order gained a third branch **inside** the shared view: catalog,
+            // then receipt, then the names one installed tap published (DD-21).
             return AnyView(
                 PackageDetailView(
                     catalog: catalog,
@@ -537,6 +550,7 @@ struct ContentView: View {
                     metadata: metadata,
                     diskUsage: diskUsage,
                     trustGrants: trustGrants,
+                    taps: taps,
                     assets: caskAssets,
                     iconLoader: caskIcons,
                     id: selection,
@@ -591,7 +605,7 @@ struct ContentView: View {
     /// pin their own collection bar; the rest get the shell's plain
     /// `ShellTitleBar` instead.
     private static let pinnedHeaderSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
+        .home, .browse, .tapSearch, .installed, .favorites, .updates, .services, .health, .security,
         .cleanup, .taps, .brewfile, .history, .settings,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
@@ -600,9 +614,30 @@ struct ContentView: View {
     /// The subset whose bar the shell itself pins — the sections with no
     /// collection controls of their own.
     private static let shellTitleBarSections: Set<AppSection> = [
-        .home, .browse, .installed, .favorites, .updates, .services, .health, .security,
+        .home, .browse, .tapSearch, .installed, .favorites, .updates, .services, .health, .security,
         .cleanup, .taps, .brewfile, .history, .settings,
     ]
+
+    /// What the pinned bar counts, for the two sections that have a number
+    /// worth showing.
+    ///
+    /// Each surface counts **its own** records: Search catalog counts catalog
+    /// packages, and Search our taps counts what the installed third-party taps
+    /// publish, through the same projection that answers its listing so the two
+    /// can never disagree (DD-17).
+    /// Deliberately **not** a `switch`: the placement suite treats any switch
+    /// with two or more `AppSection` labels as one of the shell's exhaustive
+    /// section switches, and this is a two-section special case rather than a
+    /// decision every future section must make.
+    private var countLabel: String? {
+        if section == .browse {
+            return "\(catalog.packageCount.formatted()) packages"
+        }
+        if section == .tapSearch {
+            return "\(TapPackageSearch.packageCount(inventory: taps.inventory).formatted()) packages"
+        }
+        return nil
+    }
 
     /// The section-owned control the pinned bar draws before the shared pair.
     private var shellTitleBarLeadingAccessories: AnyView? {
@@ -626,7 +661,7 @@ struct ContentView: View {
             AnyView(HistoryShellAccessories(history: history))
         case .updates:
             AnyView(UpdatesShellAccessories(operations: operations))
-        case .health, .home, .browse, .installed, .favorites, .taps, .services,
+        case .health, .home, .browse, .tapSearch, .installed, .favorites, .taps, .services,
              .cleanup, .security, .brewfile, .settings,
              .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
              .formulaBrowse, .formulaFeatured, .formulaTopCharts:

@@ -41,12 +41,10 @@ struct PackageRow: View {
                     KindTag(kind: entry.id.kind)
                     if entry.isInstalled {
                         // A pill, not an icon: the row already speaks in chips
-                        // (CASK, UPDATE), so its states read in chips too.
-                        statusPill(
-                            "Installed",
-                            background: Theme.successTint(0.16),
-                            foreground: Theme.successText
-                        )
+                        // (CASK, UPDATE), so its states read in chips too. The
+                        // tap search rows draw this exact component, so the two
+                        // search surfaces cannot drift (PS8, DD-18).
+                        StatusPill.installed
                     }
                     // The same pill the Installed and Updates lists draw, so
                     // "this has an update" reads identically everywhere.
@@ -54,8 +52,8 @@ struct PackageRow: View {
                         UpdateTag(nextVersion: installed.catalogVersion)
                     }
                     ForEach(entry.catalog?.badges ?? [], id: \.self) { badge in
-                        statusPill(
-                            badge.label,
+                        StatusPill(
+                            label: badge.label,
                             background: Color.orange.opacity(0.16),
                             foreground: Color.orange
                         )
@@ -77,25 +75,6 @@ struct PackageRow: View {
             }
         }
         .padding(.vertical, 3)
-    }
-
-    /// The row's state chips — Installed, Deprecated, Disabled — in the CASK
-    /// and UPDATE chips' exact shape, so every fact on the line carries the
-    /// same glance weight.
-    private func statusPill(
-        _ label: String,
-        background: Color,
-        foreground: Color
-    ) -> some View {
-        Text(label.uppercased())
-            .font(.system(size: 8.5, weight: .bold))
-            .kerning(0.3)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
-            .background(background, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
-            .foregroundStyle(foreground)
-            .help(label)
-            .accessibilityLabel(label)
     }
 
     /// The design's second line is the version story; the description stands in

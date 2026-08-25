@@ -174,25 +174,97 @@ struct ReceiptDetailCompositionTests {
         }
     }
 
-    // MARK: - II15 sc11, DD-8 — the row's verbs, from the row's own surface
+    // MARK: - II15 sc11 (round 8), DD-24 — the catalog pane's Actions section
 
-    @Test("The receipt pane offers the same verbs as the installed row")
-    func theReceiptPaneOffersTheSameVerbsAsTheRow() throws {
+    /// The maintainer's 2026-08-25 instruction, asserted where it can be:
+    /// this pane shows the **same** Actions section the catalog pane shows, at
+    /// the foot of the pane, and its header's primary slot is empty.
+    ///
+    /// "The same section" is a claim about **one declaration reached from two
+    /// places**, which no rendering test can make — a second copy would render
+    /// identically and pass. So the pane is pinned to the call, the call is
+    /// pinned with its closing parenthesis, and every verb literal is asserted
+    /// **absent here and present exactly once there**, which is what makes the
+    /// absence non-vacuous.
+    @Test("The receipt pane offers the catalog pane's Actions section")
+    func theReceiptPaneOffersTheCatalogPanesActionsSection() throws {
         let pane = try ReceiptDetailSources.pane()
+        let detail = try ReceiptDetailSources.source(at: "cellar/Browse/PackageDetailView.swift")
         let row = try ReceiptDetailSources.source(at: "cellar/Installed/InstalledRow.swift")
 
-        // The same shared surface the installed list row uses, for the same
-        // catalog-less entry shape.
-        #expect(pane.code.contains("MutationMenu(center:"))
+        // 1. The pane calls the one shared builder with its own entry. The
+        //    terminator is part of the pin: a scan for the bare name would pass
+        //    for a differently-shaped call, including one that rebuilt the entry.
+        #expect(
+            pane.code.contains("actionsSection(for: receiptEntry(for: snapshot))"),
+            "the pane does not reach the catalog pane's Actions section"
+        )
         #expect(pane.code.contains("catalog: nil"))
+        // 2. It sits last, after the pane's own footer content, where the
+        //    catalog pane places it.
+        let footer = try #require(pane.code.range(of: "receiptFooter\n"))
+        let actions = try #require(
+            pane.code.range(of: "actionsSection(for: receiptEntry(for: snapshot))")
+        )
+        #expect(
+            footer.upperBound < actions.lowerBound,
+            "the Actions section is not the last block of the pane"
+        )
+        // 3. The header's primary slot is empty: one pane, one place to act.
+        #expect(pane.code.contains("EmptyView()"), "the header slot is not empty")
+        #expect(
+            pane.code.contains("MutationMenu(") == false,
+            "the pane still hangs the row's menu in its header"
+        )
+        // 4. …and the menu is untouched where it belongs. Without this, the
+        //    absence above would also pass if the shared menu had been deleted.
         #expect(
             row.code.contains("MutationMenu(center:"),
-            "the row no longer uses the shared surface, so the pane matching it proves nothing"
+            "the installed row lost the shared menu, so the pane's absence proves nothing"
         )
-        // …and no verb is re-implemented here.
-        #expect(pane.code.contains("MutationCommand") == false, "the pane builds its own verb")
-        #expect(pane.code.contains("submit(") == false)
-        #expect(pane.code.contains("PackageTarget(") == false)
+        // 5. No verb, argv, target or section copy is composed here.
+        for local in ["MutationCommand", "PackageTarget(", "submit(", "SectionHeader(\"Actions\")"] {
+            #expect(pane.code.contains(local) == false, "the pane builds its own \(local)")
+        }
+        for verb in ReceiptDetailSources.verbLiterals {
+            #expect(
+                pane.code.contains(verb) == false,
+                "the pane words the verb \(verb) locally instead of sharing the section"
+            )
+        }
+
+        // 6. Non-vacuous: the section really is where those verbs live, exactly
+        //    once each, with the command line, its copy button and the shared
+        //    unavailable guidance.
+        let section = try ReceiptDetailSources.actionsSection(in: detail)
+        for verb in ReceiptDetailSources.verbLiterals {
+            #expect(
+                section.components(separatedBy: verb).count == 2,
+                "the shared Actions section does not declare \(verb) exactly once"
+            )
+        }
+        #expect(section.contains("SectionHeader(\"Actions\")"))
+        #expect(section.contains("CopyCommandButton(text: primaryCommand("))
+        #expect(section.contains("operations.unavailableGuidance"))
+
+        // 7. It is built from the entry both panes can supply — never from a
+        //    catalog record, which neither of them has and PD6 forbids either
+        //    of them to synthesize.
+        #expect(detail.code.contains("func actionsSection(for entry: PackageEntry) -> some View"))
+        #expect(
+            detail.code.contains("private func actionsSection") == false,
+            "the section is file-scoped again, so no extension can reach it"
+        )
+        #expect(section.contains("CatalogPackage") == false)
+
+        // 8. PT7, PM10: the shared section carries no trust control, so reusing
+        //    it adds none to this pane.
+        for trust in ["Trust", "trust", "Grant", "grant"] {
+            #expect(
+                section.contains(trust) == false,
+                "the shared Actions section composes a trust presentation: \(trust)"
+            )
+        }
     }
 
     // MARK: - II15 sc12, R2, DD-12 — the copy stays a claim about the catalog
@@ -322,6 +394,49 @@ nonisolated enum ReceiptDetailSources {
             code: AppSecuritySources.stripComments(from: raw),
             raw: raw
         )
+    }
+
+    /// Every verb label the shared Actions section declares, as complete Swift
+    /// literals.
+    ///
+    /// The quotes are load-bearing, not decoration: `Uninstall` is a prefix of
+    /// `Uninstall and Zap…`, and `Install` is a substring of `Installed as`, so
+    /// a bare substring search would report both a false match and a false
+    /// duplicate. A whole literal is the only honest shape for these claims.
+    static let verbLiterals = [
+        "\"Upgrade\"",
+        "\"Reinstall\"",
+        "\"Pin version\"",
+        "\"Unpin\"",
+        "\"Uninstall…\"",
+        "\"Uninstall and Zap…\"",
+        "\"Install\""
+    ]
+
+    /// The shared Actions section's own body, extracted by brace matching from
+    /// its declaration.
+    ///
+    /// Extracted rather than scanned whole-file, so a claim about "the section"
+    /// is a claim about the section: `PackageDetailView.swift` legitimately
+    /// carries a trust marker and a catalog type elsewhere, and a whole-file
+    /// sweep would report the section guilty of both.
+    static func actionsSection(in detail: Source) throws -> String {
+        let lines = detail.code.components(separatedBy: "\n")
+        let start = try #require(
+            lines.firstIndex { $0.contains("func actionsSection(for entry: PackageEntry)") },
+            "the shared Actions section moved, so every claim about it anchors on nothing"
+        )
+        var depth = 0
+        var body: [String] = []
+        for index in start..<lines.count {
+            body.append(lines[index])
+            depth += lines[index].filter { $0 == "{" }.count
+            depth -= lines[index].filter { $0 == "}" }.count
+            if depth == 0, index > start { break }
+        }
+        #expect(depth == 0, "the shared Actions section's block never closes")
+        #expect(body.count > 20, "the extracted Actions section is too small to be it")
+        return body.joined(separator: "\n")
     }
 
     static func pane() throws -> Source {

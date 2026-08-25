@@ -617,7 +617,7 @@ struct BrewfilePlacementTests {
     func theSidebarVocabularyIsTheDesignDocumentsSections() {
         #expect(
             AppSection.allCases.map(\.rawValue) == [
-                "home", "browse",
+                "home", "browse", "tapSearch",
                 "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
                 "caskCategory",
                 "formulaBrowse", "formulaFeatured", "formulaTopCharts",
@@ -626,7 +626,7 @@ struct BrewfilePlacementTests {
                 "history", "settings"
             ]
         )
-        #expect(AppSection.allCases.count == 21)
+        #expect(AppSection.allCases.count == 22)
     }
 
     @Test("Both affordances live in the Brewfile section, and the sheets are presented nowhere else")
