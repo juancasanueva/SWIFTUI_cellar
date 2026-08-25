@@ -517,10 +517,11 @@ struct TapSearchCompositionTests {
             "\(surface.name) still names trust in code"
         )
 
-        // The install affordance is offered unconditionally, through the shared
-        // menu, over an entry with neither an installed nor a catalog record.
+        // The mutation affordances are offered unconditionally, through the
+        // shared menu, over an entry carrying the projection's installed record
+        // and **never** a catalog one (PS8 round 5, DD-20; PD6).
         #expect(surface.code.contains("MutationMenu(center:"))
-        #expect(surface.code.contains("PackageEntry(installed: nil, catalog: nil"))
+        #expect(surface.code.contains("PackageEntry(installed: hit.installed, catalog: nil"))
         #expect(surface.code.contains("id: hit.mutationTarget"))
         // …and no verb, argv or target is re-implemented here.
         for forbidden in ["MutationCommand", "PackageTarget(", "submit(", "FormulaID", "CaskID"] {
@@ -531,6 +532,87 @@ struct TapSearchCompositionTests {
         let menu = try TapSearchSources.source(at: "cellar/Activity/MutationMenu.swift")
         #expect(menu.code.contains("action(\"Install\", .install(target))"))
         #expect(menu.code.contains("Copy install command"))
+    }
+
+    // MARK: - ps18 (round 5), DD-20 — the installed record reaches the menu
+
+    /// PS8 round 5: an installed tap row must offer the verbs the Installed and
+    /// catalog surfaces offer the same package.
+    ///
+    /// The defect this pins was a *composition* one, not a missing verb: the row
+    /// handed the shared menu an entry built with `installed: nil`, so the
+    /// menu's own installed branch could never be taken however installed the
+    /// package was. The claim is therefore about what the row hands over and
+    /// about what it still refuses to declare for itself.
+    @Test("An installed tap row reaches the mutation menu with its record")
+    func anInstalledTapRowReachesTheMutationMenuWithItsRecord() throws {
+        let surface = try TapSearchSources.surface()
+        let menu = try TapSearchSources.source(at: "cellar/Activity/MutationMenu.swift")
+
+        // What the row hands over: the projection's resolved record, no catalog
+        // record, the bare target.
+        let entry = try TapSearchSources.callSite("PackageEntry(", in: surface.code)
+        #expect(entry.contains("installed: hit.installed"))
+        #expect(entry.contains("catalog: nil"))
+        #expect(entry.contains("id: hit.mutationTarget"))
+        // The literal the defect lived in, gone from the whole file rather than
+        // merely from that call.
+        #expect(
+            surface.code.contains("installed: nil") == false,
+            "the tap row still builds an entry with no installed record"
+        )
+        // …and it neither looks a record up nor re-keys one: the tap-aware
+        // resolution is the projection's, where a `unit` test can reach it.
+        //
+        // `installed.inventory` is deliberately **not** forbidden — the view
+        // hands that whole inventory *to* the projection (`:109`), which is the
+        // shipped composition and the opposite of resolving a record here. What
+        // is forbidden is a lookup: a `package(_:)` call or the handoff key.
+        for forbidden in [
+            "installed.package(", "inventory.package(", "installedHandoff", ".installed?."
+        ] {
+            #expect(
+                surface.code.contains(forbidden) == false,
+                "the tap row resolves the installed record itself through \(forbidden)"
+            )
+        }
+
+        // The shared menu really is what branches on that record, so handing it
+        // over proves something: it reads `entry.isInstalled` and declares every
+        // installed-time verb exactly once.
+        #expect(menu.code.contains("if entry.isInstalled {"))
+        for verb in [
+            "action(\"Reinstall\", .reinstall(target))",
+            "action(\"Uninstall…\", .uninstall(target))",
+            "action(\"Uninstall and Zap…\", .zap(cask))",
+            "action(\"Upgrade\", .upgrade(target))",
+            "action(\"Pin\", .pin(formula))",
+            "action(\"Unpin\", .unpin(formula))"
+        ] {
+            #expect(
+                menu.code.components(separatedBy: verb).count == 2,
+                "the shared menu does not declare \(verb) exactly once"
+            )
+        }
+
+        // …and none of those verbs, nor the machinery behind them, is declared
+        // by the presenting surface: the row supplies a record and a target, and
+        // decides nothing (PS8, PM10).
+        for local in [
+            "\"Reinstall\"", "\"Uninstall", "\"Upgrade\"", "\"Pin\"", "\"Unpin\"", "\"Zap",
+            "MutationCommand", "PackageTarget(", "submit(", "FormulaID", "CaskID",
+            "isOutdated", "isPinned"
+        ] {
+            #expect(
+                surface.raw.contains(local) == false,
+                "the tap row re-implements the shared menu's \(local)"
+            )
+        }
+
+        // The zero-diff file is untouched for the fourth round running.
+        let browse = try TapSearchSources.browse()
+        #expect(browse.code.contains("TapSearchHit") == false)
+        #expect(browse.code.contains("hit.installed") == false)
     }
 
     // MARK: - ps16 — neither tap-search file reaches the process layer
