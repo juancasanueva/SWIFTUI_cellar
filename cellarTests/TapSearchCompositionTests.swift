@@ -682,6 +682,110 @@ struct TapSearchCompositionTests {
         #expect(browse.code.contains("nextVersion") == false)
     }
 
+    // MARK: - ps8 round 9 — the one shared leading icon tile
+
+    /// The last half of the round-2 instruction "a visual copy of Browse".
+    ///
+    /// Rounds 3, 4 and 5 gave the tap row the catalog row's install pill, update
+    /// pill and verbs. It still opened with text where every other package row
+    /// in the application opens with a tile. This row pins the tile as the
+    /// **same component, with the same argument shape**, rather than as a
+    /// lookalike that would drift the moment the shared one changed.
+    @Test("Both search surfaces open their rows with the one shared icon tile")
+    func bothSearchSurfacesDrawTheOneSharedIconTile() throws {
+        let surface = try TapSearchSources.surface()
+        let row = try TapSearchSources.packageRow()
+
+        // One component, declared once in the whole tree.
+        let declaring = try TapSearchSources.swiftSources()
+            .filter { $0.code.contains("struct PackageIconTile: View") }
+        #expect(
+            declaring.map(\.name) == ["CaskIconView.swift"],
+            "the icon tile is declared in \(declaring.map(\.name)) rather than exactly once"
+        )
+
+        // Both rows reach for it, and the call is the **same text**: same
+        // component, same label order, same three values. A tile drawn with a
+        // different identity or a different pipeline would still compile and
+        // would still look like a tile, which is exactly what a substring
+        // search for the type name would fail to catch.
+        let call = "PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)"
+        #expect(
+            row.code.contains(call),
+            "the catalog row no longer draws the shared icon tile in the pinned shape"
+        )
+        #expect(
+            surface.code.contains(call),
+            "the tap row does not draw the shared icon tile with the catalog row's argument shape"
+        )
+
+        // …and the surface composes no tile, glyph or image of its own.
+        //
+        // Asserted **here**, before the first `try #require` below, and not at
+        // the end: a `#require` that throws ends the row, so a prohibition
+        // placed after one is only reached while the file is already correct —
+        // which is precisely when it can prove nothing. The empty state's
+        // `systemImage:` argument is deliberately not on this list: it is
+        // `ContentUnavailableView`'s own parameter, not artwork this file
+        // draws, and it has been there since round 2.
+        for local in ["Image(", "PackageTile(", "FormulaIconTile(", "CaskIconView(", "Theme.tile("] {
+            #expect(
+                surface.code.contains(local) == false,
+                "the tap surface composes its own artwork rather than reusing the shared tile: \(local)"
+            )
+        }
+
+        // …over the **same entry** it hands the shared mutation menu, so the
+        // tile and the verbs can never disagree about which package the row is.
+        #expect(surface.code.contains("let entry = entry(for: hit)"))
+        #expect(surface.code.contains("MutationMenu(center: operations, entry: entry)"))
+
+        // The artwork dependencies are the surface's own optional properties,
+        // spelled exactly as Browse spells them — and asserted against Browse,
+        // so "the same pipeline" is proven rather than asserted.
+        let browse = try TapSearchSources.browse()
+        for declaration in ["var assets: CaskBrowseAssets?", "var iconLoader: CaskIconLoader?"] {
+            #expect(
+                surface.code.contains(declaration),
+                "the tap surface does not declare \(declaration)"
+            )
+            #expect(browse.code.contains(declaration), "Browse no longer declares \(declaration)")
+        }
+
+        // The tile **leads** the row: before the name and before the kind chip,
+        // where the catalog row puts it.
+        let tile = try #require(surface.code.range(of: call))
+        let name = try #require(surface.code.range(of: "Text(hit.displayName)"))
+        let kind = try #require(surface.code.range(of: "KindTag(kind: hit.id.kind)"))
+        #expect(tile.upperBound < name.lowerBound)
+        #expect(tile.upperBound < kind.lowerBound)
+        let rowTile = try #require(row.code.range(of: call))
+        let rowName = try #require(row.code.range(of: "Text(entry.displayName)"))
+        #expect(rowTile.upperBound < rowName.lowerBound)
+
+        // The shell hands both surfaces the identical pair. Scoped to each call,
+        // because `assets: caskAssets` appears at a dozen call sites in that
+        // file and finding it anywhere would prove nothing about these two.
+        let root = try TapSearchSources.source(at: "cellar/ContentView.swift")
+        let tapCall = try TapSearchSources.callSite("TapSearchView(", in: root.code)
+        let browseCall = try TapSearchSources.callSite("BrowseView(", in: root.code)
+        for argument in ["assets: caskAssets", "iconLoader: caskIcons"] {
+            #expect(
+                tapCall.contains(argument),
+                "the tap surface is not handed \(argument) at its one call site"
+            )
+            #expect(
+                browseCall.contains(argument),
+                "Browse is no longer handed \(argument) at its call site"
+            )
+        }
+
+        // The zero-diff file is untouched for the eighth round running.
+        for forbidden in ["TapSearchHit", "hit.", "TapPackageSearch"] {
+            #expect(browse.code.contains(forbidden) == false)
+        }
+    }
+
     // MARK: - ps15, PM10 — no trust gate, no badge, no control
 
     @Test("The tap search surface composes no trust gate and no badge")
