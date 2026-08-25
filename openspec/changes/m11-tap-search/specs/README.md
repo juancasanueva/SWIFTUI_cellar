@@ -1,7 +1,17 @@
 # Spec index — `m11-tap-search`
 
 Three delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
-the searchable mirror. **Revision 3** — the 2026-08-25 maintainer scope change.
+the searchable mirror. **Revision 4** — the 2026-08-25 maintainer UI feedback, on top of revision 3's
+scope change.
+
+**UI feedback, 2026-08-25 (round 3, binding).** Observed in the running app: a tap row carried a third
+text line reading `Installed.` or `Not installed.`, where a catalog row carries a green **Installed**
+pill and shows nothing at all when the package is not installed. The tap rows now mirror the catalog
+rows — the **same shared pill component**, no state sentence — so one install state is presented one
+way on both search surfaces. Both strings are **withdrawn** as this surface's copy; the withheld state
+keeps TM5's sentence *and* gains the pill; the collision note is unchanged. **Scenario counts do not
+move**: the change lands as amended clauses in PS8 plus amended bullets inside two of its existing
+scenarios, so the arithmetic below stands exactly as revision 3 recorded it.
 
 **Scope change, 2026-08-25 (binding).** The tap packages get their **own surface**, not a section
 inside Browse. Browse — "Search catalog" — stays **catalog-only**, and `cellar/Browse/BrowseView.swift`
@@ -53,13 +63,18 @@ requirements, following the precedent `2026-08-23-m7-tap-trust` recorded at
 | Empty state — inventory unavailable | `No packages from your taps.` | `brewAbsent` or a failed refresh; an ordinary empty state, never an error. **New copy** |
 | Empty state — nothing published | `Your taps publish nothing yet.` | inventory available, no installed third-party tap publishes anything. **New copy** |
 | Catalog collision note | `Also in the catalog. Homebrew installs the catalog package.` | the hit's bare token is also carried by the catalog for the same kind; supplied by the projection, never composed by the surface |
-| Install state — installed | `Installed.` | the installed record reports the same tap. **New copy, not a shipped string**: TM5 expresses this state as the **Show in Installed** control rather than as copy, so this delta pins it here and requires the projection to produce it |
-| Install state — tap withheld | `Installed. Homebrew withholds its tap while this tap is untrusted.` | TM5's exact shipped string, reused byte-for-byte |
-| Install state — not installed | `Not installed.` | TM5's exact shipped string, reused byte-for-byte |
+| Install state — installed | ~~`Installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | Replaced by the **shared status pill** the catalog result surface already draws, reading `Installed`. Not copy this delta owns: the label lives in that one shared component, so neither search surface and no projection composes it |
+| Install state — tap withheld | `Installed. Homebrew withholds its tap while this tap is untrusted.` | TM5's exact shipped string, reused byte-for-byte. **Round 3**: the withheld row now carries the pill **and** this sentence — it is installed, and the sentence explains what Homebrew is withholding |
+| Install state — not installed | ~~`Not installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | A not-installed row carries **no state copy and no pill**, exactly as the catalog result surface shows nothing for a row that is not installed |
 
-The four install-state and collision strings MUST be produced by the **projection**, never composed by
+Both withdrawn strings stay **unchanged in TM5** for the tap-detail rows TM5 governs; only this
+surface's copy is withdrawn. Neither is promoted by this change, and no MODIFIED block is needed to
+withdraw them: PS8 is an ADDED requirement that reaches `openspec/specs/**` for the first time at
+archive, so it simply lands without them.
+
+The withheld-state and collision strings MUST be produced by the **projection**, never composed by
 the presenting surface; the surface title and the two empty-state strings belong to the surface and its
-section-list entry. The two TM5 strings are reused rather than reworded so the same install state
+section-list entry. TM5's withheld string is reused rather than reworded so the same install state
 cannot read differently on Taps and on the tap query surface. The collision note is a neutral statement
 of Homebrew's own resolution: no recommendation, no warning styling, and no suggestion to
 disambiguate — because PM10 forbids qualifying the argv, so there is nothing for the user to act on
@@ -84,6 +99,7 @@ carried into PS8:
 | Matching via the index's normalisation, exact/prefix/substring ladder | matching paragraphs + three `unit` scenarios (ladder, token-awareness, total order). **Refined by the orchestrator gate**: the ladder is token-aware (`gentle-ai` → tokens `gentle ai`, so `ai` is an exact-token match), matching applies to the published qualified name as well as the bare token, and a qualified-name-only match ranks no higher than substring |
 | ~~Section absent, never an error, when the tap inventory is unavailable~~ — **superseded 2026-08-25** | An ordinary empty state with pinned copy, never an error, distinguishing an unavailable inventory from an empty one: availability paragraph + `unit` empty-state scenario |
 | PS6's ceiling not regressed; no new brew invocation | latency paragraph + `unit` per-surface latency scenario + `unit-app` process-layer scan. **Restated 2026-08-25**: the surfaces answer separate keystroke turns, so the tap surface holds the same 8 ms p95 ceiling on its own turn and PS6's catalog measurement is unchanged |
+| ~~Install state shown as a row sentence: `Installed.` / `Not installed.`~~ — **superseded 2026-08-25 (round 3)** | The **shared `Installed` pill** the catalog row already draws, on both installed states, and **nothing** on a not-installed row: install-state paragraph + the `unit` install-state scenario + the `unit-app` copy-ownership scan. The withheld sentence survives as the row's explanatory line, beside the pill |
 
 ## `package-mutation`: activated, not changed — no delta
 

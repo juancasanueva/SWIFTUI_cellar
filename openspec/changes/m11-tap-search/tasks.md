@@ -555,12 +555,15 @@ Matched `design.md` r3's Testing Strategy table against the r3 specs, scenario b
 | Empty state — inventory unavailable | `No packages from your taps.` | the **projection** (`brewAbsent` **and** failed refresh) |
 | Empty state — nothing published | `Your taps publish nothing yet.` | the **projection** (available, no third-party tap publishes) |
 | Catalog collision note | `Also in the catalog. Homebrew installs the catalog package.` | the **projection** only |
-| Install state — installed | `Installed.` | the **projection** only |
-| Install state — tap withheld | `Installed. Homebrew withholds its tap while this tap is untrusted.` | the **projection** only |
-| Install state — not installed | `Not installed.` | the **projection** only |
+| Install state — installed | ~~`Installed.`~~ **WITHDRAWN round 3** | replaced by `StatusPill.installed`, whose `Installed` label lives in `cellar/Browse/StatusPill.swift` |
+| Install state — tap withheld | `Installed. Homebrew withholds its tap while this tap is untrusted.` | the **projection** only — **and** the pill beside it (round 3) |
+| Install state — not installed | ~~`Not installed.`~~ **WITHDRAWN round 3** | nothing at all: no copy, no pill |
 
 `From your taps` is **WITHDRAWN** — it named a section that no longer exists. It must appear **nowhere**
-in the tree after WU7. A non-empty query matching nothing reuses the ordinary no-match empty state; **no
+in the tree after WU7. `Installed.` and `Not installed.` are **WITHDRAWN for this surface** by round 3;
+neither may be produced, whole, by `TapPackageSearch.swift` or `TapSearchView.swift`. Both survive
+unchanged in `TapProjection.statusExplanation` for the tap-detail rows TM5 governs — do not delete them
+there. A non-empty query matching nothing reuses the ordinary no-match empty state; **no
 copy is pinned for it**, so do not invent one.
 
 **SF Symbol.** `AppSection.tapSearch`'s `systemImage` MUST be **the symbol recorded in Engram topic
@@ -916,3 +919,104 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
       tap-source-read ban); the **merged ranked list** stays rejected; **index ingestion** is forbidden by
       PD6's text; `SearchFilters` gains **no** member; and the tap surface knowingly holds a
       `SearchFilters` whose two exclusion predicates are dead (**DD-15**'s accepted cost).
+
+---
+
+# Round 3 — maintainer UI feedback (2026-08-25, binding)
+
+Observed in the running app: a tap row carried a third text line reading `Installed.` or
+`Not installed.`, where a catalog row carries the green **Installed** pill and shows **nothing** when a
+package is not installed. The tap rows now mirror the catalog rows exactly. Delivery is unchanged:
+**single-pr**, `size:exception` accepted (maintainer, 2026-08-25), `review_budget_lines: 5000` already
+exceeded on artifact lines — report the measured total, never trim. Branch `feat/m11-tap-search`
+continues from `8f233b1`.
+
+**Scenario arithmetic does not move.** The change lands as amended clauses in PS8 plus amended bullets
+inside two of its existing scenarios: `package-search` stays **1 ADDED / 17 scenarios** (→ 8 req / 36
+sc), `package-detail` and `tap-management` are untouched by round 3. Nothing new is promoted.
+
+## Round-3 Work Units (`work-unit-commits`; conventional commits, **no `Co-Authored-By`, no AI attribution**)
+
+| Unit | Goal | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU10** | The amended artifacts land **first** — PS8's install-state clauses, `specs/README.md`'s copy table, `design.md` (DD-7 amended, DD-9 rewritten, DD-18 new, the round-3 RED rows) and this file | N/A — artifacts only | N/A — no behaviour changes | Revert one docs commit; the branch returns to `8f233b1` |
+| **WU11** | `TapSearchHit.stateCopy: String` → `stateNote: String?` (withheld state only) plus a computed `isInstalled`; the two withdrawn constants deleted | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` | N/A — a pure projection over resident values | Revert one commit in `TapPackageSearch.swift` + its test file. **Not independently revertible from WU12** — it changes a member the surface renders |
+| **WU12** | `StatusPill` extracted from `PackageRow`; both surfaces draw it; the tap row loses its state sentence and keeps the withheld note | `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'` | **Launch the app**: an installed tap row shows the green `Installed` pill and no third line; a not-installed row shows no state text; a withheld row shows the pill **and** TM5's sentence; Browse's rows are unchanged | `git checkout 8f233b1 -- cellar/Browse/` restores all three files and deletes the new one |
+| **WU13** | Composition guards: the withdrawn strings absent from both files, the shared pill asserted on both surfaces | `xcodebuild test … -only-testing:cellarTests` | N/A — source-scan suite; the app harness is WU12's | Revert one test commit; no production line is its own |
+
+## Phase 1″: WU10 — the amended artifacts land first
+
+- [x] 1″.1 Amend `specs/package-search/spec.md`: the five-facts paragraph, the install-state paragraph
+      (pill for both installed states, TM5's sentence for the withheld one, nothing for not-installed,
+      both strings **WITHDRAWN**), the ps4 scenario's THEN, the ps9 scenario (renamed to "…only the
+      withheld state pins a sentence"), the ps15 scenario's scan clauses, the revision header and the
+      archive notes. **Never touch `openspec/specs/**`.**
+- [x] 1″.2 Amend `specs/README.md`: revision 4 header, the pinned-copy table's three install-state rows,
+      the copy-ownership paragraph, and one new superseded row in the presentation-decisions table.
+- [x] 1″.3 Amend `design.md`: **DD-7** amended, **DD-9** rewritten, **DD-18** new (the extraction), the
+      round-3 file-changes table, the flow diagram's row line, and the round-3 RED rows.
+- [x] 1″.4 Append this phase to `tasks.md` and mark the round-2 pinned-copy table's two withdrawn rows.
+- [x] 1″.5 Commit `docs(sdd): amend m11-tap-search for the shared Installed pill on tap rows`.
+
+## Phase 2″: WU11 — the install state becomes a fact (RED → GREEN)
+
+- [ ] 2″.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: rename
+      `theThreeInstallStatesCarryTheirExactCopy` → `onlyTheWithheldStateCarriesANote` and restate it —
+      three distinct states; `isInstalled` true, true, false; `stateNote` `nil`, TM5's exact sentence,
+      `nil`; and **neither withdrawn string produced for any hit**. Amend
+      `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse` (`Mirror` labels carry `stateNote`, the
+      not-installed hit's note is `nil` rather than `""`) and the two spot assertions at the ambiguity
+      and five-facts rows. Confirm the failure is a **compile** failure naming `stateNote`/`isInstalled`.
+- [ ] 2″.2 **GREEN** in `TapPackageSearch.swift`: `stateCopy: String` → `stateNote: String?`; add
+      `public var isInstalled: Bool` computed from `state`, so no `Mirror` label is added; delete
+      `installedCopy` and `notInstalledCopy`; `copy(for:)` → `note(for:) -> String?`.
+- [ ] 2″.3 Run `swift test --package-path Packages/CellarCore` whole — the guard is that no other core
+      suite reads `stateCopy`, and that `TapProjectionTests`' own `statusExplanation` rows stay green.
+- [ ] 2″.4 Commit `feat(search): expose the tap install state as a fact instead of row copy`.
+
+## Phase 3″: WU12 — the shared pill
+
+- [ ] 3″.1 Create `cellar/Browse/StatusPill.swift`: an internal `StatusPill: View` carrying
+      `label`/`background`/`foreground`, the exact body `PackageRow.statusPill` had, and
+      `static var installed` with the pinned `Installed` label and `Theme.successTint(0.16)` /
+      `Theme.successText`. **No `project.pbxproj` edit** — `path = cellar` is a synchronized root group.
+- [ ] 3″.2 `PackageRow.swift`: delete `private func statusPill(…)`; the installed call site becomes
+      `StatusPill.installed`, the badge loop becomes `StatusPill(label:background:foreground:)`.
+      `BrowseView.swift` is **not** touched — verify with `git diff`.
+- [ ] 3″.3 `TapSearchView.swift`: draw `StatusPill.installed` after `KindTag` when `hit.isInstalled`;
+      delete `state(_:)` and the unconditional third `Text`; render the note line only when
+      `[hit.stateNote, hit.collisionNote]` joins to something non-empty.
+- [ ] 3″.4 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [ ] 3″.5 Commit `feat(taps): mark installed tap packages with the shared Installed pill`.
+
+## Phase 4″: WU13 — the composition guards
+
+- [ ] 4″.1 `TapSearchCompositionTests.swift`: drop `"Installed."` and `"Not installed."` from
+      `pinnedCopy`; add a `withdrawnCopy` list asserted **absent as complete literals** from the
+      projection and the surface (a substring check would fail on the withheld sentence's first five
+      characters); assert the surface carries no `"Installed"` literal at all, renders
+      `StatusPill.installed`, `hit.stateNote` and `hit.collisionNote`; assert `PackageRow.swift` draws
+      the same `StatusPill.installed`; assert `StatusPill.swift` declares the label exactly once.
+- [ ] 4″.2 Amend `notInstalledTapRowsAreNotSelectable`: `hit.isInstalled` leaves the forbidden list
+      (the pill reads it, and a `Bool` about installation cannot express routability), and the row that
+      replaces it asserts the pill is gated on `hit.isInstalled` while routability still comes from
+      `hit.routableID` alone. `alsoInCatalog`, `hit.state ==` and `== .notInstalled` stay forbidden.
+- [ ] 4″.3 Decide and record whether `StatusPill.swift` joins `PerPackageTrustSources.views()`. It does
+      **not**: that guard scans surfaces that present per-package trust, and the pill presents install
+      state. Retarget nothing.
+- [ ] 4″.4 Prove RED for every new row by **reversible mutation** of the production files, restored
+      byte-identically and `shasum -a 256 -c` verified.
+- [ ] 4″.5 Commit `test(taps): pin the shared Installed pill and the withdrawn row copy`.
+
+## Phase 6″: Verification and bindings (round 3)
+
+- [ ] 6″.1 `swift test --package-path Packages/CellarCore` — record the total against the 1,870 baseline.
+- [ ] 6″.2 `xcodebuild test … -only-testing:cellarTests` — record against the 267 baseline. The full
+      `-scheme cellar` runner is **not** the gate: it is red on `main` from two pre-existing
+      `cellarUITests` Taps failures (`:209`, `:231`).
+- [ ] 6″.3 Bindings proof — `git diff --stat main --` over `cellar/Browse/BrowseView.swift`,
+      `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
+      `MutationCommand.swift`, `PackageDetailView.swift` and `cellarUITests/` must print **nothing**.
+- [ ] 6″.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+      `size:exception`; never trim.
+- [ ] 6″.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 3 apply progress`.

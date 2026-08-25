@@ -37,6 +37,14 @@ control** on the surface, so the outdated-hides-everything rule is gone rather t
 unavailable tap inventory renders an **ordinary empty state with pinned copy** rather than an absent
 section. The string “From your taps” is withdrawn — it named a section that no longer exists.
 
+**Maintainer UI feedback, 2026-08-25 (round 3) — binding, and this revision's reason.** Observed in the
+running app: the tap rows carried a third text line reading “Installed.” or “Not installed.”, where the
+catalog rows carry a green **Installed** pill and nothing at all when a package is not installed. The
+tap rows now mirror the catalog rows exactly — the **same shared pill component**, and no state
+sentence — so the two search surfaces present one install state one way. The strings “Installed.” and
+“Not installed.” are **withdrawn** as this surface's copy. The withheld state keeps TM5's sentence as
+its explanatory line **and** gains the pill, because it *is* installed; the collision note is unchanged.
+
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
@@ -66,8 +74,9 @@ observable with no process launcher to inject.
 
 A hit MUST carry exactly five facts: the package **kind**, the **bare token** brew installs by, the
 **published qualified name** the tap declares, the **tap of origin**, and its **install state** —
-together with the **projection-supplied copy** for that install state, and the collision note where the
-hit collides. It MUST carry nothing else — in particular no description, no version, no homepage, no
+together with the **projection-supplied explanatory copy** for that install state where any is pinned
+(the withheld state alone, below), and the collision note where the hit collides. It MUST carry nothing
+else — in particular no description, no version, no homepage, no
 license, no dependency list, no install count, no deprecation flag, no disabled flag and no size —
 because the tap inventory publishes none of them and obtaining any of them would require the
 tap-source read TM5 forbids. An absent fact MUST be absent rather than an empty string, a dash,
@@ -141,10 +150,34 @@ MUST surface through the already-shipped typed refusal and its Trust recovery, n
 pre-launch block.
 
 The install state MUST resolve into the **same three distinct states** TM5 defines and MUST NOT be
-collapsed into two. Its copy MUST be **supplied by the projection**, never composed by the presenting
-surface, and MUST be exactly “Installed.” for the installed state, “Installed. Homebrew withholds its
-tap while this tap is untrusted.” for the withheld state — TM5's exact string, scoped to the tap and
-never implying the package is untrusted — and “Not installed.”.
+collapsed into two, and the projection MUST expose it as a **fact of the hit** — a value a test can read
+directly — rather than as a sentence the row prints.
+
+An **installed** hit, in **either** installed state, MUST be marked by the **same status pill the
+catalog result surface already draws for an installed row**, reading exactly “Installed”. That pill MUST
+be **one shared component** referenced by both surfaces, never a second pill declared beside it and
+never a label either surface composes for itself. `installed-inventory` II8 already requires installed
+state to be composed once and presented once, and `package-trust` PT5 already requires one projection to
+answer one fact for every surface that shows it; two independently-worded install marks on the
+application's two search surfaces is exactly the drift those rules exist to forbid. The label therefore
+belongs to that shared component — neither presenting surface composes it, and neither does the
+projection.
+
+The **withheld** state MUST carry that same pill **and, in addition**, the exact sentence “Installed.
+Homebrew withholds its tap while this tap is untrusted.” — TM5's exact string, scoped to the tap and
+never implying the package is untrusted. That sentence is explanatory copy, not a state label: it MUST
+be **supplied by the projection**, never composed by the presenting surface, exactly as the collision
+note is.
+
+A **not-installed** hit MUST carry **no install-state copy and no pill**, mirroring the catalog result
+surface, which marks the installed row and says nothing at all for a row that is not installed.
+
+The strings “Installed.” and “Not installed.” are **WITHDRAWN** as this surface's copy: neither MUST be
+produced, in whole, by the projection or by the surface. The pill's presence carries the first fact and
+its absence carries the second, and a row that repeats in a sentence what a chip beside it already says
+is the duplicate presentation II8 forbids. The withheld sentence is unaffected — it begins with the same
+five characters but is one indivisible pinned string, and it stays. Nothing here changes TM5 either,
+whose own tap-detail rows keep both withdrawn strings on the surface TM5 governs.
 
 An **installed** hit MUST open the receipt-backed detail `installed-inventory` owns, selected by its
 exact `PackageID` through the existing resolution order and with no new routing branch — **unless its
@@ -205,8 +238,8 @@ method, same ceiling, unaffected by this source's existence.
   installed record for it
 - WHEN every fact the hit exposes is enumerated
 - THEN they are exactly kind `cask`, bare token `widget`, published name `acme/tools/widget`, tap of
-  origin `acme/tools`, an install state, and the projection-supplied copy for that state — with a
-  collision note present only when the hit collides
+  origin `acme/tools`, an install state, and the projection-supplied note for that state — absent here,
+  because only the withheld state pins one — with a collision note present only when the hit collides
 - AND no description, version, homepage, license, dependency list, install count, deprecation flag,
   disabled flag or size exists in any member, and no exposed value is a placeholder standing for
   absence
@@ -250,15 +283,17 @@ method, same ceiling, unaffected by this source's existence.
   bare `PackageID` for `(formula, wget)`, with no qualified token anywhere in the argv it produces
 - Verification: `unit`
 
-#### Scenario: The three install states stay distinct and carry their exact copy
+#### Scenario: The three install states stay distinct, and only the withheld state pins a sentence
 
 - GIVEN three tap packages under installed taps: one whose installed record reports the same tap, one
   whose installed record withholds its tap under an `untrusted` tap that publishes it, and one with no
   installed record
-- WHEN each hit's install state and its copy are read
-- THEN the three states remain distinct values, never collapsed into two
-- AND the copy is exactly “Installed.”, “Installed. Homebrew withholds its tap while this tap is
-  untrusted.” and “Not installed.” respectively
+- WHEN each hit's install state, its installed-ness and its projection-supplied note are read
+- THEN the three states remain distinct values, never collapsed into two, and the first two report
+  themselves installed while the third does not — each as a fact, not as a sentence
+- AND only the withheld hit carries a note, exactly “Installed. Homebrew withholds its tap while this
+  tap is untrusted.”, while the other two carry none
+- AND neither “Installed.” nor “Not installed.” is produced for any of the three
 - Verification: `unit`
 
 #### Scenario: An installed hit with an ambiguous identity is not routable
@@ -316,11 +351,14 @@ method, same ceiling, unaffected by this source's existence.
 - GIVEN the source of the projection that answers the composed source and the source of the surface
   that presents it
 - WHEN both are scanned for a tap-trust or per-package-trust type name, for a trust badge or a trust
-  control, and for the install-state and collision copies
+  control, for the withheld-state and collision copies, for the two withdrawn strings, and for the
+  component that draws the installed mark
 - THEN neither contains a trust type name, a trust badge or a trust control, and the install
   affordance is offered for every hit whatever the origin tap's trust state
-- AND the install-state and collision copies are produced by the projection, with no such copy
-  composed by the presenting surface itself
+- AND the withheld-state note and the collision note are produced by the projection, with no such copy
+  composed by the presenting surface itself, and neither file produces “Installed.” or “Not installed.”
+- AND the installed mark is the **one shared status-pill component the catalog result surface draws**,
+  referenced by both surfaces, with its label composed by neither of them and by no projection
 - Verification: `unit-app`
 
 #### Scenario: Composing the tap source reaches no process layer
@@ -378,3 +416,11 @@ method, same ceiling, unaffected by this source's existence.
 - **The string “From your taps” is withdrawn** by the 2026-08-25 scope change and appears nowhere in
   this delta: it named a Browse section that no longer exists. The surface title “Search our taps” and
   the two empty-state strings replace it, all three **new copy** with no shipped precedent.
+- **The strings “Installed.” and “Not installed.” are withdrawn** by the round-3 maintainer feedback and
+  are **not promoted**. This delta never pinned them into `openspec/specs/**` — the whole PS8 block is
+  ADDED and lands for the first time at archive — so the withdrawal costs no MODIFIED block and no
+  destructive-delta warning. TM5 keeps both strings, unchanged, for the tap-detail rows it governs
+  (`openspec/specs/tap-management/spec.md`, `TapPackage.statusExplanation`); nothing about that surface
+  moves. What replaces them here is a **presentation** obligation, not copy: the installed state is
+  marked by the one shared status pill the catalog result surface already draws, whose label lives in
+  that component. The pinned-copy table in `specs/README.md` records the withdrawal.
