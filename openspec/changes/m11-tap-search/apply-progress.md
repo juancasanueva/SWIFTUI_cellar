@@ -1009,3 +1009,144 @@ still round 2's **`6′.7`**, deferred by this run's explicit instruction not to
 pull request. Round 6's ledger is unchanged at 25 of 25, round 5's at 19 of 19, round 4's at 22 of 22,
 round 3's at 24 of 24, round 2's at 55 of 56, and round 1's 59 boxes are unchanged history with `6.7`
 void.
+
+## Phase 0⁷ — baselines, measured at `e0e9ce5`
+
+| Runner | Baseline |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,879 tests / 218 suites** passed, 1 known issue |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 261 distinct test ids**, 0 failures |
+| Working tree | clean after discarding `cellar/InfoPlist.xcstrings` churn |
+
+The CellarCore baseline is round 7's final figure exactly (**1,879**, up from round 7's own 1,878
+starting point). **One transient failure is reported, not hidden**: the *first* baseline run answered
+`1879 tests … failed … with 2 issues (including 1 known issue)`, i.e. one real issue beyond the known
+one. Only the tail was captured, so the failing row's identity was lost; **two** subsequent full runs
+passed cleanly at 1,879 / 1 known issue, and a third was captured to a full log and also passed. It is
+recorded here as an **unidentified transient**, which is the honest shape — round 6 recorded a core
+flake at `MutationRefreshReceiptTests.swift:214` and it did not recur this round either.
+
+The `cellarTests` baseline of **261** was reached by the counting rule, not by a raw line count: the log
+carried **271** `Test case '…'` occurrences, of which **270** parse to **260** distinct ids; the one
+corrupted line is `BrewfileCompositionTests/skipsAreGroupedCountedAndName` + an interleaved xcodebuild
+status line, and that id is **absent** from the cleanly parsed set, so **260 + 1 = 261**.
+
+## Commits
+
+| Unit | Commit | What |
+|---|---|---|
+| WU28 | `2bf6081` | `docs(sdd): amend m11-tap-search so tap detail panes show the shared actions section` — PS8's rewritten pane clause with its `(Previously: …)` line and its amended `unit-app` pane-composition scenario; a **new** `specs/installed-inventory/spec.md` carrying MODIFIED **II15**; `specs/README.md` revision 9 (new capability row, corrected “activated, not changed” section, new reversed presentation-decision row); `design.md` (**DD-24**, round-8 preamble, file table, RED rows). **Delta specs only; `openspec/specs/**` untouched** |
+| WU29a | `d1781a7` | `refactor(browse): build the detail actions section from a package entry` — `actionsSection(for entry: PackageEntry)`, `internal`; `primaryCommand(for entry:target:)` reading `entry.installed`; the catalog call site becomes `actionsSection(for: entry(for: package))`. **One file** |
+| WU29b | `c887078` | `feat(browse): show the shared actions section on tap-backed detail panes` — both panes pass `EmptyView()` as `primaryButton`, drop `MutationMenu`, and call the shared builder as the **last** block of their scroll content |
+| WU30 | `92c4262` | `test(browse): pin the shared actions section on tap-backed detail panes` — `ReceiptDetailCompositionTests`'s verb row **replaced**; `TapSearchCompositionTests`'s pane row item 4 amended |
+| — | (this record) | `docs(sdd): record the m11-tap-search round 8 apply progress` |
+
+## Key design decision — DD-24
+
+**The signature was simply older than the type.** `actionsSection` never read a catalog *field*: every
+input it had was `PackageTarget(package.id)`, `FormulaID(package.id)`, `CaskID(package.id)`,
+`entry(for: package)` and `installed.inventory.package(package.id)` — an **identity** and an
+**installed record**, which is exactly what `PackageEntry` has carried since the Installed list
+shipped. Rebuilding it from the entry is therefore a signature catching up with its own body, not a
+generalisation invented for the tap panes, and that is what makes "one component" literally true rather
+than aspirational. Three consequences worth recording:
+
+1. **`entry.catalog` is read by nothing inside the section**, so the panes lose nothing by having none
+   — and PD6's prohibition on synthesizing a catalog record is satisfied by construction rather than by
+   a rule someone has to remember.
+2. **Only the declaration is relaxed.** `submit`, `quietButton`, `accentButton`, `dangerButton`,
+   `snoozeButton` and `primaryCommand` all stay `private`: they are called from inside the same file,
+   so the surface area exposed to the extensions is exactly one function. This is **DD-18**'s precedent
+   applied a third time, and the cheapest instance of it yet — no file is created and nothing moves.
+3. **The header slot going empty is half the instruction, not a side effect.** One pane offers one
+   place to act; leaving the menu *and* adding the section would have been the reported defect stated
+   twice.
+
+Rejected: copying the section into each pane (three declarations of one verb set — the drift **DD-18**
+exists to end and the drift II15's clause forbids in words); extracting it to a third file as
+`StatusPill` was extracted (its body calls six `private` helpers and reads four stored properties, so
+extraction means moving or threading all of them — a large diff to reach a shape `internal` already
+reaches); a `CatalogPackage?` parameter the panes would always pass `nil` for; a protocol over "things
+with an id and an installed record", which `PackageEntry` already is.
+
+## Work unit evidence — round 8
+
+| Unit | Focused test command and exact result | Runtime harness | Rollback boundary |
+|---|---|---|---|
+| **WU28** | N/A — artifacts only | N/A — no behaviour change | Revert `2bf6081`; the branch returns to `e0e9ce5` |
+| **WU29a** | `xcodebuild build …` → **`** BUILD SUCCEEDED **`**; `xcodebuild test … -only-testing:cellarTests` → **260 clean distinct ids**, the **only** two failures being the round-8 RED rows written before the edit; every other app-suite row passed, which is the approval evidence that the refactor preserved behaviour | **N/A, with reason.** No runtime boundary is added: the section, its verbs, its argv and its confirmation rule are the shipped ones, exercised by the catalog pane's own suite on every run | Revert `d1781a7`; one file, and the panes are untouched at that commit |
+| **WU29b** | `xcodebuild build …` → **`** BUILD SUCCEEDED **`**; `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`**, both RED rows now green | N/A — same reason | Revert `c887078`; both panes return to the header menu with no other file touched |
+| **WU30** | `xcodebuild test … -only-testing:cellarTests/ReceiptDetailCompositionTests -only-testing:cellarTests/TapSearchCompositionTests -only-testing:cellarTests/PerPackageTrustCompositionTests` → **`** TEST SUCCEEDED **`**; under each mutation → **`** TEST FAILED **`** | N/A — source-scan suites | Revert `92c4262`; two test files, **no production line is its own** |
+
+## TDD cycle evidence — round 8
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 3⁷.1 the receipt pane's Actions section | `cellarTests/ReceiptDetailCompositionTests.swift` | `unit-app` | ✅ 261 distinct ids at `e0e9ce5` | ✅ **written first, before any production edit**, and failed as a **genuine** RED rather than a mutation one: the row references `actionsSection(for entry: PackageEntry)`, which did not exist, so `ReceiptDetailSources.actionsSection(in:)`'s `#require` threw. Exactly **one** row in the suite failed; the other six passed | ✅ after `d1781a7` the section exists and after `c887078` the pane calls it → whole suite `** TEST SUCCEEDED **` | ✅ two reversible mutations, proving **different halves** of "one component, one place": (a) `MutationMenu(center: operations, entry: …)` re-added to a pane → the `MutationMenu(` absence assertion failed; (b) `Button("Reinstall") { }` added to a pane → the verb-literal absence assertion failed. Both restored and verified `shasum -a 256 -c` → both panes `OK` | ✅ the verb list extracted to `ReceiptDetailSources.verbLiterals` and the section extracted by brace matching, so `PackageDetailView.swift`'s legitimate trust marker and catalog type are not swept into a claim about the section |
+| 3⁷.2 the name-only pane's Actions section | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ same baseline | ✅ **written first**; failed on the absent `actionsSection(for: publishedEntry(for: published))` call. Exactly one row in the suite failed | ✅ green after `c887078` | ✅ the same two mutations bite this row too — recorded once, run once, and both rows named in each failure list | ➖ none needed; the row was amended in place and its entry assertion is byte-unchanged |
+| 2⁷.2 the entry-shaped section | `cellarTests` (whole suite, as approval tests) | `unit-app` | ✅ 261 distinct ids | ✅ **approval testing**, per the strict-TDD module's refactoring path: the shipped suite describes current behaviour, and it was run before the edit | ✅ after the refactor the whole suite passed **except** the two rows already RED for the feature — no shipped row changed verdict | ➖ N/A — a refactor triangulates nothing new | ✅ the section's body is byte-unchanged apart from `package.id` → `entry.id`; every label, `detail-action-*` identifier, argv and ordering is identical, shown in full in the bindings proof |
+
+### Test summary — round 8
+
+- **Tests written**: 1 **replaced** (`theReceiptPaneOffersTheSameVerbsAsTheRow` →
+  `theReceiptPaneOffersTheCatalogPanesActionsSection`), 1 **amended in place**
+  (`theNameOnlyTapDetailComposesNothingItCannotKnow`, item 4 only).
+- **Counts**: CellarCore **1,879 → 1,879** (±0 — round 8 touches no CellarCore file at all, proven by an
+  empty `git diff --stat e0e9ce5 -- Packages/CellarCore`). `cellarTests` **261 → 261**, the difference
+  between the two id sets being **exactly** the one rename.
+- **Layers used**: `unit-app` (2 touched, 0 net new), Unit (0 — nothing in CellarCore moves).
+- **Pure functions created**: 0. **Visibility relaxed**: 1 declaration, `actionsSection`.
+
+## Phase 6⁷ — verification and bindings
+
+| Gate | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **`Test run with 1879 tests in 218 suites passed`**, 1 known issue (baseline **1,879** → **±0**) |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 261 distinct test ids**, 0 failures (baseline **261** → **±0**). Each run loses a different single id to an interleaved status line — baseline `BrewfileCompositionTests/skipsAreGroupedCountedAndNamed()`, final `AutomaticUpdateChecksTests/turningItOffRecordsAStoredFalse()` — and **each missing id is present in the other run's clean set**, so both runs provably enumerate 261. The only genuine set difference is the one rename, in **both** directions: the old id appears only in the baseline, the new one only in the final run |
+| `xcodebuild build …` | **`** BUILD SUCCEEDED **`** |
+| Bindings — zero-diff vs `main` | `git diff --stat main --` printed **nothing** for `cellar/Browse/BrowseView.swift` (**DD-8**, seventh round running), `cellar/Activity/MutationMenu.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`, `MutationCommand.swift` and `cellarUITests/` |
+| Bindings — CellarCore | `git diff --stat e0e9ce5 -- Packages/CellarCore` printed **nothing**: round 8 is presentation only, so no projection, fact or copy moves |
+| Bindings — `PackageDetailView.swift` | `git diff main --` shown in full: round 6's four hunks (`let taps`, the third branch, the widened `versionStory`, the preview) plus round 8's refactor and the one relaxed `private`. **+55 / −18.** Every verb label, every `detail-action-*` identifier, every command family and the section's internal order are **byte-unchanged** — the diff inside the section is `package.id` → `entry.id` and nothing else |
+| Files changed this round (`e0e9ce5..HEAD`) | **10 files, +685 / −53** — of which **5** are docs artifacts (**+487**) and one is the new II15 delta alone (**+252**). The production diff is **three files, +69 / −27** |
+| `git diff --shortstat main...HEAD` | **33 files changed, 10,370 insertions(+), 93 deletions(-)** — **10,463 changed lines**, measured at `92c4262`, i.e. the commit immediately **before** this record. Reported under the accepted `size:exception` and **not trimmed**. Adding this record itself takes it to **+10,511 / −93 = 10,604**; both figures are given because a progress record cannot measure itself without circularity, and rounds 2–7 all used the same before-the-record convention |
+| Working tree | clean; `cellar/InfoPlist.xcstrings` churn discarded at phase 0⁷ and never committed |
+
+## Deviations — round 8 (reported, not absorbed)
+
+1. **A `MODIFIED II15` delta was required, and the brief's condition for it was met on a reading the
+   brief did not spell out.** The brief said to add the delta "if it pins `MutationMenu` or the header
+   slot". II15 names **neither** literally. What it does pin is the **source**: "the same mutation verbs
+   the installed list row offers … obtained from the same shared mutation surface". Presenting the
+   catalog pane's Actions section changes that source, and the verb *sets* are not identical either —
+   the section adds snooze and labels the pin verb `Pin version` where the menu says `Pin`, and it shows
+   a command **line** where the menu offers `Copy install command`. So the clause was contradicted, not
+   merely re-styled, and the delta is mandatory. Recorded because "it does not name `MutationMenu`" was
+   a reachable and wrong conclusion.
+2. **The RED was genuine, not mutation-based — a change from rounds 3–7.** Both guard rows were written
+   and run **before** any production edit and failed on production that did not exist yet. The two
+   mutations were still run afterwards, because a genuine RED proves the row bites on *absence* while
+   the mutations prove it bites on the two ways the absence could be reintroduced. Both are reported.
+3. **`WU29` shipped as two commits, as the brief specified**, and the intermediate commit is green on
+   its own terms: at `d1781a7` the panes still hang the menu, the two guard rows were **uncommitted**,
+   and the whole app suite passes. The guard rows landed with `92c4262`. Test-first authoring and
+   commit order are independent, and the record says which is which rather than implying the tests were
+   written last.
+4. **`primaryCommand`'s source of truth narrowed, and it is a genuine simplification rather than a
+   no-op.** It read `installed.inventory.package(package.id)` directly; it now reads `entry.installed`.
+   For the catalog pane the two are the same value by construction — `entry(for:)` builds that member
+   from that exact lookup — but the new shape means the panes cannot get a *different* answer from the
+   command line than from the buttons above it, which the old shape could not have promised for an
+   entry built anywhere else.
+5. **One transient CellarCore failure at phase 0⁷ is reported unidentified** (see the baseline table).
+   It did not recur across three subsequent full runs, and the final gate is clean at 1,879.
+6. **`specs/README.md`'s "activated, not changed" section for `installed-inventory` was stale the
+   moment this delta was written**, and was corrected rather than left: II7 and II8 are still
+   activation-only, II15 is not.
+
+## Task ledger
+
+**Round 8: 26 of 26 complete.** Round 8 has **no** delivery task — the branch's one open delivery box is
+still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
+pull request. Round 7's ledger is unchanged at 24 of 24, round 6's at 25 of 25, round 5's at 19 of 19,
+round 4's at 22 of 22, round 3's at 24 of 24, round 2's at 55 of 56, and round 1's 59 boxes are
+unchanged history with `6.7` void.
