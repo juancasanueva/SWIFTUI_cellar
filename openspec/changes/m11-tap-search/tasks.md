@@ -1376,16 +1376,19 @@ measured total; never trim. RDD disabled. Strict TDD active.
 
 ## Phase 3⁶: WU27 — the app surface and its guard
 
-- [ ] 3⁶.1 Verify `cellar/Browse/TapSearchView.swift` needs no behaviour change: selection is gated on
+- [x] 3⁶.1 Verify `cellar/Browse/TapSearchView.swift` needs no behaviour change: selection is gated on
       `if let routable = hit.routableID` and nothing else. Correct the inert-row **comment** only — the
       collision is no longer a bar.
-- [ ] 3⁶.2 `cellarTests/TapSearchCompositionTests.swift`: restate
+- [x] 3⁶.2 `cellarTests/TapSearchCompositionTests.swift`: restate
       `theTapSearchSurfaceSelectsOnRoutabilityAlone`'s recorded reason to duplicate-only; keep the
       forbidden-token list (including `alsoInCatalog`) and the catalog-first order assertion unchanged.
-- [ ] 3⁶.3 Prove RED by **reversible mutation**: restore `collides == false &&` in the projection.
-      Restore byte-identically and verify with `shasum -a 256 -c`.
-- [ ] 3⁶.4 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
-- [ ] 3⁶.5 Commit `test(taps): pin that colliding tap rows open the catalog detail`.
+- [x] 3⁶.3 Prove RED by **two reversible mutations**, because no app behaviour line changes and the two
+      prove different things: (a) restore `collides == false &&` in the projection — this bites the
+      `unit` rows and is **blind** to the `unit-app` scan; (b) re-derive routability in the view
+      (`if let routable = hit.routableID, hit.alsoInCatalog == false`) — this is what bites the
+      `unit-app` forbidden-token scan. Restore both byte-identically and verify with `shasum -a 256 -c`.
+- [x] 3⁶.4 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [x] 3⁶.5 Commit `test(taps): pin that colliding tap rows open the catalog detail`.
 
 ## Phase 6⁶: Verification and bindings (round 7)
 

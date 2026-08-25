@@ -235,24 +235,29 @@ struct TapSearchCompositionTests {
         #expect(surface.code.contains("TapSearchSelection") == false)
     }
 
-    /// Round 6 (DD-21) renamed this row and rewrote its recorded reason; its
-    /// **subject never moved**. Selection was gated on `hit.routableID` alone
-    /// before the reversal and is gated on it alone after, which is precisely
-    /// why the reversal cost the view nothing: the projection changed its mind
-    /// about which hits are routable, and the surface — which never knew the
-    /// rule — needed no edit at all.
+    /// Round 6 (DD-21) renamed this row and rewrote its recorded reason; round 7
+    /// (DD-23) rewrites the reason again. Its **subject has never moved**.
+    /// Selection was gated on `hit.routableID` alone before both reversals and
+    /// is gated on it alone after, which is precisely why each cost the view
+    /// nothing: the projection changed its mind about which hits are routable,
+    /// and the surface — which never knew the rule — needed no edit either time.
     ///
-    /// The inert case is now **ambiguity**, in either install state. The four
-    /// forbidden tokens below are unchanged and are what keep that true: a view
-    /// that re-derived non-collision or uniqueness would be a second opinion on
-    /// the one rule the projection owns.
+    /// The inert case is now a **duplicated `PackageID` among the emitted
+    /// hits**, and nothing else. Round 6 removed the install state from the
+    /// rule; round 7 removed the catalog collision, whose row now opens the
+    /// catalog's own pane.
+    ///
+    /// The four forbidden tokens below are **unchanged**, and `alsoInCatalog` is
+    /// now load-bearing in a second way: a view that consulted the collision to
+    /// guess routability would be wrong about real rows — every colliding row —
+    /// rather than merely ill-mannered.
     @Test("The tap search surface selects on the projection's routability alone")
     func theTapSearchSurfaceSelectsOnRoutabilityAlone() throws {
         let surface = try TapSearchSources.surface()
 
         #expect(surface.code.contains(".selectionDisabled("))
-        // The two inert cases are one code path: the projection already decided,
-        // and the view reads `routableID` rather than re-deriving anything.
+        // One inert case, one code path: the projection already decided, and the
+        // view reads `routableID` rather than re-deriving anything.
         #expect(surface.code.contains("if let routable = hit.routableID"))
         #expect(surface.code.contains(".tag(routable)"))
         #expect(
@@ -271,11 +276,13 @@ struct TapSearchCompositionTests {
         // `hit.isInstalled` left this list in round 3, deliberately and
         // narrowly. The row reads it to draw the shared pill, and a `Bool`
         // about installation **cannot** express routability: routing requires
-        // the hit to be uncollided and unique, and those are the two facts still
-        // forbidden below. Round 6 made that separation load-bearing rather than
-        // merely tidy — install state and routability are now genuinely
-        // independent, so a view consulting the first to guess the second would
-        // be wrong about real rows rather than only ill-mannered.
+        // the hit's identity to be unique among the emitted hits, which is a
+        // property of the whole result set and appears nowhere on a single row.
+        // Rounds 6 and 7 each made that separation load-bearing rather than
+        // merely tidy — install state, then the catalog collision, became
+        // genuinely independent of routability, so a view consulting either to
+        // guess it would now be wrong about real rows rather than only
+        // ill-mannered.
         for forbidden in ["alsoInCatalog", "hit.state ==", "== .notInstalled", "occurrences"] {
             #expect(
                 surface.code.contains(forbidden) == false,
@@ -388,6 +395,12 @@ struct TapSearchCompositionTests {
         //    the tap inventory. An installed package therefore always reaches
         //    its receipt pane, and this one answers only for a package the Mac
         //    does not have.
+        //
+        //    Round 7 (DD-23) leans on this same ordering and adds no assertion
+        //    of its own: a colliding row is now routable, and what keeps it off
+        //    *this* pane — and on the catalog's — is `catalogBranch` coming
+        //    first. That is why the ordering is pinned by position rather than
+        //    by mere presence.
         let catalogBranch = try #require(detail.code.range(of: "if let package = catalog.package(id)"))
         let receiptBranch = try #require(
             detail.code.range(of: "else if let snapshot = installed.inventory.package(id)")

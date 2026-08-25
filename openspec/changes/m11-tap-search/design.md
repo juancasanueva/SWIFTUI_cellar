@@ -386,9 +386,17 @@ ordering, so round 7 only stops withholding what they already resolve correctly.
 | `unit-app` | the same row's catalog-first assertion (**unchanged**) | The destination is the shipped branch order, which the round-6 pane row already pins as `catalog.package(id)` before the receipt branch before the inventory branch. Round 7 adds no branch, so it adds no assertion — it depends on that one |
 
 **Honesty note.** Round 7 writes **one** genuinely new test (PD6's) and **replaces** two. The two
-replacements are the whole RED proof of the production change, and a mutation-based RED — restoring
-`collides == false &&` — is what proves the `unit-app` scan still bites, since no app source line
-changes.
+replacements are the whole RED proof of the production change. Because no app **behaviour** line
+changes, the round needs **two** mutations rather than one, and they prove different things:
+
+1. Restoring `collides == false &&` in the projection proves the four `unit` rows bite. It says
+   **nothing** about the `unit-app` scan, which reads app sources only and is blind to a CellarCore
+   edit — recording it as proof of both would be a false claim.
+2. Re-deriving routability in the view — `if let routable = hit.routableID, hit.alsoInCatalog == false`
+   — is what proves the `unit-app` forbidden-token scan still bites, and it is the exact drift that scan
+   exists to catch.
+
+Both are restored byte-identically and verified with `shasum -a 256 -c`.
 
 ## Removal plan (explicit, per the scope change)
 

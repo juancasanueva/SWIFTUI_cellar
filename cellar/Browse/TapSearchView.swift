@@ -83,15 +83,19 @@ struct TapSearchView: View {
                             .tag(routable)
                             .themedListSelection(isSelected: selection == routable)
                     } else {
-                        // Deliberately inert, and for one reason only:
-                        // **ambiguity**. Either the catalog carries this bare
-                        // token and would answer for it instead, or two taps
-                        // publish it and there is no single package to open —
-                        // so a pane here would present something other than the
-                        // row chosen. The install state decides nothing: since
-                        // round 6 a not-installed hit routes too, to the
-                        // name-only detail composed from this same inventory
-                        // (PS8 round 6, DD-21).
+                        // Deliberately inert, and for one reason only: **two
+                        // emitted hits carry this one `PackageID`**. Two taps
+                        // publish the same name, nothing distinguishes them, and
+                        // a pane opened for either would present something other
+                        // than the row chosen.
+                        //
+                        // Neither of the two facts that used to bar a row does
+                        // any more. The install state stopped deciding in round
+                        // 6 — a not-installed hit routes to the name-only detail
+                        // composed from this same inventory — and the catalog
+                        // collision stopped deciding in round 7: such a row
+                        // opens the catalog's own pane, which is the package its
+                        // own note says Homebrew installs (PS8 round 7, DD-23).
                         row(hit)
                             .selectionDisabled()
                     }
