@@ -886,7 +886,7 @@ Runner: `swift test --package-path Packages/CellarCore --filter 'TapPackageSearc
       and artifact buckets, and compare each against the Round 2 forecast (~2,057–2,107 and 3,361–3,561).
       Record the **measured** total against the maintainer's accepted 4,900–5,200 and against this
       forecast's 5,418–5,668. A miss is information for the next forecast, not a failure.
-- [ ] 6′.7 **Delivery — one PR** (`single-pr`, **`size:exception` accepted by the maintainer on
+- [x] 6′.7 **Delivery — one PR** (`single-pr`, **`size:exception` accepted by the maintainer on
       2026-08-25**; no chain). The body states up front: (a) **Browse is byte-identical to `main`** — the
       catalog surface is out of scope, asserted by both a `git diff` and a test; (b) the surface **adds no
       brew invocation and no store** — it composes a resident inventory, and each surface holds its own

@@ -1275,3 +1275,7 @@ still round 2's **`6′.7`**, deferred by this run's explicit instruction not to
 pull request. Round 8's ledger is unchanged at 26 of 26, round 7's at 24 of 24, round 6's at 25 of 25,
 round 5's at 19 of 19, round 4's at 22 of 22, round 3's at 24 of 24, round 2's at 55 of 56, and round 1's
 59 boxes are unchanged history with `6.7` void.
+
+## Delivery (task 6′.7 — done)
+
+Pushed `feat/m11-tap-search` and opened https://github.com/juancasanueva/SWIFTUI_cellar/pull/77 against `main` after verify round 11 (PASS WITH WARNINGS, 56/56), under the maintainer-accepted `size:exception`. The PR body discloses the exception, the scoped runners, the pre-existing Taps UI failures, and the four capability deltas.
