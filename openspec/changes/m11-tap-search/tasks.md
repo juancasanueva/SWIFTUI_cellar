@@ -1407,3 +1407,105 @@ measured total; never trim. RDD disabled. Strict TDD active.
 - [x] 6⁶.5 Merge the round-7 section into `apply-progress.md`, re-mirror it to Engram topic
       `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks`.
 - [x] 6⁶.6 Commit `docs(sdd): record the m11-tap-search round 7 apply progress`.
+
+## Work units — round 8
+
+**Maintainer UI feedback, 2026-08-25 (round 8) — binding.** Both tap-backed detail panes — the m10
+receipt pane (`cellar/Browse/PackageDetailView+Receipt.swift`) and the round-6 name-only pane
+(`cellar/Browse/PackageDetailView+TapInventory.swift`) — hang `MutationMenu` in the header's
+`primaryButton` slot. The maintainer does not want it there. Both panes must instead show the **same
+Actions section the catalog pane shows** (`PackageDetailView.swift`, `actionsSection(for:)`): a
+`SectionHeader("Actions")`, one labelled button per applicable verb, the primary `brew …` command line
+with `CopyCommandButton`, and the runner-unavailable guidance — placed **last** in the pane, where the
+catalog pane places it. Both header slots become `EmptyView()`. `MutationMenu` stays on the **rows**.
+
+**One component, not a copy (DD-24).** `actionsSection` is rebuilt from a `PackageEntry` — every input
+it ever read is `entry.id` or `entry.installed` — relaxed from `private` to `internal`, and called by
+both extensions. `primaryCommand(for:target:)` moves with it. The catalog pane's rendering, its verb
+labels, its `detail-action-*` identifiers and its ordering are **byte-unchanged**.
+
+**Delivery.** `single-pr` with `size:exception` **accepted** (maintainer, 2026-08-25). Report the
+measured total; never trim. RDD disabled. Strict TDD active.
+
+| Unit | Goal | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU28** | The amended artifacts land **first** — PS8's rewritten pane clause and amended pane-composition scenario; a **new** `installed-inventory` delta carrying MODIFIED **II15**; `specs/README.md` revision 9 with the new capability row; `design.md` (**DD-24**, the round-8 preamble, file table and RED rows) and this file | N/A — artifacts only | N/A — no behaviour changes | Revert one docs commit; the branch returns to `e0e9ce5` |
+| **WU29** | The refactor, then the feature: `actionsSection`/`primaryCommand` rebuilt from the entry and relaxed to `internal` (catalog pane proven unchanged by `cellarTests`), then both panes call it and drop the header menu | `xcodebuild test … -only-testing:cellarTests`, plus `xcodebuild build …` | N/A — no runtime boundary is added: the section, its verbs and its argv are the shipped ones, exercised by the catalog pane's own suite | Two commits: revert the feature commit to restore both panes' menus, or both commits to restore the `CatalogPackage`-shaped signature |
+| **WU30** | The `unit-app` guards: `ReceiptDetailCompositionTests` and `TapSearchCompositionTests` pin the shared builder call (with its terminator), the absent `MutationMenu(`, the absent verb literals and the empty header slot; two reversible mutations prove both halves | `xcodebuild test … -only-testing:cellarTests/ReceiptDetailCompositionTests` and `…/TapSearchCompositionTests` | N/A — source-scan suites | Revert one commit across two test files; no production line is its own |
+
+## Phase 0⁷: baselines, measured at `e0e9ce5`
+
+- [x] 0⁷.1 `swift test --package-path Packages/CellarCore` — record the total before any edit.
+- [x] 0⁷.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** before any edit.
+- [x] 0⁷.3 Confirm a clean working tree; discard `cellar/InfoPlist.xcstrings` churn, never commit it.
+
+## Phase 1⁷: WU28 — the amended artifacts land first
+
+- [x] 1⁷.1 Amend `specs/package-search/spec.md`: the round-8 UI-feedback paragraph; PS8's pane
+      presentation clause rewritten so the pane's last block is the **shared Actions section** rather
+      than the shared mutation menu, with its own `(Previously: …)` line and the placement, shape and
+      empty-header-slot obligations; the pane-composition `unit-app` scenario amended in place. Scenario
+      counts are **unchanged**. **Never touch `openspec/specs/**`.**
+- [x] 1⁷.2 Create `specs/installed-inventory/spec.md`: MODIFIED **II15**, whole block copied from
+      `openspec/specs/installed-inventory/spec.md` and edited in exactly two places — the mutation-verb
+      clause and the verb scenario — each with a `(Previously: …)` line. The other **11** scenarios and
+      every other clause stay **byte-identical**, verified by diff.
+- [x] 1⁷.3 Amend `specs/README.md`: revision 9 header, the round-8 paragraph, the new
+      `installed-inventory` arithmetic row (+0 scenarios), the totals line, the
+      “activated, not changed” section corrected for II15, and the new reversed presentation-decision row.
+- [x] 1⁷.4 Amend `design.md`: **DD-24** new; the round-8 preamble; the round-8 file-changes table and
+      RED rows with the two-mutation note.
+- [x] 1⁷.5 Append this phase to `tasks.md`.
+- [ ] 1⁷.6 Commit `docs(sdd): amend m11-tap-search so tap detail panes show the shared actions section`.
+
+## Phase 2⁷: WU29 — the refactor, then the feature
+
+- [ ] 2⁷.1 **Approval baseline**: `cellarTests` is green at the phase-0⁷ distinct-id count, and the
+      catalog pane's `detail-action-*` identifiers are enumerated before the edit.
+- [ ] 2⁷.2 **Refactor** `PackageDetailView.swift`: `actionsSection(for entry: PackageEntry)`, internal;
+      `primaryCommand(for entry: PackageEntry, target:)` reading `entry.installed`; the catalog call
+      site becomes `actionsSection(for: entry(for: package))`. No label, identifier, argv or order
+      changes. Re-run `cellarTests` and `xcodebuild build …` to prove behaviour preserved.
+- [ ] 2⁷.3 Commit `refactor(browse): build the detail actions section from a package entry`.
+- [ ] 2⁷.4 **Feature**: both panes pass `EmptyView()` as `primaryButton`, drop `MutationMenu`, and call
+      the shared builder as the **last** block of their scroll content — after `receiptFooter` and after
+      `publishedFooter(published)` respectively. Their `PackageEntry(…)` builders are **unchanged**.
+- [ ] 2⁷.5 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [ ] 2⁷.6 Commit `feat(browse): show the shared actions section on tap-backed detail panes`.
+
+## Phase 3⁷: WU30 — the composition guards
+
+- [ ] 3⁷.1 `cellarTests/ReceiptDetailCompositionTests.swift`: replace
+      `theReceiptPaneOffersTheSameVerbsAsTheRow` with the II15 round-8 row — the pane calls the shared
+      builder (pinned **with its terminator**), references no `MutationMenu(`, passes `EmptyView()` in
+      the header slot, and composes none of `"Reinstall"`, `"Uninstall"`, `"Install"`, `"Upgrade"`,
+      `"Pin version"`; those literals are asserted **present** in `PackageDetailView.swift` so the
+      absence is not vacuous. Assert no trust control still (PT7).
+- [ ] 3⁷.2 `cellarTests/TapSearchCompositionTests.swift`: amend item 4 of
+      `theNameOnlyTapDetailComposesNothingItCannotKnow` to the same four claims, leaving its
+      `PackageEntry(installed: nil, catalog: nil, id: published.id)` assertion unchanged.
+- [ ] 3⁷.3 Prove RED by **two reversible mutations**: (a) re-add `MutationMenu(center: operations, …)`
+      to a pane; (b) add a local `quietButton("Reinstall", …)` to a pane. Each must fail a different
+      assertion. Restore both byte-identically and verify with `shasum -a 256 -c`.
+- [ ] 3⁷.4 Confirm `PerPackageTrustCompositionTests`'s `views()` list is **unchanged** — no app-target
+      file is created this round.
+- [ ] 3⁷.5 Commit `test(browse): pin the shared actions section on tap-backed detail panes`.
+
+## Phase 6⁷: Verification and bindings (round 8)
+
+- [ ] 6⁷.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁷
+      baseline. **Expected ±0**: round 8 touches no CellarCore file.
+- [ ] 6⁷.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+      phase-0⁷ baseline. **Redirect with `> log 2>&1`, never `tee`.** Count distinct ids by membership
+      of each recovered quoted id against the cleanly parsed set. The full `-scheme cellar` runner is
+      **not** the gate.
+- [ ] 6⁷.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+      `cellar/Activity/MutationMenu.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`,
+      `PackageSearchIndex.swift`, `MutationCommand.swift` and `cellarUITests/` must print **nothing**
+      under `git diff --stat main --`; `PackageDetailView.swift`'s diff against `main` shown in full and
+      limited to round 6's two hunks plus round 8's refactor and one relaxed `private`.
+- [ ] 6⁷.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+      `size:exception`; never trim.
+- [ ] 6⁷.5 Merge the round-8 section into `apply-progress.md`, re-mirror it to Engram topic
+      `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks`.
+- [ ] 6⁷.6 Commit `docs(sdd): record the m11-tap-search round 8 apply progress`.

@@ -95,6 +95,19 @@ name, neither of them the catalog's — where nothing distinguishes the two rows
 the one chosen. Nothing about tap-source reads, catalog records, trust presentation, the receipt branch
 or the inventory branch is weakened or moved.
 
+**Maintainer UI feedback, 2026-08-25 (round 8) — binding, and this revision's reason.** Observed in the
+running app, comparing the catalog detail pane against the name-only tap pane round 6 added: the catalog
+pane presents its verbs as an **Actions** section at the foot of the pane — a section header, one
+labelled button per applicable verb, the primary `brew …` command beneath them with a copy affordance,
+and the runner-unavailable guidance under that. The tap pane instead hung the row's `⋯` menu in the
+header's primary-button slot. The maintainer rejected that placement and that shape. The pane now shows
+**the same Actions section, from the same one component**, in the same position. This changes the
+**presentation** of the verbs and nothing else: the entry handed over is unchanged
+(`installed: nil, catalog: nil`, the bare `PackageID`), no verb is added or re-implemented, no argv
+shape moves, and the pane still composes no trust presentation of any kind. The `⋯` menu is untouched
+**on the rows**, where it is the right affordance and where this surface still draws it. The
+receipt-backed pane `installed-inventory` II15 owns takes the identical change, in its own delta.
+
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
@@ -322,10 +335,22 @@ search or to the index, and MUST cost **no brew invocation** — it is composed 
 
 That detail MUST present exactly: the package's **identity** — the bare token it is known by, drawn in
 the same identity header every other package detail draws; its **kind**; its **tap of origin**; its
-**install state**, carried by `tap-management` TM5's exact shipped string “Not installed.”; the
-**shared mutation menu**, handed no installed record and no catalog record, with the bare `PackageID`
-as its target; and a **footer** carrying the exact copy “Cellar knows this package by name only until
-it is installed.”.
+**install state**, carried by `tap-management` TM5's exact shipped string “Not installed.”; a **footer**
+carrying the exact copy “Cellar knows this package by name only until it is installed.”; and, **last**,
+the **same Actions section the catalog detail pane presents**, handed no installed record and no
+catalog record, with the bare `PackageID` as its target.
+
+That Actions section MUST be **the one shared component** the catalog detail pane already uses — not a
+second one built here and not a copy of it — so the two panes cannot drift. It MUST render each
+applicable verb as its own labelled button, MUST show the primary `brew …` command beneath them
+together with the shared copy affordance, and MUST carry the shared runner-unavailable guidance when
+there is no runner. It MUST sit at the **bottom of the pane**, after the facts and the footer, exactly
+where the catalog pane places it, and the pane's identity header MUST carry **no** mutation menu and no
+mutation button in its primary slot: one pane offers exactly one place to act. No verb label, no
+command family, no argv and no applicability rule MUST be declared by this pane.
+(Previously: this clause named the **shared mutation menu** — the row's `⋯` menu — and placed it in the
+header's primary-button slot, so the same package's verbs read one way on the catalog pane and another
+way here. The **entry** handed over is unchanged, and so is every prohibition around it.)
 
 It MUST carry **no collision note**, and that absence MUST be asserted rather than assumed. A colliding
 identity cannot reach this rendering by any route: the catalog carries the token, so the **catalog
@@ -577,8 +602,13 @@ method, same ceiling, unaffected by this source's existence.
 - GIVEN the sources of the detail surface and of the pane that renders a not-installed tap package
 - WHEN the pane is scanned for a description, a version, a homepage, a licence, a dependency list, an
   analytics figure or a size field, for a collision note, for any trust type name, badge, control or
-  grant marker, and for where the resolution branch sits and where the pane's two strings are worded
+  grant marker, for what fills its header's primary slot and what it offers to act with, and for where
+  the resolution branch sits and where the pane's two strings are worded
 - THEN the pane composes none of those fields and no trust presentation of any kind
+- AND its verbs are the **catalog detail pane's Actions section**, reached by calling that one shared
+  component with the pane's own entry, placed last in the pane's content; the pane's header primary
+  slot is empty, the pane references no mutation menu, and it words no verb label, no command family
+  and no mutation target of its own
 - AND the detail surface resolves this rendering in a **third** branch, after the catalog branch and
   after the receipt branch, so an installed package still reaches its receipt-backed pane first
 - AND the resident tap inventory is passed to the detail surface at its single construction site, and

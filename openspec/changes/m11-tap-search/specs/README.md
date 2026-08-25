@@ -1,9 +1,25 @@
 # Spec index — `m11-tap-search`
 
-Three delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
-the searchable mirror. **Revision 8** — the 2026-08-25 maintainer **product decision** that a colliding
-tap hit opens the catalog detail, on top of revision 7's name-only detail, revision 6's mutation verbs,
-revision 5's update pill, revision 4's install pill and revision 3's scope change.
+**Four** delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
+the searchable mirror. **Revision 9** — the 2026-08-25 maintainer **UI feedback** that both tap-backed
+detail panes show the catalog pane's **Actions** section, on top of revision 8's colliding-hit route,
+revision 7's name-only detail, revision 6's mutation verbs, revision 5's update pill, revision 4's
+install pill and revision 3's scope change.
+
+**UI feedback, 2026-08-25 (round 8, binding).** Observed in the running app, comparing the catalog
+detail pane against the two tap-backed panes: the catalog pane presents its verbs as an **Actions**
+section at the foot of the pane — a section header, one labelled button per applicable verb, the
+primary `brew …` command beneath them with a copy affordance, and the runner-unavailable guidance under
+that. The receipt-backed pane (m10, promoted **II15**) and the name-only tap pane (round 6, PS8) both
+hung the row's `⋯` menu in the header's primary-button slot instead. Both panes now call **the one
+shared Actions section the catalog pane already uses**, in the same position, and both header slots are
+empty. The `⋯` menu is **untouched on the list rows**, where it stays the right affordance. The change
+is presentational: the entries handed over are unchanged, no verb is added or re-implemented, no argv
+shape moves, and no trust presentation is added to either pane (PM10, TM12, PT7). **Scenario counts do
+not move at all**: `package-search` amends PS8's pane clause and its pane-composition `unit-app`
+scenario in place, and `installed-inventory` gains a **new delta file** whose single MODIFIED **II15**
+block amends one clause and one scenario in place. The arithmetic below is therefore unchanged except
+for the new capability row, which nets zero.
 
 **Product decision, 2026-08-25 (round 7, binding).** The **collision** half of round 6's ambiguity rule
 is reversed. A hit whose bare token the catalog also carries is now **selectable** and opens the
@@ -78,10 +94,13 @@ restated **per surface** rather than as a shared keystroke turn. The string `Fro
 | `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +22 (14 `unit`, 8 `unit-app`) | 7 → **8** requirements, 19 → **41** scenarios |
 | `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +3 (`unit`) | 8 requirements unchanged, 31 → **34** scenarios |
 | `tap-management` | **MODIFIED** — **TM5** and **TM11** (main-spec markers) | both whole blocks, all 12 existing scenarios byte-identical | +3 (`unit`) | 13 requirements unchanged, 58 → **61** scenarios |
+| `installed-inventory` | **MODIFIED** — **II15** (round 8) | whole block, 11 of its 12 existing scenarios byte-identical, the twelfth amended in place | **+0** | 15 requirements unchanged, 79 → **79** scenarios |
 
-**Totals: 1 ADDED, 3 MODIFIED blocks across 2 capabilities, 0 REMOVED, 0 RENAMED — 28 new scenarios
+**Totals: 1 ADDED, 4 MODIFIED blocks across 3 capabilities, 0 REMOVED, 0 RENAMED — 28 new scenarios
 (20 `unit`, 8 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
-destructive-delta warning does not fire.
+destructive-delta warning does not fire. The `installed-inventory` row contributes **no** new scenario
+by design: round 8 changes how II15's verbs are *presented*, and the scenario that owned that claim is
+amended rather than joined by a second one that would restate it.
 
 > **Arithmetic correction, round 5.** This line read “20 new scenarios (15 `unit`, 5 `unit-app`)” from
 > revision 3 onward and was not re-footed when rounds 3 and 4 amended the table above it. The table is
@@ -168,6 +187,7 @@ carried into PS8:
 | An installed row offers the **same verbs the Installed and catalog surfaces offer** — **added 2026-08-25 (round 5)** | The hit gains a **mutation handoff** — this machine's own installed receipt, resolved by the tap-aware handoff, present in both installed states and absent when not installed — and the row hands it to the shared mutation menu: verbs paragraph + handoff paragraph, the amended facts and offered-version `unit` scenarios and the new `unit-app` mutation-composition scenario. It is **not a seventh fact**: it publishes nothing the tap declares, costs no brew invocation, and the surface presents nothing from it |
 | ~~Not-installed rows non-selectable~~ — **reversed 2026-08-25 (round 6)** | An unambiguous not-installed hit **is** selectable and opens a minimal detail composed exclusively from the resident tap inventory — identity, kind, tap of origin, TM5's `Not installed.`, the shared mutation menu and one pinned footer, and nothing that would need a tap-source read: selectability paragraph + detail paragraphs, the amended ambiguity `unit` scenario and surface-entry `unit-app` scenario, the new `unit` resolution scenario and the new `unit-app` composition scenario. **Ambiguity still withholds the route** in either install state, and no trust presentation is added |
 | ~~A colliding hit is non-selectable~~ — **reversed 2026-08-25 (round 7)** | A colliding hit **is** selectable and opens the **catalog's own detail** — the package Homebrew resolves its bare token to, and the one its own collision note names. Routability becomes **uniqueness among the emitted hits** and nothing else: rewritten selectability clause + the colliding-route paragraph, the amended collision `unit` scenario, the amended ambiguity `unit` scenario (now duplicate-only) and the amended surface-entry `unit-app` scenario, plus PD6's new `unit` scenario. **No routing branch is added** — the shipped catalog-first order already answers — the collision note is unchanged and still required, and the receipt and inventory branches are untouched. The **only** inert row left is a duplicate `PackageID` among emitted hits |
+| ~~The tap-backed panes offer their verbs through the row's `⋯` menu, in the header's primary slot~~ — **reversed 2026-08-25 (round 8)** | Both tap-backed detail panes — the receipt-backed one **II15** owns and the name-only one PS8 added — present the **same Actions section the catalog detail pane presents**, from **one** shared component, placed **last** in the pane, with the primary `brew …` command line and its copy affordance; both header primary slots are **empty**. The `⋯` menu is **unchanged on the list rows**. Lands as PS8's rewritten pane clause + its amended `unit-app` pane-composition scenario, and as a **new `installed-inventory` delta** whose MODIFIED **II15** amends the verb clause and the verb scenario in place. **No scenario is added**, no verb is re-implemented, no argv shape moves, and no trust presentation appears on either pane |
 
 ## `package-mutation`: activated, not changed — no delta
 
@@ -186,13 +206,20 @@ binds the new install path exactly as written today and is **activated** by it:
 A `package-mutation` MODIFIED block would restate a requirement that already says the right thing, so
 `sdd-spec` found **no genuine gap** and wrote none. Record this at archive as *activated, not changed*.
 
-## `installed-inventory`: activated, not changed — no delta
+## `installed-inventory`: activated by II7 and II8, and **modified** at II15 in round 8
+
+Rounds 1–7 recorded this capability as *activated, not changed*. **Round 8 changes that for II15 only**,
+and the delta says so in `specs/installed-inventory/spec.md`: II15's mutation-verb clause pinned the
+verbs to "the same shared mutation surface" the installed **list row** uses, and its verb scenario
+pinned that shape, so presenting them as the catalog pane's **Actions** section would have contradicted
+a promoted requirement rather than merely re-styling a pane. II7 and II8 below are **still** activated
+rather than changed.
 
 | Requirement | How m11 activates it |
 |---|---|
 | **II7** — the catalog target does not depend on the brew-process target | The projection lives in `BrewClient`, which already imports `Catalog`; the direction is unchanged, which is precisely why index ingestion (explore Approach C) was rejected. |
 | **II8** — installed-state filters are composed, never pushed into the search index | PS8 extends the same discipline to a second result source: the hide-installed subtraction composes above it, and II8's "no enabled control that cannot change the visible results" rule is why the tap surface offers no outdated control at all. |
-| **II15** — the installed receipt supplies a reduced detail for a package the catalog does not carry | An installed tap hit routes there by exact `PackageID` through the existing resolution order; no routing branch is added. |
+| **II15** — the installed receipt supplies a reduced detail for a package the catalog does not carry | An installed tap hit routes there by exact `PackageID` through the existing resolution order; no routing branch is added. **Round 8: no longer activation alone** — its mutation-verb clause and its verb scenario are MODIFIED so that pane presents the catalog pane's Actions section instead of the list row's `⋯` menu. See the delta file. |
 
 ## Numbering and marker drift, recorded once
 
