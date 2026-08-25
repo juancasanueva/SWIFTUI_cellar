@@ -13,6 +13,51 @@ import Testing
 @Suite("Installed detail projection")
 struct InstalledDetailProjectionTests {
 
+    // MARK: - II15 — the install date is the receipt's, or absent
+
+    /// The date is exposed as a **value**, never as a formatted fact: locale
+    /// belongs to the presenting surface. A keg whose receipt carries no
+    /// timestamp yields `nil`, and never the Unix epoch — the decoder now
+    /// preserves that absence, which is what unblocked the fact at all.
+    @Test("The install date is the primary keg's own, and absent when the receipt has none")
+    func theInstallDateIsTheReceiptsOrAbsent() {
+        let dated = InstalledKeg(
+            version: "1.4.0",
+            installedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            installedOnRequest: true
+        )
+        let undated = InstalledKeg(version: "1.4.0", installedAt: nil, installedOnRequest: true)
+
+        let withDate = InstalledDetailProjection(Self.receipt(primaryKeg: dated))
+        let withoutDate = InstalledDetailProjection(Self.receipt(primaryKeg: undated))
+
+        #expect(withDate.installedAt == Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(withoutDate.installedAt == nil)
+        // Not a labelled fact of any group: the surface joins it beside the
+        // other install-state facts it owns, in its own locale.
+        #expect(withDate.orderedFacts.contains { $0.label.lowercased().contains("install") } == false)
+        #expect(withoutDate.orderedFacts.contains { $0.value.contains("1970") } == false)
+    }
+
+    private static func receipt(primaryKeg keg: InstalledKeg) -> InstalledPackage {
+        InstalledPackage(
+            kind: .formula,
+            name: "widget",
+            displayName: "widget",
+            desc: nil,
+            homepage: nil,
+            tap: "acme/tools",
+            catalogVersion: keg.version,
+            kegs: [keg],
+            primaryKeg: keg,
+            snapshotOutdated: false,
+            isPinned: false,
+            pinnedVersion: nil,
+            declaresAutoUpdates: nil,
+            linkedKeg: keg.version
+        )
+    }
+
     // MARK: - II15 sc1 — detailed from the receipt alone
 
     @Test("A package the catalog does not carry is detailed from its receipt alone")
@@ -329,7 +374,7 @@ struct InstalledDetailProjectionTests {
         // rather than merely unset, in the same idiom sc3 uses for the kind
         // asymmetry (DD-4).
         let members = Mirror(reflecting: detail).children.compactMap(\.label)
-        #expect(members == ["description", "identity", "tapOfOrigin", "kindState"])
+        #expect(members == ["description", "identity", "tapOfOrigin", "kindState", "installedAt"])
         for member in members {
             for forbidden in ["grant", "trust", "marker", "badge"] {
                 #expect(
