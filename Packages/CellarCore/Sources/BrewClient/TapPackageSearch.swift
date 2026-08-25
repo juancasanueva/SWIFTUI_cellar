@@ -82,6 +82,23 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     /// denies. Storing it is also what keeps the synthesised `Hashable` from
     /// needing anything more than the hand-written `hash(into:)` below.
     public let nextVersion: String?
+    /// This Mac's own installed receipt for the hit, and `nil` when it has none
+    /// (PS8 round 5, DD-20).
+    ///
+    /// **A handoff, not a seventh fact.** It exists so the row can hand the
+    /// shared mutation spine the record that spine already takes — an installed
+    /// package must offer Reinstall, Uninstall…, Upgrade and Pin exactly as it
+    /// does on the Installed and catalog surfaces, and the shared menu resolves
+    /// all of that from this one value. It publishes nothing the tap declares,
+    /// costs no brew invocation, and the surface presents nothing from it, so
+    /// the six-fact ceiling above is untouched.
+    ///
+    /// Resolved by the **same** `TapPackage.installedHandoff` `nextVersion` is
+    /// resolved by, and from the same lookup rather than a second one: a bare
+    /// `PackageID` lookup would attach a *colliding catalog package's* receipt
+    /// to this row and offer to uninstall a package the row does not name.
+    /// Non-`nil` in **both** installed states, because both are installed.
+    public let installed: InstalledPackage?
     /// A catalog record carries this bare token, so Homebrew resolves the
     /// install there. Surfaced, never suppressed.
     public let alsoInCatalog: Bool
@@ -243,6 +260,11 @@ public struct TapPackageSearch: Sendable {
             let collides = isInCatalog(match.package.id)
             let unique = occurrences[match.package.id] == 1
             let routable = match.package.isInstalled && collides == false && unique
+            // Resolved **once** and read twice: the offered version and the
+            // mutation handoff are the same receipt, so the row's update pill
+            // and its menu can never disagree about which record answered
+            // (DD-19, DD-20).
+            let receipt = installedReceipt(for: match.package)
             return TapSearchHit(
                 id: TapSearchHit.RowID(
                     tapName: match.tapName,
@@ -255,7 +277,8 @@ public struct TapPackageSearch: Sendable {
                 tapName: match.tapName,
                 state: match.package.state,
                 stateNote: Self.note(for: match.package.state),
-                nextVersion: offeredVersion(for: match.package),
+                nextVersion: Self.offeredVersion(of: receipt),
+                installed: receipt,
                 alsoInCatalog: collides,
                 collisionNote: collides ? Self.collisionCopy : nil,
                 rank: match.rank,
@@ -264,20 +287,32 @@ public struct TapPackageSearch: Sendable {
         }
     }
 
-    /// The version brew offers for this package, or `nil` (PS8 round 4, DD-19).
+    /// This Mac's receipt for a published package, or `nil` (DD-19, DD-20).
     ///
     /// Keyed off **`installedHandoff`**, not off `package.id`. The two differ
     /// exactly where it matters: `TapProjection.installState` answers
     /// `.notInstalled` for a receipt whose `tap` names a *different* tap, so a
-    /// lookup by bare identity would offer a version to a row this projection
-    /// calls not installed. Both installed states answer, because both **are**
-    /// installed.
-    private func offeredVersion(for package: TapPackage) -> String? {
-        guard
-            let id = package.installedHandoff,
-            let receipt = installed.package(id),
-            receipt.isOutdated
-        else { return nil }
+    /// lookup by bare identity would offer a version — and, since round 5, a
+    /// whole set of installed-package verbs — to a row this projection calls not
+    /// installed, including a row whose bare token the *catalog* carries and
+    /// installed from its own tap. Both installed states answer, because both
+    /// **are** installed.
+    ///
+    /// One lookup serves both readers below: the offered version and the
+    /// mutation handoff are the same record by construction rather than by
+    /// agreement.
+    private func installedReceipt(for package: TapPackage) -> InstalledPackage? {
+        package.installedHandoff.flatMap { installed.package($0) }
+    }
+
+    /// The version brew offers for this receipt, or `nil` (PS8 round 4, DD-19).
+    ///
+    /// Gated on the receipt's **own** `isOutdated` — `installed-inventory` II4's
+    /// shipped rule, including the self-updating-cask exclusion — so this
+    /// surface cannot disagree with the Installed list about which packages have
+    /// an update.
+    private static func offeredVersion(of receipt: InstalledPackage?) -> String? {
+        guard let receipt, receipt.isOutdated else { return nil }
         return receipt.catalogVersion
     }
 

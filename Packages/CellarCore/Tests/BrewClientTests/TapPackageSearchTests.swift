@@ -180,10 +180,16 @@ struct TapPackageSearchTests {
         // round 3, DD-9). An absence, never `""`.
         #expect(hit.stateNote == nil)
         #expect(hit.collisionNote == nil)
+        // The one further member is round 5's **mutation handoff** — this Mac's
+        // own receipt, carried so the shared mutation spine can be handed the
+        // record it already takes. Absent here, because this hit is not
+        // installed, so the enumeration below still exposes six facts and no
+        // tap-published value (PS8 round 5, DD-20).
+        #expect(hit.installed == nil)
 
         let labels = Mirror(reflecting: hit).children.compactMap(\.label).sorted()
         #expect(labels == [
-            "alsoInCatalog", "collisionNote", "displayName", "id", "mutationTarget",
+            "alsoInCatalog", "collisionNote", "displayName", "id", "installed", "mutationTarget",
             "nextVersion", "publishedName", "rank", "routableID", "state", "stateNote",
             "tapName"
         ])
@@ -673,6 +679,76 @@ struct TapPackageSearchTests {
         #expect(upToDate.count == 3)
         #expect(upToDate.filter(\.isInstalled).count == 2)
         #expect(upToDate.allSatisfy { $0.nextVersion == nil })
+
+        // PS8 round 5 (DD-20): the same resolved receipt is carried as the
+        // hit's **mutation handoff**, so the shared mutation spine can offer an
+        // installed package the verbs it offers everywhere else. Present in
+        // **both** installed states — including the up-to-date one, which has no
+        // offered version but is no less installed — and absent when this Mac
+        // has nothing.
+        #expect(outdated.installed?.id == PackageID(kind: .formula, name: "widget-installed"))
+        #expect(withheld.installed?.id == PackageID(kind: .formula, name: "widget-withheld"))
+        #expect(current.installed?.id == PackageID(kind: .formula, name: "widget-current"))
+        #expect(absent.installed == nil)
+        #expect(found.compactMap(\.installed).count == 3)
+
+        // …and it is the **same** receipt the offered version was read off,
+        // rather than a second lookup with a second chance to disagree: each
+        // hit's offer is exactly its own record's `catalogVersion`, and the
+        // up-to-date record is carried while offering nothing.
+        #expect(outdated.nextVersion == outdated.installed?.catalogVersion)
+        #expect(withheld.nextVersion == withheld.installed?.catalogVersion)
+        #expect(current.installed?.isOutdated == false)
+        #expect(upToDate.compactMap(\.installed).count == 2)
+        #expect(upToDate.compactMap(\.installed).allSatisfy { $0.isOutdated == false })
+    }
+
+    /// PS8 round 5 (DD-20): the handoff is keyed the way DD-19 keys the offered
+    /// version, so a **colliding** catalog package's receipt can never reach a
+    /// tap row's mutation menu.
+    @Test("A colliding catalog receipt is never attached to a tap row")
+    func aCollidingCatalogReceiptIsNeverAttachedToATapRow() throws {
+        let wget = PackageID(kind: .formula, name: "wget")
+        // The only resident receipt names the **catalog's** tap. A bare
+        // `PackageID` lookup would hand it to this row and offer Uninstall for a
+        // package the row does not name.
+        let catalogsOwn = InstalledInventory(packages: [
+            InstalledFixture.receipt(.formula, "wget", tap: "homebrew/core")
+        ])
+        let stray = try #require(
+            hits(
+                [TapSearchFixture.acmeWget], "wget", installed: catalogsOwn, catalog: [wget]
+            ).first
+        )
+
+        #expect(stray.alsoInCatalog)
+        #expect(stray.state == .notInstalled)
+        #expect(stray.isInstalled == false)
+        #expect(stray.installed == nil)
+        // Non-vacuous: the receipt really is resident under exactly this
+        // identity, so the absence is the tap-aware keying working rather than
+        // an empty inventory answering.
+        #expect(catalogsOwn.package(wget)?.tap == "homebrew/core")
+        #expect(stray.mutationTarget == wget)
+
+        // Triangulated: the same tap, the same catalog collision, the same bare
+        // identity — and a receipt that names the **publishing** tap. Now the
+        // record is present, and it is that receipt.
+        let tapsOwn = InstalledInventory(packages: [
+            InstalledFixture.receipt(.formula, "wget", tap: "acme/tools")
+        ])
+        let owned = try #require(
+            hits([TapSearchFixture.acmeWget], "wget", installed: tapsOwn, catalog: [wget]).first
+        )
+
+        #expect(owned.alsoInCatalog)
+        #expect(owned.isInstalled)
+        #expect(owned.installed?.id == wget)
+        #expect(owned.installed?.tap == "acme/tools")
+        // The collision still costs it its detail route and never its verbs:
+        // the row stays presented, installable and mutable over the bare token.
+        #expect(owned.routableID == nil)
+        #expect(owned.mutationTarget == wget)
     }
 
     /// The gate DD-19 keys off `installedHandoff` rather than off the bare

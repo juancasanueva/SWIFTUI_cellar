@@ -169,19 +169,27 @@ struct TapSearchView: View {
                 }
             }
             Spacer(minLength: 0)
-            // The shared spine, unconditionally: an entry with neither an
-            // installed nor a catalog record renders Install and Copy install
-            // command, over the bare token (package-mutation PM10).
+            // The shared spine, unconditionally: the menu decides which verbs
+            // this package can be offered, from the record below and the bare
+            // token (package-mutation PM10).
             MutationMenu(center: operations, entry: entry(for: hit))
         }
         .padding(.vertical, 3)
     }
 
-    /// A row with neither an installed nor a catalog record, identified by the
-    /// bare token the projection resolved. `MutationMenu` reads that as "not
-    /// installed" and renders exactly Install and Copy install command.
+    /// The hit as the shared mutation spine takes it: **the record this Mac
+    /// already holds** where the package is installed, no catalog record ever,
+    /// and the bare token the projection resolved (PS8 round 5, DD-20).
+    ///
+    /// The record is the projection's — resolved there by the tap-aware handoff,
+    /// so a colliding catalog package's receipt can never arrive here — and this
+    /// file neither looks one up nor re-keys one. Handing it over is the whole
+    /// change: `MutationMenu` already branches on it, and already words and
+    /// orders Reinstall, Uninstall…, Upgrade and Pin for itself. `catalog` stays
+    /// `nil` in **both** install states: no catalog record reaches this row
+    /// (`package-detail` PD6).
     private func entry(for hit: TapSearchHit) -> PackageEntry {
-        PackageEntry(installed: nil, catalog: nil, id: hit.mutationTarget)
+        PackageEntry(installed: hit.installed, catalog: nil, id: hit.mutationTarget)
     }
 
     /// The row's explanatory line, or `nil` when the row has nothing to explain.
