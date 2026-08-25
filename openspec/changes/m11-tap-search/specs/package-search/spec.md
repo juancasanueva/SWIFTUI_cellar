@@ -293,10 +293,13 @@ the same identity header every other package detail draws; its **kind**; its **t
 **install state**, carried by `tap-management` TM5's exact shipped string “Not installed.”; the
 **shared mutation menu**, handed no installed record and no catalog record, with the bare `PackageID`
 as its target; and a **footer** carrying the exact copy “Cellar knows this package by name only until
-it is installed.”. Where a hit collides with the catalog the pane MUST carry the same collision note
-the row carries, worded identically and supplied by the same projection — though no such pane is
-reachable while collision is itself a bar to selection, so that clause binds the composition rather
-than any reachable state.
+it is installed.”.
+
+It MUST carry **no collision note**, and that absence MUST be asserted rather than assumed. A colliding
+identity cannot reach this rendering by any route: the catalog carries the token, so the catalog detail
+resolves it first, and the row that would otherwise offer it is unroutable for the same reason. A
+collision note composed here would therefore be unreachable presentation — a worse answer than none,
+because it could never be seen to be wrong.
 
 It MUST present **nothing else**. In particular it MUST NOT present a description, a version of any
 kind, a homepage, a licence, a dependency list, an install count, a deprecation or disabled flag, an
@@ -309,9 +312,10 @@ PM10 and `tap-management` TM12 bind it exactly as they bind the row — and `pac
 individual-grant marker MUST NOT appear, because a package this machine has not installed has no
 origin receipt for that marker to be a fact about.
 
-The strings above MUST be **supplied by the same projection** that answers the composed source, never
-composed by the presenting pane, exactly as the row's own sentences are. The footer is this pane's own
-pinned copy and MUST be worded in exactly **one place** in the application's sources.
+**Both** strings above — the install state and the footer — MUST be **supplied by the projection**,
+never composed by the presenting pane, exactly as the row's own sentences are. Each MUST be worded in
+exactly **one place**, and neither MUST appear in the application's own sources at all, so a test can
+read their bytes without rendering a view.
 
 Resolving a selected identity to that rendering MUST use the **resident tap inventory** and MUST resolve
 to a rendering **only when exactly one installed third-party tap publishes that `(kind, name)`**. Zero
@@ -509,27 +513,29 @@ method, same ceiling, unaffected by this source's existence.
   third-party tap publishes and a `(kind, name)` two third-party taps both publish
 - WHEN each identity is resolved against that inventory for a name-only detail
 - THEN `widget` resolves to exactly one rendering, whose facts are its bare token, its kind, its tap of
-  origin `acme/tools` and the exact install-state string “Not installed.”, with the footer copy
-  “Cellar knows this package by name only until it is installed.” and no other value of any kind — no
+  origin `acme/tools`, the exact install-state string “Not installed.” and the exact footer copy
+  “Cellar knows this package by name only until it is installed.” — and no other value of any kind: no
   description, no version, no homepage, no licence, no dependency list, no install count, no
-  deprecation or disabled flag and no size
+  deprecation or disabled flag, no size and no collision note
 - AND the unpublished identity and the doubly-published one both resolve to nothing, so no tap is
   guessed
-- AND a package installed from a tap whose tap Homebrew withholds still resolves through the
-  receipt-backed route rather than through this one, because it has a receipt
+- AND an identity this machine holds a **receipt** for resolves to nothing here — including one whose
+  tap Homebrew withholds — so the receipt-backed route owns it and this rendering can never claim “Not
+  installed.” about a package that is installed
 - Verification: `unit`
 
 #### Scenario: The name-only tap detail composes no catalog field and no trust presentation
 
 - GIVEN the sources of the detail surface and of the pane that renders a not-installed tap package
 - WHEN the pane is scanned for a description, a version, a homepage, a licence, a dependency list, an
-  analytics figure or a size field, for any trust type name, badge, control or grant marker, and for
-  where the resolution branch sits and where the pane's footer copy is worded
+  analytics figure or a size field, for a collision note, for any trust type name, badge, control or
+  grant marker, and for where the resolution branch sits and where the pane's two strings are worded
 - THEN the pane composes none of those fields and no trust presentation of any kind
 - AND the detail surface resolves this rendering in a **third** branch, after the catalog branch and
   after the receipt branch, so an installed package still reaches its receipt-backed pane first
 - AND the resident tap inventory is passed to the detail surface at its single construction site, and
-  the footer copy appears in exactly one place in the application's sources
+  neither the install-state string nor the footer copy appears anywhere in the application's own
+  sources, because the projection supplies both
 - Verification: `unit-app`
 
 #### Scenario: The tap search surface composes no trust gate and no local copy

@@ -1242,7 +1242,7 @@ measured total; never trim. RDD disabled. Strict TDD active.
       table with the narrowed `PackageDetailView.swift` claim; the round-6 RED rows and honesty note; the
       **DD-4** open question re-closed.
 - [x] 1⁵.6 Append this phase to `tasks.md`.
-- [ ] 1⁵.7 Commit `docs(sdd): amend m11-tap-search for a minimal detail on not-installed tap packages`.
+- [x] 1⁵.7 Commit `docs(sdd): amend m11-tap-search for a minimal detail on not-installed tap packages`.
 
 ## Phase 2⁵: WU22 — the projection and the resolution (RED → GREEN)
 
