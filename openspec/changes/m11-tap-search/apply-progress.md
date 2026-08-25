@@ -374,9 +374,11 @@ commit.
    which this surface withdrew, and it is a projection over `TapPackage`, not over a hit. `TapPackageSearch`
    keeps its own `note(for:)`. Recorded so a later reader does not "simplify" the two into one.
 5. **The round-2 record's app-target figure "267 passing / 257 distinct" mixed two metrics.** The 267 is
-   a `Test case … passed` line count that double-reports about ten ids under parallel execution; the
-   distinct-id count at that commit was **256**. Round 3 measures **257** distinct after adding one row.
-   Information for the next verify, not a re-measurement of round 2.
+   a `Test case … passed` line count; it exceeds the distinct-id count because three parameterized
+   tests print one line per case, not because ids are reported twice. Measured by verify round 4 from
+   the retained logs: **257** distinct ids at round 3 (`f98d9fa`) and **258** at round 4 (`9894a6a`),
+   exactly one id added and none removed (`comm` over the id sets). This paragraph originally stated
+   256 → 257 and a duplicate-reporting cause; both were wrong and are corrected here (verify W4).
 
 ## Task ledger
 
