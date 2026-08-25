@@ -33,6 +33,11 @@ struct TapsListView: View {
                                 )
                         }
                         .padding(.vertical, 2)
+                        // Selectable like a tap row, with the same highlight:
+                        // the selection opens the read-only official pane,
+                        // never the third-party detail (TM4).
+                        .tag(source.id)
+                        .themedListSelection(isSelected: selection == source.id)
                     }
                 } header: {
                     sectionHeader("Official sources")
@@ -123,7 +128,8 @@ struct TapsListView: View {
         .navigationTitle(AppSection.taps.title)
         .onChange(of: taps.inventory) { _, inventory in
             guard let selection,
-                  inventory.taps.contains(where: { $0.name == selection })
+                  TapProjection.officialSource(named: selection) != nil
+                      || inventory.taps.contains(where: { $0.name == selection })
             else {
                 self.selection = nil
                 return

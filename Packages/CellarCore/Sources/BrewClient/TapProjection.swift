@@ -85,11 +85,24 @@ public struct TapProjection: Sendable, Equatable {
     public let thirdPartyTaps: [TapRecord]
     public let canAddTap: Bool
 
+    /// The two official rows, in presentation order. One constant, so the list
+    /// and the detail pane resolve a selected official source from the same
+    /// values (tap-management TM4).
+    public static let allOfficialSources = [
+        OfficialTapSource(id: "homebrew/core", title: "Homebrew Core"),
+        OfficialTapSource(id: "homebrew/cask", title: "Homebrew Cask")
+    ]
+
+    /// The official source a selection names, or `nil` for anything else —
+    /// including a local `homebrew/core` checkout, which is still the official
+    /// source and never a third-party tap to untap (TM4).
+    public static func officialSource(named name: String?) -> OfficialTapSource? {
+        guard let name else { return nil }
+        return allOfficialSources.first { $0.id == name.lowercased() }
+    }
+
     public init(inventory: TapInventory, isAvailable: Bool = true) {
-        officialSources = [
-            OfficialTapSource(id: "homebrew/core", title: "Homebrew Core"),
-            OfficialTapSource(id: "homebrew/cask", title: "Homebrew Cask")
-        ]
+        officialSources = Self.allOfficialSources
         thirdPartyTaps = inventory.taps.filter { !Self.officialNames.contains($0.name.lowercased()) }
         canAddTap = isAvailable
     }
