@@ -258,7 +258,7 @@ struct TapSearchCompositionTests {
         #expect(surface.code.contains(".selectionDisabled("))
         // One inert case, one code path: the projection already decided, and the
         // view reads `routableID` rather than re-deriving anything.
-        #expect(surface.code.contains("if let routable = hit.routableID"))
+        #expect(surface.code.contains("if let routable = hit.routableID {"))
         #expect(surface.code.contains(".tag(routable)"))
         #expect(
             surface.code.components(separatedBy: ".tag(").count == 2,
@@ -292,7 +292,7 @@ struct TapSearchCompositionTests {
         // Proven rather than argued: the two reads are separate, and the one
         // that gates selection is still `routableID`.
         #expect(surface.code.contains("if hit.isInstalled {"))
-        #expect(surface.code.contains("if let routable = hit.routableID"))
+        #expect(surface.code.contains("if let routable = hit.routableID {"))
         #expect(
             surface.code.contains(".selectionDisabled()")
                 && surface.code.contains("hit.isInstalled ? ") == false,
