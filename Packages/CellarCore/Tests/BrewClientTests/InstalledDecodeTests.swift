@@ -51,6 +51,38 @@ struct InstalledDecodeTests {
         #expect(git.installedAt == InstalledFixture.date(1_733_011_200))
     }
 
+    /// `brew info` omits `time` for a keg whose receipt predates the field, and
+    /// `installed_time` for a cask installed by an older brew. A missing
+    /// timestamp is **no answer**, and the projection must carry it as one:
+    /// collapsing it to the Unix epoch would state "1 January 1970" as a fact
+    /// about this Mac (installed-inventory II15 provenance).
+    @Test("A keg without a timestamp decodes with no install date, not the epoch")
+    func missingKegTimestampIsAbsentNotTheEpoch() throws {
+        let inventory = try InstalledDecoder.inventory(from: Data("""
+        {"formulae":[{"name":"undated","installed":[{"version":"1.0","installed_on_request":true}]}],
+         "casks":[{"token":"undated-app","installed":"2.0"}]}
+        """.utf8))
+
+        let formula = try #require(inventory.package(PackageID(kind: .formula, name: "undated")))
+        let cask = try #require(inventory.package(PackageID(kind: .cask, name: "undated-app")))
+        #expect(formula.installedAt == nil)
+        #expect(formula.kegs.map(\.installedAt) == [nil])
+        #expect(cask.installedAt == nil)
+    }
+
+    @Test("With no linked keg, a dated keg is newer than an undated one")
+    func aDatedKegOutranksAnUndatedOneAsTheFallback() throws {
+        let inventory = try InstalledDecoder.inventory(from: Data("""
+        {"formulae":[{"name":"mixed","installed":[
+            {"version":"2.0","installed_on_request":true},
+            {"version":"1.0","installed_on_request":true,"time":1700000000}]}]}
+        """.utf8))
+
+        let mixed = try #require(inventory.package(PackageID(kind: .formula, name: "mixed")))
+        #expect(mixed.installedVersion == "1.0")
+        #expect(mixed.installedAt == InstalledFixture.date(1_700_000_000))
+    }
+
     @Test("Formula kegs carry their own on-request marker")
     func kegsCarryTheOnRequestMarker() throws {
         let openssl = try InstalledFixture.package(.formula, "openssl@3")
