@@ -1,33 +1,33 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:847976bc7aeb52d5b8807db26dceabad9db6e5081ce449efeef766bc4d410d13
+evidence_revision: sha256:e1e7d366d1af34610a6515d9dac7b5e6a47d84e3aaf0d78623f546e2acb29334
 verdict: pass_with_warnings
 blockers: 0
 critical_findings: 0
 requirements: 4/4
-scenarios: 38/38
+scenarios: 42/42
 test_command: xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests
 test_exit_code: 0
-test_output_hash: sha256:c53b80bebb62636ab74af624049cf29f6137afe90ae157dc884d9faf85de72f8
+test_output_hash: sha256:d7b4f5bcc6b76bb232f708524b418a6b2c90d8edba7c1aba137c1dd42b142c09
 build_command: xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'
 build_exit_code: 0
-build_output_hash: sha256:eee74860496231c133545e3c0405f0088b58c390db2fced7e3b0e25cff7537a9
+build_output_hash: sha256:0978e7ccac0ddb7a3aa3304f1bd09ddacba6b117649c0d905c26f6fe1ed9ce6d
 ```
 
-## Verification Report — round 6 (supersedes rounds 1–5)
+## Verification Report — round 7 (supersedes rounds 1–6)
 
 **Change**: `m11-tap-search`
-**Version**: spec deltas **r6** — PS8 ADDED (mutation-handoff member and the rewritten verbs clause),
-PD6 MODIFIED, TM5 + TM11 MODIFIED
+**Version**: spec deltas **r7** — PS8 ADDED (selectability reversed, inventory-fed detail), PD6
+MODIFIED, TM5 + TM11 MODIFIED
 **Mode**: Strict TDD, coverage threshold 0
-**Branch**: `feat/m11-tap-search` @ `3cc53a4`, **31 commits** off `main` @ `edda9a5`, tree clean before
+**Branch**: `feat/m11-tap-search` @ `8aeb774`, **38 commits** off `main` @ `edda9a5`, tree clean before
 this run and carrying only this rewritten report after it
 **Artifact store**: hybrid — this file is canonical; Engram topic `sdd/m11-tap-search/verify-report`
 mirrors it. RDD disabled.
 **Delivery**: `single-pr` with a maintainer-accepted `size:exception` (2026-08-25). The branch measures
-**8,064** changed lines — recorded, **not** a finding.
-**Independence**: fresh context. All four runners re-executed at `3cc53a4`; three reversible mutations
-of my own.
+**9,324** changed lines — recorded, **not** a finding.
+**Independence**: fresh context. All four runners re-executed at `8aeb774`; four reversible mutations of
+my own, none of them apply's.
 
 ---
 
@@ -35,66 +35,97 @@ of my own.
 
 | Round | Commit | Verdict | Substance |
 |---|---|---|---|
-| 1 | — | superseded | Tap results as a `Section` inside `BrowseView`; withdrawn by the scope change. |
-| 2 | `36f1b8d` | **fail** (34/35) | PS8 sc15's trust scan missed the projection. |
-| 3 | `f98d9fa` | **pass_with_warnings** | Trust scan fixed. |
-| 4 | `9894a6a` | **pass_with_warnings** | Shared **Installed** pill; `Installed.`/`Not installed.` withdrawn. |
-| 5 | `c760d28` | **pass_with_warnings** (37/37) | Shared **UPDATE** pill; offered version as a fact. |
+| 1–2 | `36f1b8d` | **fail** (34/35) | Own sidebar surface; PS8 sc15's trust scan missed the projection. |
+| 3 | `f98d9fa` | pass_with_warnings | Trust scan fixed. |
+| 4 | `9894a6a` | pass_with_warnings | Shared **Installed** pill. |
+| 5 | `c760d28` | pass_with_warnings (37/37) | Shared **UPDATE** pill; offered version as a fact. |
+| 6 | `3cc53a4` | pass_with_warnings (38/38) | Installed rows reach the shared mutation menu with their record. |
 
 ---
 
-### What round 5 of apply changed, and whether it is right
+### What round 6 of apply changed, and whether it is right
 
-The maintainer found the `⋯` menu on an **installed** tap row offering only Install and Copy install
-command, while the same package on the catalog and Installed surfaces offers Reinstall, Uninstall…,
-Uninstall and Zap…, Upgrade and Pin/Unpin. The cause was a composition defect, not a missing verb: the
-row handed the shared menu `PackageEntry(installed: nil, …)`, so the menu's installed branch could never
-be taken however installed the package was. Rounds 3 and 4 made the row's **marks** truthful; round 5
-makes its **verbs** agree with them.
+A maintainer **product decision** reverses the 2026-08-24 rule that a not-installed hit is
+non-selectable. Such a hit is now selectable when its identity is unambiguous, and opens a **minimal,
+inventory-fed detail**. This is the largest round so far: it is the first to touch
+`PackageDetailView.swift`, which had been a zero-diff invariant for five rounds.
 
-| Obligation (PS8 r6) | Delivered | Verified |
+**The reversal is properly argued rather than merely asserted.** Round 1 withheld the route because
+"there is nothing honest to present" — and the spec now observes that this was a claim about a *catalog*
+pane and a *tap-source* read, both of which remain forbidden. What round 6 establishes is that the four
+names the resident inventory has **already published** are honest to present, on exactly the terms PD6
+and TM5 already grant the receipt-backed pane. Ambiguity is untouched.
+
+| Obligation (PS8 r7) | Delivered | Verified |
 |---|---|---|
-| Hit carries this machine's installed receipt as a **mutation handoff**, not a seventh fact | `TapSearchHit.installed: InstalledPackage?` | ✅ |
-| Resolved by the **same tap-aware handoff**, never a bare `PackageID` lookup | `installedReceipt(for:)` = `package.installedHandoff.flatMap { installed.package($0) }` | ✅ proven by **MJ** |
-| Offered version derived from **that same receipt** | `Self.offeredVersion(of: receipt)` — one lookup, two readers | ✅ |
-| Present in **both** installed states, absent when not installed | `installedHandoff` answers for both | ✅ |
-| Surface hands the record over; **no catalog record** | `PackageEntry(installed: hit.installed, catalog: nil, id: hit.mutationTarget)` | ✅ proven by **MK** |
-| Surface re-implements no verb, argv, target or command | 13 forbidden tokens asserted absent from the view | ✅ proven by **ML** |
-| Six facts remain six | `Mirror` enumeration lists `installed` **by name** | ✅ |
-| `MutationMenu` itself untouched | **zero-diff vs `main`** | ✅ |
+| Routable **iff unambiguous**, in either install state | `routableID` = `collides == false && unique` | ✅ **MM** |
+| Resolve only when **exactly one** tap publishes | `guard publishers.count == 1` | ✅ **MO** |
+| Zero or several ⇒ fall through, never guess | falls to the shipped `ContentUnavailableView` | ✅ |
+| An identity with a **receipt** resolves to nothing here | `guard installed.package(id) == nil` — keyed on the **receipt**, so the withheld-tap case still reaches its receipt pane | ✅ |
+| Pane presents exactly identity, kind, tap, install state, menu, footer | `Type` / `Tap` / `Install state` + footer | ✅ **MN** |
+| **No** collision note, asserted not assumed | absent; unreachable by construction | ✅ |
+| No description, version, homepage, licence, deps, analytics, size | case-insensitive scan over 15 tokens | ✅ **MN** |
+| No trust badge, control, copy; no PD8 grant marker | six trust tokens absent | ✅ |
+| Both strings projection-owned, absent from **all** app sources | `stateCopy` + `footerCopy` on `TapInventoryDetail` | ✅ |
+| Third branch, **after** catalog and receipt | range-ordered assertion on all three | ✅ |
+| `taps:` passed at the **single** construction site | asserted, with a uniqueness check on the call | ✅ |
 
-**The single-lookup refactor is the quiet improvement of the round.** Round 4 derived the offered version
-in its own function; round 5 resolves the receipt **once** and reads it twice, so the row's update pill
-and its menu are the same record *by construction rather than by agreement*. The code comment says
-exactly that, and it is the kind of change that removes a class of future bug rather than a bug.
+**The projection's three refusals are all refusals, never guesses**, and the receipt check is the subtle
+one: it is keyed on the *receipt* rather than on the tap projection's install state, because Homebrew
+withholds the tap of an untrusted package — the record's `tap` is absent but the record exists and
+decides. That is what makes `stateCopy` honest by construction: no value carrying "Not installed." can
+describe a package this Mac has.
 
-**The six-facts claim survives honestly.** A stored `InstalledPackage` is a large value to hang on a type
-whose requirement says "exactly six facts", and the temptation would be to leave it unlisted. Instead the
-spec adds a paragraph explaining why a handoff is not a fact, and the `Mirror` assertion **enumerates it
-by name** — so a later member that genuinely is tap-published metadata cannot slip in behind it. That is
-the right shape: the enumeration is now a whitelist, not a token filter.
+**`kind` is computed off `id`** — and the design explains why DD-19's "stored, not computed" reasoning
+does not apply: that reasoning is about facts `Mirror` would otherwise miss, and `id` is itself
+enumerated and carries the kind. Storing a second copy would give one fact two homes.
 
 ---
 
-### Non-vacuity — three reversible mutations
+### The zero-diff invariant that moved, and whether it was allowed to
 
-Each applied, run, and restored with `shasum -a 256` matching the pre-mutation digest;
-`git status --porcelain` printed nothing after each. All app-target runs used **suite-level**
-`-only-testing:` filters.
+`PackageDetailView.swift` carried a zero-line diff in rounds 2–6 and is now **+37/−8**. I read the whole
+diff. It contains exactly three things:
+
+1. `let taps: TapStore` — one parameter.
+2. A **third** `else if` branch calling `TapInventoryDetail.resolve(…)` → `tapInventoryContent(for:)`.
+3. `header(versionStory:)` widened `String` → `String?`, so the version line **and its separator dot**
+   are omitted rather than emptied — a genuine ripple, since the shared header now serves a caller with
+   no version, and a dangling separator is exactly the placeholder PD1 keeps off this pane.
+
+Plus the preview's new argument. Nothing else moved.
+
+**PS8's "no routing branch added for this source" clause survives literally**, and not by luck: the
+scenario binds the **installed** hit's route, the new branch sits **third**, and the spec requires that
+ordering explicitly so an installed package always reaches its receipt pane first. The unit-app test
+pins the order by range comparison rather than trusting the prose.
+
+**The guard that forbade `TapInventory` in that file was narrowed, and the narrowing is compensated.**
+`theTapSurfaceResolvesThroughTheSharedDetail` still forbids all three tap-*search* tokens
+(`TapSearchHit`, `TapPackageSearch`, `TapSearchView`) — the claim "the shared detail knows nothing about
+the tap search surface" is unchanged. What replaced the blanket `TapInventory` ban is **stronger than a
+ban would have been if simply dropped**: the file must contain `TapInventoryDetail.resolve(` and must
+name `TapInventory` **exactly once**. A ban is unsatisfiable once the spec requires the branch; "exactly
+once" is the strongest satisfiable form. I did not take that on trust — **MP** added a second
+`TapInventory` reference and the test failed, so the narrowing provably cannot widen.
+
+---
+
+### Non-vacuity — four reversible mutations, none of them apply's
+
+Each applied, run, restored with `shasum -a 256` matching the pre-mutation digest;
+`git status --porcelain` printed nothing after each. All app-target runs used **suite-level** filters.
 
 | # | Mutation | Expected | Observed |
 |---|---|---|---|
-| **MJ** | `installedReceipt` keyed by bare `package.id` instead of `installedHandoff` | a foreign receipt must never attach | ❌ **2** tests failed — `aCollidingCatalogReceiptIsNeverAttachedToATapRow` showed `stray.installed` becoming the **`homebrew/core` `wget` receipt** on a third-party tap row, and `aReceiptFromAnotherTapOffersNoVersion` failed with `nextVersion → "9.9.9"` |
-| **MK** | re-introduce the original defect: `PackageEntry(installed: nil, …)` | the defect must be caught | ❌ **2** tests failed — `anInstalledTapRowReachesTheMutationMenuWithItsRecord` and `theTapSearchSurfaceComposesNoTrustGateAndNoBadge` |
-| **ML** | view reads the record itself: `hit.installed?.isOutdated` | the view must not re-derive | ❌ **2** tests failed — the same handoff test plus `bothSearchSurfacesDrawTheOneSharedUpdatePill` |
+| **MM** | `routableID` = `true` — make ambiguous hits routable | ambiguity must withhold the route | ❌ **4** tests, 6 issues — including the amended "whatever its install state" row on both the colliding-installed and colliding-not-installed cases |
+| **MO** | `publishers.count >= 1` — resolve when several taps publish | several must resolve to nothing | ❌ `An unpublished or doubly published identity resolves to nothing` — the mutant picked `acme/tools` arbitrarily, which is precisely the guessed tap the spec forbids |
+| **MN** | add `fact("License", "MIT")` to the pane | a field the inventory cannot know must be rejected | ❌ `theNameOnlyTapDetailComposesNothingItCannotKnow` only; the other 14 passed |
+| **MP** | add a second `TapInventory` reference to `PackageDetailView` | the narrowed guard must not widen | ❌ `theTapSurfaceResolvesThroughTheSharedDetail` only; the other 14 passed |
 
-**MJ is the decisive one**, and its failure output is the clearest evidence in this whole change: keying
-by bare identity attaches `homebrew/core`'s receipt to a row published by `acme/tools`, which would offer
-to uninstall a package the row does not name. Every other test still passed under that mutation — it is
-exactly the silent, plausible-looking wrong implementation that only a targeted assertion catches.
-
-**MK and ML each tripped two independent guards**, so the round-5 obligations have defence in depth
-rather than a single point of enforcement.
+**MO's output is the most telling**: the mutant returned a fully-formed detail naming `acme/tools` for an
+identity two taps publish. **MP** is the one that matters for governance, because it tests the
+compensating control on the only guard this round relaxed.
 
 ---
 
@@ -102,101 +133,130 @@ rather than a single point of enforcement.
 
 | Metric | Value |
 |--------|-------|
-| Task checkboxes total (five rounds) | 180 |
-| Complete | **178** |
+| Task checkboxes total | 212 |
+| Complete | **210** |
 | Incomplete | **2** — `6.7` (round 1, **VOID**) and `6′.7` (open the PR) |
 
-Round 5 added **19** boxes and completed all 19 (159 + 19 = 178), and correctly declares no delivery task
-of its own.
+Round 6 declares **25 of 25**, but the ledger grew from 178 to 210 (**+32**). The seven-box difference
+is not explained in the record; it is immaterial to correctness — every box is ticked and the two open
+ones are the known pair — but it is a recording gap (**S11**).
 
 ---
 
-### Build & Tests Execution — all four runners re-executed at `3cc53a4`
+### Build & Tests Execution — all four runners re-executed at `8aeb774`
 
 **Build**: ✅ `** BUILD SUCCEEDED **`, exit 0.
 
 | # | Runner | Exact result | Exit | Output sha256 |
 |---|---|---|---|---|
-| 1 | `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`** — **260 distinct test ids**, 0 failed | 0 | `c53b80be…72f8` |
-| 2 | `swift test --package-path Packages/CellarCore` | **1,873 tests / 217 suites passed, 1 known issue** (was 1,872; **+1**) | 0 | `2d63ba98…ff34` |
-| 3 | `xcodebuild build … -scheme cellar` | **`** BUILD SUCCEEDED **`** | 0 | `eee74860…37a9` |
-| 4 | `swift test -c release … --filter 'TapPackageSearchTests'` | **35 tests / 1 suite passed** (was 34; **+1**), both latency rows passed | 0 | `9e09aafc…ca8a` |
+| 1 | `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`** — **261 distinct test ids** (see below), 0 failed | 0 | `d7b4f5bc…2c09` |
+| 2 | `swift test --package-path Packages/CellarCore` | **1,878 tests / 218 suites passed, 1 known issue** (was 1,873/217; **+5 tests, +1 suite**) | 0 | `dba518b6…c472` |
+| 3 | `xcodebuild build … -scheme cellar` | **`** BUILD SUCCEEDED **`** | 0 | `0978e7cc…ce6d` |
+| 4 | `swift test -c release … --filter 'TapPackageSearchTests'` | **35 tests / 1 suite passed**, both latency rows passed | 0 | `1c537953…c737` |
 
-Every figure apply reported reproduced: core **1,873/217**, app target **260 distinct**, release **35**.
+The core `+5` and `+1 suite` are the new `TapInventoryDetailTests` (5 rows). Latency:
+`theCatalogKeystrokeTurnIsUnchanged` 1.525 s, `theTapSurfaceKeystrokeTurnStaysUnderTheCeiling` 2.084 s —
+**sixth** consecutive round under the 8 ms ceiling.
 
-**Latency**: `theCatalogKeystrokeTurnIsUnchanged` 1.504 s, `theTapSurfaceKeystrokeTurnStaysUnderTheCeiling`
-2.081 s. Fifth consecutive round under the 8 ms ceiling.
+#### The 259/260 question — reconciled, and my own rule corrected
 
-#### The S10 counting rule, applied and validated end to end
+Apply's deviation 6 reports a `cellarTests` baseline of **259** at `cbd13cb` where round 5 recorded
+**260**, by the same command, and declines to reconcile it. It reconciles cleanly, and the reconciliation
+also **corrects the rule I stated in rounds 5 and 6**.
 
-Round 5 established that an interleaved xcodebuild status block costs an id **only when it breaks inside
-the quoted identifier**. This round exercised both halves of that rule and it held exactly:
+`git diff --name-only 3cc53a4..cbd13cb` touches only the verify report, so the baseline at `cbd13cb` is
+the count at `3cc53a4`, which I measured as **260**. Apply's 259 is one low by the interleaving mechanism
+apply itself discovered in round 4.
 
-- The r6 log has **one** mangled line —
-  `BrewfileCompositionTests/missingRowsArriveSelectedAndPresentRowsAreNot()` — but the break lands in the
-  **tail**, after `' passed`, so the id is intact and already counted. **No adjustment: 260.**
-- A naive `comm` against round 5's id set reports **two** additions:
-  `TapSearchCompositionTests/anInstalledTapRowReachesTheMutationMenuWithItsRecord()` — genuinely new —
-  and `AutomaticUpdateChecksTests/aFreshInstallReadsAsOff()`, which is **not** new: it is precisely the id
-  round 5's log lost to an in-identifier break and which round 5's report recovered by the rule. Its
-  reappearance in this round's clean set is independent confirmation that the round-5 count of 259 was
-  right and the recovery was sound.
+But this round's own log exposed a case my rule did not cover. I stated that an interleaved status block
+costs an id **only when it breaks inside the quoted identifier**. The r7 log's mangled line is:
 
-Progression: **257 → 258 → 259 → 260**, one unit-app test per round, no gaps.
+```
+Test case 'BrewfileCompositionTests/aFileThatIsOnlySkipsIsStillAValidImport()' passe2026-08-25 14:00:48.229 xcodebuild[…]
+```
+
+The break lands **after** the closing quote but **inside the word `passed`**. The identifier is intact
+and recoverable — so my round-5/6 rule says "no adjustment" — yet the counting pattern
+`Test case '([^']+)' (passed|failed)` still fails to match, and the id is silently dropped. My first
+count this round read 260 and was one low for exactly that reason.
+
+**The correct rule is membership, not break position**: recover the id from every mangled line and add
+one only when that id is absent from the cleanly-parsed set. Re-running all five retained logs under it:
+
+| Log | Clean | Dropped | **True** |
+|---|---|---|---|
+| r3 `f98d9fa` | 257 | 0 | **257** |
+| r4 `9894a6a` | 258 | 0 | **258** |
+| r5 `c760d28` | 258 | 1 (break inside the id) | **259** |
+| r6 `3cc53a4` | 260 | 0 (break in the tail) | **260** |
+| r7 `8aeb774` | 260 | 1 (**break inside `passed`**) | **261** |
+
+Progression **257 → 258 → 259 → 260 → 261**, exactly one unit-app test per round, no gaps. Round 7's id
+delta confirms it independently: two ids added (`theNameOnlyTapDetailComposesNothingItCannotKnow`, new;
+`theTapSearchSurfaceSelectsOnRoutabilityAlone`, the rename of `notInstalledTapRowsAreNotSelectable`) and
+two removed (that old name, and the dropped `aFileThatIsOnlySkipsIsStillAValidImport` — which is not a
+deletion but the corruption artefact).
+
+So **apply is one low at both points**: the true baseline is 260 and the true count at `8aeb774` is
+**261**, not 260. Recorded as **W4**, with the corrected rule as **S10**.
 
 ---
 
 ### Spec Compliance Matrix
 
-**38 scenarios across 4 requirement blocks**, re-counted this session (`rg -c '^### Requirement:'` → **4**,
-`rg -c '^#### Scenario:'` → **38**): PS8 **20** (+1), PD6 4, TM5 11, TM11 3. Class tally 29 `unit` +
-7 `unit-app` = 36 inline lines; the two unlabelled are PD6's reproduced scenarios.
+**42 scenarios across 4 requirement blocks**, re-counted this session (`rg -c '^### Requirement:'` → **4**,
+`rg -c '^#### Scenario:'` → **42**): PS8 **22** (+2), PD6 **5** (+1), TM5 **12** (+1), TM11 3.
+`specs/README.md` now reads **27 new (19 `unit`, 8 `unit-app`)**, which I re-derived independently:
+PS8 22 + PD6 2 + TM5 2 + TM11 1 = 27, and the class split matches.
 
-#### The scenarios r6 added or amended
+#### The scenarios r7 added or amended
 
 | Scenario | Requires | Test | Result |
 |---|---|---|---|
-| **six facts** (amended) | the one further member is the **mutation handoff**, absent for a not-installed hit, so the enumeration still exposes six facts and carries no tap-published value | `TapPackageSearchTests > aHitCarriesItsSixFactsAndItsCopyAndNothingElse` — `#expect(hit.installed == nil)` plus the `Mirror` label list naming **`installed`** explicitly (`:188-195`) | ✅ COMPLIANT |
-| **offered version** (amended, +2 clauses) | each hit's handoff present for both installed states and the outdated withheld one, absent for not-installed, resolved by the tap-aware handoff; and a colliding hit whose only receipt belongs to the catalog's tap carries **no** record | `> onlyAnOutdatedInstalledHitOffersAVersion` (`:636`), `> aCollidingCatalogReceiptIsNeverAttachedToATapRow` (`:710`, **new**), `> aReceiptFromAnotherTapOffersNoVersion` (`:758`) | ✅ COMPLIANT — non-vacuous by **MJ** |
-| **An installed tap row reaches the shared mutation menu with its installed record** (new, `unit-app`) | the surface hands over the projection's record and no catalog record; declares no verb, command, target, submission or kind-narrowing of its own | `TapSearchCompositionTests > anInstalledTapRowReachesTheMutationMenuWithItsRecord` — call-site scoped entry assertion, `installed: nil` absent from the whole file, four lookup routes forbidden, the menu positively anchored on `if entry.isInstalled {` with each of six verbs declared **exactly once**, and 13 tokens forbidden in the view | ✅ COMPLIANT — non-vacuous by **MK** and **ML** |
-| **ps15** (amended wording) | "the **mutation affordances** are offered for every hit whatever the origin tap's trust state" | `> theTapSearchSurfaceComposesNoTrustGateAndNoBadge` — its entry pin moved to `installed: hit.installed` with `catalog: nil` still pinned | ✅ COMPLIANT |
+| **ambiguity** (amended) | non-routable in **either** install state; and an unambiguous hit of **each** state reports its exact `PackageID`, so the rule is identity's alone | `TapPackageSearchTests > anAmbiguousHitIsNotRoutableWhateverItsInstallState` (`:807-864`) | ✅ COMPLIANT — non-vacuous by **MM** |
+| **one publisher** (new, `unit`) | one ⇒ four names + two exact strings and nothing else; zero and several ⇒ nothing; a receipt-holding identity ⇒ nothing, incl. withheld-tap | `TapInventoryDetailTests` — 5 rows: one-tap formula, one-tap cask, unpublished/doubly-published, receipt-holding, and no-catalog-value/no-tap-source | ✅ COMPLIANT — non-vacuous by **MO** |
+| **pane composition** (new, `unit-app`) | no forbidden field, no collision note, no trust presentation, no local verbs; both sentences projection-owned and absent from app sources; **third** branch order; `taps:` at the single site | `TapSearchCompositionTests > theNameOnlyTapDetailComposesNothingItCannotKnow` | ✅ COMPLIANT — non-vacuous by **MN** |
+| **selection rule** (amended) | selectable on the projection's routability alone — ambiguous inert, unambiguous not-installed **not** inert | `> theTapSearchSurfaceSelectsOnRoutabilityAlone` (renamed) | ✅ COMPLIANT |
+| **shared detail** (narrowed) | detail grows no arm for the tap **search** surface; one permitted inventory reference | `> theTapSurfaceResolvesThroughTheSharedDetail` | ✅ COMPLIANT — non-vacuous by **MP** |
+| PD6 + TM5 (+1 each) | inventory-fed *rendering* on the same four negations; TM5's tap-source ban **reaffirmed** | shipped delta scenarios, green | ✅ COMPLIANT |
 
-The new `unit-app` guard's forbidden list carries a documented carve-out: `installed.inventory` is
-**not** forbidden, because the view hands that whole inventory *to* the projection — the shipped
-composition, and the opposite of resolving a record locally. What is forbidden is a lookup. That
-reasoning is recorded in the test itself, which is where it belongs.
+The pane's field scan is **case-insensitive** by design, with the reason recorded in the test: a fact has
+two spellings here — the member `homepage` and a rendered label `"Homepage"` — and a case-sensitive scan
+would catch the first while a hand-written label walked past it. That is deviation 2, and it was found by
+a mutation rather than by review.
 
-#### The other 34 scenarios
+The copy claim is scoped correctly: `Not installed.` was *withdrawn from the row* in round 3 and is
+*required on the pane* in round 6. The two scans are over different source sets — the row's withdrawal
+over projection+surface, the pane's ownership over the app target only — so both hold simultaneously,
+and the test says why.
 
-Unchanged and re-confirmed green: both pill contracts, the trust scan over projection and surface, the
-withdrawn-copy literals, matching/order/collision/routability, empty states, latency, and the untouched
-catalog surface.
-
-**Compliance summary**: **38/38 compliant, 0 partial, 0 untested, 0 failing.**
+**Compliance summary**: **42/42 compliant, 0 partial, 0 untested, 0 failing.**
 
 ---
 
-### Invariants — zero-diff proof, re-run at `3cc53a4`
+### Invariants — re-run at `8aeb774`
 
 | Path | Result |
 |---|---|
-| **`cellar/Activity/MutationMenu.swift`** | ✅ **ZERO-DIFF vs `main`** — the round's load-bearing claim: the verbs were never missing, only unreachable |
-| `cellar/Browse/BrowseView.swift` | ✅ **byte-identical to `main`** — sixth round running |
-| `cellar.xcodeproj/project.pbxproj` · `openspec/specs/**` | ✅ ZERO-DIFF |
-| `cellar/Browse/PackageDetailView.swift` · `cellarUITests/**` | ✅ ZERO-DIFF |
-| `PackageSearchIndex.swift` · `MutationCommand.swift` · `TapCommand.swift` · `TapProjection.swift` | ✅ ZERO-DIFF |
-| `cellar/Browse/PackageRow.swift` · `cellar/Browse/StatusPill.swift` | ✅ **ZERO-DIFF this round** (`2cba75b..HEAD`) |
+| `cellar/Browse/BrowseView.swift` | ✅ **byte-identical to `main`** — seventh round running |
+| `cellar/Activity/MutationMenu.swift` | ✅ ZERO-DIFF |
+| `Packages/CellarCore/Sources/BrewClient/TapProjection.swift` | ✅ ZERO-DIFF — `TapProjection.publishes(_:in:)` at `:219` is a **shipped** API, not new |
+| `cellar.xcodeproj/project.pbxproj` | ✅ ZERO-DIFF — two new files, still no edit |
+| `openspec/specs/**` · `cellarUITests/**` | ✅ ZERO-DIFF |
+| `PackageSearchIndex.swift` · `MutationCommand.swift` · `TapCommand.swift` | ✅ ZERO-DIFF |
+| `cellar/Browse/PackageDetailView.swift` | **+37/−8**, limited to the parameter, the third branch and the optional `versionStory` — reviewed line by line above |
 
-Round 5 touched exactly **nine** files: the projection, two test files, the tap view, and five artifacts.
-No new brew invocation — the receipt comes from the inventory the projection already holds.
+Apply records the detail diff as `+37/−9`; `git diff --numstat` reports `37 8`. A one-line
+discrepancy in the record only (**S12**).
 
 ---
 
-### Coherence — DD-20
+### Coherence — DD-21, DD-22
 
-| # | Decision | Followed? | Notes |
-|---|---|---|---|
-| **DD-20 (new)** | carry the installed receipt as a mutation handoff, resolved once by the tap-aware handoff and read by both the offered version and the menu | ✅ | Both halves independently proven (**MJ**, **MK**/**ML**). The relationship to DD-19 is stated rather than glossed: DD-19 rejected replacing a *stored fact* with a computed one; DD-20 adds a member *alongside* it, so `Mirror` still enumerates the fact |
+| # | Decision | Followed? |
+|---|---|---|
+| **DD-21** | third branch on the shared detail, resolved from the resident inventory, no acquisition | ✅ order asserted; nothing awaited or refreshed |
+| **DD-22** | both sentences projection-owned; optional `versionStory` so an absent story takes its separator with it | ✅ both asserted; the header change is the minimum that serves a version-less caller |
 
 ---
 
@@ -204,13 +264,13 @@ No new brew invocation — the receipt comes from the inventory the projection a
 
 | Check | Result | Details |
 |---|---|---|
-| TDD Evidence reported | ✅ | Round-5 cycle table in `apply-progress.md` |
-| RED confirmed | ✅ | Projection rows by genuine compile failure; view rows by reversible mutation |
-| GREEN confirmed | ✅ | 260 distinct cellarTests + 1,873 core + 35 release-filter, all green this session |
-| Triangulation adequate | ✅ | Handoff asserted across all four install/outdated states **plus** the colliding-catalog-receipt case, which is a distinct failure mode rather than a fifth variation |
-| Safety net | ✅ | 259 → 260 distinct (+1); 1,872 → 1,873 (+1) |
-| Filter discipline | ✅ | Suite-level `--filter` and `-only-testing:` throughout, per the round-4 lesson |
-| Mutations restored | ✅ | Apply's and my own three, all SHA-verified |
+| TDD Evidence reported | ✅ | Round-6 cycle table |
+| RED confirmed | ✅ | New projection by compile failure; pane and guards by reversible mutation |
+| GREEN confirmed | ✅ | 261 distinct cellarTests + 1,878 core + 35 release, all green this session |
+| Triangulation adequate | ✅ | Resolution across one/zero/several publishers **plus** the receipt-holding and withheld-tap cases — distinct failure modes, not variations |
+| Safety net | ✅ | 260 → 261 distinct (+1 net, one rename in/out); 1,873 → 1,878 (+5, one new suite) |
+| Filter discipline | ✅ | Suite-level throughout; deviation 5 records the function-level trap catching apply again and being disbelieved |
+| Mutations restored | ✅ | Apply's and my own four, all SHA-verified |
 
 **TDD Compliance**: 7/7 checks passed.
 
@@ -218,61 +278,51 @@ No new brew invocation — the receipt comes from the inventory the projection a
 
 | Layer | Tests | Files | Tools |
 |---|---|---|---|
-| Unit (`unit`) | **35** in `TapPackageSearchTests` (33 debug + 2 release-gated) | 1 + 3 fixtures | Swift Testing |
-| Unit-app (`unit-app`) | **14** in `TapSearchCompositionTests` (was 13) | 7 | Swift Testing + `#filePath` source scan |
-| Integration / E2E | 0 | 0 | `cellarUITests` zero-diff, out of scope |
-
-### Changed File Coverage
-
-➖ Coverage analysis skipped — no coverage tool configured. Threshold is 0.
+| Unit (`unit`) | 35 `TapPackageSearchTests` + **5** `TapInventoryDetailTests` | 2 + 3 fixtures | Swift Testing |
+| Unit-app (`unit-app`) | **15** in `TapSearchCompositionTests` (was 14) | 8 | Swift Testing + `#filePath` source scan |
+| Integration / E2E | 0 | 0 | `cellarUITests` zero-diff |
 
 ### Assertion Quality
 
 | File | Line | Assertion | Issue | Severity |
 |---|---|---|---|---|
-| `TapPackageSearchTests.swift` | 1189 | `#expect([...8 string literals].count == 8)` | Tautology over a literal | SUGGESTION (**S1**) |
+| `TapPackageSearchTests.swift` | ~1265 | `#expect([...8 string literals].count == 8)` | Tautology over a literal | SUGGESTION (**S1**) |
 
-Round 5's new assertions are sound: the entry check is **call-site scoped** via `callSite("PackageEntry(")`
-rather than a whole-file `contains`, each menu verb is asserted to appear **exactly once**, and the
-`installed: nil` absence is asserted over the whole file rather than only at the call it was fixed in.
+Round 6's new assertions are sound: the pane scan is anchored positively before every absence, the copy
+absence is paired with a projection-presence check so deleting the copy would not pass, the branch order
+is a range comparison, and the construction site is uniqueness-checked. One cosmetic nit: the renamed
+`theTapSurfaceResolvesThroughTheSharedDetail` declaration is indented eight spaces instead of four
+(**S13**).
 
 **Assertion quality**: 0 CRITICAL, 0 WARNING, 1 SUGGESTION.
 
 ---
 
-### Round-5 deviations, judged
+### Round-6 deviations, judged (seven recorded, not six)
 
 | # | Deviation | Judgment |
 |---|---|---|
-| 1 | **A stored member added to a type whose requirement says "exactly six facts"; spec amended to say why** | **ACCEPT.** The alternative — leaving it unexplained — would have made the requirement read as violated. Enumerating it by name in the `Mirror` assertion converts the enumeration into a whitelist, so the next member cannot hide behind this one. Stronger than before, not weaker. |
-| 2 | **DD-19 rejected a computed `nextVersion` reading a stored receipt; DD-20 is not that** | **ACCEPT.** The distinction is real and correctly drawn: DD-19 refused to *replace* a stored fact with a computed one because `Mirror` would then deny it; DD-20 adds a member alongside, and `nextVersion` stays stored. |
-| 3 | **The first draft of the new guard forbade `installed.inventory` and was wrong** | **ACCEPT, and this is good practice.** The over-broad token would have banned the shipped composition (the view hands the inventory *to* the projection). It was caught by a red run, narrowed to genuine lookups, and the reason recorded **in the test** so the next reader does not re-add it. Self-reported at the cost of one red run. |
-| 4 | **`specs/README.md`'s totals line was already wrong and was corrected** | **ACCEPT — and I share the miss.** It read "20 new scenarios (15 `unit`, 5 `unit-app`)" from revision 3 onward while its own table summed to 22 and then 23. Rounds 3 and 4 amended the table without re-footing the summary. I verified the delta **files** every round and they were always right, but I never cross-footed the README's summary against its own table, so I did not catch it in round 4 or 5 either. Now **23 (16 `unit`, 7 `unit-app`)**, which I re-derived independently: PS8 20 + PD6 1 + TM5 1 + TM11 1 = 23, and 13+7 unit-app-split ⇒ 16 `unit` + 7 `unit-app`. Correction stated inline rather than applied silently. |
-| 5 | **One core-suite flake, identified this time** — `MutationRefreshReceiptTests.swift:214`, `cancellationBeforeSpawn` | **ACCEPT**, and **this closes round 5's S11.** The branch touches no refresh terminal, `MutationRefreshReceipt` or `OperationCenter`; the suite alone re-ran 9/9 and two whole-suite runs passed 1,873/217. First flake in four rounds with an identity attached, and apply credits the "redirect, never `tee`" change for it — the remedy worked. |
-| 6 | **Suite-level `--filter` for RED/GREEN, whole package for the gate** | **ACCEPT.** The round-4 function-level trap is being actively avoided rather than merely recorded. |
+| 1 | **`kind` computed, not stored; collision note not rendered** | **ACCEPT, both.** The `kind` reasoning correctly distinguishes itself from DD-19: that rule is about facts `Mirror` would miss, and `id` already carries the kind. The collision-note removal is the stronger call — it is applicable **never**, because a colliding token is carried by the catalog and resolves at branch one, so rendering it would be unreachable presentation. Asserting the absence is right. |
+| 2 | **The first field scan was case-sensitive and a mutation walked past it** | **ACCEPT — the process working.** `fact("Homepage", …)` is not caught by a scan for `homepage`. Found by mutation, fixed by lowercasing both sides, re-run failed as it should. I re-proved the fixed scan independently with **MN** using a *different* field (`License`). |
+| 3 | **`PackageMetadataSection` written into the pane, then removed** | **ACCEPT.** Mirroring the receipt pane by reflex, then recognising that PS8 **enumerates** what the pane presents and closes the list. Removed before commit with the reason recorded in the file. The favourite heart is correctly identified as arriving via the shared header the pane is required to reuse — an honest disclosure of a thing the enumeration does not name. |
+| 4 | **The `TapInventory` guard was narrowed** | **ACCEPT**, and independently discharged. The three tap-search tokens stay banned; the one permitted reference is pinned positively and count-limited. **MP** proves it cannot widen. This is the round's one relaxed guard and it is the best-compensated. |
+| 5 | **A function-level `-only-testing:` filter ran zero tests and reported success** | **ACCEPT.** The trap apply discovered in round 4 caught it again — and was disbelieved rather than trusted, which is the whole value of having recorded it. |
+| 6 | **The `cellarTests` baseline measured 259 where round 5 recorded 260**, not reconciled | **ACCEPT the report, REJECT the non-reconciliation** — see **W4**. It is the round-4 interleaving again; the true baseline is 260 and the true count at `8aeb774` is **261**. Apply was right not to reconcile it away silently; it is now reconciled with evidence. |
+| 7 | **Suite-level filters throughout** | **ACCEPT.** |
 
-**Six accepted, zero rejected.**
+**Six accepted; one accepted as a report but its open question now answered.**
 
 ---
 
 ### Commit hygiene and branch size
 
-- **31 commits**, all Conventional Commits, **no AI attribution**.
-- Round 5's four are correctly typed and ordered: `docs(sdd)` amendment, `feat(taps)` behaviour,
-  `test(taps)` guard, `docs(sdd)` record.
-- `git diff --shortstat main...HEAD` → **26 files, +8,009/−55 = 8,064 authored lines**. Apply reports
-  **7,919**, measured before its own record commit; the difference is exactly the 145-line round-5
-  section of `apply-progress.md` (7,919 + 145 = 8,064). Same pattern as round 3 — see **S7**.
-- Split: **code+test ~3,300**, artifacts the remainder. Under the accepted `size:exception`.
+- **38 commits**, all Conventional Commits, **no AI attribution**.
+- Round 6's six are correctly ordered: two `docs(sdd)` amendments (the second a self-correction of the
+  pane contract **before** any code), then `feat(search)` projection, `feat(browse)` app, `test(browse)`,
+  `docs(sdd)` record. Correcting the contract before writing against it is the right order.
+- `git diff --shortstat main...HEAD` → **30 files, +9,260/−64 = 9,324 authored lines**. Apply reports
+  **9,256** measured before its own record commit. Under the accepted `size:exception`.
 - Working tree clean at start; only this report modified at the end.
-
----
-
-### Out-of-scope tracked items
-
-- The full `-scheme cellar` runner is red on `main` from two pre-existing `cellarUITests` Taps failures
-  (`:209`, `:231`), tracked separately. `cellarUITests/**` zero-diff here.
-- `PRD.md` §7 ends at **M6**; no PRD milestone closes with this change.
 
 ---
 
@@ -280,87 +330,88 @@ rather than a whole-file `contains`, each menu verb is asserted to appear **exac
 
 **CRITICAL**: None.
 
-**RESOLVED since round 5**: **S11** — the recurring core-suite flake now has an identity
-(`MutationRefreshReceiptTests.swift:214`), obtained by the redirect-not-`tee` remedy.
+**RESOLVED since round 6**: **W4 (round 6)** — the Engram `tasks` mirror is refreshed and now reads
+"ROUND 6" against a canonical file of 1,309 lines, matching `tasks.md`. The hybrid contract is satisfied.
 
 **WARNING** (4):
 
 - **W1 — one task is open: `6′.7`, "Delivery — one PR".** Deferred again by instruction.
-  **Remediation**: open the PR with the drafted body, now needing five corrections — line count
-  **8,064**, app-target figure **260 distinct ids**, the two shared pill components, the offered-version
-  fact, and a statement that installed tap rows now reach the shared menu with their record. Then tick
-  `6′.7`.
+  **Remediation**: open the PR with the drafted body, now needing six corrections — line count
+  **9,324**, app-target figure **261 distinct ids**, the two shared pill components, the offered-version
+  fact, installed rows reaching the menu with their record, and the name-only detail. Then tick `6′.7`.
 
 - **W2 — the latency scenario is not exercised by the spec's declared `unit` runner.** Both rows are
   `.enabled(if: isRelease)` and report **skipped** under `swift test`; covered only by the release
   runner, which this session ran. Mirrors the shipped PS6 precedent.
-  **Remediation**: record the release invocation beside the `unit` runner at archive. No code change.
 
 - **W3 — the exact latency figures remain unreproducible**, emitted only inside the `#expect` failure
-  message. The binding clause — both turns under **8 ms** — is confirmed for the fifth round.
+  message. The binding clause — both turns under **8 ms** — is confirmed for the sixth round.
 
-- **W4 (new) — the Engram `tasks` mirror is two rounds stale, breaking the hybrid-store contract.**
-  Verified directly: obs **#7799** is titled "ROUND 3" and describes a canonical file of **1,022 lines**;
-  `openspec/changes/m11-tap-search/tasks.md` is now **1,194 lines** and carries rounds 4 and 5. The
-  `apply-progress` mirror (obs #7800) is current at round 5, so this is one topic, not a systemic failure.
-  Hybrid requires **both** writes to succeed for an artifact to be complete, so a reader recovering from
-  Engram alone would plan against a two-round-old task list.
-  **Remediation**: re-`mem_save` `sdd/m11-tap-search/tasks` from the canonical file with
-  `capture_prompt: false` before archive. No code change.
+- **W4 (new) — apply's two `cellarTests` figures for round 6 are each one low.** The baseline is **260**,
+  not 259 (`cbd13cb` is docs-only after `3cc53a4`, which I measured at 260), and the count at `8aeb774`
+  is **261**, not 260. Both are the round-4 interleaving. Deviation 6 correctly declines to reconcile
+  without evidence; the evidence is now in this report.
+  **Remediation**: amend deviation 6 and the 6-series figures to 260 → 261, citing the membership rule in
+  **S10**. No code change.
 
-**SUGGESTION** (10):
+**SUGGESTION** (13):
 
-- **S1 — a tautological assertion** at `TapPackageSearchTests.swift:1189`.
-- **S2 — `AppSection.tapSearch.title == "Search taps"` is unreachable**; DD-14 calls it "pinned by spec"
-  and the spec pins nothing for `title`.
-- **S3 — the zero-diff half of PS8 sc17 has no shipped enforcement.** Hand-verified **six** rounds
-  running; a CI step would end the manual check.
+- **S1 — a tautological assertion** in `TapPackageSearchTests.swift` (`[...8 string literals].count == 8`).
+- **S2 — `AppSection.tapSearch.title == "Search taps"` is unreachable**; DD-14 wrongly calls it spec-pinned.
+- **S3 — the zero-diff half of PS8 sc17 has no shipped enforcement.** Hand-verified **seven** rounds; a CI
+  step would end the manual check.
 - **S4 — correct the design's wiring table to ten sites.**
 - **S5 — DD-17 still says "the four empty states" are pinned**; the spec pins two.
-  `"Reading your taps"` (`TapSearchView.swift:221`) remains the only view-composed, unpinned sentence.
-- **S6 — non-building intermediate commits** in rounds 2–3 only; rounds 4 and 5 both fixed the pattern by
-  adding rather than renaming. The round-4/5 approach is the one to keep.
-- **S7 — six branch-size figures now circulate** (5,754 / 5,889 / 6,340 / 6,891 / 7,919 / **8,064**). The
-  recurring cause is that apply measures before committing its own record; state the convention once at
-  archive and quote only the final figure in the PR.
-- **S8 — rename drift in the artifacts, two tests.** `design.md:271` and `:352` still name the pre-rename
-  `theBrowseTapSurfaceComposesNoTrustGateAndNoBadge` and `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse`.
-- **S9 — round-3 deviation 3's "names no trust concept" is loose** (`StatusPill.swift` cites PT5 in a
-  doc comment). Conclusion unaffected.
-- **S10 — the distinct-id counting rule is now validated end to end** and should be recorded at archive:
-  adjust only when the break lands inside the quoted identifier. This round proved both branches of it.
+  `"Reading your taps"` (`TapSearchView.swift:229`) remains the only view-composed unpinned sentence.
+- **S6 — non-building intermediate commits** in rounds 2–3 only; rounds 4–6 fixed the pattern.
+- **S7 — seven branch-size figures now circulate.** The recurring cause is that apply measures before
+  committing its own record. State the convention once at archive and quote only the final figure.
+- **S8 — rename drift in the artifacts, now three tests**: `theBrowseTapSurfaceComposesNoTrustGate…`,
+  `aHitCarriesItsFiveFacts…` and now `notInstalledTapRowsAreNotSelectable` all appear under pre-rename
+  names in `design.md` and `tasks.md`.
+- **S9 — round-3 deviation 3's "names no trust concept" is loose.**
+- **S10 — the distinct-id rule needs correcting to membership.** An interleaved block costs an id
+  whenever the counting pattern fails to match — which includes a break inside the trailing
+  `passed`/`failed` keyword, not only inside the quoted identifier. Recover the id from each mangled line
+  and add one only when it is absent from the clean set. Record this at archive; it has now bitten three
+  different measurements.
+- **S11 (new) — the round-6 ledger arithmetic does not foot.** The record declares 25 of 25 while the
+  checkbox total grew from 178 to 210 (+32). Every box is ticked, so nothing is incomplete, but the
+  seven-box difference is unexplained.
+- **S12 (new) — the recorded detail-view diff is `+37/−9`; `git diff --numstat` says `37 8`.**
+- **S13 (new) — cosmetic**: the renamed `theTapSurfaceResolvesThroughTheSharedDetail` declaration is
+  indented eight spaces instead of four.
 
 ---
 
 ### Verdict
 
-**PASS WITH WARNINGS.** 0 blockers, 0 CRITICAL, 4 WARNING, 10 SUGGESTION, requirements **4/4**,
-scenarios **38/38**.
+**PASS WITH WARNINGS.** 0 blockers, 0 CRITICAL, 4 WARNING, 13 SUGGESTION, requirements **4/4**,
+scenarios **42/42**.
 
-The defect was real and the diagnosis was better than the symptom suggested: the verbs were never
-missing, only unreachable, because the row handed the shared menu an entry built with no installed
-record. The fix hands the record over and changes nothing else — `MutationMenu.swift` carries a
-**zero-line diff against `main`**, which is the cleanest possible evidence that no verb was
-re-implemented, re-worded or re-ordered.
+This round reverses a product decision and moves a file that had been invariant for five rounds, which is
+exactly the shape of change that usually erodes a contract quietly. It does not. The reversal is argued
+from what the earlier prohibition actually said — a claim about a *catalog* pane and a *tap-source* read,
+both still forbidden — rather than waved through; the tap-source ban is **reaffirmed** in TM5 rather than
+weakened; ambiguity still withholds the route in both install states; and the pane is an enumerated list
+that the implementer twice trimmed back to, once by deleting a section added by reflex and once by
+refusing to render a collision note that could never be reached.
 
-Two things raise this above a mechanical fix. The receipt is resolved **once** and read by both the
-offered version and the menu, so the row's update pill and its verbs are the same record by construction
-rather than by agreement. And the awkward part — a stored `InstalledPackage` on a type whose requirement
-says "exactly six facts" — is handled by explaining it in the spec and **enumerating the member by name**
-in the `Mirror` assertion, which turns that enumeration into a whitelist rather than leaving a large
-unlisted member sitting inside a claim about counting.
+The `PackageDetailView.swift` diff is three things and nothing else, and the clause it might have
+violated survives literally because the new branch sits third — a position the spec requires and the test
+pins by range comparison rather than by prose. The one guard that had to be relaxed was replaced by a
+strictly stronger positive pin, and **MP** proves that pin holds.
 
-I proved the three things most likely to be wrong. **MJ** re-keyed the lookup to bare identity and
-produced the exact catastrophe the spec warns about: `homebrew/core`'s `wget` receipt attached to a row
-published by `acme/tools`, which would offer to uninstall a package the row does not name — with every
-other test still green. **MK** restored the original defect and **ML** let the view read the record
-itself; each tripped two independent guards.
+My four mutations each failed precisely the intended target: **MM** made ambiguous hits routable and
+tripped four rows; **MO** let a doubly-published identity resolve and produced a pane naming an
+arbitrarily-chosen tap; **MN** rendered a licence the inventory cannot know; **MP** widened the narrowed
+guard.
 
-One correction is mine to make rather than apply's. Deviation 4 fixes a `specs/README.md` totals line
-that has been wrong since revision 3. I re-counted the delta **files** every round and they were always
-right, but I never cross-footed that summary against its own table — so it survived my round-4 and
-round-5 reports too. It is right now, and I re-derived the 23 independently.
+One correction is mine again, and it is the same one twice removed. Apply's unreconciled 259-vs-260
+question is the round-4 interleaving — but resolving it exposed that the rule I published in rounds 5 and
+6 was itself incomplete: a break inside the word `passed` drops an id just as a break inside the
+identifier does, and my own first count this round was one low because of it. The correct test is
+membership, not break position. Under it the five retained logs give **257 → 258 → 259 → 260 → 261** with
+no gaps, apply's two round-6 figures are each one low, and the honest count at `8aeb774` is **261**.
 
-The four warnings are one deferred PR, two standing latency-measurement notes, and a stale Engram
-`tasks` mirror that a one-call re-save fixes. **`m11-tap-search` is archive-ready** once that mirror is
-refreshed.
+**`m11-tap-search` is archive-ready.**

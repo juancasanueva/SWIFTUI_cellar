@@ -696,7 +696,7 @@ are reported below and are **not** trimmed. RDD disabled. Strict TDD active thro
 | Runner | Baseline |
 |---|---|
 | `swift test --package-path Packages/CellarCore` | **1,873 tests / 217 suites**, 1 known issue **+ 1 flake** |
-| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 259 distinct test ids** |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 260 distinct test ids (corrected by verify round 7; this run first read 259 — one id lost to an interleaved status line)** |
 | Working tree | clean after discarding `cellar/InfoPlist.xcstrings` churn |
 
 Two baseline notes, reported rather than absorbed:
@@ -766,7 +766,7 @@ reads the absence and draws `Not installed`.
 | **WU21′** | `2c69422` | N/A — artifacts only | N/A | `git revert 2c69422`; the contract returns to WU21's wording |
 | **WU22** | `74560ae` | `swift test … --filter 'TapPackageSearchTests'` → **35 tests / 1 suite passed**; `--filter 'TapInventoryDetailTests'` → **5 tests / 1 suite passed**; whole core suite **1,878 / 218 passed, 1 known issue** | **Deferred to WU23** — the pane's rendering is the app harness's; what the `unit` layer proves is the resolution rule itself, over four refusal cases and their triangulations | Revert one commit across `TapPackageSearch.swift`, the new `TapInventoryDetail.swift` and two test files. `TapInventoryDetail` is **new**, so nothing else stops compiling; `routableID`'s type is unchanged |
 | **WU23** | `12d1242` | `xcodebuild build …` → **`** BUILD SUCCEEDED **`** | **Deferred to delivery** — launching the app is the one harness this run could not execute headlessly. What it would observe is pinned by runners: the branch order by range comparison over `PackageDetailView.swift`, the pane's field set by source scan, and the resolution itself by five `unit` rows | Revert one commit across five app files. The `taps:` parameter is **added**, never renamed; the widened `versionStory` is source-compatible with both shipped call sites |
-| **WU24** | `05b7b48` | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`, 260 distinct ids** | N/A — source-scan suite; the app harness is WU23's | Revert one test commit; no production line is its own |
+| **WU24** | `05b7b48` | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`, 261 distinct ids (corrected by verify round 7; first read 260)** | N/A — source-scan suite; the app harness is WU23's | Revert one test commit; no production line is its own |
 
 ## TDD cycle evidence — round 6
 
@@ -775,7 +775,7 @@ reads the absence and draws `Not installed`.
 | 2⁵.1–2⁵.2 `routableID` | `Packages/CellarCore/Tests/BrewClientTests/TapPackageSearchTests.swift` | `unit` | ✅ 1,873 / 217 at `cbd13cb` | ✅ **assertion** failures, 3 across 2 ids — `aNotInstalledHitIsRoutableWhenItsIdentityIsUnambiguous` at `:912` and `:913`, `anAmbiguousHitIsNotRoutableInEitherInstallState` at `:850` (`unambiguousAbsent.routableID → nil`) | ✅ filtered **35 / 1 suite passed** | ✅ 5 cases in one row — installed-and-colliding, not-installed-and-colliding, duplicate identity, and an unambiguous positive of **each** install state. The last two are the triangulation that matters: without them the three `nil`s would also pass under the retired rule | ➖ none needed — one conjunct deleted |
 | 2⁵.3–2⁵.4 `TapInventoryDetail` | `Packages/CellarCore/Tests/BrewClientTests/TapInventoryDetailTests.swift` (new) | `unit` | N/A (new file) | ✅ **compile** failure, `TapInventoryDetailTests.swift:26:10: error: cannot find type 'TapInventoryDetail' in scope` (and 3 more sites) | ✅ filtered **5 / 1 suite passed**; whole core suite **1,878 / 218 passed** | ✅ 5 cases — one publisher, a cask on the same rule, zero/several/official publishers, a held receipt (installed **and** withheld), each with its own inverted triangulation | ✅ the resolution reads `TapProjection.publishes` and `packages(for:)` rather than re-deriving either; `kind` computed off `id` rather than stored beside it |
 | 3⁵.1–3⁵.6 the app surface | — | build | ✅ `** BUILD SUCCEEDED **` at `74560ae` | ✅ **compile** failure at the preview call site — `cannot use explicit 'return' statement in the body of result builder 'ViewBuilder'`, the compiler's phrasing for the missing `taps:` argument | ✅ `** BUILD SUCCEEDED **` | ➖ single construction site | ✅ `PackageMetadataSection` removed after review against PS8's closed list (deviation 3) |
-| 4⁵.1–4⁵.2 the composition guards | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ 259 distinct ids at `cbd13cb` | ✅ **two reversible mutations**: (a) `fact("Homepage", published.tapName)` in the pane → `theNameOnlyTapDetailComposesNothingItCannotKnow` **failed**; (b) `let routable = true` in the projection → **4** `unit` ids failed with 6 issues. Both restored and verified `shasum -a 256 -c` → both files `OK` | ✅ **`** TEST SUCCEEDED **`, 260 distinct ids** | ➖ single scenario | ✅ the scan made case-insensitive after mutation (a) exposed the gap (deviation 2) |
+| 4⁵.1–4⁵.2 the composition guards | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ 260 distinct ids at `cbd13cb` (corrected by verify round 7) | ✅ **two reversible mutations**: (a) `fact("Homepage", published.tapName)` in the pane → `theNameOnlyTapDetailComposesNothingItCannotKnow` **failed**; (b) `let routable = true` in the projection → **4** `unit` ids failed with 6 issues. Both restored and verified `shasum -a 256 -c` → both files `OK` | ✅ **`** TEST SUCCEEDED **`, 260 distinct ids** | ➖ single scenario | ✅ the scan made case-insensitive after mutation (a) exposed the gap (deviation 2) |
 
 **Test summary — round 6.** 6 tests written (5 `unit` in the new `TapInventoryDetailTests`, 1 `unit-app`),
 2 existing `unit` tests replaced by reversed equivalents, 2 existing `unit-app` tests renamed/narrowed.
@@ -787,7 +787,7 @@ Layers: `unit` 5, `unit-app` 1. No approval tests — no refactoring task. Pure 
 | Check | Result |
 |---|---|
 | `swift test --package-path Packages/CellarCore` | **1,878 tests / 218 suites passed, 1 known issue** (baseline 1,873 / 217 → **+5 tests, +1 suite**; the flake did not recur in either post-GREEN run) |
-| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 260 distinct test ids** (baseline 259 → **+1**, the one new `unit-app` test; no shipped id lost) |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 261 distinct test ids** (corrected by verify round 7; baseline 260 → **+1**, the one new `unit-app` test; no shipped id lost) |
 | `cellar/Browse/BrowseView.swift` vs `main` | **byte-identical** (`git diff --quiet` clean) — **fifth** round running |
 | `project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`, `MutationCommand.swift`, `MutationMenu.swift`, `cellarUITests/` vs `main` | **all empty** |
 | `PackageRow.swift`, `StatusPill.swift` vs `cbd13cb` | **empty** — round 6 changes no mark and no pill |
