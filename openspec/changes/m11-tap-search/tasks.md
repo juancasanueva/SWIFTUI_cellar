@@ -1246,19 +1246,19 @@ measured total; never trim. RDD disabled. Strict TDD active.
 
 ## Phase 2⁵: WU22 — the projection and the resolution (RED → GREEN)
 
-- [ ] 2⁵.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: rename
+- [x] 2⁵.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: rename
       `anAmbiguousInstalledHitIsNotRoutable` to `anAmbiguousHitIsNotRoutableInEitherInstallState` and add
       the not-installed colliding fixture plus the unambiguous positive of each install state; replace
       `aNotInstalledHitIsNeverRoutable` with `aNotInstalledHitIsRoutableWhenItsIdentityIsUnambiguous`.
       Confirm the failure is an **assertion** failure on the reversed expectation.
-- [ ] 2⁵.2 **GREEN** in `TapPackageSearch.swift`: `routable` becomes `collides == false && unique`.
-- [ ] 2⁵.3 **RED** in a new `TapInventoryDetailTests.swift`: the exactly-one-publisher row, the
+- [x] 2⁵.2 **GREEN** in `TapPackageSearch.swift`: `routable` becomes `collides == false && unique`.
+- [x] 2⁵.3 **RED** in a new `TapInventoryDetailTests.swift`: the exactly-one-publisher row, the
       zero/several/official rows, and the enumerated-facts row over `Mirror`. Confirm the failure is a
       **compile** failure naming `TapInventoryDetail`.
-- [ ] 2⁵.4 **GREEN** in a new `Packages/CellarCore/Sources/BrewClient/TapInventoryDetail.swift`: the
+- [x] 2⁵.4 **GREEN** in a new `Packages/CellarCore/Sources/BrewClient/TapInventoryDetail.swift`: the
       value and `resolve(_:in:)`, composed over `TapProjection.thirdPartyTaps` and
       `TapProjection.publishes(_:in:)`. Pure, `nonisolated`, `Sendable`; no `Catalog` value, no process.
-- [ ] 2⁵.5 `swift test --package-path Packages/CellarCore` whole against the phase-0⁵ baseline.
+- [x] 2⁵.5 `swift test --package-path Packages/CellarCore` whole against the phase-0⁵ baseline.
 - [ ] 2⁵.6 Commit `feat(search): resolve a not-installed tap package to its one publishing tap for a minimal detail`.
 
 ## Phase 3⁵: WU23 — the app surface

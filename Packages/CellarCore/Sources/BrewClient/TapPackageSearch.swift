@@ -106,8 +106,16 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     public let collisionNote: String?
     public let rank: TapMatchRank
     /// The identity this row may hand to a selection, or `nil` when it must not
-    /// be selectable: not installed, `alsoInCatalog`, or another emitted hit
-    /// carries the same `PackageID` (DD-4).
+    /// be selectable: `alsoInCatalog`, or another emitted hit carries the same
+    /// `PackageID` (DD-4, amended by DD-21).
+    ///
+    /// **Round 6 dropped the install state from this rule.** A not-installed
+    /// hit used to be unroutable because there was nothing honest to show it —
+    /// but that was a claim about a *catalog* pane and a *tap-source* read, and
+    /// the four names this inventory already publishes are neither. What
+    /// survives is the ambiguity half, which was always the real hazard: the
+    /// detail resolves the catalog first, so a colliding or duplicated identity
+    /// would open a different package than the row the user chose.
     public let routableID: PackageID?
 
     /// Whether this Mac has the package — **both** installed states say yes.
@@ -259,7 +267,16 @@ public struct TapPackageSearch: Sendable {
         return matches.map { match in
             let collides = isInCatalog(match.package.id)
             let unique = occurrences[match.package.id] == 1
-            let routable = match.package.isInstalled && collides == false && unique
+            // Routability is a fact about **identity**, and about nothing else
+            // (PS8 round 6, DD-21). An unambiguous hit hands over its exact
+            // `PackageID` in either install state: an installed one lands on the
+            // receipt-backed detail, a not-installed one on the name-only detail
+            // composed from this same tap inventory. What still withholds the
+            // route is what always did — a bare token the catalog also carries,
+            // or two emitted hits sharing one identity — because the
+            // catalog-first resolution would then present a different package
+            // than the row chosen.
+            let routable = collides == false && unique
             // Resolved **once** and read twice: the offered version and the
             // mutation handoff are the same receipt, so the row's update pill
             // and its menu can never disagree about which record answered

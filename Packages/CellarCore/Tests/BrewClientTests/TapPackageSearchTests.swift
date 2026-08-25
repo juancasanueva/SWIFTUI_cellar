@@ -783,27 +783,71 @@ struct TapPackageSearchTests {
         #expect(hit.mutationTarget == widget)
     }
 
-    // MARK: - ps10 — an ambiguous installed hit is not routable
+    // MARK: - ps10 — an ambiguous hit is not routable, whatever its install state
 
-    @Test("An installed hit whose token the catalog also carries is not routable")
-    func anAmbiguousInstalledHitIsNotRoutable() throws {
+    /// Round 6 (DD-21): routability is a fact about **identity** alone.
+    ///
+    /// The install state is read alongside every assertion below and is never
+    /// what decides. That is the whole content of the maintainer's reversal:
+    /// before it, a not-installed hit was unroutable *because* it was not
+    /// installed; now it is unroutable only when its identity is ambiguous, and
+    /// this row is what keeps the two reasons from being confused again.
+    @Test("An ambiguous hit is not routable, whatever its install state")
+    func anAmbiguousHitIsNotRoutableInEitherInstallState() throws {
         let wget = PackageID(kind: .formula, name: "wget")
         let installed = InstalledInventory(packages: [
             InstalledFixture.receipt(.formula, "wget", tap: "acme/tools")
         ])
-        let hit = try #require(
+
+        // (a) Installed **and** colliding with the catalog.
+        let collidingInstalled = try #require(
             hits([TapSearchFixture.acmeWget], "wget", installed: installed, catalog: [wget]).first
         )
-
-        #expect(hit.state == .installed(wget))
-        #expect(hit.routableID == nil)
+        #expect(collidingInstalled.state == .installed(wget))
+        #expect(collidingInstalled.routableID == nil)
         // Presented and installable regardless: only the detail route is
         // withheld.
-        #expect(hit.mutationTarget == wget)
+        #expect(collidingInstalled.mutationTarget == wget)
         // It is installed, so the row draws the pill — and has nothing further
         // to say, because this state pins no sentence (PS8 round 3).
-        #expect(hit.isInstalled)
-        #expect(hit.stateNote == nil)
+        #expect(collidingInstalled.isInstalled)
+        #expect(collidingInstalled.stateNote == nil)
+
+        // (b) **Not** installed and colliding with the catalog. The reversal
+        // does not reach this hit: the catalog-first resolution would still
+        // open the catalog's package, not this row's.
+        let collidingAbsent = try #require(
+            hits([TapSearchFixture.acmeWget], "wget", catalog: [wget]).first
+        )
+        #expect(collidingAbsent.state == .notInstalled)
+        #expect(collidingAbsent.alsoInCatalog)
+        #expect(collidingAbsent.routableID == nil)
+        #expect(collidingAbsent.mutationTarget == wget)
+
+        // (c) Two taps emitting one `PackageID` — the ambiguity `alsoInCatalog`
+        // cannot see.
+        let duplicates = hits(
+            [TapSearchFixture.acmeDuplicate, TapSearchFixture.bravoDuplicate],
+            "widget",
+            installed: TapSearchFixture.withheldWidgetInstalled
+        )
+        #expect(duplicates.count == 2)
+        #expect(duplicates.allSatisfy { $0.routableID == nil })
+
+        // Triangulated on the decisive variable: an unambiguous hit of **each**
+        // install state hands over its exact identity. Without these two the
+        // three `nil`s above would also pass under the old install-state rule.
+        let widget = PackageID(kind: .formula, name: "widget")
+        let sole = TapSearchFixture.tap("acme/tools", formulae: ["acme/tools/widget"])
+        let unambiguousInstalled = try #require(
+            hits([sole], "widget", installed: TapSearchFixture.acmeWidgetInstalled).first
+        )
+        #expect(unambiguousInstalled.isInstalled)
+        #expect(unambiguousInstalled.routableID == widget)
+
+        let unambiguousAbsent = try #require(hits([sole], "widget").first)
+        #expect(unambiguousAbsent.state == .notInstalled)
+        #expect(unambiguousAbsent.routableID == widget)
     }
 
     @Test("Two taps publishing one name are both unroutable")
@@ -850,13 +894,25 @@ struct TapPackageSearchTests {
         #expect(withheld.routableID == widget)
     }
 
-    @Test("A not-installed hit is never routable")
-    func aNotInstalledHitIsNeverRoutable() {
+    /// Round 6 (DD-21) **reverses** this row's shipped expectation.
+    ///
+    /// It is replaced rather than narrowed: the old row asserted precisely what
+    /// the maintainer overturned, and keeping it beside the new one — over a
+    /// fixture chosen to still satisfy it — would let the retired rule and its
+    /// replacement both appear to hold.
+    @Test("A not-installed hit is routable when its identity is unambiguous")
+    func aNotInstalledHitIsRoutableWhenItsIdentityIsUnambiguous() {
         let found = hits([TapSearchFixture.acmeWidgets], "widget")
 
         #expect(found.count == 3)
         #expect(found.allSatisfy { $0.state == .notInstalled })
-        #expect(found.allSatisfy { $0.routableID == nil })
+        #expect(found.allSatisfy { $0.alsoInCatalog == false })
+        // None of the three collides and none shares an identity, so all three
+        // hand over the exact `PackageID` a detail is selected by.
+        #expect(found.allSatisfy { $0.routableID == $0.mutationTarget })
+        #expect(
+            found.compactMap(\.routableID).map(\.name) == ["widget", "widget-cli", "superwidget"]
+        )
         // …and each is still presented and still installable.
         #expect(found.allSatisfy { PackageTarget($0.mutationTarget) != nil })
     }
