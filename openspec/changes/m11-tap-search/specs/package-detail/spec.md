@@ -4,14 +4,16 @@ Existing capability — `openspec/specs/package-detail/spec.md` (**8 requirement
 established by `2026-08-01-m1-catalog-browse`, amended by `2026-08-06-m5-catalog-inspection`,
 `2026-08-24-m9-per-package-trust` and `2026-08-24-m10-third-party-detail`). This delta is **1 MODIFIED,
 0 added, 0 removed, 0 renamed**: the modified block keeps all **three** scenarios it carries today
-**byte-identical** and adds **2 scenarios**, taking the capability to **8 requirements / 33 scenarios**.
+**byte-identical** and adds **3 scenarios**, taking the capability to **8 requirements / 34 scenarios**.
 
 Nothing is removed and no requirement is renamed, so `rules.archive`'s destructive-delta warning does
 not fire. The MODIFIED block is a whole-block replacement copied from the main spec and then edited; it
-is a strict superset of the text it replaces. The only textual change is **one added paragraph** — the
-parallel of m10's boundary paragraph, drawn for a *search surface* instead of a detail surface — plus
-its `(Previously: …)` line. The clause "MUST NOT appear in search results" is reproduced **verbatim**;
-this delta narrows nothing about what the catalog projection itself may return.
+is a strict superset of the text it replaces. Every textual change is an **addition to the boundary
+paragraph** — the parallel of m10's, drawn for a *search surface* instead of a detail surface; then the
+inventory-fed rendering (round 6); then the colliding selection (round 7) — each with its own
+`(Previously: …)` line. The clause "MUST NOT appear in search results" is reproduced **verbatim**;
+this delta narrows nothing about what the catalog projection itself may return, and round 7 adds no
+permission to it: the record a colliding selection returns is one the catalog **already covers**.
 
 **This delta lands in the first work unit (proposal risk R2).** Read literally, PD6's second paragraph
 already scopes every clause to "the **catalog projection** this capability owns — the snapshot, catalog
@@ -29,7 +31,7 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
-| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **2** |
+| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **3** |
 
 ## MODIFIED Requirements
 
@@ -56,7 +58,14 @@ additional brew invocation — so it neither satisfies nor violates this require
 read the catalog for **membership alone** — to report that a hit's bare token is also carried by the
 catalog — and that read produces no catalog result for the tap package, creates no catalog record, and
 adds nothing to the snapshot or to the index; it draws no catalog value into the hit beyond the fact of
-that collision. `package-search` owns that composed surface and states its own rules for it. The same boundary, on the
+that collision. Such a surface MAY also let a row whose bare token the catalog **does** carry be
+selected, resolving it through the **ordinary** detail lookup by that bare identity: what the lookup
+then returns is the catalog's **own** record for its **own** package — the record the catalog carried
+before any tap was installed and would return for the same identity with no tap inventory resident at
+all. That is this capability's own lookup answering for a package it covers, not a catalog result
+manufactured for the tap package: no record is created, synthesized or amended, the snapshot and the
+index are unchanged, and the tap package contributes nothing to what comes back. `package-search` owns
+that composed surface and states its own rules for it. The same boundary, on the
 same terms, binds a **rendering fed exclusively by the resident tap inventory**: a detail composed from
 the names an installed third-party tap has **already published** — its bare token, its kind, its tap of
 origin — together with this capability's neighbours answering that the machine holds no receipt for it
@@ -79,6 +88,10 @@ tap package, including one composed above the index from the resident tap invent
 receipt** alone, so a rendering fed by the resident **tap inventory** — for a package this machine does
 not have, and therefore has no receipt for — fell under neither carve-out and read as forbidden, even
 though it consults no catalog value and reads no tap source.)
+(Previously: the search-surface half permitted a **membership** read but said nothing about a selection
+made on that surface, so opening the catalog's own detail for a bare token the catalog carries — the
+package Homebrew resolves that token to — read as producing “a catalog result” for a tap row, even
+though the record returned is the catalog's own and predates the tap entirely.)
 
 #### Scenario: A third-party tap package is a normal not-found
 
@@ -125,6 +138,19 @@ though it consults no catalog value and reads no tap source.)
   value the catalog publishes
 - Verification: `unit`
 
+#### Scenario: A colliding selection resolves to the catalog's own record and creates nothing
+
+- GIVEN the catalog carries a package, an installed third-party tap publishes the same `(kind, name)`,
+  and the identity the tap surface offers for that row is the bare one
+- WHEN that identity is resolved through the ordinary catalog detail lookup with the tap inventory
+  resident
+- THEN the lookup returns the catalog's own record — byte-identical to the record the same lookup
+  returns with no tap inventory resident — so nothing about the tap package reached it
+- AND the snapshot and the index are unchanged: the record count is the catalog's own, the catalog
+  search results for that query are identical to those returned with no tap inventory present, and no
+  record exists for any package the catalog does not cover
+- Verification: `unit`
+
 ## Notes for archive
 
 - **The verification-class table above is NOT promoted.** `openspec/specs/package-detail/spec.md`
@@ -145,3 +171,9 @@ though it consults no catalog value and reads no tap source.)
 - The added paragraph is deliberately symmetric with m10's: same four negations (no catalog record,
   nothing added to the snapshot or search, no catalog value consulted, no additional brew invocation),
   plus the one this change needs — composed above the index, never pushed into it.
+- **Round 7 adds no permission, only a clarification.** The colliding-selection sentence describes the
+  catalog answering for a package **it covers**, by the same lookup it has always answered with. Nothing
+  in the round makes a tap package reachable through the snapshot, the index or the detail lookup; the
+  membership carve-out is unchanged and no new catalog read is granted. The added scenario proves the
+  record returned is byte-identical to the one the same lookup returns with **no tap inventory
+  resident**, which is the strongest available form of "the tap contributed nothing".

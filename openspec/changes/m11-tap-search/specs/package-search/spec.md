@@ -79,6 +79,22 @@ withholds the route in **either** install state, because the catalog-first resol
 different package than the row chosen. Nothing about tap-source reads, catalog records or trust
 presentation is weakened; the pane adds none of the three.
 
+**Maintainer product decision, 2026-08-25 (round 7) — binding, and this revision's reason.** The
+**collision** half of round 6's ambiguity rule is **reversed**. A hit whose bare token the catalog also
+carries is now **selectable**, and it opens the **catalog's own detail**. Round 1's reason for
+withholding that route — the catalog-first resolution “would present a different package than the row
+chosen” — measured the destination against the wrong thing. Homebrew resolves the bare token to the
+catalog package; the collision note on the row says exactly that, in those words. So the catalog pane is
+not a different package than the row chosen: it **is** the package the row's own note says will be
+installed, and refusing to open it left the user with a sentence naming a package and no way to look at
+it. The route costs no branch, because the shipped resolution already resolves the catalog first — the
+hit simply becomes routable by its `PackageID`. The collision note is **unchanged and still required**,
+because it still explains which package a mutation from this row would install. The **only** inert case
+left is a **duplicate `PackageID` among the emitted hits** — two third-party taps publishing the same
+name, neither of them the catalog's — where nothing distinguishes the two rows and no destination is
+the one chosen. Nothing about tap-source reads, catalog records, trust presentation, the receipt branch
+or the inventory branch is weakened or moved.
+
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
@@ -269,20 +285,36 @@ is the duplicate presentation II8 forbids. The withheld sentence is unaffected �
 five characters but is one indivisible pinned string, and it stays. Nothing here changes TM5 either,
 whose own tap-detail rows keep both withdrawn strings on the surface TM5 governs.
 
-A hit MUST be selectable **exactly when its identity is unambiguous**, in **either** install state. A
-hit's identity is ambiguous when its bare token is also carried by the catalog for the same kind, or
-when another hit this source emits carries the same `PackageID`. An ambiguous hit MUST NOT be
-selectable, because the existing resolution order resolves the catalog first and would present a
-**different package** than the row the user chose. The projection MUST report that routability as a
-fact of the hit — a value a test can read directly — so the presenting surface does not re-derive it,
-and it MUST NOT be derived from the install state, which cannot express non-collision or uniqueness.
-An ambiguous hit MUST still be **presented and installable**: only its detail route is withheld, and
-its mutation target stays the bare `PackageID`.
+A hit MUST be selectable **exactly when its `PackageID` is unique among the hits this source emits** —
+in **either** install state, and **whether or not** the catalog also carries its bare token. That
+uniqueness MUST be counted over the **emitted hits alone**: a catalog record is not a hit this source
+emits and MUST NOT be counted against a hit's uniqueness. The projection MUST report that routability
+as a fact of the hit — a value a test can read directly — so the presenting surface does not re-derive
+it, and it MUST NOT be derived from the install state or from the collision fact, neither of which can
+express uniqueness.
 
-An **installed**, unambiguous hit MUST open the receipt-backed detail `installed-inventory` owns,
-selected by its exact `PackageID` through the existing resolution order.
+A hit whose bare token the catalog also carries MUST still report that collision as a fact and MUST
+still carry the pinned collision note — the note is **unchanged and still required**, because it still
+names which package a mutation from this row would install — and it MUST **also** be selectable when
+its `PackageID` is unique among the emitted hits. Resolving it MUST use that same exact `PackageID`
+through the **existing** resolution order, which resolves the **catalog first** and therefore opens the
+**catalog's own detail**. That is the correct destination rather than a mismatch: Homebrew resolves the
+bare token to the catalog package, so the catalog pane is precisely the package the collision note says
+will be installed. **No routing branch MUST be added** for this case, and neither the receipt branch nor
+the inventory branch MUST change.
 
-A **not-installed**, unambiguous hit MUST open a **minimal detail composed exclusively from the
+The **only** hit that MUST NOT be selectable is one whose `PackageID` **another emitted hit also
+carries** — two third-party taps publishing the same name, neither of them the catalog's — because
+nothing distinguishes the two rows and a pane opened for either would present something other than the
+row chosen. Such a hit MUST still be **presented and installable**: only its detail route is withheld,
+and its mutation target stays the bare `PackageID`.
+
+An **installed** hit whose bare token the catalog does **not** carry, and whose `PackageID` is unique
+among the emitted hits, MUST open the receipt-backed detail `installed-inventory` owns, selected by its
+exact `PackageID` through the existing resolution order.
+
+A **not-installed** hit whose bare token the catalog does **not** carry, and whose `PackageID` is
+unique among the emitted hits, MUST open a **minimal detail composed exclusively from the
 resident tap inventory**. That rendering MUST perform **no tap-source read** (TM5), MUST consult **no
 catalog record** and MUST create none (PD6), MUST add nothing to the catalog snapshot, to catalog
 search or to the index, and MUST cost **no brew invocation** — it is composed from names the tap has
@@ -296,10 +328,11 @@ as its target; and a **footer** carrying the exact copy “Cellar knows this pac
 it is installed.”.
 
 It MUST carry **no collision note**, and that absence MUST be asserted rather than assumed. A colliding
-identity cannot reach this rendering by any route: the catalog carries the token, so the catalog detail
-resolves it first, and the row that would otherwise offer it is unroutable for the same reason. A
-collision note composed here would therefore be unreachable presentation — a worse answer than none,
-because it could never be seen to be wrong.
+identity cannot reach this rendering by any route: the catalog carries the token, so the **catalog
+detail branch resolves it first** and answers for it. Since round 7 such a row is selectable, which
+makes that branch **ordering** the sole guarantee rather than one of two — and it is sufficient,
+because the ordering is itself asserted. A collision note composed here would therefore be unreachable
+presentation — a worse answer than none, because it could never be seen to be wrong.
 
 It MUST present **nothing else**. In particular it MUST NOT present a description, a version of any
 kind, a homepage, a licence, a dependency list, an install count, a deprecation or disabled flag, an
@@ -407,7 +440,7 @@ method, same ceiling, unaffected by this source's existence.
   same query are unchanged
 - Verification: `unit`
 
-#### Scenario: A catalog collision is reported on the hit and never suppressed
+#### Scenario: A catalog collision is reported on the hit, never suppressed, and never withholds the route
 
 - GIVEN the catalog carries formula `wget` and installed tap `acme/tools` publishes
   `acme/tools/wget`
@@ -416,6 +449,9 @@ method, same ceiling, unaffected by this source's existence.
   “Also in the catalog. Homebrew installs the catalog package.”
 - AND its row identity differs from the catalog row's identity, while its mutation target remains the
   bare `PackageID` for `(formula, wget)`, with no qualified token anywhere in the argv it produces
+- AND the hit is **routable**, reporting that same bare `PackageID` as the identity it is selected by,
+  so the catalog-first resolution opens the catalog's own detail — the package this hit's own note says
+  Homebrew installs
 - Verification: `unit`
 
 #### Scenario: The three install states stay distinct, and only the withheld state pins a sentence
@@ -452,18 +488,24 @@ method, same ceiling, unaffected by this source's existence.
   package's receipt is never attached to a tap row
 - Verification: `unit`
 
-#### Scenario: A hit with an ambiguous identity is not routable, whatever its install state
+#### Scenario: Only a duplicated identity withholds the route, whatever the install state and the collision
 
-- GIVEN an installed tap hit whose bare token the catalog also carries for the same kind, a
-  not-installed hit whose bare token the catalog also carries, and two hits published by different taps
-  that carry the same `PackageID`
+- GIVEN two hits published by different taps that carry the same `PackageID`, neither of them carried
+  by the catalog, and separately an installed hit whose bare token the catalog also carries, a
+  not-installed hit whose bare token the catalog also carries, and an uncollided hit of each install
+  state
 - WHEN each hit's routability to a detail is read
-- THEN each of them reports itself as non-routable, so the catalog-first resolution can never present a
-  different package than the row chosen
-- AND each is still presented and still offers its install, with the bare `PackageID` as the mutation
-  target
-- AND an unambiguous hit of each install state reports its exact `PackageID` as routable, so the rule
-  is identity's alone and never the install state's
+- THEN only the two hits sharing one `PackageID` report themselves non-routable, because nothing
+  distinguishes them and no destination is the one chosen
+- AND both colliding hits report their exact bare `PackageID` as routable, in either install state, so
+  the catalog-first resolution opens the catalog's own package — the one their note names — rather than
+  nothing at all
+- AND each colliding hit still carries the collision note, so the route is added and no fact is
+  withdrawn
+- AND each non-routable hit is still presented and still offers its install, with the bare `PackageID`
+  as the mutation target
+- AND the uncollided hit of each install state reports its exact `PackageID` as routable, so the rule
+  is uniqueness's alone and never the install state's and never the collision's
 - Verification: `unit`
 
 #### Scenario: Hide-installed composes above the tap source, and no outdated control exists
@@ -486,21 +528,27 @@ method, same ceiling, unaffected by this source's existence.
   ceiling, with no tap inventory in its turn
 - Verification: `unit`
 
-#### Scenario: The tap surface is its own titled entry, and its ambiguous rows are inert
+#### Scenario: The tap surface is its own titled entry, and only its duplicated rows are inert
 
-- GIVEN the source of the surface that presents this source and the application's section list
-- WHEN the surface's title, its section-list entry, and the rule that gates a row's selection are
-  inspected
+- GIVEN the source of the surface that presents this source, the source of the shared detail surface,
+  and the application's section list
+- WHEN the surface's title, its section-list entry, the rule that gates a row's selection, and the
+  order of the shared detail's resolution branches are inspected
 - THEN the section-list entry and the surface title are both exactly “Search our taps”
 - AND the surface is its own entry rather than a section of the catalog query surface, and a row is
-  selectable on the projection's routability alone — so an ambiguous hit is inert and an unambiguous
-  not-installed hit is not
+  selectable on the projection's routability alone — so a duplicated-identity hit is inert while a
+  not-installed hit and a colliding hit are not
+- AND the surface consults neither the collision fact nor the install state to decide selection, so
+  the one rule stays the projection's
+- AND the shared detail resolves the **catalog branch first**, which is what carries a colliding row to
+  the catalog's own package with no branch added for this surface
 - Verification: `unit-app`
 
 #### Scenario: An installed tap hit opens the receipt-backed detail
 
 - GIVEN an installed tap package chosen from the composed source, with no catalog record for its
-  `(kind, name)` and no other emitted hit carrying the same `PackageID`, so its identity is unambiguous
+  `(kind, name)` — so the catalog branch cannot answer for it — and no other emitted hit carrying the
+  same `PackageID`, so it is routable
 - WHEN that choice is resolved by its exact `PackageID`
 - THEN the receipt-backed detail `installed-inventory` owns is presented, through the existing
   resolution order and with no routing branch added for this source
@@ -674,8 +722,9 @@ method, same ceiling, unaffected by this source's existence.
   package's — the membership answer stays a collision `Bool` and contributes nothing to a hit's content.
 - **Round 6 reverses a 2026-08-24 decision and pins one new string.** The decision block above records
   “a not-installed hit is non-selectable”; the round-6 block records the maintainer's reversal and the
-  reason. Only the **route** changes: ambiguity still withholds it, the mutation target is still the
-  bare `PackageID`, and no row presentation moves. The one new pinned string is the pane's footer,
+  reason. Only the **route** changes: ambiguity still withholds it (round 7 narrows *which* ambiguity),
+  the mutation target is still the bare `PackageID`, and no row presentation moves. The one new pinned
+  string is the pane's footer,
   “Cellar knows this package by name only until it is installed.”, which has no shipped precedent and
   is added to the pinned-copy table in `specs/README.md`.
 - **Round 6 activates `package-detail` and `tap-management` rather than weakening either.** PD6 gains a
@@ -686,3 +735,12 @@ method, same ceiling, unaffected by this source's existence.
 - **PD8 does not reach this pane.** The individual-grant marker is a fact about a receipt's tap of
   origin, and a package this machine has not installed has no receipt. The pane asserts the marker's
   **absence** rather than rendering it, so PD8 needs no delta for the third round running.
+- **Round 7 narrows the inert case and adds no scenario.** The collision half of round 6's ambiguity
+  rule is reversed: a colliding hit is now routable and lands on the **catalog's own detail**, which the
+  shipped catalog-first branch already answers, so the change is a **deleted conjunct** in one
+  expression and **no new branch anywhere**. The class counts above are unchanged — the two affected
+  `unit` scenarios and the one `unit-app` scenario are **amended in place**, because each already owned
+  the claim that moved and splitting it would let the retired rule and its replacement both appear to
+  hold. The collision note is **not** withdrawn: it names the package a mutation from the row installs,
+  which is now also the package the row opens, so the sentence and the route agree rather than compete.
+  The duplicate-`PackageID` case is untouched and is the sole remaining inert row.

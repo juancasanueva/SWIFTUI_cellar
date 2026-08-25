@@ -1,9 +1,24 @@
 # Spec index — `m11-tap-search`
 
 Three delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
-the searchable mirror. **Revision 7** — the 2026-08-25 maintainer **product decision** on the detail
-route for a not-installed tap package, on top of revision 6's mutation verbs, revision 5's update pill,
-revision 4's install pill and revision 3's scope change.
+the searchable mirror. **Revision 8** — the 2026-08-25 maintainer **product decision** that a colliding
+tap hit opens the catalog detail, on top of revision 7's name-only detail, revision 6's mutation verbs,
+revision 5's update pill, revision 4's install pill and revision 3's scope change.
+
+**Product decision, 2026-08-25 (round 7, binding).** The **collision** half of round 6's ambiguity rule
+is reversed. A hit whose bare token the catalog also carries is now **selectable** and opens the
+**catalog's own detail**, because Homebrew resolves that bare token to the catalog package — which is
+exactly what the row's collision note already says, in those words. Withholding the route left the user
+with a sentence naming a package and no way to look at it. The route costs **no new branch**: the
+shipped resolution order already resolves the catalog first, so the hit simply becomes routable by its
+`PackageID`. The collision note is **unchanged and still required**, the receipt branch and the
+inventory branch are untouched, and the **sole** remaining inert row is a **duplicate `PackageID` among
+the emitted hits** — two third-party taps publishing one name, neither of them the catalog's — which
+nothing can disambiguate. **Scenario counts move by one**: `package-detail` PD6 gains a third `unit`
+scenario (→ 8 req / **34** sc) pinning that the record a colliding selection returns is the catalog's
+own, byte-identical to the one returned with no tap inventory resident. `package-search` gains
+**none** — its two affected `unit` scenarios and its one `unit-app` scenario are amended **in place**,
+because each already owned the claim that moved. `tap-management` is untouched by round 7.
 
 **Product decision, 2026-08-25 (round 6, binding).** The 2026-08-24 decision that a not-installed hit is
 **non-selectable** is reversed in favour of the follow-up recorded beside it. A not-installed hit whose
@@ -61,11 +76,11 @@ restated **per surface** rather than as a shared keystroke turn. The string `Fro
 | Capability | Op | Block | Scenarios | Net |
 |---|---|---|---|---|
 | `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +22 (14 `unit`, 8 `unit-app`) | 7 → **8** requirements, 19 → **41** scenarios |
-| `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +2 (`unit`) | 8 requirements unchanged, 31 → **33** scenarios |
+| `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +3 (`unit`) | 8 requirements unchanged, 31 → **34** scenarios |
 | `tap-management` | **MODIFIED** — **TM5** and **TM11** (main-spec markers) | both whole blocks, all 12 existing scenarios byte-identical | +3 (`unit`) | 13 requirements unchanged, 58 → **61** scenarios |
 
-**Totals: 1 ADDED, 3 MODIFIED blocks across 2 capabilities, 0 REMOVED, 0 RENAMED — 27 new scenarios
-(19 `unit`, 8 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
+**Totals: 1 ADDED, 3 MODIFIED blocks across 2 capabilities, 0 REMOVED, 0 RENAMED — 28 new scenarios
+(20 `unit`, 8 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
 destructive-delta warning does not fire.
 
 > **Arithmetic correction, round 5.** This line read “20 new scenarios (15 `unit`, 5 `unit-app`)” from
@@ -75,10 +90,13 @@ destructive-delta warning does not fire.
 
 **One catalog read is permitted, and only one.** PD6's added paragraph allows the composed surface to
 read the catalog for **membership alone** — whether a hit's bare token is also carried by the catalog
-for the same kind — because that is what produces the collision fact and the ambiguity that makes an
-installed hit non-routable. That read creates no catalog record, adds nothing to the snapshot or the
-index, and draws no catalog value into the hit beyond the collision itself. PS8 declares the same
-membership answer as an input of the projection, used for that fact and for nothing else.
+for the same kind — because that is what produces the collision fact the row's note is worded from.
+Since round 7 that read decides **nothing else**: it no longer feeds routability, which is now
+uniqueness among the emitted hits and nothing more. The read still creates no catalog record, adds
+nothing to the snapshot or the index, and draws no catalog value into the hit beyond the collision
+itself. PS8 declares the same membership answer as an input of the projection, used for that fact and
+for nothing else. PD6's round-7 sentence adds no second read: it describes the **ordinary** detail
+lookup answering, for a package the catalog already covers, when such a row is selected.
 
 ## Verification classes
 
@@ -102,7 +120,7 @@ requirements, following the precedent `2026-08-23-m7-tap-trust` recorded at
 | Surface title and sidebar entry | `Search our taps` | always — both the section-list entry and the surface's own title. **New copy**, replacing the withdrawn `From your taps` |
 | Empty state — inventory unavailable | `No packages from your taps.` | `brewAbsent` or a failed refresh; an ordinary empty state, never an error. **New copy** |
 | Empty state — nothing published | `Your taps publish nothing yet.` | inventory available, no installed third-party tap publishes anything. **New copy** |
-| Catalog collision note | `Also in the catalog. Homebrew installs the catalog package.` | the hit's bare token is also carried by the catalog for the same kind; supplied by the projection, never composed by the surface |
+| Catalog collision note | `Also in the catalog. Homebrew installs the catalog package.` | the hit's bare token is also carried by the catalog for the same kind; supplied by the projection, never composed by the surface. **Round 7**: unchanged and still required — the row it sits on is now also **selectable**, and it opens the very package this sentence names, so the note and the route agree rather than compete |
 | Install state — installed | ~~`Installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | Replaced by the **shared status pill** the catalog result surface already draws, reading `Installed`. Not copy this delta owns: the label lives in that one shared component, so neither search surface and no projection composes it |
 | Install state — tap withheld | `Installed. Homebrew withholds its tap while this tap is untrusted.` | TM5's exact shipped string, reused byte-for-byte. **Round 3**: the withheld row now carries the pill **and** this sentence — it is installed, and the sentence explains what Homebrew is withholding |
 | Install state — not installed | ~~`Not installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | A not-installed row carries **no state copy and no pill**, exactly as the catalog result surface shows nothing for a row that is not installed |
@@ -110,7 +128,7 @@ requirements, following the precedent `2026-08-23-m7-tap-trust` recorded at
 | Mutation verbs on an installed row | **no copy pinned here** — Reinstall, Uninstall…, Uninstall and Zap…, Upgrade, Pin and Unpin belong to the **shared mutation menu** | **Round 5**: the row hands that menu the hit's installed record, so an installed hit takes the menu's installed branch. Not copy this delta owns and not verbs it declares: every label, every argv and every applicability rule lives in the shared menu and the shipped command type, and the surface supplies only the record and the bare target they already take |
 | Name-only detail — install state | `Not installed.` | **Round 6**: on the **detail pane** for an unambiguous not-installed hit, reusing TM5's exact shipped string byte-for-byte. The round-3 withdrawal above is about the **row**, where a pill answers instead; a pane with no pill has to say it. Supplied by the projection, never composed by the pane |
 | Name-only detail — footer | `Cellar knows this package by name only until it is installed.` | **Round 6**: always, on that pane. **New copy** with no shipped precedent, supplied by the projection like every other sentence this change pins, so it is worded in exactly one place and appears nowhere in the application's own sources. It states the pane's own boundary — why there is no description, no version and no size — without claiming anything about the package or its tap |
-| Name-only detail — collision note | **none** — the note is **not** rendered on this pane, and its absence is asserted | **Round 6**: a colliding bare token is carried by the catalog, so the catalog detail resolves it before this branch and the row offering it is unroutable for the same reason. A note here could never be reached, and unreachable presentation is worse than none |
+| Name-only detail — collision note | **none** — the note is **not** rendered on this pane, and its absence is asserted | **Round 6**: a colliding bare token is carried by the catalog, so the catalog detail resolves it before this branch and the row offering it is unroutable for the same reason. A note here could never be reached, and unreachable presentation is worse than none. **Round 7**: the row is now routable, so the **branch ordering** is the sole guarantee — and it is sufficient, because that ordering is itself asserted |
 
 Both withdrawn strings stay **unchanged in TM5** for the tap-detail rows TM5 governs; only this
 surface's **row** copy is withdrawn — and round 6 puts `Not installed.` back on the **pane**, where no
@@ -137,7 +155,7 @@ carried into PS8:
 | ~~Section renders **below** the catalog rows~~ — **superseded 2026-08-25** | Its own surface titled `Search our taps`, never interleaved with catalog results, with Browse untouched: presentation paragraph + `unit-app` surface-title scenario + `unit-app` untouched-catalog-surface scenario |
 | Collision shown with a neutral note, never suppressed | collision paragraph + `unit` collision scenario |
 | Tap name only — no `Untrusted` badge, no trust control | install paragraph + `unit-app` no-trust-gate scan |
-| ~~Not-installed rows non-selectable~~; installed hits route to the m10 receipt pane — **half superseded 2026-08-25 (round 6)**, see the round-6 row below | install-state paragraph + both routing scenarios. **Refined by the orchestrator gate**: an installed hit whose identity is ambiguous — colliding bare token, or two emitted hits sharing a `PackageID` — is also non-routable, because the catalog-first resolution would open a different package; it stays presented and installable (`unit` ambiguity scenario) |
+| ~~Not-installed rows non-selectable~~; installed hits route to the m10 receipt pane — **half superseded 2026-08-25 (round 6)**, see the round-6 and round-7 rows below | install-state paragraph + both routing scenarios. **Refined by the orchestrator gate**: an installed hit whose identity is ambiguous — colliding bare token, or two emitted hits sharing a `PackageID` — is also non-routable, because the catalog-first resolution would open a different package; it stays presented and installable (`unit` ambiguity scenario). **Half of that refinement is reversed in round 7**: the colliding case now routes, precisely *through* the catalog-first resolution, to the package the row's note names; only the shared-`PackageID` case stays inert |
 | ~~Section renders only for a non-empty query~~ — **superseded 2026-08-25** | An empty query lists everything the installed taps publish, in the deterministic order, mirroring PS5: empty-query paragraph + `unit` list-everything scenario |
 | "Hide installed" subtracts from the tap results | filters paragraph + `unit` hide-installed scenario |
 | ~~Outdated hides the section entirely~~ — **superseded 2026-08-25** | The surface offers **no** outdated control at all (a tap hit has no version, and II8 forbids an enabled control that cannot change results): filters paragraph + the same `unit` scenario's enumeration clause |
@@ -149,6 +167,7 @@ carried into PS8:
 | An available update is marked with the **shared UPDATE pill**, after the Installed pill — **added 2026-08-25 (round 4)** | The offered version becomes a **sixth fact** of the hit, derived from the installed receipt and gated on its own `isOutdated`: six-facts paragraph + offered-version paragraph + update-pill paragraph, the new `unit` offered-version scenario and the new `unit-app` shared-update-pill scenario. The **Outdated control stays absent** — its rule survives round 4 with a narrowed reason, stated in the filters paragraph |
 | An installed row offers the **same verbs the Installed and catalog surfaces offer** — **added 2026-08-25 (round 5)** | The hit gains a **mutation handoff** — this machine's own installed receipt, resolved by the tap-aware handoff, present in both installed states and absent when not installed — and the row hands it to the shared mutation menu: verbs paragraph + handoff paragraph, the amended facts and offered-version `unit` scenarios and the new `unit-app` mutation-composition scenario. It is **not a seventh fact**: it publishes nothing the tap declares, costs no brew invocation, and the surface presents nothing from it |
 | ~~Not-installed rows non-selectable~~ — **reversed 2026-08-25 (round 6)** | An unambiguous not-installed hit **is** selectable and opens a minimal detail composed exclusively from the resident tap inventory — identity, kind, tap of origin, TM5's `Not installed.`, the shared mutation menu and one pinned footer, and nothing that would need a tap-source read: selectability paragraph + detail paragraphs, the amended ambiguity `unit` scenario and surface-entry `unit-app` scenario, the new `unit` resolution scenario and the new `unit-app` composition scenario. **Ambiguity still withholds the route** in either install state, and no trust presentation is added |
+| ~~A colliding hit is non-selectable~~ — **reversed 2026-08-25 (round 7)** | A colliding hit **is** selectable and opens the **catalog's own detail** — the package Homebrew resolves its bare token to, and the one its own collision note names. Routability becomes **uniqueness among the emitted hits** and nothing else: rewritten selectability clause + the colliding-route paragraph, the amended collision `unit` scenario, the amended ambiguity `unit` scenario (now duplicate-only) and the amended surface-entry `unit-app` scenario, plus PD6's new `unit` scenario. **No routing branch is added** — the shipped catalog-first order already answers — the collision note is unchanged and still required, and the receipt and inventory branches are untouched. The **only** inert row left is a duplicate `PackageID` among emitted hits |
 
 ## `package-mutation`: activated, not changed — no delta
 
@@ -195,8 +214,12 @@ A `package-mutation` MODIFIED block would restate a requirement that already say
 - **A merged ranked list.** PS3's order is broken by 365-day install count, which a tap package does
   not have. The two orders stay independent, which is also what keeps the hits visibly a different kind
   of result rather than degraded catalog rows.
-- **A name-only detail pane for a not-installed hit.** Not-installed rows are non-selectable in this
-  slice; the minimal pane is a clearly scoped follow-up.
+- ~~**A name-only detail pane for a not-installed hit.** Not-installed rows are non-selectable in this
+  slice; the minimal pane is a clearly scoped follow-up.~~ — **no longer excluded: delivered in round
+  6.** The exclusion was written when the route was withheld; the maintainer reversed that and the pane
+  is in this change. Recorded here rather than deleted, because the exclusion list is the record of what
+  each slice deliberately left out and why it stopped being true. (Missed when round 6 landed; corrected
+  in round 7.)
 - **Any `SearchFilters` member for this source.** PS4's declared-filter-set scenario stays true by
   construction: this source is composed, not filtered.
 - **A `package-trust` delta.** Nothing on this surface reads, presents or decides on a grant.

@@ -1307,3 +1307,100 @@ measured total; never trim. RDD disabled. Strict TDD active.
       `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks` — the
       tasks mirror went stale in an earlier round and must not again.
 - [x] 6⁵.6 Commit `docs(sdd): record the m11-tap-search round 6 apply progress`.
+
+## Work units — round 7
+
+**Maintainer product decision, 2026-08-25 (round 7) — binding.** In “Search our taps”, a hit whose bare
+token the catalog **also** carries must be **selectable** and must open the **catalog** detail. Homebrew
+resolves the bare token to the catalog package, so the catalog pane is exactly the package the row's
+collision note says will be installed; `PackageDetailView` already resolves catalog-first, so **no new
+branch** is needed — the hit simply becomes routable by its `PackageID`. The **only** remaining inert
+case is a duplicate `PackageID` among the emitted hits (two third-party taps publishing one name,
+neither in the catalog), which nothing can disambiguate.
+
+`Packages/CellarCore/Sources/BrewClient/TapPackageSearch.swift:279` changes from
+`let routable = collides == false && unique` to `let routable = unique`. `unique` keeps being counted
+over **emitted tap hits only**, by the existing `occurrences` fold — a catalog record is not an emitted
+hit. `alsoInCatalog` stays a fact and `collisionNote` stays pinned and required.
+
+**Delivery.** `single-pr` with `size:exception` **accepted** (maintainer, 2026-08-25). Report the
+measured total; never trim. RDD disabled. Strict TDD active.
+
+| Unit | Goal | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU25** | The amended artifacts land **first** — PS8's rewritten selectability clause, its colliding-route paragraph and its corrected unreachable-note paragraph; the two amended `unit` scenarios and the amended `unit-app` scenario; PD6's colliding-selection clause, its `(Previously: …)` line and one new `unit` scenario; `specs/README.md` revision 8; `design.md` (**DD-23**, the round-7 preamble, file table and RED rows) and this file | N/A — artifacts only | N/A — no behaviour changes | Revert one docs commit; the branch returns to `6f18d2d` |
+| **WU26** | CellarCore: `routable` drops the collision conjunct; the two rows that pinned the retired rule are **replaced**; PD6's new row | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'`, then the whole package | N/A — no runtime boundary is added; the destination is the shipped catalog branch, exercised by the app harness round 6 already recorded | Revert one commit across `TapPackageSearch.swift` and one test file |
+| **WU27** | App: `TapSearchView`'s inert-row comment corrected (comment only); the `unit-app` selection-rule scan restated to duplicate-only | `xcodebuild test … -only-testing:cellarTests` | N/A — source-scan suite | Revert one commit across one app file and one test file; no behaviour line is its own |
+
+## Phase 0⁶: baselines, measured at `6f18d2d`
+
+- [x] 0⁶.1 `swift test --package-path Packages/CellarCore` — record the total before any edit.
+- [x] 0⁶.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** before any edit.
+- [x] 0⁶.3 Confirm a clean working tree; discard `cellar/InfoPlist.xcstrings` churn, never commit it.
+
+## Phase 1⁶: WU25 — the amended artifacts land first
+
+- [x] 1⁶.1 Amend `specs/package-search/spec.md`: the round-7 decision paragraph; the **rewritten
+      selectability clause** (routable **iff** the `PackageID` is unique among emitted hits, in either
+      install state and whether or not the catalog carries the token); the colliding-route paragraph
+      (same identity, same existing order, catalog-first, **no branch added**); the duplicate-only inert
+      paragraph; the narrowed receipt-branch and inventory-branch paragraphs; the corrected
+      unreachable-collision-note paragraph; the amended collision `unit` scenario, the amended
+      ambiguity `unit` scenario (now duplicate-only) and the amended surface-entry `unit-app` scenario;
+      the round-7 archive note. Class counts are **unchanged**. **Never touch `openspec/specs/**`.**
+- [x] 1⁶.2 Amend `specs/package-detail/spec.md`: PD6's boundary paragraph gains the colliding-selection
+      clause, plus its `(Previously: …)` line and one new `unit` scenario; the counts move to
+      **3 `unit` / 34 scenarios**. Pre-existing scenarios stay **byte-identical**.
+- [x] 1⁶.3 Amend `specs/README.md`: revision 8 header, the round-7 paragraph, the `package-detail`
+      arithmetic row and the totals line, the amended collision and name-only-note pinned-copy rows, the
+      new reversed presentation-decision row, and the corrected one-catalog-read paragraph.
+- [x] 1⁶.4 Amend `design.md`: **DD-23** new; the round-7 preamble; **DD-4**'s collision clause struck;
+      the round-7 file-changes table and RED rows with the honesty note.
+- [x] 1⁶.5 Append this phase to `tasks.md`.
+- [x] 1⁶.6 Commit `docs(sdd): amend m11-tap-search so colliding tap hits open the catalog detail`.
+
+## Phase 2⁶: WU26 — the routability rule (RED → GREEN)
+
+- [ ] 2⁶.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: **replace**
+      `aCollidingHitIsShownAndIsNotRoutable` with `aCollidingHitIsShownAndIsRoutable`, and
+      `anAmbiguousHitIsNotRoutableInEitherInstallState` with
+      `onlyADuplicatedIdentityWithholdsTheRoute`; move the two `routableID == nil` lines inside
+      `aCollidingCatalogReceiptIsNeverAttachedToATapRow` and leave everything else in it byte-identical;
+      keep `twoTapsPublishingOneNameAreBothUnroutable` untouched. Add PD6's
+      `aCollidingSelectionResolvesToTheCatalogsOwnRecord`. Confirm the failures are **assertion**
+      failures on the reversed expectations.
+- [ ] 2⁶.2 **GREEN** in `TapPackageSearch.swift`: `let routable = unique`, and restate the comment above
+      it — the bar is a duplicated identity, not a collision.
+- [ ] 2⁶.3 `swift test --package-path Packages/CellarCore` whole against the phase-0⁶ baseline.
+- [ ] 2⁶.4 Commit `feat(search): route a colliding tap hit to the catalog detail it resolves to`.
+
+## Phase 3⁶: WU27 — the app surface and its guard
+
+- [ ] 3⁶.1 Verify `cellar/Browse/TapSearchView.swift` needs no behaviour change: selection is gated on
+      `if let routable = hit.routableID` and nothing else. Correct the inert-row **comment** only — the
+      collision is no longer a bar.
+- [ ] 3⁶.2 `cellarTests/TapSearchCompositionTests.swift`: restate
+      `theTapSearchSurfaceSelectsOnRoutabilityAlone`'s recorded reason to duplicate-only; keep the
+      forbidden-token list (including `alsoInCatalog`) and the catalog-first order assertion unchanged.
+- [ ] 3⁶.3 Prove RED by **reversible mutation**: restore `collides == false &&` in the projection.
+      Restore byte-identically and verify with `shasum -a 256 -c`.
+- [ ] 3⁶.4 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [ ] 3⁶.5 Commit `test(taps): pin that colliding tap rows open the catalog detail`.
+
+## Phase 6⁶: Verification and bindings (round 7)
+
+- [ ] 6⁶.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁶ baseline.
+- [ ] 6⁶.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+      phase-0⁶ baseline. **Redirect with `> log 2>&1`, never `tee`.** Count distinct ids by membership
+      of each recovered quoted id against the cleanly parsed set: one line per run is corrupted by an
+      interleaved status line. The full `-scheme cellar` runner is **not** the gate.
+- [ ] 6⁶.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+      `cellar/Browse/PackageDetailView.swift` **unchanged this round** against `6f18d2d`;
+      `cellar/Activity/MutationMenu.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`,
+      `PackageSearchIndex.swift`, `MutationCommand.swift` and `cellarUITests/` must print **nothing**
+      under `git diff --stat main --`.
+- [ ] 6⁶.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+      `size:exception`; never trim.
+- [ ] 6⁶.5 Merge the round-7 section into `apply-progress.md`, re-mirror it to Engram topic
+      `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks`.
+- [ ] 6⁶.6 Commit `docs(sdd): record the m11-tap-search round 7 apply progress`.
