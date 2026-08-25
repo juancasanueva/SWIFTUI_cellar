@@ -42,6 +42,34 @@ import Foundation
 ///    unreadable, future-dated, or never read — is not evidence: the card must
 ///    never appear on the strength of a question that was not answered.
 nonisolated enum HomebrewUpdateNeed {
+    /// What the Home page's Update Homebrew card says.
+    ///
+    /// The card is always on the page — `brew update` is the only way to
+    /// learn whether brew is behind, so an affordance gated on that evidence
+    /// would hide the very action that produces it. `isBehind` therefore
+    /// chooses the wording and the emphasis, never the card's existence.
+    struct Copy: Equatable {
+        let title: String
+        let sub: String
+        /// Whether the evidence warrants the accent dress over the neutral one.
+        let isEmphasized: Bool
+    }
+
+    static func copy(behind: Bool) -> Copy {
+        if behind {
+            return Copy(
+                title: "Homebrew is behind what's published",
+                sub: "Run brew update to refresh available versions and taps · installs nothing",
+                isEmphasized: true
+            )
+        }
+        return Copy(
+            title: "Homebrew learns about new versions from brew update",
+            sub: "Refreshes available versions and taps · installs nothing",
+            isEmphasized: false
+        )
+    }
+
     /// - Parameters:
     ///   - catalogVersion: the synced catalog's published version for a
     ///     package, or `nil` when the catalog has no answer for it.
