@@ -22,7 +22,14 @@
 #   ASC_KEY_ID         App Store Connect API key id
 #   ASC_ISSUER_ID      App Store Connect issuer id
 #                      — notarize, and archive/export when SIGNING_STYLE=automatic
-#   SIGNING_STYLE      automatic (default) or manual
+#   SIGNING_STYLE      manual (default) or automatic
+#
+# Signing style: `manual` signs the archive directly with the Developer ID
+# Application identity already present in the keychain and asks Apple for
+# nothing. `automatic` lets Xcode manage signing through the App Store Connect
+# key, which on a fresh CI runner mints a new "Created via API" Mac Development
+# certificate on every run; Apple caps those at ten per team, and the v1.4.0
+# release failed against that cap until ten of them were revoked by hand.
 #   RELEASE_BUILD_DIR  output root, default "build" (excluded from the repository)
 
 set -euo pipefail
@@ -45,7 +52,7 @@ cd "$REPO_ROOT"
 
 VERSION="${VERSION:-}"
 BUILD_NUMBER="${BUILD_NUMBER:-}"
-SIGNING_STYLE="${SIGNING_STYLE:-automatic}"
+SIGNING_STYLE="${SIGNING_STYLE:-manual}"
 BUILD="${RELEASE_BUILD_DIR:-build}"
 
 ARCHIVE_PATH="$BUILD/$SCHEME.xcarchive"
@@ -55,6 +62,7 @@ VERIFY_DIR="$BUILD/verify"
 VERIFIED_APP="$VERIFY_DIR/$PRODUCT.app"
 ZIP=""
 SIGN_FLAGS=()
+ARCHIVE_SETTINGS=()
 
 usage() {
 	cat >&2 <<'USAGE'
@@ -92,10 +100,18 @@ expect_equal() {
 	fi
 }
 
-# DD-5: automatic signing needs the App Store Connect key; manual signing is the
-# pre-authorized fallback and simply omits the flags.
+# DD-5: manual signing overrides the project's `CODE_SIGN_STYLE = Automatic`
+# on the archive line and pins the Developer ID identity, so the archive is
+# signed with the imported certificate and never with a freshly minted
+# Development one. Automatic signing needs the App Store Connect key instead.
+# The export options plist carries the matching `signingStyle`; the two must
+# agree, so `SIGNING_STYLE` is checked against it before xcodebuild runs.
 configure_signing() {
 	SIGN_FLAGS=()
+	ARCHIVE_SETTINGS=()
+	expect_equal \
+		"$(plutil -extract signingStyle raw -o - "$EXPORT_OPTIONS")" \
+		"$SIGNING_STYLE" "signingStyle in $EXPORT_OPTIONS"
 	case "$SIGNING_STYLE" in
 	automatic)
 		require_env ASC_KEY_PATH ASC_KEY_ID ASC_ISSUER_ID
@@ -106,7 +122,13 @@ configure_signing() {
 			-authenticationKeyIssuerID "$ASC_ISSUER_ID"
 		)
 		;;
-	manual) ;;
+	manual)
+		ARCHIVE_SETTINGS=(
+			CODE_SIGN_STYLE=Manual
+			"CODE_SIGN_IDENTITY=Developer ID Application"
+			"DEVELOPMENT_TEAM=$TEAM_ID"
+		)
+		;;
 	*) fail "SIGNING_STYLE must be 'automatic' or 'manual', not '$SIGNING_STYLE'" ;;
 	esac
 }
@@ -128,6 +150,7 @@ phase_archive() {
 		ONLY_ACTIVE_ARCH=NO \
 		MARKETING_VERSION="$VERSION" \
 		CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+		${ARCHIVE_SETTINGS[@]+"${ARCHIVE_SETTINGS[@]}"} \
 		${SIGN_FLAGS[@]+"${SIGN_FLAGS[@]}"}
 }
 

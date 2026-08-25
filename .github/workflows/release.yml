@@ -120,30 +120,27 @@ jobs:
           chmod 600 "$RUNNER_TEMP/asc.p8"
           security find-identity -v -p codesigning "$KEYCHAIN"   # identity names only
 
-      # The three App Store Connect bindings are repeated verbatim per step
-      # rather than shared through a YAML anchor (&asc / *asc): GitHub Actions
-      # does not support anchors reliably across all workflow contexts, and a
-      # silently dropped alias would strip the credentials from a step. Six
-      # repeated lines are cheaper than that failure mode.
+      # Archive and export sign manually with the Developer ID certificate
+      # imported above and never see the App Store Connect key. Automatic
+      # signing would hand that key to Xcode, which on a fresh runner mints a
+      # new "Created via API" Mac Development certificate every run; Apple
+      # caps those at ten per team, and v1.4.0 failed against that cap until
+      # ten were revoked by hand. Only notarization needs the key.
       - name: Archive
-        env:                                  # ids are not secret material; the key is a path
-          ASC_KEY_PATH: ${{ runner.temp }}/asc.p8
-          ASC_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        env:
+          SIGNING_STYLE: manual
         run: scripts/release.sh archive
 
       - name: Export and gate version and architecture
         env:
-          ASC_KEY_PATH: ${{ runner.temp }}/asc.p8
-          ASC_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          SIGNING_STYLE: manual
         run: scripts/release.sh export
 
       - name: Package
         run: scripts/release.sh package
 
       - name: Notarize
-        env:
+        env:                                  # ids are not secret material; the key is a path
           ASC_KEY_PATH: ${{ runner.temp }}/asc.p8
           ASC_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
