@@ -1150,3 +1150,128 @@ still round 2's **`6′.7`**, deferred by this run's explicit instruction not to
 pull request. Round 7's ledger is unchanged at 24 of 24, round 6's at 25 of 25, round 5's at 19 of 19,
 round 4's at 22 of 22, round 3's at 24 of 24, round 2's at 55 of 56, and round 1's 59 boxes are
 unchanged history with `6.7` void.
+
+# Round 9 — icon tiles on tap rows
+
+**Change**: `m11-tap-search` · **Mode**: Strict TDD · **Round 9** (maintainer UI feedback, final)
+**Branch**: `feat/m11-tap-search`, from `2548e40`. **Delivery**: `single-pr` with `size:exception`
+**accepted** (maintainer, 2026-08-25) — the measured total is reported below and is **not** trimmed.
+RDD disabled. Not pushed; no pull request opened.
+
+**The instruction.** In the “Search our taps” list the rows must show the **same leading icon tile
+Browse rows show** — the default formula glyph for formulae, the default colour + initial letter tile
+for casks. `PackageRow.swift:34` and `InstalledRow.swift:34` both draw
+`PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)`; `TapSearchView`'s row drew no
+tile at all.
+
+## Phase 0⁸ — baselines, measured at `2548e40`
+
+| Gate | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **`Test run with 1879 tests in 218 suites passed`**, 1 known issue → baseline **1,879** |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`** → baseline **261 distinct ids** (260 cleanly parsed; one lost to an interleaved `xcodebuild` status line that truncated it to `Test case 'Brewfil…`, recovered by membership from the final run as `BrewfileCompositionTests/missingRowsArriveSelectedAndPresentRowsAreNot()`) |
+| Working tree | clean; `cellar/InfoPlist.xcstrings` churn discarded before any edit and never committed |
+
+## Work units — round 9
+
+| Unit | Commit | What landed |
+|---|---|---|
+| **WU31** | `db5d2f7` `docs(sdd): amend m11-tap-search so tap rows carry the shared icon tile` | PS8's new leading-tile clause and its **new** `unit-app` scenario (the delta's only count movement: 22 → **23** added, 41 → **42** scenarios, `unit-app` 8 → **9**); `specs/README.md` revision **10** with the re-footed arithmetic and the new decision row; `design.md` **DD-25**, the round-9 preamble, file table and RED rows; `tasks.md` round 9 |
+| **WU32** | `2e0d5c9` `feat(taps): draw the shared package icon tile on tap search rows` | `TapSearchView` gains `var assets: CaskBrowseAssets?` and `var iconLoader: CaskIconLoader?`; `row(_:)` binds the entry once, nests an `HStack(spacing: 10)` and draws the shared tile first; `MutationMenu` takes the same bound entry; `ContentView`'s one call site passes `caskAssets` / `caskIcons` |
+| **WU33** | `e5939d6` `test(taps): pin the shared icon tile on tap search rows` | `bothSearchSurfacesDrawTheOneSharedIconTile` — the guard |
+
+## Phase 2⁸.1 — the component's fallback, verified before it was relied on
+
+The brief asked what `PackageIconTile` renders for a tap cask with **no** catalog record, and said to
+fix the fallback minimally if it did not degrade to the letter tile. It was read, not assumed:
+
+1. `PackageIconTile` (`cellar/Casks/CaskIconView.swift:68-95`) branches on `id.kind` **only** — never on
+   a catalog record. A `.formula` takes `FormulaIconTile(size:)`, the bundled glyph, unconditionally.
+2. A `.cask` with a non-`nil` loader takes `CaskIconView`, passing
+   `isKnownToken: assets?.isKnownIconToken(id.name) ?? false` — `false` both for an unloaded catalog and
+   for a token the catalog does not list, which is every third-party tap cask.
+3. `CaskIconURL.candidateURLs(for:isKnownToken: false)` drops the two CaskFlow rungs and returns the
+   App-Fair URL alone; a miss is stamped and answers `nil`.
+4. `CaskIconView`'s `nil`-icon branch renders `PackageTile(name: token, …)` — the **coloured initial
+   tile**, which is exactly the required default.
+
+**No fix was required, and `cellar/Casks/**` carries a zero-line diff this round.** The letter tile for
+a tap cask is the component's designed answer, not a degradation.
+
+## TDD Cycle Evidence — round 9
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 3⁸.1 the shared icon tile on the tap rows | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ 261 distinct ids at `2548e40`; the suite's other 15 rows green | ✅ **written first, before any production edit**, and a **genuine** RED rather than a mutation one: `** TEST FAILED **` with **6** recorded issues in exactly one row — the absent call text, the absent `let entry = entry(for: hit)`, the absent `MutationMenu(center: operations, entry: entry)`, both absent property declarations, and the leading-position `#require` throwing. The other **15** rows passed | ✅ after `2e0d5c9` the whole suite is `** TEST SUCCEEDED **`, 16/16 rows | ✅ **one reversible mutation**: the tile replaced by `Image(systemName: "shippingbox")` → **3** recorded issues at once — the call-text equality, the no-local-artwork prohibition and the leading-position `#require`. Restored and verified `shasum -a 256 -c` → `cellar/Browse/TapSearchView.swift: OK` |  ✅ the prohibition loop was **moved above** the first `#require` after the first mutation run proved it unreachable behind a throw (see deviation 2), and the row re-run green before the mutation was repeated |
+
+### Test summary — round 9
+
+- **Tests written**: 1 **new** (`bothSearchSurfacesDrawTheOneSharedIconTile`). None replaced, none deleted.
+- **Counts**: CellarCore **1,879 → 1,879** (±0 — round 9 touches no CellarCore file, proven by an empty
+  `git diff --stat 2548e40 -- Packages/CellarCore`). `cellarTests` **261 → 262**, the set difference
+  being **exactly** the one new id.
+- **Layers used**: `unit-app` (1 new), Unit (0 — nothing in CellarCore moves).
+- **Pure functions created**: 0. **Visibility relaxed**: 0. **Components edited**: 0 — the tile, its
+  loader, its asset store and its URL ladder are all untouched.
+
+## Phase 6⁸ — verification and bindings
+
+| Gate | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **`Test run with 1879 tests in 218 suites passed`**, 1 known issue (baseline **1,879** → **±0**) |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 262 distinct test ids**, 0 failures (baseline **261** → **+1**). 261 ids parsed cleanly; the run lost one to an interleaved status line (`Test case 'BrewfileCompositionTests/aTrustedClaimIsSurfa…`), recovered by membership from the baseline's clean set. Each run's lost id is present in the other run's clean set, so both runs provably enumerate their full totals. `comm` over the two clean sets shows exactly one genuine addition: `TapSearchCompositionTests/bothSearchSurfacesDrawTheOneSharedIconTile()` — the +1 `unit-app` scenario, and nothing else |
+| `xcodebuild build …` | **`** BUILD SUCCEEDED **`** |
+| Bindings — unchanged since `2548e40` | `git diff --stat 2548e40 --` printed **nothing** for `cellar/Browse/PackageRow.swift`, `cellar/Browse/BrowseView.swift`, `cellar/Activity/MutationMenu.swift`, **the whole of `cellar/Casks/`** (so `PackageIconTile`, `CaskIconView`, `CaskIconLoader` and `CaskBrowseAssets` are provably unedited), `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `cellarUITests/` and `Packages/CellarCore/` (which carries `PackageSearchIndex.swift` and `MutationCommand.swift`) |
+| Bindings — zero-diff vs `main` | `git diff --stat main --` printed **nothing** for `cellar/Browse/BrowseView.swift` (**DD-8**, eighth round running), `cellar/Activity/MutationMenu.swift`, `cellar/Casks/`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `Packages/CellarCore/Sources/Catalog/PackageSearchIndex.swift`, `Packages/CellarCore/Sources/BrewClient/MutationCommand.swift` and `cellarUITests/`. **`cellar/Browse/PackageRow.swift` is the one exception, and it is not round 9's** — see deviation 1 |
+| `PackageIconTile` fallback diff | **None.** The component required no fix; the round-9 diff under `cellar/Casks/` is zero lines |
+| Files changed this round (`2548e40..HEAD`) | **7 files, +396 / −50** — of which 4 are docs artifacts (**+217 / −10**). The production diff is **two files, +75 / −40**, and `TapSearchView.swift` alone is **+73 / −40** raw but **+35 / −2** ignoring whitespace: 38 of those lines are the re-indentation the nested `HStack` forces (deviation 3) |
+| `git diff --shortstat main...HEAD` | **33 files changed, 10,930 insertions(+), 93 deletions(-)** — **11,023 changed lines**, measured at `e5939d6`, i.e. the commit immediately **before** this record. Reported under the accepted `size:exception` and **not trimmed**. Adding this record itself takes it to **+11,060 / −93 = 11,153** (measured after the commit, not estimated before it); both figures are given because a progress record cannot measure itself without circularity, and rounds 2–8 all used the same before-the-record convention |
+| Working tree | clean; no `cellar/InfoPlist.xcstrings` churn appeared this round and none was committed |
+
+## Deviations — round 9 (reported, not absorbed)
+
+1. **`cellar/Browse/PackageRow.swift` is *not* zero-diff against `main`, and the brief's bindings list
+   said it should be.** It carries **+6 / −27** against `main`, entirely from **round 3**'s commit
+   `30608ab`, which extracted the row's private `statusPill(_:background:foreground:)` into the shared
+   `StatusPill` component so both search surfaces could draw one installed mark. That is the diff **DD-18**
+   exists to have produced. Round 9 touches the file not at all: `git diff --stat 2548e40 -- cellar/Browse/PackageRow.swift`
+   prints nothing. The honest binding for this round is therefore "**unchanged since `2548e40`**", which
+   holds, and the "zero-diff vs `main`" phrasing is recorded here as inapplicable to that one file rather
+   than quietly satisfied. Every other file on the list *is* zero-diff against `main`.
+2. **The first mutation run proved less than the design claimed, and the test was fixed rather than the
+   claim softened.** The design's RED row said the mutation must fail "the call-text equality *and* the
+   no-local-image prohibition". The first run recorded only **2** issues, because the prohibition loop sat
+   **after** `try #require(surface.code.range(of: call))` — which throws under the mutation and ends the
+   row before the loop runs. A prohibition reachable only while the file is already correct proves
+   nothing. The loop was moved above the `#require`, the row re-run green, and the mutation repeated:
+   **3** issues, the prohibition among them. `design.md` and `tasks.md` were corrected in the commit that
+   carries this record, and the sequence is reported rather than presented as having worked first time.
+3. **`TapSearchView.swift`'s diff is far larger than the design's `+14 / −4` estimate, and almost all of
+   it is whitespace.** Measured **+73 / −40**; `git diff -w` measures **+35 / −2**. The gap is the
+   re-indentation forced by nesting the row's text column inside a new `HStack(spacing: 10)`. The nesting
+   itself is deliberate: `PackageRow` puts **10** points between the tile and the name while the tap row's
+   outer stack uses **6** for the menu, so flattening would have drawn the tile 4 points closer to the
+   name than the surface it is copying — a visible mismatch on the one thing this round exists to match.
+   The file table now records the measured figure and its whitespace share.
+4. **The forbidden-token list had to exclude `systemImage:`, which the design and tasks first named.**
+   `TapSearchEmptyState` has passed `systemImage:` to `ContentUnavailableView` since round 2; forbidding
+   it would have failed the row on shipped, correct code. The list is `Image(`, `PackageTile(`,
+   `FormulaIconTile(`, `CaskIconView(`, `Theme.tile(` — every way this file could draw artwork itself,
+   and no way it could not. Corrected in both artifacts, with the reason stated in the test's own comment.
+5. **No `.task { await assets?.load() }` was added, unlike `BrowseView`.** Two reasons, both binding:
+   PS8's process-layer scenario scans this exact file for `.task`, `await ` and `async ` (**DD-12**), and
+   the asset catalog gates only the CaskFlow rungs for tokens it lists — never a third-party tap's cask —
+   so the load would change no pixel on this surface. The store is handed through and the component asks;
+   every other cask surface already calls the idempotent `load()`.
+6. **`WU32` shipped before `WU33` in commit order, and the test was still written first.** The guard row
+   was authored and run to a genuine 6-issue RED **before** any production line existed; it was committed
+   after the feature so that each commit carries one kind of change. Authoring order and commit order are
+   independent, and this record says which is which rather than letting the log imply the tests came last.
+
+## Task ledger
+
+**Round 9: 24 of 24 complete.** Round 9 has **no** delivery task — the branch's one open delivery box is
+still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
+pull request. Round 8's ledger is unchanged at 26 of 26, round 7's at 24 of 24, round 6's at 25 of 25,
+round 5's at 19 of 19, round 4's at 22 of 22, round 3's at 24 of 24, round 2's at 55 of 56, and round 1's
+59 boxes are unchanged history with `6.7` void.

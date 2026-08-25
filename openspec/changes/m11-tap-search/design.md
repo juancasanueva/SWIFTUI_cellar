@@ -464,9 +464,9 @@ of the new one. Both are restored byte-identically and verified with `shasum -a 
 
 | File | Action | Est. delta | Description |
 |---|---|---|---|
-| `cellar/Browse/TapSearchView.swift` | Modify | +14 / −4 | **DD-25**: `var assets: CaskBrowseAssets?` and `var iconLoader: CaskIconLoader?` join the surface's properties between `operations` and the selection binding, exactly where `BrowseView` declares them; `row(_:)` binds the entry once, nests an `HStack(spacing: 10)` and draws `PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)` first; the preview is unchanged, because both properties are optional |
+| `cellar/Browse/TapSearchView.swift` | Modify | **measured +73 / −40**, of which **+35 / −2** is not whitespace | **DD-25**: `var assets: CaskBrowseAssets?` and `var iconLoader: CaskIconLoader?` join the surface's properties between `operations` and the selection binding, exactly where `BrowseView` declares them; `row(_:)` binds the entry once, nests an `HStack(spacing: 10)` and draws `PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)` first; the preview is unchanged, because both properties are optional |
 | `cellar/ContentView.swift` | Modify | +2 / −0 | **DD-25**: the one `TapSearchView(` call site gains `assets: caskAssets` and `iconLoader: caskIcons` — the identical pair it already passes to `BrowseView` two cases above |
-| `cellarTests/TapSearchCompositionTests.swift` | Modify | +45 / −0 | PS8's new icon-tile scenario, as one new `unit-app` row |
+| `cellarTests/TapSearchCompositionTests.swift` | Modify | **measured +104 / −0** | PS8's new icon-tile scenario, as one new `unit-app` row |
 | `cellar/Casks/CaskIconView.swift` | **Untouched** | **0** | **DD-25**: `PackageIconTile`'s cask branch already degrades to the coloured initial tile for a token the registries do not carry, and its formula branch is unconditional. No fallback fix was required — verified by reading the branch, not assumed |
 | `cellar/Casks/CaskIconLoader.swift`, `cellar/Casks/CaskBrowseAssets.swift`, `Packages/CellarCore/Sources/Catalog/CaskBrowse/CaskIconURL.swift` | **Untouched** | **0** | The pipeline is consumed, never edited. `candidateURLs(for:isKnownToken: false)` is App-Fair alone, and its miss is the letter tile |
 | `cellar/Browse/PackageRow.swift` | **Untouched** | **0** | It is the *anchor* of the claim: the tap row's call must match its line 34 |
@@ -488,15 +488,17 @@ calls `load()`, and it is idempotent.
 
 | Class | Test | What it proves |
 |---|---|---|
-| `unit-app` | `bothSearchSurfacesDrawTheOneSharedIconTile` (**new**) | PS8's new scenario: `PackageIconTile` is declared exactly once in the whole tree; `PackageRow.swift` and `TapSearchView.swift` both contain the identical call text `PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)`; the tap surface declares both optional properties with `BrowseView`'s own spellings; the tile precedes the name and the kind chip by range comparison; the surface composes no `Image(`, `systemImage:`, `PackageTile(`, `FormulaIconTile(` or `CaskIconView(` of its own; `ContentView`'s one `TapSearchView(` call site — scoped by `callSite(_:in:)`, because `assets: caskAssets` appears at a dozen call sites in that file — passes `assets: caskAssets` and `iconLoader: caskIcons`, and its `BrowseView(` call site passes the same pair, so "the same pipeline" is proven against Browse rather than asserted; and `BrowseView.swift` is still free of every tap token |
+| `unit-app` | `bothSearchSurfacesDrawTheOneSharedIconTile` (**new**) | PS8's new scenario: `PackageIconTile` is declared exactly once in the whole tree; `PackageRow.swift` and `TapSearchView.swift` both contain the identical call text `PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)`; the tap surface declares both optional properties with `BrowseView`'s own spellings; the tile precedes the name and the kind chip by range comparison; the surface composes no `Image(`, `PackageTile(`, `FormulaIconTile(`, `CaskIconView(` or `Theme.tile(` of its own — asserted **before** the first `#require`, so a throw cannot skip the prohibition, and deliberately excluding `systemImage:`, which is `ContentUnavailableView`'s own parameter in the empty state; `ContentView`'s one `TapSearchView(` call site — scoped by `callSite(_:in:)`, because `assets: caskAssets` appears at a dozen call sites in that file — passes `assets: caskAssets` and `iconLoader: caskIcons`, and its `BrowseView(` call site passes the same pair, so "the same pipeline" is proven against Browse rather than asserted; and `BrowseView.swift` is still free of every tap token |
 | `unit-app` | `neitherTapSearchFileReachesTheProcessLayer` (**unchanged, and now load-bearing in a second way**) | **DD-12** survives the round: its `.task` / `await ` / `async ` prohibition is what forbids copying `BrowseView`'s asset-load hop into this file, so the row that was a manners rule is now the rule that shapes the implementation |
 | `unit-app` | `theTapSurfaceMirrorsBrowsesComposition` (**unchanged**) | The shared-component list it already scans is unaffected; the tile joins it as its own row rather than by widening a list whose failure message would then name the wrong thing |
 
 **One mutation, reversible and `unit-app`.** Replacing the tile with a local
-`Image(systemName: "shippingbox")` must fail two assertions in the new row at once — the call-text
-equality *and* the no-local-image prohibition — which is the point: the row bites both on the shared
-component's absence and on a lookalike's presence. Restored byte-identically and verified with
-`shasum -a 256 -c`.
+`Image(systemName: "shippingbox")` must fail **three** assertions in the new row at once — the
+call-text equality, the no-local-image prohibition and the leading-position `#require` — which is the
+point: the row bites both on the shared component's absence and on a lookalike's presence. The
+prohibition is asserted **before** that `#require` precisely so the mutation reaches it; behind a throw
+it would only ever run while the file was already correct, which is when it can prove nothing. Restored
+byte-identically and verified with `shasum -a 256 -c`.
 
 ## Removal plan (explicit, per the scope change)
 

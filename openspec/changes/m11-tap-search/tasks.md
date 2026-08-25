@@ -1559,51 +1559,54 @@ measured total; never trim. RDD disabled. Strict TDD active.
 
 ## Phase 2⁸: WU32 — the shared tile on the row
 
-- [ ] 2⁸.1 **Verify the component's fallback before relying on it**: read `PackageIconTile`'s cask
+- [x] 2⁸.1 **Verify the component's fallback before relying on it**: read `PackageIconTile`'s cask
       branch, `CaskIconView`'s `nil`-icon branch and `CaskIconURL.candidateURLs(for:isKnownToken:)`, and
       state what an unknown tap cask renders. Fix the component **only** if it does not already degrade
       to the letter tile, and report the diff if so.
-- [ ] 2⁸.2 `TapSearchView` gains `var assets: CaskBrowseAssets?` and `var iconLoader: CaskIconLoader?`,
+- [x] 2⁸.2 `TapSearchView` gains `var assets: CaskBrowseAssets?` and `var iconLoader: CaskIconLoader?`,
       declared between `operations` and the selection binding, spelled as `BrowseView` spells them.
-- [ ] 2⁸.3 `row(_:)` binds `let entry = entry(for: hit)` once, nests an `HStack(spacing: 10)` and draws
+- [x] 2⁸.3 `row(_:)` binds `let entry = entry(for: hit)` once, nests an `HStack(spacing: 10)` and draws
       `PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)` before the name column;
       `MutationMenu` takes the same bound entry. No `.task`, no `await`, no `async`.
-- [ ] 2⁸.4 `ContentView`'s one `TapSearchView(` call site gains `assets: caskAssets` and
+- [x] 2⁸.4 `ContentView`'s one `TapSearchView(` call site gains `assets: caskAssets` and
       `iconLoader: caskIcons`.
-- [ ] 2⁸.5 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
-- [ ] 2⁸.6 Commit `feat(taps): draw the shared package icon tile on tap search rows`.
+- [x] 2⁸.5 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [x] 2⁸.6 Commit `feat(taps): draw the shared package icon tile on tap search rows`.
 
 ## Phase 3⁸: WU33 — the composition guard
 
-- [ ] 3⁸.1 `cellarTests/TapSearchCompositionTests.swift`: new row
+- [x] 3⁸.1 `cellarTests/TapSearchCompositionTests.swift`: new row
       `bothSearchSurfacesDrawTheOneSharedIconTile` — `PackageIconTile` declared exactly once tree-wide;
       the identical call text in `PackageRow.swift` and `TapSearchView.swift`; both property
       declarations present; the tile before the name and the kind chip by range comparison; no local
-      `Image(`, `systemImage:`, `PackageTile(`, `FormulaIconTile(` or `CaskIconView(`; both
+      `Image(`, `PackageTile(`, `FormulaIconTile(`, `CaskIconView(` or `Theme.tile(` — **not**
+      `systemImage:`, which is `ContentUnavailableView`'s own parameter in the empty state and has
+      been there since round 2 — and asserted **before** the first `#require`, so a throw cannot
+      skip it; both
       `ContentView` call sites scoped with `callSite(_:in:)` and carrying the same pair; `BrowseView`
       still free of every tap token.
-- [ ] 3⁸.2 Prove RED by one reversible mutation: replace the tile with a local
+- [x] 3⁸.2 Prove RED by one reversible mutation: replace the tile with a local
       `Image(systemName: "shippingbox")`. Restore byte-identically and verify with `shasum -a 256 -c`.
-- [ ] 3⁸.3 Confirm `PerPackageTrustCompositionTests`'s `views()` list is **unchanged** — no app-target
+- [x] 3⁸.3 Confirm `PerPackageTrustCompositionTests`'s `views()` list is **unchanged** — no app-target
       file is created this round.
-- [ ] 3⁸.4 Commit `test(taps): pin the shared icon tile on tap search rows`.
+- [x] 3⁸.4 Commit `test(taps): pin the shared icon tile on tap search rows`.
 
 ## Phase 6⁸: Verification and bindings (round 9)
 
-- [ ] 6⁸.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁸
+- [x] 6⁸.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁸
       baseline. **Expected ±0**: round 9 touches no CellarCore file.
-- [ ] 6⁸.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+- [x] 6⁸.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
       phase-0⁸ baseline. **Redirect with `> log 2>&1`, never `tee`.** Count distinct ids by membership
       of each recovered quoted id against the cleanly parsed set. The full `-scheme cellar` runner is
       **not** the gate.
-- [ ] 6⁸.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+- [x] 6⁸.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
       `cellar/Activity/MutationMenu.swift`, `cellar/Browse/PackageRow.swift`,
       `cellar/Casks/CaskIconView.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`,
       `PackageSearchIndex.swift`, `MutationCommand.swift` and `cellarUITests/` must print **nothing**
       under `git diff --stat main --`. If `PackageIconTile`'s fallback had to change, report that diff
       explicitly instead.
-- [ ] 6⁸.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+- [x] 6⁸.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
-- [ ] 6⁸.5 Merge the round-9 section into `apply-progress.md`, re-mirror it to Engram topic
+- [x] 6⁸.5 Merge the round-9 section into `apply-progress.md`, re-mirror it to Engram topic
       `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks`.
-- [ ] 6⁸.6 Commit `docs(sdd): record the m11-tap-search round 9 apply progress`.
+- [x] 6⁸.6 Commit `docs(sdd): record the m11-tap-search round 9 apply progress`.
