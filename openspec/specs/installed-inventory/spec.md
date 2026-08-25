@@ -756,9 +756,20 @@ Where the reduced detail is presented:
   presenting surface MUST NOT compose that copy locally. Where the tap of origin is absent, the
   identity cannot be established exactly, so the marker MUST be absent too — and its absence MUST NOT
   be marked, muted or explained.
-- The surface MUST offer the **same mutation verbs** the installed list row offers for the same
-  package, obtained from the same shared mutation surface, so the two cannot drift. No verb MUST be
-  re-implemented for this surface.
+- The surface MUST present its mutation verbs as the **same Actions section the catalog detail pane
+  presents**, obtained from that **one shared component** rather than restated here, so the two panes
+  cannot drift. That section MUST render each applicable verb as its own labelled button, MUST show the
+  primary `brew …` command beneath them together with the shared copy affordance, and MUST carry the
+  shared runner-unavailable guidance when there is no runner. It MUST sit at the **bottom of the pane**,
+  after the pane's own facts and footer content, exactly where the catalog pane places it. The pane's
+  identity header MUST carry **no** mutation menu and no mutation button in its primary slot: one pane
+  offers exactly one place to act. No verb, no argv and no applicability rule MUST be re-implemented for
+  this surface.
+  (Previously: the clause required the same verbs "obtained from the same shared mutation surface" as
+  the installed **list row** — the `⋯` menu — which this pane rendered in its header's primary-button
+  slot. The verbs were right and the presentation was not: the catalog pane answers the same question
+  with a labelled Actions section at the foot of the pane, so two detail panes offered one package's
+  verbs in two shapes and two places.)
 - The surface MUST offer **no trust control**: nothing on it MUST grant, revoke or alter a tap trust or
   a per-package grant, and nothing MUST state or imply that the package is untrusted, unverified,
   unsigned or unnotarized.
@@ -861,14 +872,21 @@ Where the reduced detail is presented:
   surface itself
 - Verification: `unit-app`
 
-#### Scenario: The surface offers the installed row's verbs and no trust control
+#### Scenario: The surface offers the catalog pane's Actions section and no trust control
 
 - GIVEN a package the catalog does not carry, presented as a reduced detail
 - WHEN every control on that surface is enumerated
-- THEN its mutation verbs are exactly those the installed list row offers for that package, obtained
-  from the same shared mutation surface
+- THEN its mutation verbs are exactly those the catalog detail pane's Actions section offers for that
+  package, obtained from that one shared component, with the primary `brew …` command and its copy
+  affordance coming from the same component and worded nowhere on this pane
+- AND the pane's identity header carries no mutation menu and no mutation button, and the pane declares
+  no verb label, no command family and no mutation target of its own
 - AND no control grants, revokes or alters a tap trust or a per-package grant
 - Verification: `unit-app`
+  (Previously: the scenario read “The surface offers the installed row's verbs and no trust control”
+  and asserted the verbs were "exactly those the installed list row offers … obtained from the same
+  shared mutation surface", which pinned the `⋯` menu and its header slot. The trust half is
+  byte-unchanged.)
 
 #### Scenario: The catalog-miss copy stays scoped to the catalog
 
@@ -1182,4 +1200,48 @@ Where the reduced detail is presented:
     delta's own class table is delta-local provenance and stayed in the archived delta; only the
     per-scenario inline `- Verification:` lines promoted, following the precedent this file records
     for `m7-tap-trust` above.
+  - The archived delta spec is the verbatim audit trail.
+- **Amended by change `m11-tap-search`** (archived `2026-08-25` —
+  `openspec/changes/archive/2026-08-25-m11-tap-search/`), **1 MODIFIED (II15), 0 added, 0 removed, 0
+  renamed** — **15 req / 79 sc → 15 req / 79 sc**. The scenario count is deliberately unmoved: round 8
+  changed how II15's verbs are *presented*, and the scenario that owned that claim was amended in place
+  rather than joined by a second one restating it. `rules.archive`'s destructive-delta warning did not
+  fire. II1–II14 are **byte-identical**, and **11 of II15's 12 scenarios are reproduced byte-identical**
+  — verified at archive by byte-slicing against a pre-merge copy (empty diffs), with the trailing
+  `## Provenance` section and its archive notes proven untouched by the same method. The promoted block
+  is byte-identical to
+  `openspec/changes/archive/2026-08-25-m11-tap-search/specs/installed-inventory/spec.md:39-252` (empty
+  diff). Delivered in PR **#77**, merged `2026-08-25` at `2d96b1d`.
+  - **This block is *not* a byte-true superset, and the delta says so up front.** Exactly two regions
+    changed: II15's mutation-verb clause (3 lines replaced by 14) and the scenario
+    *"The surface offers the installed row's verbs and no trust control"*, renamed to *"…the catalog
+    pane's Actions section…"* (3 lines replaced by 9, plus a 4-line `(Previously:)` note). Both carry
+    their own `(Previously: …)` line preserving the prior wording verbatim. **No verb was added, removed
+    or re-implemented, no argv shape moved, the confirmation rule is untouched, and the trust
+    prohibition is reproduced word for word.** Unlike the m9 and m10 `tap-management` cases, the header
+    claim and the bytes agree here — the delta claimed an in-place amendment and delivered one.
+  - **Why a promoted requirement had to move for a presentational change.** The old clause pinned the
+    verbs to "the same shared mutation surface" the installed **list row** uses — the `⋯` menu — and its
+    scenario pinned that shape. The catalog detail pane answers the same question with a labelled
+    **Actions** section at the foot of the pane. Presenting the receipt-backed pane that way without
+    amending II15 would have contradicted a promoted requirement rather than merely re-styling a pane.
+    The amended clause now pins the **one shared component**, its position (last in the pane, after the
+    facts and footer), the primary `brew …` command line with its copy affordance, the
+    runner-unavailable guidance, and an **empty** header primary slot: one pane, one place to act. The
+    `⋯` menu is unchanged on the **list rows**, where it stays the right affordance.
+  - **II7 and II8 were activated, not changed — as in rounds 1–7.** II7's package-graph direction is why
+    the projection lives in `BrewClient` (which already imports `Catalog`) and why index ingestion was
+    rejected. II8's "installed-state filters are composed, never pushed into the search index" is
+    extended to a second result source by PS8's hide-installed subtraction, and II8's "no enabled
+    control that cannot change the visible results" is the original reason the tap surface offers no
+    Outdated control (see the rationale rewrite recorded in `package-search`'s entry).
+  - **II4's outdated rule is what the tap surface's update pill reads.** An installed tap hit's offered
+    version is derived from this machine's own receipt under II4's existing rule, including the
+    self-updating-cask case. No brew invocation was added to obtain it.
+  - **Carried open, unchanged by this change**: `InstalledDecoder` still collapses a missing install
+    timestamp to the Unix epoch, so II15 continues to report no install date. Recorded by m10 and still
+    true.
+  - **No `## Verification classes` table was promoted**; the delta's table stayed delta-local provenance
+    and only the per-scenario inline `- Verification:` lines promoted. Verified after the merge: zero
+    matches in this file.
   - The archived delta spec is the verbatim audit trail.

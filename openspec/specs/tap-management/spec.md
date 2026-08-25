@@ -152,6 +152,26 @@ the installed receipt**: **Show in Installed** already hands off by exact `Packa
 reduced, receipt-backed detail `installed-inventory` owns, which synthesizes no catalog record, adds
 nothing to catalog search, and spawns no additional brew invocation.
 
+Nor does the **catalog search** half of that prohibition reach a search surface composed **above the
+index**. Tap packages MUST NOT enter the catalog snapshot, the catalog index or a catalog result —
+that clause is unchanged and unweakened — but the inventory this capability acquires MAY feed a surface
+**owned by another capability**, provided that surface composes its hits above the index, creates no
+catalog record, adds nothing to the snapshot or to the index, and spawns no additional brew invocation.
+`package-search` owns finding a tap package from the query surface and states its own rules for it;
+`package-mutation` owns installing one on the shared mutation spine with the bare token PM10 mandates.
+Every such consumer MUST still perform **no tap-source read**: that prohibition is unconditional and
+binds this capability's own surfaces and every outside consumer alike, which is why a surface fed from
+this inventory can present a name, a kind, a tap of origin and an install state — and nothing more.
+
+That last clause is **reaffirmed, not relaxed, for a detail surface**: a consumer MAY compose a
+package **detail** from this inventory on exactly the terms above and no others, because the four
+things it presents are things the tap has **already published** rather than things a source read would
+have to fetch — which is precisely why such a detail carries no description, no version, no homepage,
+no licence, no dependency list, no install count, no deprecation or disabled flag and no size. A
+consumer that needs any of those for a package this machine does not have MUST do without it: the
+tap-source read remains forbidden here as everywhere, and the absence MUST be presented as an absence
+rather than filled from any other source.
+
 The inventory MUST be filterable by package name and kind. A large inventory MUST remain usable by
 presenting only the filtered/visible rows needed at a time rather than requiring every row to be
 presented eagerly.
@@ -161,6 +181,12 @@ a false statement about this Mac.)
 (Previously: the catalog paragraph ended “…and selection MUST NOT create a third-party detail
 fallback.”, a bare phrase broad enough to read as a blanket ban on any detail for a tap package,
 including one built solely from the installed receipt.)
+(Previously: the catalog paragraph carved out a receipt-backed **detail** only, so its “catalog search”
+clause was broad enough to read as a ban on this inventory feeding any search surface at all, including
+one composed above the index and owned by another capability.)
+(Previously: the outside-consumer paragraph named a **search surface** only, so a *detail* composed from
+the same four already-published names had no stated home — leaving the unconditional tap-source
+prohibition to be read as a ban on the rendering rather than as the reason it is reduced.)
 
 #### Scenario: Only the selected tap prefix is normalized
 
@@ -243,6 +269,29 @@ including one built solely from the installed receipt.)
 - WHEN a name-and-kind filter matches three casks
 - THEN exactly those three results are presented as the visible result set
 - AND presenting them does not require every non-matching row to be presented first
+- Verification: `unit`
+
+#### Scenario: The inventory feeds an outside search surface without entering the catalog
+
+- GIVEN selected tap `acme/tools` publishes formula `acme/tools/widget`, and the catalog carries no
+  record for `widget`
+- WHEN a search surface composed above the index exclusively from this inventory returns `widget` for
+  the query `widget`
+- THEN the catalog snapshot, catalog search and catalog detail lookup for `widget` are unchanged, with
+  the catalog lookup still returning the ordinary not-found result
+- AND no tap-source read is performed and no additional brew invocation is recorded
+- Verification: `unit`
+
+#### Scenario: A detail composed from this inventory carries the four published names and nothing else
+
+- GIVEN selected tap `acme/tools` publishes formula `acme/tools/widget`, the catalog carries no record
+  for `widget`, and this Mac has no receipt for it
+- WHEN an outside consumer composes a package **detail** for `widget` from this inventory
+- THEN everything it can present is enumerated, and it is exactly the bare token, the kind, the tap of
+  origin and the install state
+- AND no description, version, homepage, licence, dependency list, install count, deprecation flag,
+  disabled flag or size is representable, because no tap-source read is performed and none may be
+- AND no additional brew invocation is recorded
 - Verification: `unit`
 
 <!-- TM6 -->
@@ -539,7 +588,21 @@ management, cleanup, disk usage, or service behavior. It MUST NOT create receipt
 Showing a tap's trust state and offering to grant or revoke it is **not** tap security scanning: the
 state is read from brew's own snapshot and the grant is brew's own command. The capability MUST NOT
 inspect, analyse, score or judge a tap's contents, and MUST NOT derive a trust recommendation.
+
+The exclusions above bind **this capability's own surface** — the action set tap management itself
+exposes, enumerated below. They are not a repository-wide ban on the tap inventory as a data source.
+`package-search` owns finding a package published by an installed tap from the query surface it owns,
+and `package-mutation` owns installing that package on the shared mutation spine with the bare token
+PM10 mandates. Neither action is exposed by this capability's surface, neither adds a member to the
+enumerated set below, and neither ingests a tap package into the catalog — TM5 and PD6 continue to
+forbid that, and the tap-source read stays forbidden for every consumer. What this requirement
+continues to exclude is **tap management itself** growing an install verb, a catalog ingestion, or a
+search surface of its own beyond the name-and-kind inventory filter TM5 already grants it.
 (Previously: the enumerated action set had six members and predated any trust surface.)
+(Previously: the exclusion of package installation from tap inventory and of third-party catalog
+ingestion or search named no surface, so it read as a capability-level ban wherever the tap inventory
+is the source — including a query surface owned by `package-search` and an install owned by
+`package-mutation`.)
 
 #### Scenario: Enumerated tap actions stay within scope
 
@@ -555,6 +618,15 @@ inspect, analyse, score or judge a tap's contents, and MUST NOT derive a trust r
 - WHEN everything it presents about a tap is enumerated
 - THEN each item is either the state brew reported or a control that submits brew's own grant or revocation
 - AND nothing inspects, scores or recommends for or against a tap's contents
+- Verification: `unit`
+
+#### Scenario: A tap package found on another surface adds no action here
+
+- GIVEN a query surface owned by `package-search` that finds a package published by an installed tap
+  and offers its install on the shared mutation spine
+- WHEN all actions exposed by tap management are enumerated again
+- THEN the enumerated set is unchanged
+- AND tap management exposes no install verb, no catalog ingestion, and no search surface of its own
 - Verification: `unit`
 
 <!-- TM12 -->
@@ -872,4 +944,51 @@ reported as ordinary successful outcomes, not as errors and not as a Cellar defe
     receipt-backed detail instead of "No further details". TM5's added scenario asserts exactly that,
     together with "no additional brew invocation is recorded" and an unchanged catalog snapshot, search
     and lookup.
+  - The archived delta spec is the verbatim audit trail.
+- **Amended by change `m11-tap-search`** (archived `2026-08-25` —
+  `openspec/changes/archive/2026-08-25-m11-tap-search/`), **2 MODIFIED (TM5, TM11), 0 added, 0 removed,
+  0 renamed** — **13 req / 58 sc → 13 req / 61 sc**. `rules.archive`'s destructive-delta warning did not
+  fire. TM1–TM4, TM6–TM10 and TM12–TM13 are **byte-identical**; TM5 and TM11 were each replaced in
+  place under their existing `<!-- TM5 -->` and `<!-- TM11 -->` markers, and **all 12 of their existing
+  scenarios are reproduced byte-identical** — all verified at archive by byte-slicing against a
+  pre-merge copy (empty diffs), with all 13 markers re-counted after the merge. The promoted blocks are
+  byte-identical to
+  `openspec/changes/archive/2026-08-25-m11-tap-search/specs/tap-management/spec.md:47-223` (TM5) and
+  `:225-273` (TM11) (empty diffs). Delivered in PR **#77**, merged `2026-08-25` at `2d96b1d`.
+  - **The "strict superset" claim held this time — for both blocks.** Diffing each replaced range
+    against its predecessor returns **additions only, zero deletions** for TM5 *and* TM11. The two
+    preceding changes recorded the opposite: `m9-per-package-trust` and `m10-third-party-detail` each
+    found this capability's superset claim failing while its sibling's held (see the m10 entry above).
+    Recorded because the pattern was becoming a rule of thumb, and it is not one.
+  - **TM5's "catalog search" half was narrowed the way m10 narrowed its detail half.** The prohibition
+    now states affirmatively that the resident tap inventory MAY feed a search surface **owned
+    elsewhere** — composed above the index, creating no catalog record, adding nothing to the snapshot
+    or the index, and costing no additional brew invocation. TM5's unconditional ban on a **tap-source
+    read** is untouched and is exactly why a not-installed tap hit can carry no description, version,
+    homepage, licence, dependency list, install count, deprecation flag or size. Its second new scenario
+    pins that ceiling for a detail composed from this inventory: four published names, kind, tap of
+    origin, install state, and nothing else.
+  - **TM11 was narrowed to this capability's own action set.** It previously excluded "package
+    installation from tap inventory, third-party catalog ingestion or search" without naming an owner,
+    which read as a blanket ban on the whole change rather than as a scope boundary for Taps. It now
+    names `package-search` and `package-mutation` as those owners and keeps the exclusion for **this**
+    capability: its new scenario asserts that a tap package found on another surface adds **no** action
+    here, and that tap management still exposes no install verb, no catalog ingestion and no search
+    surface of its own.
+  - **Ordinal drift, recorded once so it cannot be re-discovered as a defect.** This file is the only
+    spec in the repository that uses `<!-- TM# -->` marker comments, and its markers are authoritative.
+    `explore.md` and `proposal.md` for this change call the adjacent-capabilities requirement **TM10**
+    and the trust-presentation requirement **TM11**, by narrative count. The file marks them
+    **`<!-- TM11 -->`** and **`<!-- TM12 -->`**. The deltas and this entry use the **file's** markers.
+    Where the m11 decision record says "TM11 untouched", it means this file's **TM12** — the trust
+    presentation — **and it is untouched**: no `Untrusted` badge, no trust control and no trust-state
+    read appears anywhere on the new search surface.
+  - **The m10 TM1 → TM5 citation correction stands.** m11's deltas cite **TM5** for the detail-fallback
+    and catalog-scope clauses throughout; no entry above was edited, reordered or removed.
+  - **No shipped tap behaviour changed.** Taps gains no navigation, no verb and no control. What moved
+    is that a surface owned by `package-search` may now read the inventory this capability already
+    refreshes from `brew tap-info --installed --json` (TM1, one invocation, unchanged).
+  - **No `## Verification classes` table was promoted**; the delta's table stayed delta-local provenance
+    and only the per-scenario inline `- Verification:` lines promoted, following the `m7-tap-trust`
+    precedent. Verified after the merge: zero matches in this file.
   - The archived delta spec is the verbatim audit trail.

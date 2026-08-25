@@ -244,8 +244,48 @@ requirement. `installed-inventory` owns that reduced, receipt-backed detail for 
 does not carry. What this requirement continues to forbid is a **catalog** record or a **catalog**
 detail result for a package the catalog does not cover — including one synthesized from an installed
 record — and that prohibition is unchanged.
+
+The same boundary binds a **search surface**. A search surface fed **exclusively by the resident tap
+inventory** is not catalog search: it is composed above the index rather than pushed into it, it
+creates no catalog record, it adds nothing to the snapshot and nothing to the index, and it spawns no
+additional brew invocation — so it neither satisfies nor violates this requirement. Such a surface MAY
+read the catalog for **membership alone** — to report that a hit's bare token is also carried by the
+catalog — and that read produces no catalog result for the tap package, creates no catalog record, and
+adds nothing to the snapshot or to the index; it draws no catalog value into the hit beyond the fact of
+that collision. Such a surface MAY also let a row whose bare token the catalog **does** carry be
+selected, resolving it through the **ordinary** detail lookup by that bare identity: what the lookup
+then returns is the catalog's **own** record for its **own** package — the record the catalog carried
+before any tap was installed and would return for the same identity with no tap inventory resident at
+all. That is this capability's own lookup answering for a package it covers, not a catalog result
+manufactured for the tap package: no record is created, synthesized or amended, the snapshot and the
+index are unchanged, and the tap package contributes nothing to what comes back. `package-search` owns
+that composed surface and states its own rules for it. The same boundary, on the
+same terms, binds a **rendering fed exclusively by the resident tap inventory**: a detail composed from
+the names an installed third-party tap has **already published** — its bare token, its kind, its tap of
+origin — together with this capability's neighbours answering that the machine holds no receipt for it
+is not a catalog detail lookup. It creates no catalog record, adds nothing to the snapshot, to catalog
+search or to the index, consults no catalog value beyond the membership answer already carved out
+above, and spawns no additional brew invocation, so it neither satisfies nor violates this requirement.
+It is the name-only counterpart of the receipt-backed rendering: where that one is complete because a
+receipt exists, this one is deliberately reduced because none does, and it presents the absence as an
+absence rather than filling it from a source it may not read. What this requirement continues to forbid is unchanged and unweakened: no tap package MUST
+enter the snapshot or the index, and no **catalog** result — nothing the catalog snapshot, the catalog
+index or the catalog detail lookup itself returns — MUST exist for a package the catalog does not cover.
+The clause "MUST NOT appear in search results" continues to bind every result the catalog projection
+returns, to the byte.
 (Previously: the requirement stated only the catalog-scope clauses, and was being cited as a blanket ban
 on any third-party detail rendering, including one built solely from the installed receipt.)
+(Previously: the boundary paragraph named only a receipt-backed **detail**, so the bare clause "MUST NOT
+appear in search results" was broad enough to read as a blanket ban on any search surface that finds a
+tap package, including one composed above the index from the resident tap inventory.)
+(Previously: the boundary paragraph's detail half was carved out for a rendering fed by the **installed
+receipt** alone, so a rendering fed by the resident **tap inventory** — for a package this machine does
+not have, and therefore has no receipt for — fell under neither carve-out and read as forbidden, even
+though it consults no catalog value and reads no tap source.)
+(Previously: the search-surface half permitted a **membership** read but said nothing about a selection
+made on that surface, so opening the catalog's own detail for a bare token the catalog carries — the
+package Homebrew resolves that token to — read as producing “a catalog result” for a tap row, even
+though the record returned is the catalog's own and predates the tap entirely.)
 
 #### Scenario: A third-party tap package is a normal not-found
 
@@ -267,6 +307,42 @@ on any third-party detail rendering, including one built solely from the install
 - THEN it remains absent from the snapshot and from search results, and the detail lookup still returns
   the ordinary not-found result
 - AND no catalog record exists for it, synthesized or otherwise
+- Verification: `unit`
+
+#### Scenario: A composed tap surface leaves catalog search unchanged
+
+- GIVEN an installed third-party tap publishing a package the catalog does not carry, and a separate
+  search surface composed exclusively from that tap inventory for the same query
+- WHEN the catalog snapshot, the catalog index's search for that query, and the catalog detail lookup
+  for that package are queried with the tap inventory resident
+- THEN the search results are identical to those returned with no tap inventory present, and the detail
+  lookup still returns the ordinary not-found result
+- AND the package remains absent from the snapshot and from the index, with no catalog record for it,
+  synthesized or otherwise
+- Verification: `unit`
+
+#### Scenario: A name-only tap detail creates no catalog record either
+
+- GIVEN an installed third-party tap publishing a package the catalog does not carry and this machine
+  has not installed, for which a reduced detail is composed from the resident tap inventory alone
+- WHEN the catalog snapshot, catalog search and catalog detail lookup are queried for it
+- THEN it remains absent from the snapshot and from search results, and the detail lookup still returns
+  the ordinary not-found result
+- AND no catalog record exists for it, synthesized or otherwise, and the composed detail carries no
+  value the catalog publishes
+- Verification: `unit`
+
+#### Scenario: A colliding selection resolves to the catalog's own record and creates nothing
+
+- GIVEN the catalog carries a package, an installed third-party tap publishes the same `(kind, name)`,
+  and the identity the tap surface offers for that row is the bare one
+- WHEN that identity is resolved through the ordinary catalog detail lookup with the tap inventory
+  resident
+- THEN the lookup returns the catalog's own record — byte-identical to the record the same lookup
+  returns with no tap inventory resident — so nothing about the tap package reached it
+- AND the snapshot and the index are unchanged: the record count is the catalog's own, the catalog
+  search results for that query are identical to those returned with no tap inventory present, and no
+  record exists for any package the catalog does not cover
 - Verification: `unit`
 
 ### Requirement: No pre-install signature or notarization verdict
@@ -479,4 +555,39 @@ control: nothing on this surface MUST grant, revoke or alter a grant.
     no additional brew invocation may be introduced to complete a detail — is honoured by m10 and
     asserted by `installed-inventory` II15 sc2 and TM5's added scenario. The earlier entry is left
     unedited as the audit trail of what was believed; this correction supersedes its citation.
+  - The archived delta spec is the verbatim audit trail.
+- **Amended by change `m11-tap-search`** (archived `2026-08-25` —
+  `openspec/changes/archive/2026-08-25-m11-tap-search/`), **1 MODIFIED (PD6), 0 added, 0 removed, 0
+  renamed** — **8 req / 31 sc → 8 req / 34 sc**. `rules.archive`'s destructive-delta warning did not
+  fire. PD1–PD5, PD7 and PD8 are **byte-identical**, and PD6's **three existing scenarios are
+  reproduced byte-identical** — both verified at archive by byte-slicing against a pre-merge copy
+  (empty diffs). The promoted block is byte-identical to
+  `openspec/changes/archive/2026-08-25-m11-tap-search/specs/package-detail/spec.md:38-152` (empty
+  diff). Delivered in PR **#77**, merged `2026-08-25` at `2d96b1d`.
+  - **The delta's "strict superset" claim is byte-true here, for the second consecutive change.**
+    Diffing the replaced range against its predecessor returns **additions only, zero deletions**. m10
+    recorded the same result for PD6 and the opposite for its `tap-management` sibling; this time
+    **both** capabilities came back byte-true (see the `tap-management` entry).
+  - **The boundary was widened by one half, not weakened.** m10 carved a *detail* out of PD6's catalog
+    prohibition; m11 carves a *search surface* out of it on the same terms — composed above the index
+    rather than pushed into it, creating no catalog record, adding nothing to the snapshot or the index,
+    and spawning no additional brew invocation. The clause "MUST NOT appear in search results" is
+    reproduced **verbatim**: what changed is which projection that clause binds, not what it forbids.
+  - **Exactly one catalog read is permitted, and it decides one fact.** The composed surface MAY read
+    the catalog for **membership alone** — whether a hit's bare token is also carried by the catalog for
+    the same kind — because that read is what produces the collision fact the row's note is worded from.
+    Since round 7 it decides nothing else: routability is uniqueness among the emitted hits and nothing
+    more. The read creates no catalog record and draws no catalog value into the hit beyond the
+    collision itself.
+  - **PD6's third new scenario is round 7's reversal, and it adds no branch.** A hit whose bare token
+    the catalog also carries is now **selectable** and opens the **catalog's own** record — the package
+    Homebrew resolves that bare token to, and the one the row's collision note already names in those
+    words. Withholding the route left the user with a sentence naming a package and no way to look at
+    it. The shipped resolution order already answers catalog-first, so the scenario pins that the record
+    returned is byte-identical to the one returned with **no** tap inventory resident.
+  - **The m10 TM1 → TM5 citation correction stands and was not re-litigated.** m11's deltas cite **TM5**
+    throughout. The m9-era entries above are left unedited as the audit trail of what was believed.
+  - **No `## Verification classes` table was promoted**; the delta's table stayed delta-local provenance
+    and only the per-scenario inline `- Verification:` lines promoted. Verified after the merge: zero
+    matches in this file.
   - The archived delta spec is the verbatim audit trail.
