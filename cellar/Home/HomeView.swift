@@ -203,11 +203,12 @@ struct HomeView: View {
     /// attention, and `brew update` is maintenance rather than a problem to
     /// report — counting it would make "everything is current" unreachable.
     ///
-    /// The card appears only on evidence — `HomebrewUpdateNeed.isBehind`, the
-    /// pure rule proven in the test suite — or while its own operation is in
-    /// flight, so a just-clicked button cannot vanish and reflow the layout
-    /// under the cursor. Once the post-update inventory re-read clears the
-    /// disagreement, the card leaves on its own.
+    /// The card is always here. `brew update` is the only way to learn whether
+    /// brew is behind, so gating the card on that evidence hid the one action
+    /// that produces it. `HomebrewUpdateNeed.isBehind` — the pure rule proven
+    /// in the test suite — now chooses the wording and the dress instead: the
+    /// plain invitation in the neutral tone, the evidence-backed one in the
+    /// accent.
     private var maintenance: [AttentionItem] {
         let behind = HomebrewUpdateNeed.isBehind(
             packages: installed.inventory.packages,
@@ -216,14 +217,14 @@ struct HomeView: View {
             lastUpdate: health.lastUpdate,
             now: Date()
         )
-        guard behind || operations.isHomebrewUpdateInFlight else { return [] }
+        let copy = HomebrewUpdateNeed.copy(behind: behind)
         return [
             AttentionItem(
                 id: "homebrew-update",
-                title: "Homebrew learns about new versions from brew update",
-                sub: "Refreshes available versions and taps · installs nothing",
+                title: copy.title,
+                sub: copy.sub,
                 systemImage: "arrow.triangle.2.circlepath",
-                tone: .neutral,
+                tone: copy.isEmphasized ? .accent(theme) : .neutral,
                 buttonLabel: "Update Homebrew",
                 buttonAction: { operations.submit(.update) },
                 isButtonEnabled: operations.isAvailable && !operations.isHomebrewUpdateInFlight,

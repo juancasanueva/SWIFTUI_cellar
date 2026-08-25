@@ -240,26 +240,48 @@ struct HomeCompositionTests {
         #expect(maintenance.contains("homebrew-update"))
     }
 
-    /// The card appears on evidence, not unconditionally — and an update the
-    /// user just started must not sweep its own card out from under the cursor.
-    @Test("The card is gated by the staleness projection and survives its own operation")
-    func theCardIsGatedByTheProjectionAndSurvivesItsOwnOperation() throws {
+    /// The card is **always** on the Home page: `brew update` is the only way
+    /// to learn whether brew is behind, so an affordance gated on that evidence
+    /// hid the very action that produces it. The evidence now chooses the
+    /// card's wording and tone, never its existence.
+    @Test("The card is always present and lets the staleness projection choose its wording")
+    func theCardIsAlwaysPresentAndTheProjectionChoosesItsWording() throws {
         let maintenance = try #require(
             Self.body(of: "private var maintenance: [AttentionItem]", in: try Self.homeSource()),
             "the maintenance projection is missing"
         )
         #expect(
-            maintenance.contains("HomebrewUpdateNeed.isBehind"),
-            "the card is not gated by the tested projection"
+            maintenance.contains("return []") == false,
+            "the maintenance projection can still answer with no card"
         )
         #expect(
-            maintenance.contains("operations.isHomebrewUpdateInFlight"),
-            "an in-flight update no longer holds its own card on screen"
+            maintenance.contains("HomebrewUpdateNeed.isBehind"),
+            "the card's wording is not chosen by the tested projection"
+        )
+        #expect(
+            maintenance.contains("HomebrewUpdateNeed.copy(behind:"),
+            "the card words its own state instead of taking the projection's copy"
         )
         #expect(
             maintenance.contains("catalog.snapshotGeneratedAt"),
             "the projection is not told when the catalog's answers were fetched"
         )
+    }
+
+    /// The two wordings, as values: the plain invitation and the evidence-backed
+    /// one differ in every user-visible field, so a wrong branch is visible.
+    @Test("The card's copy is the plain invitation unless brew is demonstrably behind")
+    func theCardCopyFollowsTheEvidence() {
+        let plain = HomebrewUpdateNeed.copy(behind: false)
+        let behind = HomebrewUpdateNeed.copy(behind: true)
+
+        #expect(plain.title == "Homebrew learns about new versions from brew update")
+        #expect(plain.sub == "Refreshes available versions and taps · installs nothing")
+        #expect(plain.isEmphasized == false)
+
+        #expect(behind.title == "Homebrew is behind what's published")
+        #expect(behind.sub == "Run brew update to refresh available versions and taps · installs nothing")
+        #expect(behind.isEmphasized)
     }
 
     // MARK: - Reading
