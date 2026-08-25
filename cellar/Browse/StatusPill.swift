@@ -3,6 +3,7 @@
 //  cellar
 //
 
+import Catalog
 import SwiftUI
 
 /// A row's state chip, in the CASK and UPDATE chips' exact shape, so every fact
@@ -34,6 +35,18 @@ struct StatusPill: View {
         )
     }
 
+    /// The catalog's own status mark — DEPRECATED, DISABLED — wherever a row
+    /// carries a catalog record. One place words it, so the catalog rows and
+    /// the Installed, Favorites and Updates rows cannot say it two ways
+    /// (package-search PS4).
+    static func catalog(_ badge: PackageStatusBadge) -> StatusPill {
+        StatusPill(
+            label: badge.label,
+            background: Color.orange.opacity(0.16),
+            foreground: Color.orange
+        )
+    }
+
     var body: some View {
         Text(label.uppercased())
             .font(.system(size: 8.5, weight: .bold))
@@ -50,11 +63,7 @@ struct StatusPill: View {
 #Preview {
     HStack(spacing: 6) {
         StatusPill.installed
-        StatusPill(
-            label: "Deprecated",
-            background: Color.orange.opacity(0.16),
-            foreground: Color.orange
-        )
+        StatusPill.catalog(.deprecated)
     }
     .padding()
 }

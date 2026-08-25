@@ -52,11 +52,7 @@ struct PackageRow: View {
                         UpdateTag(nextVersion: installed.catalogVersion)
                     }
                     ForEach(entry.catalog?.badges ?? [], id: \.self) { badge in
-                        StatusPill(
-                            label: badge.label,
-                            background: Color.orange.opacity(0.16),
-                            foreground: Color.orange
-                        )
+                        StatusPill.catalog(badge)
                     }
                     Spacer(minLength: 0)
                 }
