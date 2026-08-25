@@ -269,20 +269,24 @@ struct ReceiptDetailCompositionTests {
 
     // MARK: - II15 sc12, R2, DD-12 — the copy stays a claim about the catalog
 
+    /// Anchored on the **pane's own file** and nothing else. The same sentence
+    /// also survives in `PackageDetailView.swift` as the fallback for a package
+    /// with no installed record at all — a different code path — and an anchor
+    /// that read that file was satisfied by the wrong line: rewording the
+    /// fallback would have failed this test while the pane stayed correct, and
+    /// deleting the pane's footer would not have failed it (m10 archive S8).
     @Test("The scoped catalog-miss copy is unchanged")
     func theScopedCatalogMissCopyIsUnchanged() throws {
         let pane = try ReceiptDetailSources.pane()
-        let shipped = try ReceiptDetailSources.source(at: "cellar/Browse/PackageDetailView.swift")
 
-        // Byte-for-byte against the sentence that already ships, apostrophe
-        // included, rather than against a copy retyped in this test.
+        // Byte-for-byte, apostrophe included, against the sentence as it ships
+        // in the pane — never against a copy retyped in this test.
         let sentence = "This installed package is not in Cellar\u{2019}s core/cask catalog."
-        #expect(
-            shipped.raw.contains(sentence),
-            "the shipped sentence moved, so the comparison below anchors on nothing"
-        )
-        #expect(pane.raw.contains(sentence), "the pane's footer is not the shipped sentence")
         #expect(sentence.unicodeScalars.contains("\u{2019}"))
+        #expect(
+            pane.raw.components(separatedBy: sentence).count == 2,
+            "the pane's footer is not exactly one occurrence of the shipped sentence"
+        )
         #expect(
             pane.raw.contains("Cellar's core/cask") == false,
             "the pane straightened the typographic apostrophe"
