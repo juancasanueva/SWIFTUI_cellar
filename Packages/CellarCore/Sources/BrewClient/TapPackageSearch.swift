@@ -51,10 +51,18 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     public let displayName: String
     public let tapName: String
     public let state: TapPackageInstallState
-    /// PS8: the copy is supplied here and never composed by the presenting
-    /// surface. Deliberately **not** `TapPackage.statusExplanation`, which is
-    /// `nil` for the installed state and would leave an installed row silent.
-    public let stateCopy: String
+    /// What the withheld state still has to explain, and `nil` for every other
+    /// state (PS8).
+    ///
+    /// The install state itself is presented by the **shared status pill** the
+    /// catalog result surface draws, so `Installed.` and `Not installed.` are
+    /// withdrawn: the pill's presence carries the first fact and its absence
+    /// carries the second, and a sentence repeating either beside the chip is
+    /// the duplicate presentation `installed-inventory` II8 forbids (DD-9).
+    /// What survives is genuinely explanatory — *what* Homebrew is withholding —
+    /// and it stays here rather than in the view, exactly as `collisionNote`
+    /// does. An absence is `nil`, never `""`.
+    public let stateNote: String?
     /// A catalog record carries this bare token, so Homebrew resolves the
     /// install there. Surfaced, never suppressed.
     public let alsoInCatalog: Bool
@@ -65,6 +73,16 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     /// be selectable: not installed, `alsoInCatalog`, or another emitted hit
     /// carries the same `PackageID` (DD-4).
     public let routableID: PackageID?
+
+    /// Whether this Mac has the package — **both** installed states say yes.
+    ///
+    /// Computed rather than stored, so the hit still carries exactly its five
+    /// facts: `Mirror` enumerates stored properties, and PS8's five-facts
+    /// scenario reads that enumeration. It is the one fact the row consults to
+    /// draw the shared `Installed` pill, and it deliberately cannot stand in for
+    /// `routableID`: routing additionally needs the hit to be uncollided and
+    /// unique, which no `Bool` about installation can express (DD-4, DD-9).
+    public var isInstalled: Bool { state != .notInstalled }
 
     /// Hashed on the row identity alone.
     ///
@@ -138,14 +156,19 @@ public struct TapPackageSearch: Sendable {
 
     // MARK: - The copy this surface shows (PS8)
 
-    /// Every user-visible string on this surface originates here, so a second
-    /// presenting surface cannot word the same fact differently. `private`
-    /// rather than `public`: the view renders `stateCopy` and `collisionNote`,
-    /// it does not reach for the constants behind them.
-    private static let installedCopy = "Installed."
+    /// Every user-visible **sentence** on this surface originates here, so a
+    /// second presenting surface cannot word the same fact differently.
+    /// `private` rather than `public`: the view renders `stateNote` and
+    /// `collisionNote`, it does not reach for the constants behind them.
+    ///
+    /// Two sentences left in round 3. `Installed.` and `Not installed.` are
+    /// **withdrawn** for this surface — the shared `Installed` pill carries that
+    /// state now — and are deliberately not kept "just in case": a live constant
+    /// no caller reads is how withdrawn copy comes back. Both are untouched in
+    /// `TapPackage.statusExplanation`, which serves the tap-detail rows TM5
+    /// governs.
     private static let withheldCopy =
         "Installed. Homebrew withholds its tap while this tap is untrusted."
-    private static let notInstalledCopy = "Not installed."
     private static let collisionCopy =
         "Also in the catalog. Homebrew installs the catalog package."
 
@@ -212,7 +235,7 @@ public struct TapPackageSearch: Sendable {
                 displayName: match.package.displayName,
                 tapName: match.tapName,
                 state: match.package.state,
-                stateCopy: Self.copy(for: match.package.state),
+                stateNote: Self.note(for: match.package.state),
                 alsoInCatalog: collides,
                 collisionNote: collides ? Self.collisionCopy : nil,
                 rank: match.rank,
@@ -306,11 +329,14 @@ public struct TapPackageSearch: Sendable {
         return contains(haystack, needle) ? .nameSubstring : nil
     }
 
-    private static func copy(for state: TapPackageInstallState) -> String {
+    /// The one state that still has something to explain (PS8 round 3, DD-9).
+    ///
+    /// Exhaustive on purpose: a fourth install state would have to decide here,
+    /// visibly, at compile time, rather than silently inherit `nil`.
+    private static func note(for state: TapPackageInstallState) -> String? {
         switch state {
-        case .installed: installedCopy
+        case .installed, .notInstalled: nil
         case .installedTapWithheld: withheldCopy
-        case .notInstalled: notInstalledCopy
         }
     }
 

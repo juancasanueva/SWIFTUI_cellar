@@ -960,17 +960,17 @@ sc), `package-detail` and `tap-management` are untouched by round 3. Nothing new
 
 ## Phase 2″: WU11 — the install state becomes a fact (RED → GREEN)
 
-- [ ] 2″.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: rename
+- [x] 2″.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: rename
       `theThreeInstallStatesCarryTheirExactCopy` → `onlyTheWithheldStateCarriesANote` and restate it —
       three distinct states; `isInstalled` true, true, false; `stateNote` `nil`, TM5's exact sentence,
       `nil`; and **neither withdrawn string produced for any hit**. Amend
       `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse` (`Mirror` labels carry `stateNote`, the
       not-installed hit's note is `nil` rather than `""`) and the two spot assertions at the ambiguity
       and five-facts rows. Confirm the failure is a **compile** failure naming `stateNote`/`isInstalled`.
-- [ ] 2″.2 **GREEN** in `TapPackageSearch.swift`: `stateCopy: String` → `stateNote: String?`; add
+- [x] 2″.2 **GREEN** in `TapPackageSearch.swift`: `stateCopy: String` → `stateNote: String?`; add
       `public var isInstalled: Bool` computed from `state`, so no `Mirror` label is added; delete
       `installedCopy` and `notInstalledCopy`; `copy(for:)` → `note(for:) -> String?`.
-- [ ] 2″.3 Run `swift test --package-path Packages/CellarCore` whole — the guard is that no other core
+- [x] 2″.3 Run `swift test --package-path Packages/CellarCore` whole — the guard is that no other core
       suite reads `stateCopy`, and that `TapProjectionTests`' own `statusExplanation` rows stay green.
 - [ ] 2″.4 Commit `feat(search): expose the tap install state as a fact instead of row copy`.
 

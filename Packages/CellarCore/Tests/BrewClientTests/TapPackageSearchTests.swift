@@ -170,13 +170,17 @@ struct TapPackageSearchTests {
         #expect(hit.publishedName == "acme/tools/widget")
         #expect(hit.tapName == "acme/tools")
         #expect(hit.state == .notInstalled)
-        #expect(hit.stateCopy == "Not installed.")
+        #expect(hit.isInstalled == false)
+        // The install state is a **fact**, not a sentence: a not-installed hit
+        // pins no copy at all now that the row's pill carries the state (PS8
+        // round 3, DD-9). An absence, never `""`.
+        #expect(hit.stateNote == nil)
         #expect(hit.collisionNote == nil)
 
         let labels = Mirror(reflecting: hit).children.compactMap(\.label).sorted()
         #expect(labels == [
             "alsoInCatalog", "collisionNote", "displayName", "id", "mutationTarget",
-            "publishedName", "rank", "routableID", "state", "stateCopy", "tapName"
+            "publishedName", "rank", "routableID", "state", "stateNote", "tapName"
         ])
         // The absence set, enumerated rather than assumed: none of these is
         // representable, because the tap inventory publishes none of them and
@@ -549,10 +553,10 @@ struct TapPackageSearchTests {
         #expect(found.contains { $0.alsoInCatalog == false })
     }
 
-    // MARK: - ps9 — the three install states carry their exact copy
+    // MARK: - ps9 — the states stay distinct, and only the withheld one speaks
 
-    @Test("The three install states stay distinct and carry their exact copy")
-    func theThreeInstallStatesCarryTheirExactCopy() throws {
+    @Test("The three install states stay distinct, and only the withheld state pins a sentence")
+    func onlyTheWithheldStateCarriesANote() throws {
         let found = hits(
             TapSearchFixture.threeStateTaps,
             "widget",
@@ -572,17 +576,40 @@ struct TapPackageSearchTests {
             )
         )
         #expect(absent.state == .notInstalled)
-        #expect(Set([installed.stateCopy, withheld.stateCopy, absent.stateCopy]).count == 3)
+        // Pairwise, because `TapPackageInstallState` is `Equatable` and not
+        // `Hashable` — the hit hashes on its `RowID` for exactly that reason.
+        #expect(installed.state != withheld.state)
+        #expect(withheld.state != absent.state)
+        #expect(installed.state != absent.state)
 
-        #expect(installed.stateCopy == "Installed.")
+        // Installed-ness is a fact of the hit, and the **withheld state is
+        // installed** — the row draws the same pill for both (PS8 round 3).
+        #expect(installed.isInstalled)
+        #expect(withheld.isInstalled)
+        #expect(absent.isInstalled == false)
+
+        // Only the withheld state has anything left to explain: what Homebrew
+        // is withholding, in TM5's exact words.
+        #expect(installed.stateNote == nil)
         #expect(
-            withheld.stateCopy == "Installed. Homebrew withholds its tap while this tap is untrusted."
+            withheld.stateNote == "Installed. Homebrew withholds its tap while this tap is untrusted."
         )
-        #expect(absent.stateCopy == "Not installed.")
-        // The trap this row exists for: the shipped tap-detail projection is
-        // silent for the installed state, so reusing it would leave the row
-        // with nothing to say (DD-9).
-        #expect(found.allSatisfy { $0.stateCopy.isEmpty == false })
+        #expect(absent.stateNote == nil)
+
+        // The two withdrawn strings, enumerated rather than assumed: the pill's
+        // presence and its absence carry those facts now, and a row repeating
+        // them in a sentence is the duplicate presentation II8 forbids.
+        for withdrawn in ["Installed.", "Not installed."] {
+            #expect(
+                found.contains { $0.stateNote == withdrawn } == false,
+                "a hit still produces the withdrawn string \(withdrawn.debugDescription)"
+            )
+        }
+        // …and exactly one of the three speaks at all, so "no copy" and "empty
+        // copy" cannot be confused for one another.
+        #expect(found.compactMap(\.stateNote) == [
+            "Installed. Homebrew withholds its tap while this tap is untrusted."
+        ])
     }
 
     // MARK: - ps10 — an ambiguous installed hit is not routable
@@ -602,7 +629,10 @@ struct TapPackageSearchTests {
         // Presented and installable regardless: only the detail route is
         // withheld.
         #expect(hit.mutationTarget == wget)
-        #expect(hit.stateCopy == "Installed.")
+        // It is installed, so the row draws the pill — and has nothing further
+        // to say, because this state pins no sentence (PS8 round 3).
+        #expect(hit.isInstalled)
+        #expect(hit.stateNote == nil)
     }
 
     @Test("Two taps publishing one name are both unroutable")
