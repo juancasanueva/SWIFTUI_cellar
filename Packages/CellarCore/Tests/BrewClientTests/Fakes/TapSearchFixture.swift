@@ -127,6 +127,32 @@ enum TapSearchFixture {
         ])
     }
 
+    // MARK: - The offered version (round 4)
+
+    /// A fourth tap, so the offered-version rule is read against an installed
+    /// package that is **up to date** as well as against two outdated ones.
+    static let stateCurrentTap = tap("dave/tools", formulae: ["dave/tools/widget-current"])
+
+    static let fourStateTaps = threeStateTaps + [stateCurrentTap]
+
+    /// The same two installed records as `threeStateInstalled`, now outdated
+    /// toward two **distinct** offered versions, plus a third that is
+    /// installed and current.
+    ///
+    /// Distinct on purpose: one shared version would let a hit read another
+    /// hit's offer and still pass.
+    static var fourStateOutdatedInstalled: InstalledInventory {
+        InstalledInventory(packages: [
+            InstalledFixture.receipt(
+                .formula, "widget-installed", tap: "acme/tools", outdatedTo: "2.0.0"
+            ),
+            InstalledFixture.receipt(
+                .formula, "widget-withheld", tap: nil, outdatedTo: "3.1.4"
+            ),
+            InstalledFixture.receipt(.formula, "widget-current", tap: "dave/tools")
+        ])
+    }
+
     // MARK: - Two taps, one identity, both installed
 
     /// Both publishing taps are `untrusted` and the one installed record has no

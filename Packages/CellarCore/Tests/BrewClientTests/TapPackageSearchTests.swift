@@ -158,10 +158,10 @@ struct TapPackageSearchTests {
         #expect(Set(hits(taps, "widget").map(\.rank)) == [.exactToken])
     }
 
-    // MARK: - ps4 — five facts, its copy, and nothing else
+    // MARK: - ps4 — six facts, its copy, and nothing else
 
-    @Test("A hit carries its five facts and its copy, and nothing else")
-    func aHitCarriesItsFiveFactsAndItsCopyAndNothingElse() throws {
+    @Test("A hit carries its six facts and its copy, and nothing else")
+    func aHitCarriesItsSixFactsAndItsCopyAndNothingElse() throws {
         let tap = TapSearchFixture.tap("acme/tools", casks: ["acme/tools/widget"])
         let hit = try #require(hits([tap], "widget").first)
 
@@ -171,6 +171,10 @@ struct TapPackageSearchTests {
         #expect(hit.tapName == "acme/tools")
         #expect(hit.state == .notInstalled)
         #expect(hit.isInstalled == false)
+        // The sixth fact, absent here because this hit is not installed: an
+        // offered version is only representable for a package this Mac has
+        // (PS8 round 4, DD-19). An absence, never `""`.
+        #expect(hit.nextVersion == nil)
         // The install state is a **fact**, not a sentence: a not-installed hit
         // pins no copy at all now that the row's pill carries the state (PS8
         // round 3, DD-9). An absence, never `""`.
@@ -180,13 +184,19 @@ struct TapPackageSearchTests {
         let labels = Mirror(reflecting: hit).children.compactMap(\.label).sorted()
         #expect(labels == [
             "alsoInCatalog", "collisionNote", "displayName", "id", "mutationTarget",
-            "publishedName", "rank", "routableID", "state", "stateNote", "tapName"
+            "nextVersion", "publishedName", "rank", "routableID", "state", "stateNote",
+            "tapName"
         ])
+        // Round 4 narrows "no version" to "no **published** version": the one
+        // version-shaped member is the offered version, read off this Mac's own
+        // receipt rather than off the tap, so it is enumerated by name rather
+        // than forbidden by token.
+        #expect(labels.filter { $0.lowercased().contains("version") } == ["nextVersion"])
         // The absence set, enumerated rather than assumed: none of these is
         // representable, because the tap inventory publishes none of them and
         // reading them would need the tap-source read TM5 forbids.
         for absent in [
-            "desc", "description", "version", "homepage", "license", "dependencies",
+            "desc", "description", "homepage", "license", "dependencies",
             "dependents", "installcount", "deprecated", "disabled", "size", "caveats"
         ] {
             #expect(
@@ -610,6 +620,91 @@ struct TapPackageSearchTests {
         #expect(found.compactMap(\.stateNote) == [
             "Installed. Homebrew withholds its tap while this tap is untrusted."
         ])
+    }
+
+    // MARK: - ps9b (round 4) — the offered version
+
+    /// PS8 round 4: the offered version is a fact of the hit, gated on the
+    /// **receipt's own** outdated rule (`installed-inventory` II4).
+    @Test("Only an installed hit its receipt reports outdated offers a version")
+    func onlyAnOutdatedInstalledHitOffersAVersion() throws {
+        let found = hits(
+            TapSearchFixture.fourStateTaps,
+            "widget",
+            installed: TapSearchFixture.fourStateOutdatedInstalled
+        )
+        #expect(found.count == 4)
+
+        let byName = Dictionary(uniqueKeysWithValues: found.map { ($0.displayName, $0) })
+        let outdated = try #require(byName["widget-installed"])
+        let withheld = try #require(byName["widget-withheld"])
+        let current = try #require(byName["widget-current"])
+        let absent = try #require(byName["widget-absent"])
+
+        // Each hit reports **its own** receipt's offer, byte for byte — the two
+        // versions differ, so a hit reading its neighbour's offer fails here.
+        #expect(outdated.nextVersion == "2.0.0")
+        #expect(withheld.nextVersion == "3.1.4")
+        // …and the withheld state is installed, so it is not silently excluded
+        // from the fact the way it would be by an exact-tap-only lookup.
+        #expect(withheld.isInstalled)
+
+        // An absence, never `""`: an up-to-date installed hit and a
+        // not-installed one are indistinguishable on this fact.
+        #expect(current.nextVersion == nil)
+        #expect(absent.nextVersion == nil)
+        #expect(current.isInstalled)
+        #expect(absent.isInstalled == false)
+
+        // The fact is the version being **offered**, never a restatement of the
+        // one already installed.
+        #expect(found.allSatisfy { $0.nextVersion != InstalledFixture.installedVersion })
+        #expect(found.compactMap(\.nextVersion).sorted() == ["2.0.0", "3.1.4"])
+
+        // Triangulated against the shipped up-to-date inventory: the same taps,
+        // the same two installed records, and **no** offer at all — so the
+        // derivation consults `isOutdated` rather than handing out
+        // `catalogVersion` to everything installed.
+        let upToDate = hits(
+            TapSearchFixture.threeStateTaps,
+            "widget",
+            installed: TapSearchFixture.threeStateInstalled
+        )
+        #expect(upToDate.count == 3)
+        #expect(upToDate.filter(\.isInstalled).count == 2)
+        #expect(upToDate.allSatisfy { $0.nextVersion == nil })
+    }
+
+    /// The gate DD-19 keys off `installedHandoff` rather than off the bare
+    /// `PackageID` — because `TapProjection.installState` deliberately answers
+    /// `.notInstalled` for a receipt whose tap names a **different** tap.
+    @Test("A receipt belonging to another tap offers no version to this tap's hit")
+    func aReceiptFromAnotherTapOffersNoVersion() throws {
+        let widget = PackageID(kind: .formula, name: "widget")
+        let installed = InstalledInventory(packages: [
+            InstalledFixture.receipt(.formula, "widget", tap: "bravo/tools", outdatedTo: "9.9.9")
+        ])
+        let hit = try #require(
+            hits(
+                [TapSearchFixture.tap("acme/tools", formulae: ["acme/tools/widget"])],
+                "widget",
+                installed: installed
+            ).first
+        )
+
+        // This tap's package is **not** the installed one, so the hit is not
+        // installed — and a not-installed hit offers nothing.
+        #expect(hit.state == .notInstalled)
+        #expect(hit.isInstalled == false)
+        #expect(hit.nextVersion == nil)
+
+        // Non-vacuous: the resident record really does share the identity and
+        // really is outdated, so the absence is the gate working rather than an
+        // empty inventory answering.
+        let record = try #require(installed.package(widget))
+        #expect(record.isOutdated)
+        #expect(record.catalogVersion == "9.9.9")
+        #expect(hit.mutationTarget == widget)
     }
 
     // MARK: - ps10 — an ambiguous installed hit is not routable

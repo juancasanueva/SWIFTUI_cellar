@@ -1065,18 +1065,18 @@ round 4. No new copy is pinned — the pill's wording belongs to the shared comp
 
 ## Phase 2‴: WU15 — the offered version becomes a fact (RED → GREEN)
 
-- [ ] 2‴.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: a new
+- [x] 2‴.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: a new
       `onlyAnOutdatedInstalledHitOffersAVersion` over a four-state fixture, and
       `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse` renamed to `…SixFacts…` with `nextVersion` added
       to the `Mirror` label list. Confirm the failure is a **compile** failure naming `nextVersion`.
-- [ ] 2‴.2 Extend `InstalledFixture.receipt(…)` with a defaulted `outdatedTo: String? = nil` that sets
+- [x] 2‴.2 Extend `InstalledFixture.receipt(…)` with a defaulted `outdatedTo: String? = nil` that sets
       `catalogVersion` and `snapshotOutdated` **together**, so an incoherent receipt is unrepresentable;
       add the outdated four-state inventory to `TapSearchFixture`.
-- [ ] 2‴.3 **GREEN** in `TapPackageSearch.swift`: `public let nextVersion: String?` on `TapSearchHit`,
+- [x] 2‴.3 **GREEN** in `TapPackageSearch.swift`: `public let nextVersion: String?` on `TapSearchHit`,
       derived in `hits(…)` from `match.package.installedHandoff` → `installed.package(_:)` →
       `isOutdated ? catalogVersion : nil`. Stored, not computed — `Mirror` must see it.
-- [ ] 2‴.4 Run `swift test --package-path Packages/CellarCore` whole against the **1,870** baseline.
-- [ ] 2‴.5 Commit `feat(search): expose the offered version for an outdated installed tap package`.
+- [x] 2‴.4 Run `swift test --package-path Packages/CellarCore` whole against the **1,870** baseline.
+- [x] 2‴.5 Commit `feat(search): expose the offered version for an outdated installed tap package`.
 
 ## Phase 3‴: WU16 — the shared update pill on the row
 

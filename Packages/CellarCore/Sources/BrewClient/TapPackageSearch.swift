@@ -17,10 +17,13 @@ public enum TapMatchRank: Int, Comparable, Sendable, CaseIterable {
 /// One package published by an installed third-party tap, matched against a
 /// query (`package-search` PS8).
 ///
-/// It carries five facts and its copy, and nothing else. No description, no
-/// version, no homepage, no licence, no dependency list, no install count, no
-/// deprecation or disabled flag and no size is *representable*, because the tap
-/// inventory publishes none of them.
+/// It carries six facts and its copy, and nothing else. No description, no
+/// **published** version, no homepage, no licence, no dependency list, no
+/// install count, no deprecation or disabled flag and no size is
+/// *representable*, because the tap inventory publishes none of them. The one
+/// version it does carry is the version brew **offers** for a package this Mac
+/// has installed, which comes from the installed receipt rather than from the
+/// tap (PS8 round 4, DD-19).
 public struct TapSearchHit: Sendable, Hashable, Identifiable {
     /// Row identity — deliberately **not** a `PackageID` (DD-2).
     ///
@@ -63,6 +66,22 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     /// and it stays here rather than in the view, exactly as `collisionNote`
     /// does. An absence is `nil`, never `""`.
     public let stateNote: String?
+    /// The version brew currently **offers**, and `nil` unless this Mac has the
+    /// package *and* its receipt reports it outdated (PS8 round 4).
+    ///
+    /// Read from the installed receipt, never from the tap and never from the
+    /// catalog — so it costs no brew invocation and stays inside PD6's and TM5's
+    /// boundaries. The gate is the receipt's **own** `isOutdated`, which is
+    /// `installed-inventory` II4's shipped rule including the self-updating-cask
+    /// exclusion, so this surface cannot disagree with the Installed list about
+    /// which packages have an update.
+    ///
+    /// **Stored, not computed** — unlike `isInstalled`. `Mirror` enumerates
+    /// stored properties only, and PS8's facts scenario reads that enumeration:
+    /// a computed offer would be a fact the type carries and the enumeration
+    /// denies. Storing it is also what keeps the synthesised `Hashable` from
+    /// needing anything more than the hand-written `hash(into:)` below.
+    public let nextVersion: String?
     /// A catalog record carries this bare token, so Homebrew resolves the
     /// install there. Surfaced, never suppressed.
     public let alsoInCatalog: Bool
@@ -236,12 +255,30 @@ public struct TapPackageSearch: Sendable {
                 tapName: match.tapName,
                 state: match.package.state,
                 stateNote: Self.note(for: match.package.state),
+                nextVersion: offeredVersion(for: match.package),
                 alsoInCatalog: collides,
                 collisionNote: collides ? Self.collisionCopy : nil,
                 rank: match.rank,
                 routableID: routable ? match.package.id : nil
             )
         }
+    }
+
+    /// The version brew offers for this package, or `nil` (PS8 round 4, DD-19).
+    ///
+    /// Keyed off **`installedHandoff`**, not off `package.id`. The two differ
+    /// exactly where it matters: `TapProjection.installState` answers
+    /// `.notInstalled` for a receipt whose `tap` names a *different* tap, so a
+    /// lookup by bare identity would offer a version to a row this projection
+    /// calls not installed. Both installed states answer, because both **are**
+    /// installed.
+    private func offeredVersion(for package: TapPackage) -> String? {
+        guard
+            let id = package.installedHandoff,
+            let receipt = installed.package(id),
+            receipt.isOutdated
+        else { return nil }
+        return receipt.catalogVersion
     }
 
     /// Why the surface shows what it shows (DD-6).
