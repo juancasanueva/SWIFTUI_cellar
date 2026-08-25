@@ -48,6 +48,13 @@ struct InstalledRow: View {
                             badge.view
                         }
                     }
+                    // The catalog's DEPRECATED / DISABLED mark, drawn by the
+                    // same component the catalog rows use: an installed package
+                    // Homebrew has given up on is told so here too, not only
+                    // when it is searched for (package-search PS4).
+                    ForEach(entry.catalog?.badges ?? [], id: \.self) { badge in
+                        StatusPill.catalog(badge)
+                    }
                     Spacer(minLength: 0)
                 }
                 Text(subline)
