@@ -476,14 +476,22 @@ struct ReleaseWorkflowContractTests {
     /// S22: parsed as a property list, not grepped — a malformed plist that
     /// happens to contain the right words would fail `xcodebuild -exportArchive`
     /// at release time, and this is the check that would have caught it.
-    @Test("The export options declare developer-id, automatic signing, and the team")
+    ///
+    /// Manual, not automatic: automatic signing hands the App Store Connect key
+    /// to Xcode, which on a fresh CI runner mints a "Created via API" Mac
+    /// Development certificate per run. Apple caps those at ten per team and
+    /// v1.4.0 failed against that cap. The export therefore names the
+    /// Developer ID certificate itself, and `release.sh` refuses to run when
+    /// its own `SIGNING_STYLE` disagrees with this file.
+    @Test("The export options declare developer-id, manual Developer ID signing, and the team")
     func exportOptionsDeclareDeveloperIDDistribution() throws {
         let data = try Data(contentsOf: ReleasePipelineSources.url(Self.exportOptionsPath))
         let parsed = try PropertyListSerialization.propertyList(from: data, format: nil)
         let options = try #require(parsed as? [String: Any])
 
         #expect(options["method"] as? String == "developer-id")
-        #expect(options["signingStyle"] as? String == "automatic")
+        #expect(options["signingStyle"] as? String == "manual")
+        #expect(options["signingCertificate"] as? String == "Developer ID Application")
         #expect(options["teamID"] as? String == "Z3S5JK8E38")
     }
 
