@@ -1,8 +1,22 @@
 # Spec index — `m11-tap-search`
 
 Three delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
-the searchable mirror. **Revision 6** — the 2026-08-25 maintainer UI feedback on the mutation verbs, on
-top of revision 5's update pill, revision 4's install pill and revision 3's scope change.
+the searchable mirror. **Revision 7** — the 2026-08-25 maintainer **product decision** on the detail
+route for a not-installed tap package, on top of revision 6's mutation verbs, revision 5's update pill,
+revision 4's install pill and revision 3's scope change.
+
+**Product decision, 2026-08-25 (round 6, binding).** The 2026-08-24 decision that a not-installed hit is
+**non-selectable** is reversed in favour of the follow-up recorded beside it. A not-installed hit whose
+identity is **unambiguous** now opens a **minimal detail composed exclusively from the resident tap
+inventory** — identity, kind, tap of origin, TM5's shipped `Not installed.` state, the shared mutation
+menu, and one new pinned footer. Nothing else: a description, a version, a homepage, a licence, a
+dependency list, an analytics figure or a size would all need the tap-source read TM5 forbids, and an
+installed package gets those from its receipt instead. **Ambiguity is untouched** — a colliding token or
+a duplicate `PackageID` still withholds the route in either install state — and no trust presentation is
+added (PM10, TM12). **Scenario counts move by four**: `package-search` gains one `unit` and one
+`unit-app` scenario (→ **1 ADDED / 22 scenarios**, 8 req / **41** sc), `package-detail` PD6 gains a
+second `unit` scenario (→ 8 req / **33** sc), and `tap-management` TM5 gains a second `unit` scenario
+(→ 13 req / **61** sc).
 
 **UI feedback, 2026-08-25 (round 5, binding).** Observed in the running app: the `⋯` menu on an
 **installed** tap row offered only Install and Copy install command, where the catalog result surface
@@ -46,12 +60,12 @@ restated **per surface** rather than as a shared keystroke turn. The string `Fro
 
 | Capability | Op | Block | Scenarios | Net |
 |---|---|---|---|---|
-| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +20 (13 `unit`, 7 `unit-app`) | 7 → **8** requirements, 19 → **39** scenarios |
-| `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +1 (`unit`) | 8 requirements unchanged, 31 → **32** scenarios |
-| `tap-management` | **MODIFIED** — **TM5** and **TM11** (main-spec markers) | both whole blocks, all 12 existing scenarios byte-identical | +2 (`unit`) | 13 requirements unchanged, 58 → **60** scenarios |
+| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +22 (14 `unit`, 8 `unit-app`) | 7 → **8** requirements, 19 → **41** scenarios |
+| `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +2 (`unit`) | 8 requirements unchanged, 31 → **33** scenarios |
+| `tap-management` | **MODIFIED** — **TM5** and **TM11** (main-spec markers) | both whole blocks, all 12 existing scenarios byte-identical | +3 (`unit`) | 13 requirements unchanged, 58 → **61** scenarios |
 
-**Totals: 1 ADDED, 3 MODIFIED blocks across 2 capabilities, 0 REMOVED, 0 RENAMED — 23 new scenarios
-(16 `unit`, 7 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
+**Totals: 1 ADDED, 3 MODIFIED blocks across 2 capabilities, 0 REMOVED, 0 RENAMED — 27 new scenarios
+(19 `unit`, 8 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
 destructive-delta warning does not fire.
 
 > **Arithmetic correction, round 5.** This line read “20 new scenarios (15 `unit`, 5 `unit-app`)” from
@@ -94,9 +108,12 @@ requirements, following the precedent `2026-08-23-m7-tap-trust` recorded at
 | Install state — not installed | ~~`Not installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | A not-installed row carries **no state copy and no pill**, exactly as the catalog result surface shows nothing for a row that is not installed |
 | Update available — installed and outdated | **no copy pinned here** — the **shared update pill** the catalog result surface and the Installed list already draw | **Round 4**: an installed hit whose receipt reports it outdated carries that pill, after the Installed pill, fed the **offered version as a value**. Not copy this delta owns: the label and the wording around the version live in that one shared component, so neither search surface and no projection composes them |
 | Mutation verbs on an installed row | **no copy pinned here** — Reinstall, Uninstall…, Uninstall and Zap…, Upgrade, Pin and Unpin belong to the **shared mutation menu** | **Round 5**: the row hands that menu the hit's installed record, so an installed hit takes the menu's installed branch. Not copy this delta owns and not verbs it declares: every label, every argv and every applicability rule lives in the shared menu and the shipped command type, and the surface supplies only the record and the bare target they already take |
+| Name-only detail — install state | `Not installed.` | **Round 6**: on the **detail pane** for an unambiguous not-installed hit, reusing TM5's exact shipped string byte-for-byte. The round-3 withdrawal above is about the **row**, where a pill answers instead; a pane with no pill has to say it. Supplied by the projection, never composed by the pane |
+| Name-only detail — footer | `Cellar knows this package by name only until it is installed.` | **Round 6**: always, on that pane. **New copy** with no shipped precedent, worded in exactly one place in the application's sources. It states the pane's own boundary — why there is no description, no version and no size — without claiming anything about the package or its tap |
 
 Both withdrawn strings stay **unchanged in TM5** for the tap-detail rows TM5 governs; only this
-surface's copy is withdrawn. Neither is promoted by this change, and no MODIFIED block is needed to
+surface's **row** copy is withdrawn — and round 6 puts `Not installed.` back on the **pane**, where no
+pill carries the fact, again as TM5's exact string rather than a reworded one. Neither is promoted by this change, and no MODIFIED block is needed to
 withdraw them: PS8 is an ADDED requirement that reaches `openspec/specs/**` for the first time at
 archive, so it simply lands without them.
 
@@ -119,7 +136,7 @@ carried into PS8:
 | ~~Section renders **below** the catalog rows~~ — **superseded 2026-08-25** | Its own surface titled `Search our taps`, never interleaved with catalog results, with Browse untouched: presentation paragraph + `unit-app` surface-title scenario + `unit-app` untouched-catalog-surface scenario |
 | Collision shown with a neutral note, never suppressed | collision paragraph + `unit` collision scenario |
 | Tap name only — no `Untrusted` badge, no trust control | install paragraph + `unit-app` no-trust-gate scan |
-| Not-installed rows non-selectable; installed hits route to the m10 receipt pane | install-state paragraph + both routing scenarios. **Refined by the orchestrator gate**: an installed hit whose identity is ambiguous — colliding bare token, or two emitted hits sharing a `PackageID` — is also non-routable, because the catalog-first resolution would open a different package; it stays presented and installable (`unit` ambiguity scenario) |
+| ~~Not-installed rows non-selectable~~; installed hits route to the m10 receipt pane — **half superseded 2026-08-25 (round 6)**, see the round-6 row below | install-state paragraph + both routing scenarios. **Refined by the orchestrator gate**: an installed hit whose identity is ambiguous — colliding bare token, or two emitted hits sharing a `PackageID` — is also non-routable, because the catalog-first resolution would open a different package; it stays presented and installable (`unit` ambiguity scenario) |
 | ~~Section renders only for a non-empty query~~ — **superseded 2026-08-25** | An empty query lists everything the installed taps publish, in the deterministic order, mirroring PS5: empty-query paragraph + `unit` list-everything scenario |
 | "Hide installed" subtracts from the tap results | filters paragraph + `unit` hide-installed scenario |
 | ~~Outdated hides the section entirely~~ — **superseded 2026-08-25** | The surface offers **no** outdated control at all (a tap hit has no version, and II8 forbids an enabled control that cannot change results): filters paragraph + the same `unit` scenario's enumeration clause |
@@ -130,6 +147,7 @@ carried into PS8:
 | ~~Install state shown as a row sentence: `Installed.` / `Not installed.`~~ — **superseded 2026-08-25 (round 3)** | The **shared `Installed` pill** the catalog row already draws, on both installed states, and **nothing** on a not-installed row: install-state paragraph + the `unit` install-state scenario + the `unit-app` copy-ownership scan. The withheld sentence survives as the row's explanatory line, beside the pill |
 | An available update is marked with the **shared UPDATE pill**, after the Installed pill — **added 2026-08-25 (round 4)** | The offered version becomes a **sixth fact** of the hit, derived from the installed receipt and gated on its own `isOutdated`: six-facts paragraph + offered-version paragraph + update-pill paragraph, the new `unit` offered-version scenario and the new `unit-app` shared-update-pill scenario. The **Outdated control stays absent** — its rule survives round 4 with a narrowed reason, stated in the filters paragraph |
 | An installed row offers the **same verbs the Installed and catalog surfaces offer** — **added 2026-08-25 (round 5)** | The hit gains a **mutation handoff** — this machine's own installed receipt, resolved by the tap-aware handoff, present in both installed states and absent when not installed — and the row hands it to the shared mutation menu: verbs paragraph + handoff paragraph, the amended facts and offered-version `unit` scenarios and the new `unit-app` mutation-composition scenario. It is **not a seventh fact**: it publishes nothing the tap declares, costs no brew invocation, and the surface presents nothing from it |
+| ~~Not-installed rows non-selectable~~ — **reversed 2026-08-25 (round 6)** | An unambiguous not-installed hit **is** selectable and opens a minimal detail composed exclusively from the resident tap inventory — identity, kind, tap of origin, TM5's `Not installed.`, the shared mutation menu and one pinned footer, and nothing that would need a tap-source read: selectability paragraph + detail paragraphs, the amended ambiguity `unit` scenario and surface-entry `unit-app` scenario, the new `unit` resolution scenario and the new `unit-app` composition scenario. **Ambiguity still withholds the route** in either install state, and no trust presentation is added |
 
 ## `package-mutation`: activated, not changed — no delta
 

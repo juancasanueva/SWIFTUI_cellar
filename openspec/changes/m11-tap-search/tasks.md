@@ -1192,3 +1192,118 @@ round 4. No new copy is pinned — the pill's wording belongs to the shared comp
 - [x] 6⁗.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
 - [x] 6⁗.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 5 apply progress`.
+
+---
+
+# Round 6 — maintainer product decision: a minimal detail for a not-installed tap package
+
+**Decision (binding, 2026-08-25).** The 2026-08-24 rule "a not-installed hit is non-selectable" is
+**reversed**. A not-installed hit whose identity is **unambiguous** is selectable and opens a minimal
+detail composed **exclusively** from the resident tap inventory. Ambiguity is untouched: a colliding
+bare token or a duplicate `PackageID` still withholds the route in **either** install state. The pane
+presents identity, kind, tap of origin, TM5's `Not installed.`, the shared mutation menu and one new
+pinned footer — and nothing that would require the tap-source read TM5 forbids.
+
+**Delivery.** `single-pr` with `size:exception` **accepted** (maintainer, 2026-08-25). Report the
+measured total; never trim. RDD disabled. Strict TDD active.
+
+## Work units — round 6
+
+| Unit | Goal | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU21** | The amended artifacts land **first** — PS8's rewritten selectability clause and its inventory-fed detail paragraphs, the two amended scenarios and two new ones, PD6's added clause + scenario, TM5's reaffirmation + scenario, `specs/README.md` revision 7, `design.md` (**DD-21**, **DD-22**, the round-6 file table and RED rows) and this file | N/A — artifacts only | N/A — no behaviour changes | Revert one docs commit; the branch returns to `cbd13cb` |
+| **WU22** | CellarCore: `routableID` drops its install-state conjunct; new `TapInventoryDetail` resolution; the unit rows | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` and `--filter 'TapInventoryDetailTests'`, then the whole package | **Deferred to delivery** — the pane's rendering is the app harness's, and WU23 records it | Revert one commit across `TapPackageSearch.swift`, the new `TapInventoryDetail.swift` and two test files |
+| **WU23** | App: `PackageDetailView`'s third branch and its `taps:` parameter, the `ContentView` call site, the new pane file, and `TapSearchView`'s restated inert-row comment | `xcodebuild build …` | **Launch the app**: a not-installed unambiguous tap row opens a pane showing the name, kind, Type, Tap, `Not installed.`, the `⋯` menu with Install / Copy install command, and the footer; a colliding row stays inert; an installed row still opens the receipt pane | Revert one commit across four app files; the parameter is added, never renamed |
+| **WU24** | `unit-app` scans: the selection rule renamed and restated, and the pane's absences pinned | `xcodebuild test … -only-testing:cellarTests` | N/A — source-scan suite; the app harness is WU23's | Revert one test commit; no production line is its own |
+
+## Phase 0⁵: baselines, measured at `cbd13cb`
+
+- [x] 0⁵.1 `swift test --package-path Packages/CellarCore` — record the total before any edit.
+- [x] 0⁵.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** before any edit.
+- [x] 0⁵.3 Confirm a clean working tree; discard `cellar/InfoPlist.xcstrings` churn, never commit it.
+
+## Phase 1⁵: WU21 — the amended artifacts land first
+
+- [x] 1⁵.1 Amend `specs/package-search/spec.md`: the round-6 decision paragraph; the **rewritten
+      selectability clause** (routable iff unambiguous, both install states); the inventory-fed detail
+      paragraphs enumerating exactly what the pane presents, what it MUST NOT, the pinned footer copy and
+      the exactly-one-publisher resolution rule; the amended ambiguity `unit` scenario and surface-entry
+      `unit-app` scenario; one new `unit` scenario and one new `unit-app` scenario; the class counts and
+      the archive notes. **Never touch `openspec/specs/**`.**
+- [x] 1⁵.2 Amend `specs/package-detail/spec.md`: PD6's boundary paragraph gains the inventory-fed
+      rendering clause on the same four negations, plus its `(Previously: …)` line and one new `unit`
+      scenario. Pre-existing scenarios stay **byte-identical**.
+- [x] 1⁵.3 Amend `specs/tap-management/spec.md`: TM5's no-tap-source-read clause **reaffirmed** for a
+      detail consumer, plus its `(Previously: …)` line and one new `unit` scenario. Pre-existing
+      scenarios stay **byte-identical**.
+- [x] 1⁵.4 Amend `specs/README.md`: revision 7 header, the round-6 paragraph, the three arithmetic rows,
+      the totals line, two new pinned-copy rows and the reversed presentation-decision row.
+- [x] 1⁵.5 Amend `design.md`: **DD-21** and **DD-22** new; the round-6 preamble; the round-6 file-changes
+      table with the narrowed `PackageDetailView.swift` claim; the round-6 RED rows and honesty note; the
+      **DD-4** open question re-closed.
+- [x] 1⁵.6 Append this phase to `tasks.md`.
+- [ ] 1⁵.7 Commit `docs(sdd): amend m11-tap-search for a minimal detail on not-installed tap packages`.
+
+## Phase 2⁵: WU22 — the projection and the resolution (RED → GREEN)
+
+- [ ] 2⁵.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: rename
+      `anAmbiguousInstalledHitIsNotRoutable` to `anAmbiguousHitIsNotRoutableInEitherInstallState` and add
+      the not-installed colliding fixture plus the unambiguous positive of each install state; replace
+      `aNotInstalledHitIsNeverRoutable` with `aNotInstalledHitIsRoutableWhenItsIdentityIsUnambiguous`.
+      Confirm the failure is an **assertion** failure on the reversed expectation.
+- [ ] 2⁵.2 **GREEN** in `TapPackageSearch.swift`: `routable` becomes `collides == false && unique`.
+- [ ] 2⁵.3 **RED** in a new `TapInventoryDetailTests.swift`: the exactly-one-publisher row, the
+      zero/several/official rows, and the enumerated-facts row over `Mirror`. Confirm the failure is a
+      **compile** failure naming `TapInventoryDetail`.
+- [ ] 2⁵.4 **GREEN** in a new `Packages/CellarCore/Sources/BrewClient/TapInventoryDetail.swift`: the
+      value and `resolve(_:in:)`, composed over `TapProjection.thirdPartyTaps` and
+      `TapProjection.publishes(_:in:)`. Pure, `nonisolated`, `Sendable`; no `Catalog` value, no process.
+- [ ] 2⁵.5 `swift test --package-path Packages/CellarCore` whole against the phase-0⁵ baseline.
+- [ ] 2⁵.6 Commit `feat(search): resolve a not-installed tap package to its one publishing tap for a minimal detail`.
+
+## Phase 3⁵: WU23 — the app surface
+
+- [ ] 3⁵.1 `PackageDetailView.swift`: add `let taps: TapStore`; widen the shared header's `versionStory`
+      to `String?` and render the version line and its separator only when non-`nil`; add the **third**
+      `body` branch after the receipt branch. Both shipped header call sites must stay source-identical.
+- [ ] 3⁵.2 Create `cellar/Browse/PackageDetailView+TapInventory.swift`: the pane, calling the shared
+      header, the shared `fact(_:_:)` and the shared `MutationMenu` with
+      `PackageEntry(installed: nil, catalog: nil, id:)`, plus the file-private footer. No description, no
+      version, no homepage, no licence, no dependencies, no analytics, no size, no trust anything.
+- [ ] 3⁵.3 `cellar/ContentView.swift`: pass `taps: taps` at the **one** `PackageDetailView(` call site.
+- [ ] 3⁵.4 `cellar/Browse/TapSearchView.swift`: restate the inert-row comment — the bar is ambiguity, not
+      the install state. No behaviour change; the gate is still `hit.routableID`.
+- [ ] 3⁵.5 Add the new pane to `PerPackageTrustSources.views()` and its sorted anchor (`+` sorts before
+      `.`), so the no-local-marker guard covers the new detail surface.
+- [ ] 3⁵.6 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [ ] 3⁵.7 Commit `feat(browse): open a name-only detail for a tap package that is not installed`.
+
+## Phase 4⁵: WU24 — the composition guards
+
+- [ ] 4⁵.1 `TapSearchCompositionTests.swift`: rename `notInstalledTapRowsAreNotSelectable` to
+      `theTapSearchSurfaceSelectsOnRoutabilityAlone`, restating its recorded reason; add
+      `theNameOnlyTapDetailComposesNothingItCannotKnow` pinning the pane's field absences, its trust
+      absence, the third branch's **position** after the receipt branch, the `taps:` argument at the one
+      construction site, and the footer literal in exactly **one** place across the app sources.
+- [ ] 4⁵.2 Prove RED by **reversible mutation**: render a `Homepage` fact in the pane, and separately make
+      an ambiguous hit routable. Restore byte-identically and verify with `shasum -a 256 -c`.
+- [ ] 4⁵.3 Commit `test(browse): pin the name-only tap detail and the selection rule`.
+
+## Phase 6⁵: Verification and bindings (round 6)
+
+- [ ] 6⁵.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁵ baseline.
+- [ ] 6⁵.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+      phase-0⁵ baseline. **Redirect with `> log 2>&1`, never `tee`.** The full `-scheme cellar` runner is
+      **not** the gate — it is red on `main` from two pre-existing `cellarUITests` Taps failures.
+- [ ] 6⁵.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+      `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
+      `MutationCommand.swift`, `cellar/Activity/MutationMenu.swift` and `cellarUITests/` must print
+      **nothing** under `git diff --stat main --`. **`PackageDetailView.swift` is no longer zero-diff**:
+      show its full hunk and confirm it is limited to the third branch, the `taps:` parameter and the
+      widened `versionStory`.
+- [ ] 6⁵.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+      `size:exception`; never trim.
+- [ ] 6⁵.5 Merge the round-6 section into `apply-progress.md`, re-mirror it to Engram topic
+      `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks` — the
+      tasks mirror went stale in an earlier round and must not again.
+- [ ] 6⁵.6 Commit `docs(sdd): record the m11-tap-search round 6 apply progress`.

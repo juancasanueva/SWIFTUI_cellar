@@ -2,8 +2,8 @@
 
 Existing capability — `openspec/specs/package-search/spec.md` (**7 requirements / 19 scenarios**,
 established by `2026-08-01-m1-catalog-browse` and extended by `2026-08-02-m2-catalog-hardening`). This
-delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **20 scenarios** are added, taking the
-capability to **8 requirements / 39 scenarios**.
+delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **22 scenarios** are added, taking the
+capability to **8 requirements / 41 scenarios**.
 
 Nothing is removed, modified or renamed here, so `rules.archive`'s destructive-delta warning does not
 fire and PS1–PS7 stay byte-identical. In particular the index keeps its identity rule, its
@@ -65,12 +65,26 @@ on the row; round 5 makes the **verbs** agree with those marks. Nothing new is r
 already resident in the same installed inventory the offered version comes from — no verb is
 re-implemented, and the affordances stay unconditional with no trust gate (`package-mutation` PM10).
 
+**Maintainer product decision, 2026-08-25 (round 6) — binding, and this revision's reason.** The
+2026-08-24 decision that a not-installed hit is **non-selectable** is **reversed** in favour of the
+follow-up recorded beside it. A not-installed hit whose identity is **unambiguous** is now selectable
+and opens a **minimal, inventory-fed detail**: the identity the inventory publishes, the kind, the tap
+of origin, the install state, the shared mutation menu, and a footer saying plainly that Cellar knows
+this package by name only. Round 1's reason for withholding the route — “there is nothing honest to
+present” — was a claim about a *catalog* pane and a *tap-source* read, and both remain forbidden. What
+this round establishes is that the four names the resident inventory already publishes **are** honest
+to present, on exactly the terms `package-detail` PD6 and `tap-management` TM5 already grant the
+receipt-backed pane. **Ambiguity is untouched**: a colliding token or a duplicate `PackageID` still
+withholds the route in **either** install state, because the catalog-first resolution would open a
+different package than the row chosen. Nothing about tap-source reads, catalog records or trust
+presentation is weakened; the pane adds none of the three.
+
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
-| `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **13** |
-| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **7** |
+| `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **14** |
+| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **8** |
 
 ## ADDED Requirements
 
@@ -255,19 +269,56 @@ is the duplicate presentation II8 forbids. The withheld sentence is unaffected �
 five characters but is one indivisible pinned string, and it stays. Nothing here changes TM5 either,
 whose own tap-detail rows keep both withdrawn strings on the surface TM5 governs.
 
-An **installed** hit MUST open the receipt-backed detail `installed-inventory` owns, selected by its
-exact `PackageID` through the existing resolution order and with no new routing branch — **unless its
-identity is ambiguous**. An installed hit's identity is ambiguous when its bare token is also carried
-by the catalog for the same kind, or when another hit this source emits carries the same `PackageID`.
-In either case the hit MUST NOT be selectable, because the existing resolution order resolves the
-catalog first and would present a **different package** than the row the user chose. The projection
-MUST report that non-routability as a fact of the hit, so the presenting surface does not re-derive it.
+A hit MUST be selectable **exactly when its identity is unambiguous**, in **either** install state. A
+hit's identity is ambiguous when its bare token is also carried by the catalog for the same kind, or
+when another hit this source emits carries the same `PackageID`. An ambiguous hit MUST NOT be
+selectable, because the existing resolution order resolves the catalog first and would present a
+**different package** than the row the user chose. The projection MUST report that routability as a
+fact of the hit — a value a test can read directly — so the presenting surface does not re-derive it,
+and it MUST NOT be derived from the install state, which cannot express non-collision or uniqueness.
 An ambiguous hit MUST still be **presented and installable**: only its detail route is withheld, and
 its mutation target stays the bare `PackageID`.
 
-A **not-installed** hit MUST NOT be selectable either: the catalog carries no record for it, no receipt
-exists, and the tap-source read that would supply a description or a version is forbidden, so there is
-nothing honest to present in a detail pane.
+An **installed**, unambiguous hit MUST open the receipt-backed detail `installed-inventory` owns,
+selected by its exact `PackageID` through the existing resolution order.
+
+A **not-installed**, unambiguous hit MUST open a **minimal detail composed exclusively from the
+resident tap inventory**. That rendering MUST perform **no tap-source read** (TM5), MUST consult **no
+catalog record** and MUST create none (PD6), MUST add nothing to the catalog snapshot, to catalog
+search or to the index, and MUST cost **no brew invocation** — it is composed from names the tap has
+**already published** and from this machine's own installed inventory answering that it has none.
+
+That detail MUST present exactly: the package's **identity** — the bare token it is known by, drawn in
+the same identity header every other package detail draws; its **kind**; its **tap of origin**; its
+**install state**, carried by `tap-management` TM5's exact shipped string “Not installed.”; the
+**shared mutation menu**, handed no installed record and no catalog record, with the bare `PackageID`
+as its target; and a **footer** carrying the exact copy “Cellar knows this package by name only until
+it is installed.”. Where a hit collides with the catalog the pane MUST carry the same collision note
+the row carries, worded identically and supplied by the same projection — though no such pane is
+reachable while collision is itself a bar to selection, so that clause binds the composition rather
+than any reachable state.
+
+It MUST present **nothing else**. In particular it MUST NOT present a description, a version of any
+kind, a homepage, a licence, a dependency list, an install count, a deprecation or disabled flag, an
+analytics figure or a size on disk: the tap inventory publishes none of them, and obtaining any of them
+would require the tap-source read TM5 forbids unconditionally. An installed tap package gets those
+facts from its **receipt**, on the pane `installed-inventory` owns; a not-installed one has no receipt,
+and the absence is presented as an absence rather than filled with a placeholder, a dash or an empty
+row. The pane MUST also present **no trust badge, no trust control and no trust copy** — `package-trust`
+PM10 and `tap-management` TM12 bind it exactly as they bind the row — and `package-detail` PD8's
+individual-grant marker MUST NOT appear, because a package this machine has not installed has no
+origin receipt for that marker to be a fact about.
+
+The strings above MUST be **supplied by the same projection** that answers the composed source, never
+composed by the presenting pane, exactly as the row's own sentences are. The footer is this pane's own
+pinned copy and MUST be worded in exactly **one place** in the application's sources.
+
+Resolving a selected identity to that rendering MUST use the **resident tap inventory** and MUST resolve
+to a rendering **only when exactly one installed third-party tap publishes that `(kind, name)`**. Zero
+publishing taps, or several, MUST fall through to the ordinary unavailable-detail state the detail
+surface already renders, and MUST NOT guess a tap. That resolution MUST be answered by a pure,
+`nonisolated`, `Sendable` projection over the tap inventory, so it is observable with no view rendered
+and no process to inject.
 
 This source MUST be presented on its **own surface**, reachable as its own entry in the application's
 section list, carrying the exact title “Search our taps” in both that entry and the surface's own
@@ -397,15 +448,18 @@ method, same ceiling, unaffected by this source's existence.
   package's receipt is never attached to a tap row
 - Verification: `unit`
 
-#### Scenario: An installed hit with an ambiguous identity is not routable
+#### Scenario: A hit with an ambiguous identity is not routable, whatever its install state
 
-- GIVEN an installed tap hit whose bare token the catalog also carries for the same kind, and
-  separately two installed hits published by different taps that carry the same `PackageID`
+- GIVEN an installed tap hit whose bare token the catalog also carries for the same kind, a
+  not-installed hit whose bare token the catalog also carries, and two hits published by different taps
+  that carry the same `PackageID`
 - WHEN each hit's routability to a detail is read
 - THEN each of them reports itself as non-routable, so the catalog-first resolution can never present a
   different package than the row chosen
 - AND each is still presented and still offers its install, with the bare `PackageID` as the mutation
   target
+- AND an unambiguous hit of each install state reports its exact `PackageID` as routable, so the rule
+  is identity's alone and never the install state's
 - Verification: `unit`
 
 #### Scenario: Hide-installed composes above the tap source, and no outdated control exists
@@ -428,14 +482,15 @@ method, same ceiling, unaffected by this source's existence.
   ceiling, with no tap inventory in its turn
 - Verification: `unit`
 
-#### Scenario: The tap surface is its own titled entry, and its not-installed rows are inert
+#### Scenario: The tap surface is its own titled entry, and its ambiguous rows are inert
 
 - GIVEN the source of the surface that presents this source and the application's section list
-- WHEN the surface's title, its section-list entry, and the selectability of a not-installed hit are
+- WHEN the surface's title, its section-list entry, and the rule that gates a row's selection are
   inspected
 - THEN the section-list entry and the surface title are both exactly “Search our taps”
-- AND the surface is its own entry rather than a section of the catalog query surface, and a
-  not-installed hit is not selectable
+- AND the surface is its own entry rather than a section of the catalog query surface, and a row is
+  selectable on the projection's routability alone — so an ambiguous hit is inert and an unambiguous
+  not-installed hit is not
 - Verification: `unit-app`
 
 #### Scenario: An installed tap hit opens the receipt-backed detail
@@ -445,6 +500,36 @@ method, same ceiling, unaffected by this source's existence.
 - WHEN that choice is resolved by its exact `PackageID`
 - THEN the receipt-backed detail `installed-inventory` owns is presented, through the existing
   resolution order and with no routing branch added for this source
+- Verification: `unit-app`
+
+#### Scenario: A not-installed tap package resolves to exactly one publishing tap and its four names
+
+- GIVEN a resident tap inventory in which `acme/tools` publishes formula `acme/tools/widget` the
+  catalog does not carry, this Mac has no receipt for it, and separately a `(kind, name)` no installed
+  third-party tap publishes and a `(kind, name)` two third-party taps both publish
+- WHEN each identity is resolved against that inventory for a name-only detail
+- THEN `widget` resolves to exactly one rendering, whose facts are its bare token, its kind, its tap of
+  origin `acme/tools` and the exact install-state string “Not installed.”, with the footer copy
+  “Cellar knows this package by name only until it is installed.” and no other value of any kind — no
+  description, no version, no homepage, no licence, no dependency list, no install count, no
+  deprecation or disabled flag and no size
+- AND the unpublished identity and the doubly-published one both resolve to nothing, so no tap is
+  guessed
+- AND a package installed from a tap whose tap Homebrew withholds still resolves through the
+  receipt-backed route rather than through this one, because it has a receipt
+- Verification: `unit`
+
+#### Scenario: The name-only tap detail composes no catalog field and no trust presentation
+
+- GIVEN the sources of the detail surface and of the pane that renders a not-installed tap package
+- WHEN the pane is scanned for a description, a version, a homepage, a licence, a dependency list, an
+  analytics figure or a size field, for any trust type name, badge, control or grant marker, and for
+  where the resolution branch sits and where the pane's footer copy is worded
+- THEN the pane composes none of those fields and no trust presentation of any kind
+- AND the detail surface resolves this rendering in a **third** branch, after the catalog branch and
+  after the receipt branch, so an installed package still reaches its receipt-backed pane first
+- AND the resident tap inventory is passed to the detail surface at its single construction site, and
+  the footer copy appears in exactly one place in the application's sources
 - Verification: `unit-app`
 
 #### Scenario: The tap search surface composes no trust gate and no local copy
@@ -581,3 +666,17 @@ method, same ceiling, unaffected by this source's existence.
   reads. `package-detail` **PD6 is unaffected**: the record is the *installed* receipt, resolved by the
   tap-aware handoff, so a colliding hit still hands over its own tap row's receipt and never the catalog
   package's — the membership answer stays a collision `Bool` and contributes nothing to a hit's content.
+- **Round 6 reverses a 2026-08-24 decision and pins one new string.** The decision block above records
+  “a not-installed hit is non-selectable”; the round-6 block records the maintainer's reversal and the
+  reason. Only the **route** changes: ambiguity still withholds it, the mutation target is still the
+  bare `PackageID`, and no row presentation moves. The one new pinned string is the pane's footer,
+  “Cellar knows this package by name only until it is installed.”, which has no shipped precedent and
+  is added to the pinned-copy table in `specs/README.md`.
+- **Round 6 activates `package-detail` and `tap-management` rather than weakening either.** PD6 gains a
+  clause covering an inventory-fed *rendering* on the same four negations its receipt-backed clause
+  already carries, and TM5's tap-source prohibition is **reaffirmed** — the pane is composed from names
+  the tap already published, which is precisely why it is representable. Both are MODIFIED blocks in
+  this change with one added scenario each; neither loses a sentence.
+- **PD8 does not reach this pane.** The individual-grant marker is a fact about a receipt's tap of
+  origin, and a package this machine has not installed has no receipt. The pane asserts the marker's
+  **absence** rather than rendering it, so PD8 needs no delta for the third round running.

@@ -4,7 +4,7 @@ Existing capability — `openspec/specs/package-detail/spec.md` (**8 requirement
 established by `2026-08-01-m1-catalog-browse`, amended by `2026-08-06-m5-catalog-inspection`,
 `2026-08-24-m9-per-package-trust` and `2026-08-24-m10-third-party-detail`). This delta is **1 MODIFIED,
 0 added, 0 removed, 0 renamed**: the modified block keeps all **three** scenarios it carries today
-**byte-identical** and adds **1 scenario**, taking the capability to **8 requirements / 32 scenarios**.
+**byte-identical** and adds **2 scenarios**, taking the capability to **8 requirements / 33 scenarios**.
 
 Nothing is removed and no requirement is renamed, so `rules.archive`'s destructive-delta warning does
 not fire. The MODIFIED block is a whole-block replacement copied from the main spec and then edited; it
@@ -29,7 +29,7 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
-| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **1** |
+| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **2** |
 
 ## MODIFIED Requirements
 
@@ -56,7 +56,16 @@ additional brew invocation — so it neither satisfies nor violates this require
 read the catalog for **membership alone** — to report that a hit's bare token is also carried by the
 catalog — and that read produces no catalog result for the tap package, creates no catalog record, and
 adds nothing to the snapshot or to the index; it draws no catalog value into the hit beyond the fact of
-that collision. `package-search` owns that composed surface and states its own rules for it. What this requirement continues to forbid is unchanged and unweakened: no tap package MUST
+that collision. `package-search` owns that composed surface and states its own rules for it. The same boundary, on the
+same terms, binds a **rendering fed exclusively by the resident tap inventory**: a detail composed from
+the names an installed third-party tap has **already published** — its bare token, its kind, its tap of
+origin — together with this capability's neighbours answering that the machine holds no receipt for it
+is not a catalog detail lookup. It creates no catalog record, adds nothing to the snapshot, to catalog
+search or to the index, consults no catalog value beyond the membership answer already carved out
+above, and spawns no additional brew invocation, so it neither satisfies nor violates this requirement.
+It is the name-only counterpart of the receipt-backed rendering: where that one is complete because a
+receipt exists, this one is deliberately reduced because none does, and it presents the absence as an
+absence rather than filling it from a source it may not read. What this requirement continues to forbid is unchanged and unweakened: no tap package MUST
 enter the snapshot or the index, and no **catalog** result — nothing the catalog snapshot, the catalog
 index or the catalog detail lookup itself returns — MUST exist for a package the catalog does not cover.
 The clause "MUST NOT appear in search results" continues to bind every result the catalog projection
@@ -66,6 +75,10 @@ on any third-party detail rendering, including one built solely from the install
 (Previously: the boundary paragraph named only a receipt-backed **detail**, so the bare clause "MUST NOT
 appear in search results" was broad enough to read as a blanket ban on any search surface that finds a
 tap package, including one composed above the index from the resident tap inventory.)
+(Previously: the boundary paragraph's detail half was carved out for a rendering fed by the **installed
+receipt** alone, so a rendering fed by the resident **tap inventory** — for a package this machine does
+not have, and therefore has no receipt for — fell under neither carve-out and read as forbidden, even
+though it consults no catalog value and reads no tap source.)
 
 #### Scenario: A third-party tap package is a normal not-found
 
@@ -101,6 +114,17 @@ tap package, including one composed above the index from the resident tap invent
   synthesized or otherwise
 - Verification: `unit`
 
+#### Scenario: A name-only tap detail creates no catalog record either
+
+- GIVEN an installed third-party tap publishing a package the catalog does not carry and this machine
+  has not installed, for which a reduced detail is composed from the resident tap inventory alone
+- WHEN the catalog snapshot, catalog search and catalog detail lookup are queried for it
+- THEN it remains absent from the snapshot and from search results, and the detail lookup still returns
+  the ordinary not-found result
+- AND no catalog record exists for it, synthesized or otherwise, and the composed detail carries no
+  value the catalog publishes
+- Verification: `unit`
+
 ## Notes for archive
 
 - **The verification-class table above is NOT promoted.** `openspec/specs/package-detail/spec.md`
@@ -112,9 +136,12 @@ tap package, including one composed above the index from the resident tap invent
   three existing scenarios — including the one m10 added — are reproduced byte-identical.
   `openspec/specs/package-detail/spec.md` carries no `<!-- PD# -->` markers, so PD6 is an ordinal label
   used in prose, not a token in the file; the block is matched by its heading.
-- **PD8 needs no delta.** m11 renders no tap-of-origin fact on a *detail* surface: an installed tap hit
-  hands off to the m10 receipt-backed detail, where PD8's marker already applies unchanged, and a
-  not-installed hit is not selectable at all.
+- **PD8 needs no delta.** An installed tap hit hands off to the m10 receipt-backed detail, where PD8's
+  marker already applies unchanged. Round 6 gives an unambiguous **not-installed** hit a detail of its
+  own that *does* render a tap-of-origin fact — and PD8 still needs no delta, because its marker is a
+  fact about a **receipt's** origin and a package this machine has not installed has none. `package-search`
+  PS8 requires that pane to present the marker's **absence**, which is PD8's own positive-only rule
+  applied rather than amended.
 - The added paragraph is deliberately symmetric with m10's: same four negations (no catalog record,
   nothing added to the snapshot or search, no catalog value consulted, no additional brew invocation),
   plus the one this change needs — composed above the index, never pushed into it.

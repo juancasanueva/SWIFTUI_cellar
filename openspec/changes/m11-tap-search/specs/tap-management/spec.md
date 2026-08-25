@@ -4,11 +4,11 @@ Existing capability — `openspec/specs/tap-management/spec.md` (**13 requiremen
 established by `2026-08-05-m3-taps` and amended by `2026-08-23-m7-tap-trust`,
 `2026-08-24-m9-per-package-trust` and `2026-08-24-m10-third-party-detail`). This delta is **2 MODIFIED,
 0 added, 0 removed, 0 renamed**: each modified block keeps **every** scenario it carries today
-byte-identical and adds **1**, taking the capability to **13 requirements / 60 scenarios**.
+byte-identical and adds one or two, taking the capability to **13 requirements / 61 scenarios**.
 
 | Block | Heading | Existing scenarios (byte-identical) | Added |
 |---|---|---|---|
-| `<!-- TM5 -->` | Tap package inventory preserves identity without entering the catalog | 10 | 1 |
+| `<!-- TM5 -->` | Tap package inventory preserves identity without entering the catalog | 10 | 2 |
 | `<!-- TM11 -->` | Tap management does not expand into adjacent product capabilities | 2 | 1 |
 
 Nothing is removed and no requirement is renamed, so `rules.archive`'s destructive-delta warning does
@@ -40,7 +40,7 @@ Session preflight (cached, forwarded verbatim): `execution_mode=interactive`, `a
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
-| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **2** |
+| `unit` | RED-first assertion over an observable CellarCore behaviour | `swift test --package-path Packages/CellarCore` | **3** |
 
 ## MODIFIED Requirements
 
@@ -91,6 +91,15 @@ Every such consumer MUST still perform **no tap-source read**: that prohibition 
 binds this capability's own surfaces and every outside consumer alike, which is why a surface fed from
 this inventory can present a name, a kind, a tap of origin and an install state — and nothing more.
 
+That last clause is **reaffirmed, not relaxed, for a detail surface**: a consumer MAY compose a
+package **detail** from this inventory on exactly the terms above and no others, because the four
+things it presents are things the tap has **already published** rather than things a source read would
+have to fetch — which is precisely why such a detail carries no description, no version, no homepage,
+no licence, no dependency list, no install count, no deprecation or disabled flag and no size. A
+consumer that needs any of those for a package this machine does not have MUST do without it: the
+tap-source read remains forbidden here as everywhere, and the absence MUST be presented as an absence
+rather than filled from any other source.
+
 The inventory MUST be filterable by package name and kind. A large inventory MUST remain usable by
 presenting only the filtered/visible rows needed at a time rather than requiring every row to be
 presented eagerly.
@@ -103,6 +112,9 @@ including one built solely from the installed receipt.)
 (Previously: the catalog paragraph carved out a receipt-backed **detail** only, so its “catalog search”
 clause was broad enough to read as a ban on this inventory feeding any search surface at all, including
 one composed above the index and owned by another capability.)
+(Previously: the outside-consumer paragraph named a **search surface** only, so a *detail* composed from
+the same four already-published names had no stated home — leaving the unconditional tap-source
+prohibition to be read as a ban on the rendering rather than as the reason it is reduced.)
 
 #### Scenario: Only the selected tap prefix is normalized
 
@@ -198,6 +210,18 @@ one composed above the index and owned by another capability.)
 - AND no tap-source read is performed and no additional brew invocation is recorded
 - Verification: `unit`
 
+#### Scenario: A detail composed from this inventory carries the four published names and nothing else
+
+- GIVEN selected tap `acme/tools` publishes formula `acme/tools/widget`, the catalog carries no record
+  for `widget`, and this Mac has no receipt for it
+- WHEN an outside consumer composes a package **detail** for `widget` from this inventory
+- THEN everything it can present is enumerated, and it is exactly the bare token, the kind, the tap of
+  origin and the install state
+- AND no description, version, homepage, licence, dependency list, install count, deprecation flag,
+  disabled flag or size is representable, because no tap-source read is performed and none may be
+- AND no additional brew invocation is recorded
+- Verification: `unit`
+
 ### Requirement: Tap management does not expand into adjacent product capabilities
 
 The capability MUST NOT offer Brewfile import/export, package installation from tap inventory,
@@ -256,6 +280,11 @@ is the source — including a query surface owned by `package-search` and an ins
   following the precedent `2026-08-23-m7-tap-trust` recorded at
   `openspec/specs/installed-inventory/spec.md:948`. The class names used across this change are the
   established `unit` and `unit-app`; no new class is introduced.
+- **Round 6 reaffirms TM5's tap-source prohibition rather than carving another hole in it.** The added
+  paragraph grants a *detail* consumer exactly what the search paragraph already granted a *search*
+  consumer — the four already-published names — and restates that everything else stays unobtainable.
+  The prohibition's text is reproduced verbatim and its scope is unchanged: this capability's own
+  surfaces and every outside consumer alike.
 - The first MODIFIED block replaces **TM5** in place, under its existing `<!-- TM5 -->` marker; the
   second replaces the requirement under the existing **`<!-- TM11 -->`** marker. TM1–TM4, TM6–TM10,
   TM12 and TM13 are byte-identical, and every scenario both blocks carry today is reproduced
