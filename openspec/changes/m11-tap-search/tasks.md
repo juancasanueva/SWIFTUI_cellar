@@ -1090,24 +1090,27 @@ round 4. No new copy is pinned — the pill's wording belongs to the shared comp
 
 ## Phase 4‴: WU17 — the composition guards
 
-- [ ] 4‴.1 `TapSearchCompositionTests.swift`: a new `bothSearchSurfacesDrawTheOneSharedUpdatePill` —
+- [x] 4‴.1 `TapSearchCompositionTests.swift`: a new `bothSearchSurfacesDrawTheOneSharedUpdatePill` —
       both files reference `UpdateTag(nextVersion:`; `struct UpdateTag: View` is declared exactly once
       across the app sources; the tap row's reference sits **after** its `StatusPill.installed` (range
       comparison, as the round-3 pill row does); the gate is `hit.nextVersion` alone; and
       `TapSearchView.swift` carries no `"UPDATE"` or `"Update"` literal.
-- [ ] 4‴.2 Prove RED by **reversible mutation** of `TapSearchView.swift`: (a) replace the shared pill
+- [x] 4‴.2 Prove RED by **reversible mutation** of `TapSearchView.swift`: (a) replace the shared pill
       with a local `Text("UPDATE")`; (b) move it **above** `StatusPill.installed`. Restore
       byte-identically and verify with `shasum -a 256 -c`.
-- [ ] 4‴.3 Commit `test(taps): pin the shared update pill on outdated tap rows`.
+- [x] 4‴.3 Commit `test(taps): pin the shared update pill on outdated tap rows`.
 
 ## Phase 6‴: Verification and bindings (round 4)
 
 - [ ] 6‴.1 `swift test --package-path Packages/CellarCore` — record the total against the **1,870**
       baseline measured at `03be818`.
 - [ ] 6‴.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
-      **257** baseline measured at `03be818`. Never quote the raw `Test case … passed` line count as an
-      id count: parameterized tests print one line per case. The full `-scheme cellar` runner is **not**
-      the gate — it is red on `main` from two pre-existing `cellarUITests` Taps failures.
+      **258** baseline measured at `03be818`. Never quote the raw `Test case … passed` line count as an
+      id count: parameterized tests print one line per case. **Redirect with `> log 2>&1`, never `tee`**
+      — see the round-4 measurement gotcha; a `tee`d log interleaves xcodebuild's status block into a
+      `Test case …` line, and a line-based scan then drops that id and under-counts by one. The full
+      `-scheme cellar` runner is **not** the gate — it is red on `main` from two pre-existing
+      `cellarUITests` Taps failures.
 - [ ] 6‴.3 Bindings proof — `git diff --stat main --` over `cellar/Browse/BrowseView.swift`,
       `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
       `MutationCommand.swift`, `PackageDetailView.swift` and `cellarUITests/` must print **nothing**.

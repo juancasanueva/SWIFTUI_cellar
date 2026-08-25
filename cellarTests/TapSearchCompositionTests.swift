@@ -404,6 +404,87 @@ struct TapSearchCompositionTests {
         #expect(browse.code.contains("statusPill") == false)
     }
 
+    /// PS8's round-4 clause: the **same** update pill, in the same place.
+    ///
+    /// Shaped deliberately unlike the row above it. `StatusPill` had to be
+    /// extracted before "the same pill" was representable at all (DD-18);
+    /// `UpdateTag` was already `internal`, already drawn by the Installed and
+    /// Updates lists, and already took the version as a **value** — so round 4
+    /// costs `PackageRow.swift` a zero-line diff, and the claim here is that the
+    /// tap row *joined* an existing component rather than that one was built.
+    ///
+    /// One asymmetry is stated rather than papered over: `UpdateTag` is declared
+    /// **inside** `PackageRow.swift`, so "the presenting surface composes no
+    /// label" is provable for `TapSearchView.swift` and meaningless for
+    /// `PackageRow.swift`, where the surface and the declaration are one file.
+    /// The uniqueness of the declaration carries that half instead.
+    @Test("Both search surfaces draw the one shared update pill")
+    func bothSearchSurfacesDrawTheOneSharedUpdatePill() throws {
+        let surface = try TapSearchSources.surface()
+        let row = try TapSearchSources.packageRow()
+
+        // One component, declared once in the whole tree.
+        let declaring = try TapSearchSources.swiftSources()
+            .filter { $0.code.contains("struct UpdateTag: View") }
+        #expect(
+            declaring.map(\.name) == ["PackageRow.swift"],
+            "the update chip is declared in \(declaring.map(\.name)) rather than exactly once"
+        )
+
+        // Both surfaces reach for it, and both hand it the version as a value
+        // rather than wording anything about it themselves.
+        #expect(
+            row.code.contains("UpdateTag(nextVersion:"),
+            "the catalog row no longer draws the shared update pill"
+        )
+        #expect(
+            surface.code.contains("UpdateTag(nextVersion:"),
+            "the tap row does not draw the shared update pill"
+        )
+
+        // The tap row gates it on the offered version's presence **alone** — the
+        // projection already decided, and installed-ness is the other pill's
+        // question.
+        #expect(surface.code.contains("if let next = hit.nextVersion {"))
+        #expect(
+            surface.code.contains("UpdateTag(nextVersion: next)"),
+            "the tap row passes something other than the projection's offered version"
+        )
+        for forbidden in ["isOutdated", "catalogVersion", "installed.package("] {
+            #expect(
+                surface.code.contains(forbidden) == false,
+                "the view re-derives the offered version through \(forbidden)"
+            )
+        }
+
+        // …and it sits **after** the installed pill, exactly where the catalog
+        // row puts it, so the two rows read in the same order.
+        let tapInstalled = try #require(surface.code.range(of: "StatusPill.installed"))
+        let tapUpdate = try #require(surface.code.range(of: "UpdateTag(nextVersion:"))
+        #expect(tapInstalled.upperBound < tapUpdate.lowerBound)
+        let rowInstalled = try #require(row.code.range(of: "StatusPill.installed"))
+        let rowUpdate = try #require(row.code.range(of: "UpdateTag(nextVersion:"))
+        #expect(rowInstalled.upperBound < rowUpdate.lowerBound)
+
+        // The tap surface composes no update wording of its own: the pill's copy
+        // is the component's, and the component is not in this file.
+        for local in ["\"UPDATE\"", "\"Update\"", "\"Update available"] {
+            #expect(
+                surface.raw.contains(local) == false,
+                "the tap surface composes the update pill's copy locally: \(local)"
+            )
+        }
+        // Anchored, so the absence above is about this file rather than about a
+        // scan that read nothing: the label really does live with the component.
+        #expect(row.raw.contains("Text(\"UPDATE\")"))
+        #expect(row.code.contains("struct UpdateTag: View"))
+
+        // The zero-diff file is untouched for the third round running.
+        let browse = try TapSearchSources.browse()
+        #expect(browse.code.contains("UpdateTag") == false)
+        #expect(browse.code.contains("nextVersion") == false)
+    }
+
     // MARK: - ps15, PM10 — no trust gate, no badge, no control
 
     @Test("The tap search surface composes no trust gate and no badge")
