@@ -1,33 +1,33 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:0d37b0e0126de73c4cbae1aa66bdb5d5dd67b0d68cdd0ab195fd53277d3fc40e
+evidence_revision: sha256:a60257aca94c81e5f2c90fcbd468f1e7faa78a296cf2c64d07e6176a781c42da
 verdict: pass_with_warnings
 blockers: 0
 critical_findings: 0
 requirements: 5/5
-scenarios: 55/55
+scenarios: 56/56
 test_command: xcodebuild test -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64' -only-testing:cellarTests
 test_exit_code: 0
-test_output_hash: sha256:1e854542326006077a412faed5fa814687c123d9dd05cd3265cb28d2242001c8
+test_output_hash: sha256:c10780b0e08ef071d6f8074abb64dbfc233d2dbce1991fa61154216469166498
 build_command: xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'
 build_exit_code: 0
-build_output_hash: sha256:3767258fd147ccfafa87f0e4c930148547487f56d5a779520607f61dff924f05
+build_output_hash: sha256:b2fe5342782b36b3ca84eb20428448194282d1a87e22ac7d89498af2e90efec0
 ```
 
-## Verification Report — round 10 (supersedes rounds 1–9)
+## Verification Report — round 11 (supersedes rounds 1–10)
 
 **Change**: `m11-tap-search`
-**Version**: spec deltas **r9** — PS8 ADDED, PD6 MODIFIED, TM5 + TM11 MODIFIED, and a **new delta
-capability**: `installed-inventory` **MODIFIED II15**
+**Version**: spec deltas **r10** — PS8 ADDED (leading icon tile), PD6 MODIFIED, TM5 + TM11 MODIFIED,
+`installed-inventory` II15 MODIFIED
 **Mode**: Strict TDD, coverage threshold 0
-**Branch**: `feat/m11-tap-search` @ `5d8f659`, **51 commits** off `main` @ `edda9a5`, tree clean before
+**Branch**: `feat/m11-tap-search` @ `925ccf9`, **56 commits** off `main` @ `edda9a5`, tree clean before
 this run and carrying only this rewritten report after it
 **Artifact store**: hybrid — this file is canonical; Engram topic `sdd/m11-tap-search/verify-report`
 mirrors it. RDD disabled.
-**Delivery**: `single-pr` with a maintainer-accepted `size:exception`. The branch measures **10,604**
+**Delivery**: `single-pr` with a maintainer-accepted `size:exception`. The branch measures **11,153**
 changed lines — recorded, **not** a finding.
-**Independence**: fresh context. All runners re-executed at `5d8f659`; four reversible mutations of my
-own, none of them apply's two.
+**Independence**: fresh context. All runners re-executed at `925ccf9`, **not co-scheduled** (round 10's
+S12); four reversible mutations of my own.
 
 ---
 
@@ -36,184 +36,159 @@ own, none of them apply's two.
 | Round | Verdict | Substance |
 |---|---|---|
 | 2 `36f1b8d` | **fail** (34/35) | PS8 sc15's trust scan missed the projection. |
-| 3–7 | pass_with_warnings | Trust scan fixed; Installed pill; UPDATE pill; mutation handoff; name-only pane (42/42). |
-| 8 `21956b0` | **fail** (42/43) | Colliding hits selectable. **W1**: the selection scenario's install-state clause was unenforced. |
-| 9 `b93962d` | pass_with_warnings (43/43) | W1 closed by pinning the whole selection condition. |
+| 3–7 | pass_with_warnings | Installed pill; UPDATE pill; mutation handoff; name-only pane (42/42). |
+| 8 `21956b0` | **fail** (42/43) | Colliding hits selectable; the selection scenario's install-state clause unenforced. |
+| 9 `b93962d` | pass_with_warnings (43/43) | Closed by pinning the whole selection condition. |
+| 10 `5d8f659` | pass_with_warnings (55/55) | Shared Actions section on both tap panes; new `MODIFIED II15` delta. |
 
 ---
 
-### What round 8 of apply changed, and whether it is right
+### What round 9 of apply changed, and whether it is right
 
-Maintainer UI feedback: the tap-backed detail panes hung the installed **row's** `⋯` menu in their
-header, while the catalog pane answers the same question with a labelled **Actions section** at the foot.
-Two detail panes offered one package's verbs in two shapes and two places. Round 8 gives both tap-backed
-panes the catalog pane's **own** section and empties their header slot.
+The last visible half of the round-2 instruction *"a visual copy of Browse"*. Every catalog row and every
+Installed row opens with a leading icon tile; the tap rows opened with text. Rounds 3, 4 and 5 closed the
+chip, pill and verb halves of that drift; this closes the tile.
 
-| Obligation | Delivered | Verified |
+| Obligation (PS8 r10) | Delivered | Verified |
 |---|---|---|
-| Both tap panes present the **same** Actions section | `actionsSection(for:)` made `internal`, called from both extensions | ✅ **MU**, **MV**, **MW** |
-| Header primary slot empty; no `MutationMenu` | `EmptyView()`; `MutationMenu(` absent from both panes | ✅ |
-| Section sits **after** the pane's facts and footer | order asserted by range comparison | ✅ **MW** |
-| No verb, argv, target or section copy re-implemented | 4 tokens + 7 complete verb literals asserted absent | ✅ **MV** |
-| The shared menu untouched where it belongs | `MutationMenu.swift` **zero-diff**; `InstalledRow` still calls it | ✅ |
-| Catalog pane behaviour-preserved | see below | ✅ |
+| Same component, same leading position | `PackageIconTile(...)` first in the row | ✅ **MX**, **MZ** |
+| **Same argument shape** as the catalog row | call text **byte-identical** to `PackageRow.swift:34` | ✅ **MY2** |
+| Component declared exactly once | `CaskIconView.swift:68`, tree-walk asserted | ✅ |
+| Artwork deps optional, handed in by the shell | `var assets: CaskBrowseAssets?` / `var iconLoader: CaskIconLoader?`; `ContentView` passes `caskAssets` / `caskIcons` at the one call site | ✅ |
+| Tile not conditional on a catalog record | drawn for every hit; no catalog gate | ✅ |
+| Surface starts no load, no async work | `code` (comments stripped) contains no `.task`, `await ` or `async ` | ✅ |
+| Surface composes no artwork of its own | five forbidden constructors | ✅ **MX** |
 
-**The `MODIFIED II15` delta is mandatory, and apply's reasoning for it is right.** II15 pinned the verbs'
-**source** — *"the same mutation verbs the installed list row offers … obtained from the same shared
-mutation surface"*. Changing the source contradicts that clause; it is not a re-styling. The verb sets
-differ too (the section adds snooze, says `Pin version` where the menu says `Pin`, and shows a command
-line rather than `Copy install command`). A change that alters what a promoted requirement pins needs a
-delta, and this one has it.
+I compared the two call sites directly rather than by type name:
 
-#### II15 delta fidelity — checked against the promoted spec, not asserted
+```
+PackageRow.swift:34      PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)
+TapSearchView.swift:172  PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)
+```
 
-I compared the delta block against `openspec/specs/installed-inventory/spec.md` directly:
+— identical text. The `entry` is bound once per row and read twice, so the tile and the mutation menu are
+provably about the same package rather than two values that agree today.
 
-| Check | Result |
-|---|---|
-| Scenarios in the delta block | **12** |
-| Appearing **verbatim** in the promoted spec | **11** |
-| Replaced | **1** — `The surface offers the installed row's verbs and no trust control` → `The surface offers the catalog pane's Actions section and no trust control` |
-| Prose edits | **exactly one bullet replaced** (the verbs clause) **plus its `(Previously: …)` line**; every other line of the requirement body is unchanged |
+#### The fallback claim, verified by reading — with one precision
 
-My first pass reported only 10 verbatim, which was **my** artefact: II15 is the last requirement in the
-file, so my block extractor ran past its end and swallowed the archive notes into the final scenario.
-Re-testing the real claim — does each delta scenario appear verbatim in the promoted file — gives 11 of
-12. This is the same trailing-content trap apply itself recorded back in round 2, and it caught me here.
+The record states that an unknown cask token reaches `CaskIconView(isKnownToken: false)` → no CaskFlow
+rungs → the coloured initial tile. Reading the chain:
 
-#### The catalog pane refactor is behaviour-preserving
+- `PackageIconTile` branches on `id.kind` **only** — no catalog lookup anywhere. A formula gets
+  `FormulaIconTile` (a bundled asset, **zero network**); most tap packages are formulae.
+- A cask with a loader reaches `CaskIconView(token:size:isKnownToken: assets?.isKnownIconToken(name) ?? false, iconLoader:)`.
+  For a third-party tap's cask that gate is `false`.
+- With `icon == nil` and `loadsRemote == true`, the body renders `PackageTile(name: token, …)` — **the
+  coloured initial**. The visual claim is exactly right.
+- `CaskIconURL.candidateURLs(for:isKnownToken:)` returns `isKnownToken ? caskFlowIconURLs : []` **and
+  then appends the App-Fair URL**. So "no CaskFlow rungs" is correct, but it is **one rung, not zero**:
+  a tap cask still attempts a single App-Fair request, which normally 404s and then stamps a `.miss`
+  marker with a **24-hour** retry window (`isKnownToken ? 15min : 24h`), so later renders cost nothing.
+  The shipped `CaskIconURLTests.unknownTokenSkipsCaskFlow` pins exactly that single-URL result.
 
-`actionsSection(for package: CatalogPackage)` → `actionsSection(for entry: PackageEntry)`, `private` →
-internal. Inside the body the diff is exactly `package.id` → `entry.id` (three sites) and the removal of
-the now-redundant local `let entry = entry(for: package)`. All seven `detail-action-*` identifiers are
-**unchanged from `main`**, so the shipped UI tests keep their handles.
-
-The one substantive substitution is in `primaryCommand`, which read
-`installed.inventory.package(package.id)` and now reads `entry.installed`. At the catalog call site these
-are the **same value by construction**: `entry(for:)` is **unchanged vs `main`** and builds that member
-from that exact lookup. Apply flags this as a genuine simplification rather than a no-op (deviation 4),
-and that is the right characterisation — the new shape makes it impossible for the command line to
-disagree with the buttons above it.
-
-Exactly **one** visibility relaxation: `actionsSection`. `primaryCommand` stays `private`, and everything
-the section calls stays `private` because those calls are in the same file.
+The precision matters only for the record's phrasing, not for the design: deviation 5's actual claim —
+that adding `.task { await assets?.load() }` would buy nothing — is **correct**, because the asset
+catalog gates only the CaskFlow rungs and a tap cask is never in it either way. Recorded as **S13**.
 
 ---
 
-### Non-vacuity — four reversible mutations, none of them apply's
+### Non-vacuity — four reversible mutations
 
-Apply used "re-add `MutationMenu`" and a local `Button("Reinstall")`. I used four different probes. Each
-applied, run, restored with `shasum -a 256` matching the pre-mutation digest; `git status --porcelain`
-printed nothing after each. Suite-level `-only-testing:` filters throughout.
+Each applied, run, restored with `shasum -a 256` matching the pre-mutation digest;
+`git status --porcelain` printed nothing after each. Suite-level filters throughout.
 
 | # | Mutation | Expected | Observed |
 |---|---|---|---|
-| **MV** | reword a verb **inside** the shared section: `"Pin version"` → `"Pin"` | the exactly-once literal scan must bite | ❌ `theReceiptPaneOffersTheCatalogPanesActionsSection` only; other 6 passed |
-| **MW** | move the Actions call **above** the pane's footer | the placement clause must bite | ❌ same single test; other 6 passed |
-| **MU** | re-privatise `actionsSection` | the relaxation must be necessary | ❌ **compile error** — `'actionsSection' is inaccessible due to 'private' protection level` |
-| **MS/MT** (round 9, re-confirmed) | tap-surface selection gates | still enforced | ✅ `TapSearchCompositionTests` green on the shipped tree |
+| **MX** | replace the tile with `Image(systemName: "shippingbox")` | the no-local-artwork loop must bite | ❌ `bothSearchSurfacesDrawTheOneSharedIconTile` only; other **15** passed |
+| **MY2** | same component, **second pipeline**: `assets: nil` | the argument-shape pin must bite | ❌ same single test; other 15 passed |
+| **MZ** | move the tile **after** the kind chip | the leading-position pin must bite | ❌ same single test; other 15 passed |
+| **MY** | `id: hit.id` instead of `entry.id` | — | **type-impossible**: `hit.id` is `TapSearchHit.RowID`, not `PackageID` |
 
-**MV and MW** are clean assertion proofs. **MU** is a *necessity* proof rather than an assertion proof and
-I record it as such: it demonstrates that the two extension panes genuinely cannot reach a file-private
-declaration — which is DD-24's whole justification — while the test's
-`contains("private func actionsSection") == false` additionally guards against a silent re-privatisation.
+**MY2 is the valuable one**: it compiles, still draws a real tile through the shared component, and
+changes only which pipeline feeds it — precisely what a substring search for the type name would miss,
+and precisely what the byte-identical call-text assertion exists to catch.
+
+**MX is the one that matters for deviation 2**: it proves the relocated prohibition loop is now
+*reachable* under mutation. **MY** is an incidental finding worth recording: DD-2's decision to make
+`RowID` a distinct type from `PackageID` makes the most obvious wrong-identity substitution fail at
+compile time rather than at review.
 
 ---
 
-### Build & Tests Execution — re-executed at `5d8f659`
+### Build & Tests Execution — re-executed at `925ccf9`, not co-scheduled
 
 **Build**: ✅ `** BUILD SUCCEEDED **`, exit 0.
 
 | Runner | Exact result | Exit | Output sha256 |
 |---|---|---|---|
-| `xcodebuild test … -only-testing:cellarTests` (run 1) | `** TEST SUCCEEDED **` — **261 distinct ids**, 0 failed | 0 | `1e854542…01c8` |
-| `xcodebuild test … -only-testing:cellarTests` (run 2) | `** TEST SUCCEEDED **` — **261 distinct ids**, 0 failed | 0 | `3fd78d0c…4bba` |
-| `swift test --package-path Packages/CellarCore` (**clean run**) | **1,879 tests / 218 suites passed, 1 known issue** | 0 | `ac4a8da9…3a5c` |
-| `xcodebuild build … -scheme cellar` | `** BUILD SUCCEEDED **` | 0 | `3767258f…4f05` |
-| `swift test -c release … --filter 'TapPackageSearchTests'` | **36 tests / 1 suite passed**, latency rows green | 0 | `6db43a16…2a68` |
+| `swift test --package-path Packages/CellarCore` | **1,879 tests / 218 suites passed, 1 known issue** | 0 | `4f85f212…d355` |
+| `swift test -c release … --filter 'TapPackageSearchTests'` | **36 tests / 1 suite passed**, latency rows green | 0 | `bf91b22b…5c33` |
+| `xcodebuild test … -only-testing:cellarTests` (run 1) | `** TEST SUCCEEDED **` — **262 distinct ids**, 0 failed | 0 | `c10780b0…6498` |
+| `xcodebuild test … -only-testing:cellarTests` (run 2) | `** TEST SUCCEEDED **` — **262 distinct ids**, 0 failed | 0 | `ebd47502…e1d3` |
+| `xcodebuild build … -scheme cellar` | `** BUILD SUCCEEDED **` | 0 | `b2fe5342…fec0` |
 
-Latency holds under the 8 ms ceiling for the **ninth** consecutive round.
+**Round 10's S12 remedy works.** I ran both CellarCore suites **first and alone**, before any xcodebuild
+load, and `CatalogFootprintTests` passed on the first attempt — where co-scheduling produced a negative
+resident-memory measurement last round. Latency holds under the 8 ms ceiling for the **tenth**
+consecutive round.
 
-#### A CellarCore run failed, and I identified it rather than re-running until green
+#### Distinct ids — 262, by three methods
 
-My **first** `swift test` exited **1**: *"1879 tests in 218 suites failed … with 2 issues (including 1
-known issue)"*. The failure is:
-
-```
-CatalogFootprintTests.swift:71:9: Expectation failed: (widened.residentBytes → -125015552) > 0
-```
-
-That assertion is a **sanity check on the measurement itself**, not on any behaviour: `residentBytes` is
-a resident-memory delta between two samples, and a negative value is physically impossible as a
-footprint — it means the process's resident set was reclaimed between the baseline and the widened
-sample. Evidence that it is not ours:
-
-- `Packages/CellarCore/Sources/Catalog/` and `Packages/CellarCore/Tests/CatalogTests/` are both
-  **zero-diff** on this branch — the change touches neither the test nor its subject.
-- Re-running that suite alone: **2 tests passed**, exit 0.
-- Re-running the whole CellarCore suite with **no concurrent `xcodebuild`**: **1,879 / 218 passed**,
-  exit 0.
-
-The cause was my own method: I had run two full `xcodebuild test` passes and a build in the same job,
-and the memory pressure from that is exactly the reclaim condition this measurement cannot survive. The
-clean run is the authoritative evidence; the failed run is reported rather than discarded. This is a
-**third** distinct flake identity for this branch, after `OperationCenterCancelTests:183` and
-`MutationRefreshReceiptTests:214`, and it is a candidate identity for the unidentified transient apply
-records at its own phase 0⁷ (deviation 5) — though I have no evidence the two are the same, and I do not
-claim it. Recorded as **S12**.
-
-#### Distinct ids — 261, by three methods
-
-Run 1: 260 clean + 1 dropped = **261**. Run 2: 260 + 1 = **261**. Union of the two clean sets: **261**.
-Against round 9's union the delta is exactly one rename in and one out —
-`theReceiptPaneOffersTheSameVerbsAsTheRow()` → `theReceiptPaneOffersTheCatalogPanesActionsSection()` —
-so the count is unchanged at 261, matching apply's ±0. Progression: **257 → 258 → 259 → 260 → 261 → 261
-→ 261 → 261**.
+Run 1: 261 clean + 1 dropped = **262**. Run 2: 261 + 1 = **262**. Union of the two clean sets: **262**.
+Against round 10's union the delta is exactly **one addition and no removals** —
+`TapSearchCompositionTests/bothSearchSurfacesDrawTheOneSharedIconTile()` — matching apply's "+1 by
+`comm`". Progression: **257 → 258 → 259 → 260 → 261 → 261 → 261 → 261 → 262**.
 
 ---
 
 ### Spec Compliance Matrix
 
-**55 scenarios across 5 requirement blocks** — the totals grow this round because a **new capability**
-joins the delta set (`rg -c '^### Requirement:'` → **5**, `rg -c '^#### Scenario:'` → **55**):
-
-| Capability | Requirements | Scenarios |
-|---|---|---|
-| `package-search` (PS8, ADDED) | 1 | 22 |
-| `package-detail` (PD6, MODIFIED) | 1 | 6 |
-| `tap-management` (TM5, TM11, MODIFIED) | 2 | 15 |
-| **`installed-inventory` (II15, MODIFIED — new this round)** | **1** | **12** |
+**56 scenarios across 5 requirement blocks** (`rg -c '^### Requirement:'` → **5**,
+`rg -c '^#### Scenario:'` → **56**): `package-search` **23** (+1), `package-detail` 6,
+`tap-management` 15, `installed-inventory` 12.
 
 | Scenario | Test | Result |
 |---|---|---|
-| **II15: the surface offers the catalog pane's Actions section and no trust control** (replaced) | `ReceiptDetailCompositionTests > theReceiptPaneOffersTheCatalogPanesActionsSection` — call pinned **with its closing parenthesis**, placement by range comparison, `EmptyView()` header, `MutationMenu(` absent, 7 verb literals absent here and **exactly once** in the brace-matched section, plus the section's trust-freedom | ✅ COMPLIANT — **MV**, **MW** |
-| **PS8: the pane's actions clause** (amended) | `TapSearchCompositionTests` item amended; suite green | ✅ COMPLIANT |
-| II15's other 11 | verbatim from the promoted spec; shipped suites green | ✅ COMPLIANT |
-| The other 42 | unchanged and green | ✅ COMPLIANT |
+| **Both search surfaces open their rows with the one shared package icon tile** (new, `unit-app`) | `bothSearchSurfacesDrawTheOneSharedIconTile` — tree-walk uniqueness; **byte-identical call text** on both rows; five local-artwork constructors forbidden; the shared `entry` bound once and read by tile and menu; both optional properties asserted **against Browse**; leading position by range comparison on both rows; both `ContentView` call sites scoped by `callSite(…)`; and the zero-diff file re-checked | ✅ COMPLIANT — **MX**, **MY2**, **MZ** |
+| The other 55 | unchanged and green | ✅ COMPLIANT |
 
-The new test's shape deserves note: it extracts the section by **brace matching** so that claims about
-"the section" are scoped to the section — `PackageDetailView.swift` legitimately carries a trust marker
-and a catalog type elsewhere, and a whole-file sweep would convict the section of both. And its verb
-literals are complete Swift literals with the rationale recorded: `Uninstall` is a prefix of
-`Uninstall and Zap…`, and `Install` is a substring of `Installed as`, so a bare substring scan would
-produce both a false match and a false duplicate.
-
-**Compliance summary**: **55/55 compliant, 0 partial, 0 untested, 0 failing.**
+**Compliance summary**: **56/56 compliant, 0 partial, 0 untested, 0 failing.**
 
 ---
 
-### Invariants — re-run at `5d8f659`
+### Invariants — re-run at `925ccf9`
 
 | Path | Result |
 |---|---|
-| `cellar/Browse/BrowseView.swift` | ✅ **byte-identical to `main`** — tenth round running |
-| `cellar/Activity/MutationMenu.swift` | ✅ ZERO-DIFF — the menu was moved off two panes, never edited |
-| `cellar.xcodeproj/project.pbxproj` · `openspec/specs/**` · `cellarUITests/**` | ✅ ZERO-DIFF |
-| `PackageSearchIndex.swift` · `MutationCommand.swift` · `TapCommand.swift` · `TapProjection.swift` | ✅ ZERO-DIFF |
-| `Packages/CellarCore/Sources/Catalog/**` · `Tests/CatalogTests/**` | ✅ ZERO-DIFF |
-| `cellar/Browse/PackageDetailView.swift` | **+55/−18** vs `main` — round 6's branch hunks, this round's refactor, one relaxed `private` |
+| `cellar/Browse/BrowseView.swift` | ✅ **byte-identical to `main`** — eleventh round running |
+| `cellar/Casks/**` | ✅ ZERO-DIFF — including `CaskIconView.swift`, where the tile is declared |
+| `Packages/CellarCore/Sources/Catalog/**` | ✅ ZERO-DIFF — including `CaskIconURL.swift` |
+| `cellar/Activity/MutationMenu.swift` · `project.pbxproj` · `openspec/specs/**` · `cellarUITests/**` | ✅ ZERO-DIFF |
+| `TapProjection.swift` | ✅ ZERO-DIFF |
+| `cellar/Browse/PackageRow.swift` | **+6/−27** vs `main`, from **exactly one** commit — round 3's `30608ab` — and **unchanged since `2548e40`** |
 
-All seven `detail-action-*` accessibility identifiers are unchanged from `main`.
+The tile was reused, never edited: the component, its loader and its URL ladder are all untouched.
+
+---
+
+### Round-9 deviations, judged (six recorded, not five)
+
+| # | Deviation | Judgment |
+|---|---|---|
+| 1 | **`PackageRow.swift` is not zero-diff vs `main`, and the brief's bindings list said it should be** | **ACCEPT.** Verified exactly: **+6/−27**, from exactly one commit — round 3's `30608ab` — which is the diff **DD-18 exists to have produced**. Round 9 touches the file not at all. Recording the binding as "unchanged since `2548e40`" is the honest form, and saying so beats quietly satisfying a list that had gone stale. |
+| 2 | **The first mutation proved less than the design claimed, and the *test* was fixed rather than the claim softened** | **ACCEPT — the round's most valuable finding.** A prohibition loop placed **after** `try #require(...)` is only reached while the file is already correct, because the `#require` throws under the very mutation the loop is meant to catch. Moving it above turned 2 issues into 3. This is a general trap in Swift Testing, not a local slip, and **MX** independently confirms the relocated loop is now reachable. |
+| 3 | **`TapSearchView.swift`'s diff is far larger than estimated and almost all whitespace** | **ACCEPT.** Verified exactly: **+73/−40**, and `git diff -w` gives **+35/−2**. The re-indentation is forced by nesting the text column in an `HStack(spacing: 10)` to match `PackageRow`'s tile-to-name gap, rather than inheriting the outer stack's 6 — a 4-point mismatch on the one thing the round exists to fix. Reporting both figures is the right way to present it. |
+| 4 | **`systemImage:` had to leave the forbidden list** | **ACCEPT.** `TapSearchEmptyState` has passed it to `ContentUnavailableView` since round 2; forbidding it would fail the row on shipped, correct code. The five constructors that remain are every way this file could draw artwork itself. |
+| 5 | **No `.task { await assets?.load() }`, unlike `BrowseView`** | **ACCEPT.** Both reasons hold: DD-12 forbids async work in this file, and the asset catalog gates only CaskFlow rungs, which a tap cask never reaches. See **S13** for one phrasing precision — the tile still attempts a single App-Fair rung, so "no CaskFlow rungs" is exact but "no network" would not be. |
+| 6 | **`WU32` shipped before `WU33` in commit order, and the test was still written first** | **ACCEPT.** Authored to a genuine 6-issue RED before any production line existed, committed after so each commit carries one kind of change. The record says which is which rather than letting the log imply otherwise. |
+
+**Six accepted, zero rejected.**
+
+A small note on the doc comment at `TapSearchView.swift:42-43`: it explains the absent `.task` and so
+contains the literal `.task` and `await`. Harmless, and anticipated by the round-2 test design —
+comments are stripped before the process-layer scan, precisely so a prohibition *described* in prose is
+never mistaken for one violated in code. I verified all three occurrences are comment lines and that the
+stripped `code` contains none.
 
 ---
 
@@ -221,35 +196,20 @@ All seven `detail-action-*` accessibility identifiers are unchanged from `main`.
 
 | Metric | Value |
 |--------|-------|
-| Task checkboxes total | 262 |
-| Complete | **260** |
+| Task checkboxes total | 286 |
+| Complete | **284** |
 | Incomplete | **2** — `6.7` (round 1, **VOID**) and `6′.7` (open the PR) |
 
-Round 8 added 26 boxes and completed all 26 (234 + 26 = 260).
-
----
-
-### Round-8 deviations, judged
-
-| # | Deviation | Judgment |
-|---|---|---|
-| 1 | **A `MODIFIED II15` delta was required on a reading the brief did not spell out** | **ACCEPT, and this is the round's most important call.** II15 names neither `MutationMenu` nor the header slot, so "no delta needed" was a reachable and wrong conclusion. What it pins is the verbs' **source**, and that is what changed — with the verb sets differing too. Apply recorded the wrong reading explicitly so the next reader does not re-derive it. |
-| 2 | **The RED was genuine, not mutation-based — a change from rounds 3–7** | **ACCEPT.** Guards written and run before any production edit, failing on production that did not exist; the two mutations were then run as well, because a genuine RED proves the row bites on *absence* while mutations prove it bites on reintroduction. Both reported. The strongest evidence shape used on this branch so far. |
-| 3 | **WU29 shipped as two commits; the intermediate one is green on its own terms** | **ACCEPT.** At `d1781a7` the panes still hang the menu and the guard rows were uncommitted, and the app suite passes. Test-first authoring and commit order are independent, and the record says which is which. |
-| 4 | **`primaryCommand`'s source of truth narrowed** | **ACCEPT — and I verified the equivalence rather than taking it.** `entry(for:)` is unchanged vs `main` and builds `installed` from exactly the lookup `primaryCommand` used to perform, so the catalog pane's behaviour is preserved; and the new shape means the command line cannot disagree with the buttons for an entry built elsewhere. |
-| 5 | **One transient CellarCore failure reported unidentified** | **ACCEPT as reported.** I hit one too and identified it (`CatalogFootprintTests:71`); I cannot show they are the same, and do not claim it. See **S12**. |
-| 6 | **`specs/README.md`'s "activated, not changed" section was stale the moment the delta was written** | **ACCEPT.** II7 and II8 remain activation-only; II15 no longer is, and the section says so. Catching a summary that stopped being true in the same commit that falsified it is the discipline earlier rounds had to learn twice. |
-
-**Six accepted, zero rejected.**
+Round 9 added 24 boxes and completed all 24 (260 + 24 = 284).
 
 ---
 
 ### Commit hygiene and branch size
 
-- **51 commits**, all Conventional Commits, **no AI attribution**.
-- Round 8's five are correctly ordered and correctly typed — notably `refactor(browse):` for the
-  behaviour-preserving extraction, distinct from the `feat(browse):` that changes the panes.
-- `git diff --shortstat main...HEAD` → **33 files, +10,511/−93 = 10,604 authored lines**, matching
+- **56 commits**, all Conventional Commits, **no AI attribution**.
+- Round 9's four are correctly ordered and typed: `docs(sdd)` amendment, `feat(taps)`, `test(taps)`,
+  `docs(sdd)` record.
+- `git diff --shortstat main...HEAD` → **33 files, +11,060/−93 = 11,153 authored lines**, matching
   apply's figure exactly.
 - Working tree clean at start; only this report modified at the end.
 
@@ -262,8 +222,8 @@ Round 8 added 26 boxes and completed all 26 (234 + 26 = 260).
 **WARNING** (3):
 
 - **W1 — one task is open: `6′.7`, "Delivery — one PR".** Deferred again by instruction. The drafted body
-  needs the final figures — **10,604** lines, **261** distinct ids — and a statement that both
-  tap-backed panes now present the catalog pane's Actions section.
+  needs the final figures — **11,153** lines, **262** distinct ids — and a statement that the tap rows
+  now carry the shared icon tile.
   **Remediation**: open the PR, then tick `6′.7`. No code changes.
 
 - **W2 — the latency scenario is not exercised by the spec's declared `unit` runner.** Both rows are
@@ -271,53 +231,52 @@ Round 8 added 26 boxes and completed all 26 (234 + 26 = 260).
   runner, which this session ran. Mirrors the shipped PS6 precedent.
 
 - **W3 — the exact latency figures remain unreproducible**, emitted only inside the `#expect` failure
-  message. The binding clause — both turns under **8 ms** — is confirmed for the ninth round.
+  message. The binding clause — both turns under **8 ms** — is confirmed for the tenth round.
 
-**SUGGESTION** (12):
+**SUGGESTION** (13):
 
 **S1** tautological assertion in `TapPackageSearchTests.swift` · **S2** `AppSection.tapSearch.title` is
 unreachable and DD-14 wrongly calls it spec-pinned · **S3** PS8 sc17's zero-diff half has no shipped
-enforcement, hand-verified **ten** rounds; a CI step would end the manual check · **S4** correct the
+enforcement, hand-verified **eleven** rounds; a CI step would end the manual check · **S4** correct the
 design's wiring table to ten sites · **S5** DD-17 says "the four empty states" are pinned where the spec
 pins two · **S6** non-building intermediate commits in rounds 2–3 only · **S7** the branch-size figure
-moves with the verify report and has moved both up and down; state the convention once at archive ·
-**S8** rename drift in `design.md`/`tasks.md`, now four tests including
-`theReceiptPaneOffersTheSameVerbsAsTheRow` · **S9** round-3 deviation 3's "names no trust concept" is
-loose · **S10** record the distinct-id rule at archive: **membership**, plus the **two-run union** ·
-**S11** the round-6 ledger arithmetic still does not foot (25 declared, +32 measured) · **S12 (new)**
-`CatalogFootprintTests` measures a resident-memory delta and cannot survive concurrent `xcodebuild`
-load; do not co-schedule `swift test` with `xcodebuild` runs, and record the identity so the next
-transient is recognised rather than re-investigated.
+moves with the verify report, up and down; state the convention once at archive · **S8** rename drift in
+`design.md`/`tasks.md`, four tests · **S9** round-3 deviation 3's "names no trust concept" is loose ·
+**S10** record the distinct-id rule at archive: **membership**, plus the **two-run union** · **S11** the
+round-6 ledger arithmetic still does not foot · **S12** do not co-schedule `swift test` with
+`xcodebuild`; `CatalogFootprintTests` measures a resident-memory delta and cannot survive the load —
+**the remedy worked this round** · **S13 (new)** record that an unknown cask token skips the **CaskFlow**
+rungs but still attempts **one** App-Fair URL, cached as a 24-hour miss; "no CaskFlow rungs" is exact
+where "no network" would not be, and formula hits draw a bundled asset with no request at all.
 
 ---
 
 ### Verdict
 
-**PASS WITH WARNINGS.** 0 blockers, 0 CRITICAL, 3 WARNING, 12 SUGGESTION, requirements **5/5**,
-scenarios **55/55**.
+**PASS WITH WARNINGS.** 0 blockers, 0 CRITICAL, 3 WARNING, 13 SUGGESTION, requirements **5/5**,
+scenarios **56/56**.
 
-The round's substance is a consolidation rather than a new capability: two detail panes stop hanging the
-list row's menu in their header and call the catalog pane's own Actions section instead. What makes it
-verifiable is the refactor underneath — `actionsSection` rebuilt to take a `PackageEntry` and relaxed to
-internal, which is the minimum that makes "the same section" a claim about **one declaration reached from
-two places** rather than about two things that look alike. I confirmed the catalog pane is behaviour-
-preserved down to the one substitution that could have hidden a change, and that every accessibility
-identifier survived.
+The final visual half of "a visual copy of Browse" is closed the same way the other three were: by
+reusing the shared component rather than reproducing it. The tile is drawn by a call whose text is
+**byte-identical** to the catalog row's, from a component that is untouched — `cellar/Casks/**` and the
+whole `Catalog` target carry zero diffs — with the artwork dependencies handed in by the same shell that
+hands them to Browse, and with no load started on this surface at all.
 
-The judgment I most expected to have to argue with — whether a `MODIFIED II15` delta was needed at all —
-apply got right, and for the right reason: II15 pins the verbs' *source*, not their spelling, so changing
-the source contradicts it. I checked the delta against the promoted spec directly and found 11 of 12
-scenarios verbatim with the prose edit confined to that one clause and its provenance line. My own first
-count said 10, and that was my extraction artefact, not apply's error.
+Two judgments were worth making carefully. Apply's deviation 2 is the best methodological catch of the
+whole change: a prohibition placed after a `try #require` is unreachable under exactly the mutation it
+exists to catch, because the `#require` throws first — so the loop was moved above it and the mutation
+re-run from 2 issues to 3. My **MX** confirms the relocated loop now bites. And deviation 1 corrects the
+brief's own bindings list rather than quietly satisfying it: `PackageRow.swift` cannot be zero-diff
+against `main`, because round 3's DD-18 extraction deliberately produced that diff; I verified it is
++6/−27 from exactly one commit and untouched this round.
 
-Four mutations of my own hold the new guards: two clean assertion proofs on the verb literals and the
-section's placement, and one compile-level demonstration that the visibility relaxation is necessary
-rather than convenient.
+One precision belongs in the record rather than in the code. The fallback chain does render the coloured
+initial tile for a tap cask, as claimed — but `candidateURLs` skips the CaskFlow rungs and still appends
+App-Fair, so a tap cask attempts one request, cached as a 24-hour miss. "No CaskFlow rungs" is exact;
+"no network" would not be. The design conclusion it supports — that loading the asset catalog would buy
+this surface nothing — is unaffected and correct.
 
-One runner failed and I did not re-run until it went green. `CatalogFootprintTests` asserts its own
-measurement is positive; under the memory pressure of my concurrently-scheduled `xcodebuild` runs it went
-negative, which is impossible as a footprint and diagnostic of reclaim. The suite alone passes, the full
-suite unloaded passes, and the branch touches neither the test nor its subject. The clean run is the
-evidence; the failure is reported with its identity, which is one more than the branch had before.
+Three mutations of my own hold the new guard, and the one that matters most compiles, still draws a real
+tile, and changes only the pipeline behind it.
 
 **`m11-tap-search` is archive-ready.**
