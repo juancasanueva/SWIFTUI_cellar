@@ -200,8 +200,8 @@ struct TapSearchCompositionTests {
         #expect(surface.code.contains("catalog.packageCount") == false)
     }
 
-    @Test("The tap surface resolves through the shared detail with no new branch")
-    func theTapSurfaceResolvesThroughTheSharedDetail() throws {
+    @Test("The tap surface resolves through the shared detail, which grows no arm for it")
+        func theTapSurfaceResolvesThroughTheSharedDetail() throws {
         let surface = try TapSearchSources.surface()
         let root = try TapSearchSources.source(at: "cellar/ContentView.swift")
         let detail = try TapSearchSources.source(at: "cellar/Browse/PackageDetailView.swift")
@@ -211,17 +211,43 @@ struct TapSearchCompositionTests {
         #expect(root.code.contains("@State private var selection: PackageID?"))
         #expect(surface.code.contains("@Binding var selection: PackageID?"))
         #expect(root.code.contains("case .browse, .tapSearch, .installed, .favorites, .updates:"))
-        for forbidden in ["TapSearchHit", "TapPackageSearch", "TapSearchView", "TapInventory"] {
+        // The shared detail knows nothing about the tap **search** surface: not
+        // its hit type, not its projection, not the view itself. That is what
+        // "no branch of its own" has always meant here, and it is unchanged.
+        for forbidden in ["TapSearchHit", "TapPackageSearch", "TapSearchView"] {
             #expect(
                 detail.code.contains(forbidden) == false,
                 "PackageDetailView grew a branch for \(forbidden)"
             )
         }
+        // Round 6 narrows this row rather than dropping it. `TapInventory` left
+        // the forbidden list because the shared detail now resolves a name-only
+        // pane from the resident inventory — a **third branch of the shared
+        // view**, reached by any surface that selects such an identity, and not
+        // a branch belonging to the tap search surface. The narrowing is spelt
+        // out positively so it cannot quietly widen: the only inventory the
+        // detail may name is the resolution's, keyed on the bare `PackageID`.
+        #expect(detail.code.contains("TapInventoryDetail.resolve("))
+        #expect(
+            detail.code.components(separatedBy: "TapInventory").count == 2,
+            "PackageDetailView names the tap inventory somewhere beyond the one resolution"
+        )
         #expect(surface.code.contains("TapSearchSelection") == false)
     }
 
-    @Test("Not-installed and ambiguous tap rows are not selectable")
-    func notInstalledTapRowsAreNotSelectable() throws {
+    /// Round 6 (DD-21) renamed this row and rewrote its recorded reason; its
+    /// **subject never moved**. Selection was gated on `hit.routableID` alone
+    /// before the reversal and is gated on it alone after, which is precisely
+    /// why the reversal cost the view nothing: the projection changed its mind
+    /// about which hits are routable, and the surface — which never knew the
+    /// rule — needed no edit at all.
+    ///
+    /// The inert case is now **ambiguity**, in either install state. The four
+    /// forbidden tokens below are unchanged and are what keep that true: a view
+    /// that re-derived non-collision or uniqueness would be a second opinion on
+    /// the one rule the projection owns.
+    @Test("The tap search surface selects on the projection's routability alone")
+    func theTapSearchSurfaceSelectsOnRoutabilityAlone() throws {
         let surface = try TapSearchSources.surface()
 
         #expect(surface.code.contains(".selectionDisabled("))
@@ -243,11 +269,13 @@ struct TapSearchCompositionTests {
         // read off the hit, and the facts behind it are never consulted.
         //
         // `hit.isInstalled` left this list in round 3, deliberately and
-        // narrowly. The row now reads it to draw the shared pill, and a `Bool`
-        // about installation **cannot** express routability: routing
-        // additionally requires the hit to be uncollided and unique, and those
-        // are the two facts still forbidden below. The guard's subject is
-        // unchanged.
+        // narrowly. The row reads it to draw the shared pill, and a `Bool`
+        // about installation **cannot** express routability: routing requires
+        // the hit to be uncollided and unique, and those are the two facts still
+        // forbidden below. Round 6 made that separation load-bearing rather than
+        // merely tidy — install state and routability are now genuinely
+        // independent, so a view consulting the first to guess the second would
+        // be wrong about real rows rather than only ill-mannered.
         for forbidden in ["alsoInCatalog", "hit.state ==", "== .notInstalled", "occurrences"] {
             #expect(
                 surface.code.contains(forbidden) == false,
@@ -262,6 +290,125 @@ struct TapSearchCompositionTests {
             surface.code.contains(".selectionDisabled()")
                 && surface.code.contains("hit.isInstalled ? ") == false,
             "selection is gated on installed-ness rather than on the projection's routability"
+        )
+    }
+
+    // MARK: - PS8 round 6, DD-21/DD-22 — the name-only detail
+
+    /// The pane's whole contract is an **absence**, which is why it is asserted
+    /// structurally: a rendering test would show what the pane draws, never that
+    /// nothing else could ever reach it.
+    @Test("The name-only tap detail composes nothing it cannot know")
+    func theNameOnlyTapDetailComposesNothingItCannotKnow() throws {
+        let pane = try TapSearchSources.source(at: "cellar/Browse/PackageDetailView+TapInventory.swift")
+        let detail = try TapSearchSources.source(at: "cellar/Browse/PackageDetailView.swift")
+        let root = try TapSearchSources.source(at: "cellar/ContentView.swift")
+
+        // Positively anchored: the scan really did read the pane, so every
+        // absence below is about this file rather than about a rename.
+        #expect(
+            pane.code.contains("func tapInventoryContent(for published: TapInventoryDetail)"),
+            "the pane scan read a file that does not supply the name-only detail"
+        )
+
+        // 1. No field the tap inventory does not publish. Each would need the
+        //    tap-source read TM5 forbids; an installed package gets them from
+        //    its receipt, one branch above.
+        //
+        //    Matched **case-insensitively**, because a fact has two spellings
+        //    here — the projection member `homepage` and the rendered label
+        //    `"Homepage"` — and a case-sensitive scan would catch the first
+        //    while a hand-written label walked past it.
+        let lowered = pane.code.lowercased()
+        for forbidden in [
+            "desc", "homepage", "license", "dependencies", "dependents", "caveats",
+            "analytics", "installCount", "deprecated", "disabled",
+            "Size on disk", "sizeOnDisk(", "installedAs(", "versionStory(",
+            "catalogVersion", "InstalledDetailProjection", "PackageInspectionSection",
+            "ReleaseNotesSection"
+        ] {
+            #expect(
+                lowered.contains(forbidden.lowercased()) == false,
+                "the name-only pane composes \(forbidden), which its source cannot answer"
+            )
+        }
+        // 2. No collision note. It could never be reached — the catalog carries
+        //    a colliding token, so the catalog branch resolves it first — and
+        //    unreachable presentation is worse than none.
+        #expect(pane.raw.contains("Also in the catalog") == false)
+        #expect(pane.code.contains("collision") == false)
+        // 3. No trust presentation of any kind (PM10, TM12, PD8).
+        for trust in [
+            "TrustGrant", "grantsIndividually", "grantMarker", "TapTrustState",
+            "Untrusted", "trustGrants"
+        ] {
+            #expect(
+                pane.code.contains(trust) == false,
+                "the name-only pane composes a trust presentation: \(trust)"
+            )
+        }
+        // 4. It declares no verb, no argv and no mutation target of its own: the
+        //    shared spine takes an entry with neither record and the bare token.
+        #expect(pane.code.contains("MutationMenu(center: operations"))
+        #expect(pane.code.contains("PackageEntry(installed: nil, catalog: nil, id: published.id)"))
+        for local in ["MutationCommand", "PackageTarget(", "submit(", "FormulaID", "CaskID"] {
+            #expect(
+                pane.code.contains(local) == false,
+                "the name-only pane builds its own \(local)"
+            )
+        }
+        // 5. Both sentences are the projection's, rendered as values. Neither
+        //    appears in the app's own sources at all.
+        #expect(pane.code.contains("published.stateCopy"))
+        #expect(pane.code.contains("published.footerCopy"))
+        let appSources = try TapSearchSources.appSources()
+        #expect(appSources.count > 40, "the app-source walk read almost nothing")
+        for pinned in TapSearchSources.paneCopy {
+            for source in appSources {
+                #expect(
+                    source.raw.contains(pinned) == false,
+                    "\(source.name) words the pane's copy locally: \(pinned.debugDescription)"
+                )
+            }
+        }
+        // Non-vacuous: both strings really are alive, in the one place that owns
+        // them. Without this the absence above would also pass if the copy had
+        // simply been deleted.
+        let projection = try TapSearchSources.source(
+            at: "Packages/CellarCore/Sources/BrewClient/TapInventoryDetail.swift"
+        )
+        for pinned in TapSearchSources.paneCopy {
+            #expect(
+                projection.raw.contains(pinned),
+                "the projection no longer supplies \(pinned.debugDescription)"
+            )
+        }
+
+        // 6. The branch sits **third**: catalog, then this Mac's receipt, then
+        //    the tap inventory. An installed package therefore always reaches
+        //    its receipt pane, and this one answers only for a package the Mac
+        //    does not have.
+        let catalogBranch = try #require(detail.code.range(of: "if let package = catalog.package(id)"))
+        let receiptBranch = try #require(
+            detail.code.range(of: "else if let snapshot = installed.inventory.package(id)")
+        )
+        let inventoryBranch = try #require(
+            detail.code.range(of: "else if let published = TapInventoryDetail.resolve(")
+        )
+        #expect(catalogBranch.upperBound < receiptBranch.lowerBound)
+        #expect(receiptBranch.upperBound < inventoryBranch.lowerBound)
+        // …and the fall-through is still the shipped unavailable state, so zero
+        // or several publishing taps present nothing rather than a guess.
+        #expect(detail.code.contains("ContentUnavailableView("))
+
+        // 7. The inventory is passed in at the one construction site, from the
+        //    store the shell already holds.
+        #expect(detail.code.contains("let taps: TapStore"))
+        let call = try TapSearchSources.callSite("PackageDetailView(", in: root.code)
+        #expect(call.contains("taps: taps"))
+        #expect(
+            root.code.components(separatedBy: "PackageDetailView(").count == 2,
+            "the shared detail is constructed in more than one place, so this call proves less than it reads"
         )
     }
 
@@ -683,6 +830,20 @@ nonisolated enum TapSearchSources {
     ///
     /// Both survive untouched in `TapProjection.statusExplanation`, which serves
     /// the tap-detail rows TM5 governs — this claim is about these two files.
+    /// The two sentences the **name-only detail pane** shows, both supplied by
+    /// `TapInventoryDetail` and neither worded anywhere in the app target.
+    ///
+    /// `Not installed.` is TM5's shipped string. Round 3 withdrew it from the
+    /// tap **row**, where a pill answers instead; round 6 puts it back on a
+    /// **pane**, which has no pill and therefore has to say it. The two claims
+    /// are about different surfaces and both hold — which is why the row's
+    /// withdrawal above is scanned over `projection` and `surface` only, and
+    /// this one over the app sources.
+    static let paneCopy = [
+        "Not installed.",
+        "Cellar knows this package by name only until it is installed."
+    ]
+
     static let withdrawnCopy = [
         "\"Installed.\"",
         "\"Not installed.\""
@@ -705,6 +866,21 @@ nonisolated enum TapSearchSources {
 
     static func load() throws -> [Source] {
         try paths.map { try source(at: $0) }
+    }
+
+    /// Every Swift file the **app target** is built from, and nothing else.
+    ///
+    /// Deliberately narrower than `swiftSources()`: the pane's two sentences are
+    /// *supposed* to exist, in `TapInventoryDetail`, so a walk that included the
+    /// package would report the projection guilty of carrying the copy it is
+    /// required to carry.
+    static func appSources() throws -> [Source] {
+        let base = repositoryRoot.appendingPathComponent("cellar")
+        guard let walk = FileManager.default.enumerator(atPath: base.path) else { return [] }
+        return try walk.compactMap { entry -> Source? in
+            guard let relative = entry as? String, relative.hasSuffix(".swift") else { return nil }
+            return try source(at: "cellar/\(relative)")
+        }
     }
 
     /// Every Swift file the app target and the tap projection are built from.

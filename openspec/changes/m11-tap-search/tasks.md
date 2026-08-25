@@ -1276,16 +1276,16 @@ measured total; never trim. RDD disabled. Strict TDD active.
 - [x] 3⁵.5 Add the new pane to `PerPackageTrustSources.views()` and its sorted anchor (`+` sorts before
       `.`), so the no-local-marker guard covers the new detail surface.
 - [x] 3⁵.6 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
-- [ ] 3⁵.7 Commit `feat(browse): open a name-only detail for a tap package that is not installed`.
+- [x] 3⁵.7 Commit `feat(browse): open a name-only detail for a tap package that is not installed`.
 
 ## Phase 4⁵: WU24 — the composition guards
 
-- [ ] 4⁵.1 `TapSearchCompositionTests.swift`: rename `notInstalledTapRowsAreNotSelectable` to
+- [x] 4⁵.1 `TapSearchCompositionTests.swift`: rename `notInstalledTapRowsAreNotSelectable` to
       `theTapSearchSurfaceSelectsOnRoutabilityAlone`, restating its recorded reason; add
       `theNameOnlyTapDetailComposesNothingItCannotKnow` pinning the pane's field absences, its trust
       absence, the third branch's **position** after the receipt branch, the `taps:` argument at the one
       construction site, and the footer literal in exactly **one** place across the app sources.
-- [ ] 4⁵.2 Prove RED by **reversible mutation**: render a `Homepage` fact in the pane, and separately make
+- [x] 4⁵.2 Prove RED by **reversible mutation**: render a `Homepage` fact in the pane, and separately make
       an ambiguous hit routable. Restore byte-identically and verify with `shasum -a 256 -c`.
 - [ ] 4⁵.3 Commit `test(browse): pin the name-only tap detail and the selection rule`.
 
