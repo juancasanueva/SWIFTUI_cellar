@@ -206,8 +206,11 @@ final class cellarUITests: XCTestCase {
         let addCommand = app.staticTexts["confirmation-command"]
         XCTAssertTrue(addCommand.waitForExistence(timeout: 2))
         XCTAssertEqual(addCommand.value as? String, "brew tap acme/new-tools")
-        XCTAssertTrue(((app.staticTexts["confirmation-warning"].value as? String) ?? "")
-            .localizedCaseInsensitiveContains("third-party formulae and casks"))
+        // The disclosure says what `brew tap` does and does not do (D2): the
+        // clone happens now, the tap's formulae and casks load only once trusted.
+        let addWarning = (app.staticTexts["confirmation-warning"].value as? String) ?? ""
+        XCTAssertTrue(addWarning.contains("clones a third-party repository"), addWarning)
+        XCTAssertTrue(addWarning.contains("until you trust it"), addWarning)
         app.buttons["Cancel"].click()
     }
 
@@ -226,9 +229,13 @@ final class cellarUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Not installed."].exists)
 
         app.buttons["tap-force-untap-button"].click()
-        let forceCommand = app.staticTexts["confirmation-command"]
-        XCTAssertTrue(forceCommand.waitForExistence(timeout: 2))
-        XCTAssertEqual(forceCommand.value as? String, "brew untap --force acme/tools")
+        // A force untap is two commands, disclosed in the order they run: the
+        // removal first, the trust revocation only once brew has accepted it.
+        let forceCommands = app.staticTexts.matching(identifier: "confirmation-command")
+        XCTAssertTrue(forceCommands.firstMatch.waitForExistence(timeout: 2))
+        XCTAssertEqual(forceCommands.count, 2)
+        XCTAssertEqual(forceCommands.element(boundBy: 0).value as? String, "brew untap --force acme/tools")
+        XCTAssertEqual(forceCommands.element(boundBy: 1).value as? String, "brew untrust acme/tools")
         XCTAssertTrue(app.staticTexts["confirmation-affected-formula-widget"].exists)
         app.buttons["Cancel"].click()
     }
