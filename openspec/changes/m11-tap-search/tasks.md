@@ -1361,7 +1361,7 @@ measured total; never trim. RDD disabled. Strict TDD active.
 
 ## Phase 2⁶: WU26 — the routability rule (RED → GREEN)
 
-- [ ] 2⁶.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: **replace**
+- [x] 2⁶.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: **replace**
       `aCollidingHitIsShownAndIsNotRoutable` with `aCollidingHitIsShownAndIsRoutable`, and
       `anAmbiguousHitIsNotRoutableInEitherInstallState` with
       `onlyADuplicatedIdentityWithholdsTheRoute`; move the two `routableID == nil` lines inside
@@ -1369,10 +1369,10 @@ measured total; never trim. RDD disabled. Strict TDD active.
       keep `twoTapsPublishingOneNameAreBothUnroutable` untouched. Add PD6's
       `aCollidingSelectionResolvesToTheCatalogsOwnRecord`. Confirm the failures are **assertion**
       failures on the reversed expectations.
-- [ ] 2⁶.2 **GREEN** in `TapPackageSearch.swift`: `let routable = unique`, and restate the comment above
+- [x] 2⁶.2 **GREEN** in `TapPackageSearch.swift`: `let routable = unique`, and restate the comment above
       it — the bar is a duplicated identity, not a collision.
-- [ ] 2⁶.3 `swift test --package-path Packages/CellarCore` whole against the phase-0⁶ baseline.
-- [ ] 2⁶.4 Commit `feat(search): route a colliding tap hit to the catalog detail it resolves to`.
+- [x] 2⁶.3 `swift test --package-path Packages/CellarCore` whole against the phase-0⁶ baseline.
+- [x] 2⁶.4 Commit `feat(search): route a colliding tap hit to the catalog detail it resolves to`.
 
 ## Phase 3⁶: WU27 — the app surface and its guard
 

@@ -502,16 +502,37 @@ struct TapPackageSearchTests {
 
     // MARK: - ps8 — a catalog collision is reported and never suppressed
 
-    @Test("A colliding hit is shown and is not routable")
-    func aCollidingHitIsShownAndIsNotRoutable() throws {
+    /// Round 7 (DD-23) **reverses** this row's routability expectation and
+    /// leaves every other assertion in it standing.
+    ///
+    /// It is replaced rather than narrowed: the old row asserted precisely the
+    /// `nil` the maintainer overturned, and keeping it beside the new one would
+    /// let the retired rule and its replacement both appear to hold. What the
+    /// row still proves is that the *collision* survived the reversal intact —
+    /// the fact, the pinned sentence, the distinct `RowID` and the bare
+    /// mutation target are all untouched, because the note answers a **mutation**
+    /// question (which package an install from this row installs) and that
+    /// answer did not change. The route now agrees with it instead of competing:
+    /// the identity handed over is the same bare token, and the shipped
+    /// catalog-first resolution opens exactly the package this sentence names.
+    @Test("A colliding hit is shown and is routable")
+    func aCollidingHitIsShownAndIsRoutable() throws {
         let wget = PackageID(kind: .formula, name: "wget")
         let hit = try #require(
             hits([TapSearchFixture.acmeWget], "wget", catalog: [wget]).first
         )
 
         #expect(hit.alsoInCatalog)
-        #expect(hit.routableID == nil)
+        #expect(hit.routableID == wget)
+        // The identity it routes by and the identity it mutates are the same
+        // bare token, which is what makes the catalog-first resolution land on
+        // the package the note names rather than on some other one.
+        #expect(hit.routableID == hit.mutationTarget)
         #expect(hit.mutationTarget == wget)
+        // The collision is reported, not traded away for the route.
+        #expect(
+            hit.collisionNote == "Also in the catalog. Homebrew installs the catalog package."
+        )
         // The row identity is its own type and carries the tap of origin, so it
         // can never be compared against, or mistaken for, the catalog row's
         // `PackageID`.
@@ -522,6 +543,11 @@ struct TapPackageSearchTests {
         let alone = try #require(hits([TapSearchFixture.acmeWget], "wget").first)
         #expect(alone.alsoInCatalog == false)
         #expect(alone.collisionNote == nil)
+        // …and it routes to the same identity either way, which is the round-7
+        // rule stated as a pair rather than as a single value: the collision
+        // moved one fact and left routability alone.
+        #expect(alone.routableID == wget)
+        #expect(alone.routableID == hit.routableID)
     }
 
     @Test("Every mutation target is the bare token")
@@ -745,9 +771,11 @@ struct TapPackageSearchTests {
         #expect(owned.isInstalled)
         #expect(owned.installed?.id == wget)
         #expect(owned.installed?.tap == "acme/tools")
-        // The collision still costs it its detail route and never its verbs:
-        // the row stays presented, installable and mutable over the bare token.
-        #expect(owned.routableID == nil)
+        // Round 7: the collision costs the row **nothing** — not its verbs, not
+        // its detail route. What it never buys is the *catalog's* receipt: the
+        // record above is this tap's own, resolved by the tap-aware handoff
+        // (DD-20), and that is unchanged by the route becoming available.
+        #expect(owned.routableID == wget)
         #expect(owned.mutationTarget == wget)
     }
 
@@ -783,71 +811,92 @@ struct TapPackageSearchTests {
         #expect(hit.mutationTarget == widget)
     }
 
-    // MARK: - ps10 — an ambiguous hit is not routable, whatever its install state
+    // MARK: - ps10 — only a duplicated identity withholds the route
 
-    /// Round 6 (DD-21): routability is a fact about **identity** alone.
+    /// Round 7 (DD-23): routability is **uniqueness among the emitted hits**,
+    /// and nothing else.
     ///
-    /// The install state is read alongside every assertion below and is never
-    /// what decides. That is the whole content of the maintainer's reversal:
-    /// before it, a not-installed hit was unroutable *because* it was not
-    /// installed; now it is unroutable only when its identity is ambiguous, and
-    /// this row is what keeps the two reasons from being confused again.
-    @Test("An ambiguous hit is not routable, whatever its install state")
-    func anAmbiguousHitIsNotRoutableInEitherInstallState() throws {
+    /// This row replaces round 6's, over the same five fixtures, with the two
+    /// colliding expectations inverted. Round 6 had already taken the install
+    /// state out of the rule; round 7 takes the collision out of it too, so the
+    /// two variables that used to decide are now both read alongside every
+    /// assertion and neither is what decides. The one surviving bar is the one
+    /// nothing can lift: two emitted hits carrying one `PackageID`, where every
+    /// candidate destination is equally wrong.
+    @Test("Only a duplicated identity withholds the route")
+    func onlyADuplicatedIdentityWithholdsTheRoute() throws {
         let wget = PackageID(kind: .formula, name: "wget")
         let installed = InstalledInventory(packages: [
             InstalledFixture.receipt(.formula, "wget", tap: "acme/tools")
         ])
 
-        // (a) Installed **and** colliding with the catalog.
+        // (a) Installed **and** colliding with the catalog. It routes: the
+        // catalog-first resolution opens the catalog's own `wget`, which is the
+        // package this row's own note says Homebrew installs.
         let collidingInstalled = try #require(
             hits([TapSearchFixture.acmeWget], "wget", installed: installed, catalog: [wget]).first
         )
         #expect(collidingInstalled.state == .installed(wget))
-        #expect(collidingInstalled.routableID == nil)
-        // Presented and installable regardless: only the detail route is
-        // withheld.
+        #expect(collidingInstalled.routableID == wget)
         #expect(collidingInstalled.mutationTarget == wget)
+        // The note is still there — the route was added, no fact was withdrawn.
+        #expect(collidingInstalled.alsoInCatalog)
+        #expect(collidingInstalled.collisionNote != nil)
         // It is installed, so the row draws the pill — and has nothing further
         // to say, because this state pins no sentence (PS8 round 3).
         #expect(collidingInstalled.isInstalled)
         #expect(collidingInstalled.stateNote == nil)
 
-        // (b) **Not** installed and colliding with the catalog. The reversal
-        // does not reach this hit: the catalog-first resolution would still
-        // open the catalog's package, not this row's.
+        // (b) **Not** installed and colliding with the catalog. Same rule, same
+        // identity, same destination: the install state decides nothing here
+        // either.
         let collidingAbsent = try #require(
             hits([TapSearchFixture.acmeWget], "wget", catalog: [wget]).first
         )
         #expect(collidingAbsent.state == .notInstalled)
         #expect(collidingAbsent.alsoInCatalog)
-        #expect(collidingAbsent.routableID == nil)
+        #expect(collidingAbsent.routableID == wget)
         #expect(collidingAbsent.mutationTarget == wget)
+        #expect(collidingAbsent.routableID == collidingInstalled.routableID)
 
-        // (c) Two taps emitting one `PackageID` — the ambiguity `alsoInCatalog`
-        // cannot see.
+        // (c) Two taps emitting one `PackageID` — the sole remaining bar, and
+        // the one `alsoInCatalog` never could see. Non-vacuous on the decisive
+        // variable: the catalog carries neither, so nothing but the duplication
+        // is withholding the route.
         let duplicates = hits(
             [TapSearchFixture.acmeDuplicate, TapSearchFixture.bravoDuplicate],
             "widget",
             installed: TapSearchFixture.withheldWidgetInstalled
         )
         #expect(duplicates.count == 2)
+        #expect(duplicates.allSatisfy { $0.alsoInCatalog == false })
         #expect(duplicates.allSatisfy { $0.routableID == nil })
+        // …and still presented and still installable, which is what "only the
+        // detail route is withheld" means.
+        #expect(duplicates.allSatisfy { $0.mutationTarget == PackageID(kind: .formula, name: "widget") })
 
-        // Triangulated on the decisive variable: an unambiguous hit of **each**
-        // install state hands over its exact identity. Without these two the
-        // three `nil`s above would also pass under the old install-state rule.
+        // Triangulated on the decisive variable from the other side: a hit of
+        // **each** install state that is neither colliding nor duplicated hands
+        // over its exact identity. Without these two, (a) and (b) alone could
+        // not distinguish "uniqueness decides" from "nothing decides".
         let widget = PackageID(kind: .formula, name: "widget")
         let sole = TapSearchFixture.tap("acme/tools", formulae: ["acme/tools/widget"])
-        let unambiguousInstalled = try #require(
+        let uncollidedInstalled = try #require(
             hits([sole], "widget", installed: TapSearchFixture.acmeWidgetInstalled).first
         )
-        #expect(unambiguousInstalled.isInstalled)
-        #expect(unambiguousInstalled.routableID == widget)
+        #expect(uncollidedInstalled.isInstalled)
+        #expect(uncollidedInstalled.alsoInCatalog == false)
+        #expect(uncollidedInstalled.routableID == widget)
 
-        let unambiguousAbsent = try #require(hits([sole], "widget").first)
-        #expect(unambiguousAbsent.state == .notInstalled)
-        #expect(unambiguousAbsent.routableID == widget)
+        let uncollidedAbsent = try #require(hits([sole], "widget").first)
+        #expect(uncollidedAbsent.state == .notInstalled)
+        #expect(uncollidedAbsent.alsoInCatalog == false)
+        #expect(uncollidedAbsent.routableID == widget)
+
+        // The duplicated pair and the sole publisher share one `PackageID`, so
+        // the difference between `nil` and `widget` above is the **count of
+        // emitted hits** and nothing else about the fixture.
+        #expect(duplicates.allSatisfy { $0.mutationTarget == uncollidedAbsent.mutationTarget })
     }
 
     @Test("Two taps publishing one name are both unroutable")
@@ -1216,6 +1265,64 @@ struct TapPackageSearchTests {
         #expect(snapshot.packages.contains { $0.id == widget } == false)
         // …and the composed hit is not, and never becomes, a catalog record.
         #expect(composed.allSatisfy { index.package($0.mutationTarget) == nil })
+    }
+
+    // MARK: - PD6 sc6 — a colliding selection resolves to the catalog's own record
+
+    /// PS8 round 7 (DD-23): a colliding row is now routable, and what answers it
+    /// is `PackageDetailView`'s **first** branch — the ordinary catalog lookup.
+    ///
+    /// The claim this row has to settle is that nothing about the tap reaches
+    /// that answer. It is asserted in the strongest form available: the record
+    /// returned with the tap inventory resident is **byte-identical** to the one
+    /// the same lookup returns with **no tap inventory at all**, so the tap
+    /// contributed nothing rather than merely nothing visible.
+    @Test("A colliding selection resolves to the catalog's own record and creates nothing")
+    func aCollidingSelectionResolvesToTheCatalogsOwnRecord() throws {
+        let wget = PackageID(kind: .formula, name: "wget")
+        let snapshot = TapSearchFixture.snapshot([
+            TapSearchFixture.catalogPackage(.formula, "curl"),
+            TapSearchFixture.catalogPackage(.formula, "wget", desc: "The catalog's own wget")
+        ])
+        let index = PackageSearchIndex(snapshot: snapshot)
+
+        // The catalog answering alone, before any tap exists.
+        let beforeLookup = try #require(index.package(wget))
+        let beforeSearch = index.search("wget")
+
+        // Now the tap publishes the same bare token, and the row it emits is
+        // routable by exactly that identity.
+        let hit = try #require(
+            hits([TapSearchFixture.acmeWget], "wget", catalog: Set(snapshot.packages.map(\.id))).first
+        )
+        #expect(hit.alsoInCatalog)
+        let selected = try #require(hit.routableID)
+        #expect(selected == wget)
+
+        // Resolving that selection through the ordinary lookup answers with the
+        // catalog's own record — the same one, unchanged.
+        let afterLookup = try #require(index.package(selected))
+        #expect(afterLookup == beforeLookup)
+        #expect(afterLookup.tap == "homebrew/core")
+        #expect(afterLookup.desc == "The catalog's own wget")
+
+        // Non-vacuous: the tap really did publish this identity, so the record
+        // above is the catalog's *despite* that rather than for want of a tap.
+        #expect(hit.tapName == "acme/tools")
+        #expect(hit.publishedName == "acme/tools/wget")
+        // And nothing the tap publishes is in the record that came back.
+        #expect(afterLookup.name == "wget")
+        #expect(afterLookup.displayName.contains("acme") == false)
+
+        // The snapshot and the index are untouched by all of it.
+        #expect(index.search("wget") == beforeSearch)
+        #expect(index.recordCount == snapshot.packages.count)
+        #expect(snapshot.packages.allSatisfy { $0.tap == "homebrew/core" })
+        // The tap's *other* packages — the ones the catalog does not carry —
+        // are still ordinary not-founds, so the round adds no catalog record.
+        for absent in hits([TapSearchFixture.acmeWidgets], "widget") {
+            #expect(index.package(absent.mutationTarget) == nil)
+        }
     }
 
     // MARK: - TM5 sc11 — the inventory feeds an outside surface

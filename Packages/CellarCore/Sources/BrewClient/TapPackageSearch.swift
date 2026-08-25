@@ -106,16 +106,21 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     public let collisionNote: String?
     public let rank: TapMatchRank
     /// The identity this row may hand to a selection, or `nil` when it must not
-    /// be selectable: `alsoInCatalog`, or another emitted hit carries the same
-    /// `PackageID` (DD-4, amended by DD-21).
+    /// be selectable: another emitted hit carries the same `PackageID`
+    /// (DD-4, amended by DD-21, narrowed to this by DD-23).
     ///
     /// **Round 6 dropped the install state from this rule.** A not-installed
     /// hit used to be unroutable because there was nothing honest to show it —
     /// but that was a claim about a *catalog* pane and a *tap-source* read, and
-    /// the four names this inventory already publishes are neither. What
-    /// survives is the ambiguity half, which was always the real hazard: the
-    /// detail resolves the catalog first, so a colliding or duplicated identity
-    /// would open a different package than the row the user chose.
+    /// the four names this inventory already publishes are neither.
+    ///
+    /// **Round 7 dropped the collision too.** The reasoning against it was that
+    /// the detail resolves the catalog first and would open "a different package
+    /// than the row chosen" — but the row's own `collisionNote` already says
+    /// Homebrew installs the catalog package, so that pane is exactly what the
+    /// row promises. What is left is the hazard neither round could argue away:
+    /// two emitted hits sharing one identity, where no destination is the one
+    /// chosen.
     public let routableID: PackageID?
 
     /// Whether this Mac has the package — **both** installed states say yes.
@@ -124,8 +129,9 @@ public struct TapSearchHit: Sendable, Hashable, Identifiable {
     /// facts: `Mirror` enumerates stored properties, and PS8's five-facts
     /// scenario reads that enumeration. It is the one fact the row consults to
     /// draw the shared `Installed` pill, and it deliberately cannot stand in for
-    /// `routableID`: routing additionally needs the hit to be uncollided and
-    /// unique, which no `Bool` about installation can express (DD-4, DD-9).
+    /// `routableID`: routing needs the hit's identity to be unique among the
+    /// emitted hits, which no `Bool` about installation can express
+    /// (DD-4, DD-9, DD-23).
     public var isInstalled: Bool { state != .notInstalled }
 
     /// Hashed on the row identity alone.
@@ -267,16 +273,27 @@ public struct TapPackageSearch: Sendable {
         return matches.map { match in
             let collides = isInCatalog(match.package.id)
             let unique = occurrences[match.package.id] == 1
-            // Routability is a fact about **identity**, and about nothing else
-            // (PS8 round 6, DD-21). An unambiguous hit hands over its exact
-            // `PackageID` in either install state: an installed one lands on the
-            // receipt-backed detail, a not-installed one on the name-only detail
-            // composed from this same tap inventory. What still withholds the
-            // route is what always did — a bare token the catalog also carries,
-            // or two emitted hits sharing one identity — because the
-            // catalog-first resolution would then present a different package
-            // than the row chosen.
-            let routable = collides == false && unique
+            // Routability is **uniqueness among the emitted hits**, and nothing
+            // else (PS8 round 7, DD-23). A unique hit hands over its exact
+            // `PackageID` whatever its install state and whatever the catalog
+            // carries; the shipped resolution order then decides *which* pane
+            // answers — the catalog's for a colliding token, the receipt-backed
+            // one for an installed package, the name-only one composed from this
+            // same tap inventory otherwise.
+            //
+            // The collision is deliberately **not** a bar any more. It used to
+            // be, on the reasoning that catalog-first resolution would open "a
+            // different package than the row chosen" — but the row's own pinned
+            // note already tells the user Homebrew installs the catalog package,
+            // so the catalog pane is precisely what the row promises. Withholding
+            // it left that sentence pointing at something unreachable.
+            //
+            // What still withholds the route is the one case nothing can
+            // disambiguate: two emitted hits carrying one `PackageID`, where
+            // every candidate destination is equally wrong. `unique` is counted
+            // over the emitted hits alone — a catalog record is not a hit this
+            // source emits and is not counted against one.
+            let routable = unique
             // Resolved **once** and read twice: the offered version and the
             // mutation handoff are the same receipt, so the row's update pill
             // and its menu can never disagree about which record answered
