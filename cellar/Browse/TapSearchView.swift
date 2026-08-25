@@ -36,7 +36,11 @@ struct TapSearchView: View {
     let operations: OperationCenter
     /// The shell's one selection, threaded exactly as `BrowseView` threads it:
     /// a routable hit lands on the shared `PackageDetailView` through the
-    /// existing resolution order, with no routing branch of its own (DD-4).
+    /// existing resolution order, with no routing arm of its own here (DD-4).
+    /// That order resolves the catalog, then this Mac's receipt, then the tap
+    /// inventory — so an installed hit reaches the receipt pane and a
+    /// not-installed one the name-only pane, both without this file deciding
+    /// (DD-21).
     @Binding var selection: PackageID?
 
     @State private var query = ""
@@ -79,11 +83,15 @@ struct TapSearchView: View {
                             .tag(routable)
                             .themedListSelection(isSelected: selection == routable)
                     } else {
-                        // Deliberately inert. Either the catalog carries this
-                        // token and would answer for it instead, or nothing on
-                        // this Mac has a record to show — so opening a pane
-                        // would present a different package than the row
-                        // chosen, or nothing at all.
+                        // Deliberately inert, and for one reason only:
+                        // **ambiguity**. Either the catalog carries this bare
+                        // token and would answer for it instead, or two taps
+                        // publish it and there is no single package to open —
+                        // so a pane here would present something other than the
+                        // row chosen. The install state decides nothing: since
+                        // round 6 a not-installed hit routes too, to the
+                        // name-only detail composed from this same inventory
+                        // (PS8 round 6, DD-21).
                         row(hit)
                             .selectionDisabled()
                     }

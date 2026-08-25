@@ -27,9 +27,12 @@ struct PerPackageTrustCompositionTests {
     func rowHeaderAndRowsReadOneProjection() throws {
         let sources = try PerPackageTrustSources.views()
 
-        // Positively anchored: the scan really did find all four files.
+        // Positively anchored: the scan really did find all six files. The
+        // name-only tap pane joined them in round 6 — it is a **detail
+        // surface**, so the no-local-marker guard below has to cover it, and
+        // `+` sorts before `.`.
         #expect(sources.map(\.name).sorted()
-            == ["PackageDetailView+Receipt.swift", "PackageDetailView.swift", "TapDetailView.swift", "TapSearchView.swift", "TapsListView.swift"])
+            == ["PackageDetailView+Receipt.swift", "PackageDetailView+TapInventory.swift", "PackageDetailView.swift", "TapDetailView.swift", "TapSearchView.swift", "TapsListView.swift"])
 
         for name in ["TapsListView.swift", "TapDetailView.swift"] {
             let code = try #require(sources.first { $0.name == name }?.code)
@@ -189,6 +192,7 @@ nonisolated enum PerPackageTrustSources {
             "cellar/Taps/TapDetailView.swift",
             "cellar/Browse/PackageDetailView.swift",
             "cellar/Browse/PackageDetailView+Receipt.swift",
+            "cellar/Browse/PackageDetailView+TapInventory.swift",
             "cellar/Browse/TapSearchView.swift"
         ].map { relative in
             ViewSource(

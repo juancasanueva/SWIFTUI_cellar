@@ -1259,23 +1259,23 @@ measured total; never trim. RDD disabled. Strict TDD active.
       value and `resolve(_:in:)`, composed over `TapProjection.thirdPartyTaps` and
       `TapProjection.publishes(_:in:)`. Pure, `nonisolated`, `Sendable`; no `Catalog` value, no process.
 - [x] 2⁵.5 `swift test --package-path Packages/CellarCore` whole against the phase-0⁵ baseline.
-- [ ] 2⁵.6 Commit `feat(search): resolve a not-installed tap package to its one publishing tap for a minimal detail`.
+- [x] 2⁵.6 Commit `feat(search): resolve a not-installed tap package to its one publishing tap for a minimal detail`.
 
 ## Phase 3⁵: WU23 — the app surface
 
-- [ ] 3⁵.1 `PackageDetailView.swift`: add `let taps: TapStore`; widen the shared header's `versionStory`
+- [x] 3⁵.1 `PackageDetailView.swift`: add `let taps: TapStore`; widen the shared header's `versionStory`
       to `String?` and render the version line and its separator only when non-`nil`; add the **third**
       `body` branch after the receipt branch. Both shipped header call sites must stay source-identical.
-- [ ] 3⁵.2 Create `cellar/Browse/PackageDetailView+TapInventory.swift`: the pane, calling the shared
+- [x] 3⁵.2 Create `cellar/Browse/PackageDetailView+TapInventory.swift`: the pane, calling the shared
       header, the shared `fact(_:_:)` and the shared `MutationMenu` with
       `PackageEntry(installed: nil, catalog: nil, id:)`, plus the file-private footer. No description, no
       version, no homepage, no licence, no dependencies, no analytics, no size, no trust anything.
-- [ ] 3⁵.3 `cellar/ContentView.swift`: pass `taps: taps` at the **one** `PackageDetailView(` call site.
-- [ ] 3⁵.4 `cellar/Browse/TapSearchView.swift`: restate the inert-row comment — the bar is ambiguity, not
+- [x] 3⁵.3 `cellar/ContentView.swift`: pass `taps: taps` at the **one** `PackageDetailView(` call site.
+- [x] 3⁵.4 `cellar/Browse/TapSearchView.swift`: restate the inert-row comment — the bar is ambiguity, not
       the install state. No behaviour change; the gate is still `hit.routableID`.
-- [ ] 3⁵.5 Add the new pane to `PerPackageTrustSources.views()` and its sorted anchor (`+` sorts before
+- [x] 3⁵.5 Add the new pane to `PerPackageTrustSources.views()` and its sorted anchor (`+` sorts before
       `.`), so the no-local-marker guard covers the new detail surface.
-- [ ] 3⁵.6 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [x] 3⁵.6 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
 - [ ] 3⁵.7 Commit `feat(browse): open a name-only detail for a tap package that is not installed`.
 
 ## Phase 4⁵: WU24 — the composition guards

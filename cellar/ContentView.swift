@@ -536,7 +536,10 @@ struct ContentView: View {
             // The same detail view for all of them: a package is a package,
             // and the catalog record is the thing worth reading about it. A
             // routable tap hit lands here through the *existing* resolution
-            // order, by its exact `PackageID` — no branch of its own (DD-4).
+            // order, by its exact `PackageID` — still no arm of its own here
+            // (DD-4). Round 6 adds the tap inventory as an input, because that
+            // order gained a third branch **inside** the shared view: catalog,
+            // then receipt, then the names one installed tap published (DD-21).
             return AnyView(
                 PackageDetailView(
                     catalog: catalog,
@@ -545,6 +548,7 @@ struct ContentView: View {
                     metadata: metadata,
                     diskUsage: diskUsage,
                     trustGrants: trustGrants,
+                    taps: taps,
                     assets: caskAssets,
                     iconLoader: caskIcons,
                     id: selection,
