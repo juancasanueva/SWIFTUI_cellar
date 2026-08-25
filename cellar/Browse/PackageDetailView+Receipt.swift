@@ -24,8 +24,9 @@ import SwiftUI
 /// (design DD-10).
 extension PackageDetailView {
 
-    /// The header, the receipt's own facts, the private note, and the scoped
-    /// sentence about Cellar's catalog.
+    /// The header, the receipt's own facts, the private note, the scoped
+    /// sentence about Cellar's catalog, and — last, where the catalog pane puts
+    /// it — the shared Actions section.
     @ViewBuilder
     func uncatalogedContent(for snapshot: InstalledPackage) -> some View {
         let detail = InstalledDetailProjection(snapshot)
@@ -36,12 +37,11 @@ extension PackageDetailView {
                 versionStory: versionStory(installed: snapshot),
                 installed: snapshot
             ) {
-                // The primary-button slot the catalog pane fills with its verb.
-                // Here it is the shared mutation surface the installed list row
-                // already renders for a record with no catalog entry, so the
-                // verbs, the confirmation rule and the argv validation all
-                // arrive already proven (design DD-8).
-                MutationMenu(center: operations, entry: receiptEntry(for: snapshot))
+                // Deliberately empty. This pane's verbs live in the shared
+                // Actions section at the foot of it, exactly where the catalog
+                // pane puts them, so there is one place to act rather than two
+                // (installed-inventory II15, design DD-24).
+                EmptyView()
             }
             .padding(EdgeInsets(top: 24, leading: 30, bottom: 0, trailing: 30))
             ScrollView {
@@ -50,6 +50,11 @@ extension PackageDetailView {
                     receiptFacts(detail, for: snapshot)
                     PackageMetadataSection(entry: receiptEntry(for: snapshot), metadata: metadata)
                     receiptFooter
+                    // The catalog pane's own Actions section, called rather than
+                    // copied: the verbs, their applicability, the confirmation
+                    // rule, the argv and the command line all arrive already
+                    // proven, and there is exactly one declaration of them.
+                    actionsSection(for: receiptEntry(for: snapshot))
                 }
                 .padding(EdgeInsets(top: 22, leading: 30, bottom: 34, trailing: 30))
                 .frame(maxWidth: .infinity, alignment: .topLeading)

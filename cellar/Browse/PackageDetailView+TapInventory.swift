@@ -46,7 +46,8 @@ import SwiftUI
 extension PackageDetailView {
 
     /// The header, the two facts the inventory published, the install state, the
-    /// shared mutation surface, and the sentence that says why there is no more.
+    /// sentence that says why there is no more, and — last, where the catalog
+    /// pane puts it — the shared Actions section.
     @ViewBuilder
     func tapInventoryContent(for published: TapInventoryDetail) -> some View {
         VStack(spacing: 0) {
@@ -61,18 +62,23 @@ extension PackageDetailView {
                 // does not have.
                 installed: nil
             ) {
-                // The shared mutation surface, unconditionally. It is handed no
-                // installed record — there is none — and no catalog record —
-                // there is none, and PD6 forbids synthesizing one — so it takes
-                // its install branch and offers Install and Copy install command
-                // over the bare token PM10 mandates.
-                MutationMenu(center: operations, entry: publishedEntry(for: published))
+                // Deliberately empty. The verbs live in the shared Actions
+                // section at the foot of this pane, exactly where the catalog
+                // pane puts them, so one pane offers one place to act
+                // (package-search PS8 round 8, design DD-24).
+                EmptyView()
             }
             .padding(EdgeInsets(top: 24, leading: 30, bottom: 0, trailing: 30))
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     publishedFacts(published)
                     publishedFooter(published)
+                    // The catalog pane's own Actions section, called rather than
+                    // copied. It is handed no installed record — there is none —
+                    // and no catalog record — there is none, and PD6 forbids
+                    // synthesizing one — so it takes its install branch and
+                    // offers Install over the bare token PM10 mandates.
+                    actionsSection(for: publishedEntry(for: published))
                 }
                 .padding(EdgeInsets(top: 22, leading: 30, bottom: 34, trailing: 30))
                 .frame(maxWidth: .infinity, alignment: .topLeading)
