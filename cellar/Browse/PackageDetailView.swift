@@ -138,7 +138,7 @@ struct PackageDetailView: View {
         analytics(for: package)
         PackageMetadataSection(entry: entry(for: package), metadata: metadata)
         caveats(for: package)
-        actionsSection(for: package)
+        actionsSection(for: entry(for: package))
     }
 
     @ViewBuilder
@@ -202,10 +202,18 @@ struct PackageDetailView: View {
     /// command underneath, danger kept visibly apart. Every submission goes
     /// through `submit(_:)`, so the confirmation rule is applied in exactly one
     /// place — the same discipline `MutationMenu` follows on the list rows.
+    ///
+    /// Built from a `PackageEntry` rather than from a `CatalogPackage` because
+    /// that is every input it ever had: an identity and an installed record.
+    /// `internal` for the same reason `header(id:…)` and `fact(_:_:)` are — the
+    /// two tap-backed panes are extensions in **other** files, Swift `private`
+    /// is file-scoped, and "the same Actions section" is only representable if
+    /// there is exactly one of it (installed-inventory II15, package-search PS8,
+    /// design DD-24). Everything it calls stays `private`: those calls are in
+    /// this file.
     @ViewBuilder
-    private func actionsSection(for package: CatalogPackage) -> some View {
-        if let target = PackageTarget(package.id) {
-            let entry = entry(for: package)
+    func actionsSection(for entry: PackageEntry) -> some View {
+        if let target = PackageTarget(entry.id) {
             let installedPackage = entry.installed
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader("Actions")
@@ -219,7 +227,7 @@ struct PackageDetailView: View {
                         quietButton("Reinstall", identifier: "detail-action-reinstall") {
                             submit(.reinstall(target))
                         }
-                        if let formula = FormulaID(package.id) {
+                        if let formula = FormulaID(entry.id) {
                             quietButton(
                                 installedPackage.isPinned ? "Unpin" : "Pin version",
                                 identifier: "detail-action-pin"
@@ -231,7 +239,7 @@ struct PackageDetailView: View {
                         dangerButton("Uninstall…", identifier: "detail-action-uninstall") {
                             submit(.uninstall(target))
                         }
-                        if let cask = CaskID(package.id) {
+                        if let cask = CaskID(entry.id) {
                             dangerButton("Uninstall and Zap…", identifier: "detail-action-zap") {
                                 submit(.zap(cask))
                             }
@@ -245,11 +253,11 @@ struct PackageDetailView: View {
                 }
                 .disabled(!operations.isAvailable)
                 HStack(spacing: 8) {
-                    Text(primaryCommand(for: package, target: target).displayCommand)
+                    Text(primaryCommand(for: entry, target: target).displayCommand)
                         .font(Theme.mono(11))
                         .foregroundStyle(Theme.textFaint)
                         .textSelection(.enabled)
-                    CopyCommandButton(text: primaryCommand(for: package, target: target).displayCommand)
+                    CopyCommandButton(text: primaryCommand(for: entry, target: target).displayCommand)
                 }
                 if let guidance = operations.unavailableGuidance {
                     Text(guidance)
@@ -261,8 +269,8 @@ struct PackageDetailView: View {
     }
 
     /// The command the caption shows: what the most likely button would run.
-    private func primaryCommand(for package: CatalogPackage, target: PackageTarget) -> MutationCommand {
-        guard let installedPackage = installed.inventory.package(package.id) else {
+    private func primaryCommand(for entry: PackageEntry, target: PackageTarget) -> MutationCommand {
+        guard let installedPackage = entry.installed else {
             return .install(target)
         }
         return installedPackage.isOutdated ? .upgrade(target) : .reinstall(target)
