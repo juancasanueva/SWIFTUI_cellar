@@ -317,6 +317,8 @@ struct ContentView: View {
                 installed: installed,
                 catalog: catalog,
                 operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
                 selection: $selection
             )
         case .caskBrowse:

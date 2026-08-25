@@ -34,6 +34,19 @@ struct TapSearchView: View {
     /// token — and never for a hit's content (PD6).
     let catalog: CatalogStore
     let operations: OperationCenter
+    /// The cask artwork pipeline, threaded exactly as `BrowseView` threads it —
+    /// same spellings, same optionality — so both search surfaces draw their
+    /// rows' leading tile from one pipeline rather than two (PS8 round 9,
+    /// DD-25). `nil` — a preview, say — keeps the letter tile for every row.
+    ///
+    /// Deliberately **not** accompanied by `BrowseView`'s `.task { await
+    /// assets?.load() }`: this file may contain no `.task`, no `await` and no
+    /// `async` (DD-12), and the load would buy nothing here anyway — the
+    /// catalog it decodes only gates the CaskFlow rungs for tokens it lists,
+    /// and a package published by a third-party tap is never one of them. The
+    /// store is handed through; the component asks.
+    var assets: CaskBrowseAssets?
+    var iconLoader: CaskIconLoader?
     /// The shell's one selection, threaded exactly as `BrowseView` threads it:
     /// a routable hit lands on the shared `PackageDetailView` through the
     /// existing resolution order, with no routing arm of its own here (DD-4).
@@ -137,54 +150,74 @@ struct TapSearchView: View {
     }
 
     private func row(_ hit: TapSearchHit) -> some View {
-        HStack(spacing: 6) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(hit.displayName)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.88))
+        // Bound once and read twice: the tile and the menu are then provably
+        // about the same package, rather than about two values that happen to
+        // agree today (DD-25).
+        let entry = entry(for: hit)
+
+        return HStack(spacing: 6) {
+            // Nested at `PackageRow`'s own spacing rather than flattened into
+            // the outer stack: the catalog list is `HStack(spacing: 6) { row;
+            // Spacer; menu }` around an `HStack(spacing: 10) { tile; text }`,
+            // and flattening would put the tile 4 points closer to the name
+            // than the surface it is copying.
+            HStack(spacing: 10) {
+                // The **same** component the catalog rows and the Installed
+                // rows draw, with the same argument shape, at the same leading
+                // position. A formula gets the shared glyph, a cask its artwork
+                // where one exists and the coloured initial tile where none
+                // does — which for a third-party tap's cask is the ordinary
+                // answer, not a fallback. This file composes no tile of its own
+                // (PS8, DD-18, DD-25).
+                PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(hit.displayName)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.88))
+                            .lineLimit(1)
+                        KindTag(kind: hit.id.kind)
+                        if hit.isInstalled {
+                            // The **same** component the catalog rows draw, in the
+                            // same position after the kind chip, so one install
+                            // state reads one way on both search surfaces. Its
+                            // label belongs to that component: this file composes
+                            // none of it (PS8, DD-18).
+                            StatusPill.installed
+                        }
+                        // The **same** update chip the catalog rows, the Installed
+                        // list and the Updates list draw — immediately after the
+                        // installed pill, exactly where the catalog row puts it, so
+                        // "this has an update" reads identically on both search
+                        // surfaces. The offered version is handed over as a value:
+                        // this file words nothing about it, and the fact itself is
+                        // the projection's, gated on the receipt's own outdated
+                        // rule (PS8 round 4, DD-19).
+                        if let next = hit.nextVersion {
+                            UpdateTag(nextVersion: next)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    Text(hit.tapName)
+                        .font(Theme.mono(11))
+                        .foregroundStyle(Color.white.opacity(0.4))
                         .lineLimit(1)
-                    KindTag(kind: hit.id.kind)
-                    if hit.isInstalled {
-                        // The **same** component the catalog rows draw, in the
-                        // same position after the kind chip, so one install
-                        // state reads one way on both search surfaces. Its
-                        // label belongs to that component: this file composes
-                        // none of it (PS8, DD-18).
-                        StatusPill.installed
+                    // Only what the pill cannot say: what Homebrew is withholding,
+                    // and which package a colliding token actually installs. A row
+                    // with neither is silent, exactly as a catalog row is.
+                    if let note = self.note(hit) {
+                        Text(note)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.textFaint)
+                            .lineLimit(2)
                     }
-                    // The **same** update chip the catalog rows, the Installed
-                    // list and the Updates list draw — immediately after the
-                    // installed pill, exactly where the catalog row puts it, so
-                    // "this has an update" reads identically on both search
-                    // surfaces. The offered version is handed over as a value:
-                    // this file words nothing about it, and the fact itself is
-                    // the projection's, gated on the receipt's own outdated
-                    // rule (PS8 round 4, DD-19).
-                    if let next = hit.nextVersion {
-                        UpdateTag(nextVersion: next)
-                    }
-                    Spacer(minLength: 0)
-                }
-                Text(hit.tapName)
-                    .font(Theme.mono(11))
-                    .foregroundStyle(Color.white.opacity(0.4))
-                    .lineLimit(1)
-                // Only what the pill cannot say: what Homebrew is withholding,
-                // and which package a colliding token actually installs. A row
-                // with neither is silent, exactly as a catalog row is.
-                if let note = self.note(hit) {
-                    Text(note)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.textFaint)
-                        .lineLimit(2)
                 }
             }
             Spacer(minLength: 0)
             // The shared spine, unconditionally: the menu decides which verbs
             // this package can be offered, from the record below and the bare
             // token (package-mutation PM10).
-            MutationMenu(center: operations, entry: entry(for: hit))
+            MutationMenu(center: operations, entry: entry)
         }
         .padding(.vertical, 3)
     }
