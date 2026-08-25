@@ -19,7 +19,12 @@ struct TapDetailView: View {
 
     var body: some View {
         Group {
-            if let tap {
+            // Resolved **before** the inventory: a local `homebrew/core`
+            // checkout is still the official source, and the third-party pane
+            // — with its Untap verbs — must never open on it (TM4).
+            if let official = TapProjection.officialSource(named: tapName) {
+                officialPane(official)
+            } else if let tap {
                 VStack(alignment: .leading, spacing: 0) {
                     header(tap)
                     HairlineDivider()
@@ -37,7 +42,55 @@ struct TapDetailView: View {
                 )
             }
         }
-        .navigationTitle(tap?.name ?? AppSection.taps.title)
+        .navigationTitle(
+            TapProjection.officialSource(named: tapName)?.title ?? tap?.name ?? AppSection.taps.title
+        )
+    }
+
+    /// The official source, read-only: identity, the same explanation the list
+    /// row carries, and where its packages are actually browsed. No verb of
+    /// any kind — nothing here is cloned, trusted or untapped (TM4).
+    private func officialPane(_ source: OfficialTapSource) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 18) {
+                PackageTile(name: source.title, size: 72, fontSize: 27, cornerRadius: 17)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(source.title)
+                        .font(.system(size: 23, weight: .semibold))
+                        .kerning(-0.5)
+                        .foregroundStyle(Theme.textPrimary)
+                        .textSelection(.enabled)
+                    HStack(spacing: 9) {
+                        Text(source.id)
+                            .font(Theme.mono(12))
+                            .foregroundStyle(Theme.textSecondary)
+                        Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
+                        Text("Official source")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                }
+                .padding(.top, 3)
+                Spacer(minLength: 12)
+            }
+            .padding(EdgeInsets(top: 24, leading: 30, bottom: 18, trailing: 30))
+            HairlineDivider()
+            VStack(alignment: .leading, spacing: 12) {
+                Text(source.explanation)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.textPrimary)
+                Text("Homebrew serves this source from its API, so there is nothing to clone, trust or untap here. Browse and install its packages from Search catalog.")
+                    .font(.system(size: 11.5))
+                    .lineSpacing(2)
+                    .foregroundStyle(Theme.textBody)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(EdgeInsets(top: 18, leading: 30, bottom: 18, trailing: 30))
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("official-tap-detail")
     }
 
     /// The identity row every detail pane shares — tile, name, story line and

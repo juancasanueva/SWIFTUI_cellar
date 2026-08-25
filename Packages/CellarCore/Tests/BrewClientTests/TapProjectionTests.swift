@@ -941,4 +941,16 @@ struct TapProjectionTests {
             declaresAutoUpdates: kind == .cask ? false : nil
         )
     }
+
+    // MARK: - TM4 — an official selection resolves to the official source, never to a tap
+
+    @Test("An official source is resolved by name, case-insensitively, and nothing else is")
+    func officialSourceResolvesByName() {
+        #expect(TapProjection.officialSource(named: "homebrew/core")?.title == "Homebrew Core")
+        #expect(TapProjection.officialSource(named: "Homebrew/Cask")?.id == "homebrew/cask")
+        #expect(TapProjection.officialSource(named: "acme/tools") == nil)
+        #expect(TapProjection.officialSource(named: nil) == nil)
+        #expect(TapProjection.allOfficialSources.map(\.id) == ["homebrew/core", "homebrew/cask"])
+        #expect(TapProjection.allOfficialSources.allSatisfy { !$0.isMutable })
+    }
 }

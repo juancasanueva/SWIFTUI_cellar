@@ -197,6 +197,16 @@ final class cellarUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["official-tap-explanation-homebrew-core"].exists)
         XCTAssertTrue(app.staticTexts["official-tap-explanation-homebrew-cask"].exists)
 
+        // TM4: an official row opens the read-only pane, never the third-party
+        // detail — no untap of any kind, whatever the inventory holds.
+        app.outlines["taps-list"].staticTexts["Homebrew Core"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["official-tap-detail"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Official source"].exists)
+        XCTAssertFalse(app.buttons["tap-untap-button"].exists)
+        XCTAssertFalse(app.buttons["tap-force-untap-button"].exists)
+        XCTAssertFalse(app.buttons["tap-untrust-button"].exists)
+        XCTAssertFalse(app.buttons["tap-trust-button"].exists)
+
         let field = app.textFields["tap-add-field"]
         XCTAssertTrue(field.exists)
         field.click()

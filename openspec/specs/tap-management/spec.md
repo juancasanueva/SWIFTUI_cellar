@@ -108,6 +108,18 @@ MUST NOT expose tap or untap controls. Only third-party taps MUST expose mutatio
 - THEN Homebrew Core and Homebrew Cask each appear once with the exact API-backed explanation
 - AND neither row offers tap or untap
 
+#### Scenario: Selecting an official source presents a read-only pane
+
+- GIVEN the Taps list, with or without a local Core or Cask checkout in the inventory
+- WHEN an official row is selected
+- THEN the row carries the same selection highlight a third-party tap row carries
+- AND the detail presents that source's title, identity and the exact API-backed explanation
+- AND it offers no trust, untrust, untap or force-untap control, even when a local checkout of that
+  name exists — the third-party detail never opens on an official source
+- Verification: `ui`
+  (Added directly on 2026-08-25: official rows were implicitly selectable and resolved to the
+  third-party detail, which offered `brew untap homebrew/core`.)
+
 #### Scenario: Zero third-party taps is useful, not erroneous
 
 - GIVEN no third-party tap records decode
