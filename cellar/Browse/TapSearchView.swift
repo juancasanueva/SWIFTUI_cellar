@@ -16,9 +16,10 @@ import SwiftUI
 /// diff (`package-search` PS8, DD-8).
 ///
 /// The surface composes **no copy of its own**. Every sentence it shows — the
-/// install state, the catalog collision and each empty state — is supplied by
-/// `TapPackageSearch`, so two surfaces cannot word the same fact differently
-/// (PS8, DD-7, DD-17).
+/// withheld-tap note, the catalog collision and each empty state — is supplied
+/// by `TapPackageSearch`, and the installed mark is the shared `StatusPill`
+/// component the catalog rows draw, so two surfaces cannot word or draw the
+/// same fact differently (PS8, DD-7, DD-9, DD-17, DD-18).
 ///
 /// It also decides nothing. Which rows may be selected, which carry a collision
 /// note, which identity the install names and why the list is empty are all
@@ -132,16 +133,29 @@ struct TapSearchView: View {
                         .foregroundStyle(Color.white.opacity(0.88))
                         .lineLimit(1)
                     KindTag(kind: hit.id.kind)
+                    if hit.isInstalled {
+                        // The **same** component the catalog rows draw, in the
+                        // same position after the kind chip, so one install
+                        // state reads one way on both search surfaces. Its
+                        // label belongs to that component: this file composes
+                        // none of it (PS8, DD-18).
+                        StatusPill.installed
+                    }
                     Spacer(minLength: 0)
                 }
                 Text(hit.tapName)
                     .font(Theme.mono(11))
                     .foregroundStyle(Color.white.opacity(0.4))
                     .lineLimit(1)
-                Text(state(hit))
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.textFaint)
-                    .lineLimit(2)
+                // Only what the pill cannot say: what Homebrew is withholding,
+                // and which package a colliding token actually installs. A row
+                // with neither is silent, exactly as a catalog row is.
+                if let note = self.note(hit) {
+                    Text(note)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.textFaint)
+                        .lineLimit(2)
+                }
             }
             Spacer(minLength: 0)
             // The shared spine, unconditionally: an entry with neither an
@@ -159,9 +173,13 @@ struct TapSearchView: View {
         PackageEntry(installed: nil, catalog: nil, id: hit.mutationTarget)
     }
 
-    /// The row's sentence — joined from values, never composed from words.
-    private func state(_ hit: TapSearchHit) -> String {
-        [hit.stateCopy, hit.collisionNote].compactMap(\.self).joined(separator: " ")
+    /// The row's explanatory line, or `nil` when the row has nothing to explain.
+    ///
+    /// Joined from values, never composed from words: both sentences come from
+    /// the projection, and either may be absent.
+    private func note(_ hit: TapSearchHit) -> String? {
+        let sentences = [hit.stateNote, hit.collisionNote].compactMap(\.self)
+        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
     }
 }
 

@@ -972,21 +972,21 @@ sc), `package-detail` and `tap-management` are untouched by round 3. Nothing new
       `installedCopy` and `notInstalledCopy`; `copy(for:)` → `note(for:) -> String?`.
 - [x] 2″.3 Run `swift test --package-path Packages/CellarCore` whole — the guard is that no other core
       suite reads `stateCopy`, and that `TapProjectionTests`' own `statusExplanation` rows stay green.
-- [ ] 2″.4 Commit `feat(search): expose the tap install state as a fact instead of row copy`.
+- [x] 2″.4 Commit `feat(search): expose the tap install state as a fact instead of row copy`.
 
 ## Phase 3″: WU12 — the shared pill
 
-- [ ] 3″.1 Create `cellar/Browse/StatusPill.swift`: an internal `StatusPill: View` carrying
+- [x] 3″.1 Create `cellar/Browse/StatusPill.swift`: an internal `StatusPill: View` carrying
       `label`/`background`/`foreground`, the exact body `PackageRow.statusPill` had, and
       `static var installed` with the pinned `Installed` label and `Theme.successTint(0.16)` /
       `Theme.successText`. **No `project.pbxproj` edit** — `path = cellar` is a synchronized root group.
-- [ ] 3″.2 `PackageRow.swift`: delete `private func statusPill(…)`; the installed call site becomes
+- [x] 3″.2 `PackageRow.swift`: delete `private func statusPill(…)`; the installed call site becomes
       `StatusPill.installed`, the badge loop becomes `StatusPill(label:background:foreground:)`.
       `BrowseView.swift` is **not** touched — verify with `git diff`.
-- [ ] 3″.3 `TapSearchView.swift`: draw `StatusPill.installed` after `KindTag` when `hit.isInstalled`;
+- [x] 3″.3 `TapSearchView.swift`: draw `StatusPill.installed` after `KindTag` when `hit.isInstalled`;
       delete `state(_:)` and the unconditional third `Text`; render the note line only when
       `[hit.stateNote, hit.collisionNote]` joins to something non-empty.
-- [ ] 3″.4 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [x] 3″.4 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
 - [ ] 3″.5 Commit `feat(taps): mark installed tap packages with the shared Installed pill`.
 
 ## Phase 4″: WU13 — the composition guards
