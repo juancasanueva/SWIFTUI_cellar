@@ -1,8 +1,20 @@
 # Spec index — `m11-tap-search`
 
 Three delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
-the searchable mirror. **Revision 5** — the 2026-08-25 maintainer UI feedback on the update pill, on top
-of revision 4's install pill and revision 3's scope change.
+the searchable mirror. **Revision 6** — the 2026-08-25 maintainer UI feedback on the mutation verbs, on
+top of revision 5's update pill, revision 4's install pill and revision 3's scope change.
+
+**UI feedback, 2026-08-25 (round 5, binding).** Observed in the running app: the `⋯` menu on an
+**installed** tap row offered only Install and Copy install command, where the catalog result surface
+offers Reinstall, Uninstall…, Uninstall and Zap… for a cask, and Upgrade and Pin/Unpin where they apply.
+The surface handed the shared mutation menu an entry built with **no installed record**, so the menu's own
+installed branch could never be taken. The projection now resolves that record — by the same **tap-aware
+handoff** the offered version uses, never by a bare identity lookup — and the row hands it over, so the
+verbs agree with the pills rounds 3 and 4 put on the same row. No verb is re-implemented, no argv shape is
+added, and the affordances stay unconditional with no trust gate. **Scenario counts move by one**: one new
+`unit-app` scenario for the composition, with the round-5 `unit` obligations amended into the existing
+facts and offered-version scenarios, so `package-search` becomes **1 ADDED / 20 scenarios** (→ 8 req /
+**39** sc). `package-detail` and `tap-management` are untouched by round 5.
 
 **UI feedback, 2026-08-25 (round 4, binding).** Round 3 gave the tap rows the catalog row's **Installed**
 pill and stopped there. An installed tap package whose own receipt already reports it outdated therefore
@@ -34,13 +46,18 @@ restated **per surface** rather than as a shared keystroke turn. The string `Fro
 
 | Capability | Op | Block | Scenarios | Net |
 |---|---|---|---|---|
-| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +19 (13 `unit`, 6 `unit-app`) | 7 → **8** requirements, 19 → **38** scenarios |
+| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +20 (13 `unit`, 7 `unit-app`) | 7 → **8** requirements, 19 → **39** scenarios |
 | `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +1 (`unit`) | 8 requirements unchanged, 31 → **32** scenarios |
 | `tap-management` | **MODIFIED** — **TM5** and **TM11** (main-spec markers) | both whole blocks, all 12 existing scenarios byte-identical | +2 (`unit`) | 13 requirements unchanged, 58 → **60** scenarios |
 
-**Totals: 1 ADDED, 3 MODIFIED blocks across 2 capabilities, 0 REMOVED, 0 RENAMED — 20 new scenarios
-(15 `unit`, 5 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
+**Totals: 1 ADDED, 3 MODIFIED blocks across 2 capabilities, 0 REMOVED, 0 RENAMED — 23 new scenarios
+(16 `unit`, 7 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
 destructive-delta warning does not fire.
+
+> **Arithmetic correction, round 5.** This line read “20 new scenarios (15 `unit`, 5 `unit-app`)” from
+> revision 3 onward and was not re-footed when rounds 3 and 4 amended the table above it. The table is
+> and was authoritative: 20 + 1 + 2 = **23**, of which 13 + 1 + 2 = **16** are `unit` and **7** are
+> `unit-app`. The row totals are unchanged by this correction; only this summary is.
 
 **One catalog read is permitted, and only one.** PD6's added paragraph allows the composed surface to
 read the catalog for **membership alone** — whether a hit's bare token is also carried by the catalog
@@ -76,6 +93,7 @@ requirements, following the precedent `2026-08-23-m7-tap-trust` recorded at
 | Install state — tap withheld | `Installed. Homebrew withholds its tap while this tap is untrusted.` | TM5's exact shipped string, reused byte-for-byte. **Round 3**: the withheld row now carries the pill **and** this sentence — it is installed, and the sentence explains what Homebrew is withholding |
 | Install state — not installed | ~~`Not installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | A not-installed row carries **no state copy and no pill**, exactly as the catalog result surface shows nothing for a row that is not installed |
 | Update available — installed and outdated | **no copy pinned here** — the **shared update pill** the catalog result surface and the Installed list already draw | **Round 4**: an installed hit whose receipt reports it outdated carries that pill, after the Installed pill, fed the **offered version as a value**. Not copy this delta owns: the label and the wording around the version live in that one shared component, so neither search surface and no projection composes them |
+| Mutation verbs on an installed row | **no copy pinned here** — Reinstall, Uninstall…, Uninstall and Zap…, Upgrade, Pin and Unpin belong to the **shared mutation menu** | **Round 5**: the row hands that menu the hit's installed record, so an installed hit takes the menu's installed branch. Not copy this delta owns and not verbs it declares: every label, every argv and every applicability rule lives in the shared menu and the shipped command type, and the surface supplies only the record and the bare target they already take |
 
 Both withdrawn strings stay **unchanged in TM5** for the tap-detail rows TM5 governs; only this
 surface's copy is withdrawn. Neither is promoted by this change, and no MODIFIED block is needed to
@@ -111,6 +129,7 @@ carried into PS8:
 | PS6's ceiling not regressed; no new brew invocation | latency paragraph + `unit` per-surface latency scenario + `unit-app` process-layer scan. **Restated 2026-08-25**: the surfaces answer separate keystroke turns, so the tap surface holds the same 8 ms p95 ceiling on its own turn and PS6's catalog measurement is unchanged |
 | ~~Install state shown as a row sentence: `Installed.` / `Not installed.`~~ — **superseded 2026-08-25 (round 3)** | The **shared `Installed` pill** the catalog row already draws, on both installed states, and **nothing** on a not-installed row: install-state paragraph + the `unit` install-state scenario + the `unit-app` copy-ownership scan. The withheld sentence survives as the row's explanatory line, beside the pill |
 | An available update is marked with the **shared UPDATE pill**, after the Installed pill — **added 2026-08-25 (round 4)** | The offered version becomes a **sixth fact** of the hit, derived from the installed receipt and gated on its own `isOutdated`: six-facts paragraph + offered-version paragraph + update-pill paragraph, the new `unit` offered-version scenario and the new `unit-app` shared-update-pill scenario. The **Outdated control stays absent** — its rule survives round 4 with a narrowed reason, stated in the filters paragraph |
+| An installed row offers the **same verbs the Installed and catalog surfaces offer** — **added 2026-08-25 (round 5)** | The hit gains a **mutation handoff** — this machine's own installed receipt, resolved by the tap-aware handoff, present in both installed states and absent when not installed — and the row hands it to the shared mutation menu: verbs paragraph + handoff paragraph, the amended facts and offered-version `unit` scenarios and the new `unit-app` mutation-composition scenario. It is **not a seventh fact**: it publishes nothing the tap declares, costs no brew invocation, and the surface presents nothing from it |
 
 ## `package-mutation`: activated, not changed — no delta
 
@@ -151,7 +170,9 @@ A `package-mutation` MODIFIED block would restate a requirement that already say
 
 - **Any tap-source read**, and therefore any description, version, homepage, license, dependency list,
   install count, deprecation flag or size for a not-installed tap hit. TM5 forbids the read
-  unconditionally, and PS8 restates the resulting five-fact ceiling.
+  unconditionally, and PS8 restates the resulting **six-fact** ceiling (round 4 raised it from five by
+  adding the offered version, which comes from this machine's own receipt rather than from the tap;
+  round 5 adds a receipt **handoff**, which is not a fact and does not raise it again).
 - **A merged ranked list.** PS3's order is broken by 365-day install count, which a tap package does
   not have. The two orders stay independent, which is also what keeps the hits visibly a different kind
   of result rather than degraded catalog rows.

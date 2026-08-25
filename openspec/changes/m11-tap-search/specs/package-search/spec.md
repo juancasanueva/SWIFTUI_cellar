@@ -2,8 +2,8 @@
 
 Existing capability — `openspec/specs/package-search/spec.md` (**7 requirements / 19 scenarios**,
 established by `2026-08-01-m1-catalog-browse` and extended by `2026-08-02-m2-catalog-hardening`). This
-delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **19 scenarios** are added, taking the
-capability to **8 requirements / 38 scenarios**.
+delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **20 scenarios** are added, taking the
+capability to **8 requirements / 39 scenarios**.
 
 Nothing is removed, modified or renamed here, so `rules.archive`'s destructive-delta warning does not
 fire and PS1–PS7 stay byte-identical. In particular the index keeps its identity rule, its
@@ -55,12 +55,22 @@ version brew currently offers, so nothing new is read and no brew invocation is 
 offered version a **fact of the hit**, gated on the receipt's own outdated rule, and marks the row with
 the **same shared update pill** the catalog surface and the Installed list already draw.
 
+**Maintainer UI feedback, 2026-08-25 (round 5) — binding, and this revision's reason.** Observed in the
+running app: the row's `⋯` menu on an **installed** tap package offered only Install and Copy install
+command, while the catalog result surface offers Reinstall, Uninstall…, Uninstall and Zap… for a cask,
+and Upgrade and Pin/Unpin where they apply. The cause is a presentation one, not a verb one: the surface
+handed the shared mutation menu an entry built with **no installed record at all**, so the menu's own
+installed branch could never be taken. Rounds 3 and 4 marked the installed state and the available update
+on the row; round 5 makes the **verbs** agree with those marks. Nothing new is read — the receipt is
+already resident in the same installed inventory the offered version comes from — no verb is
+re-implemented, and the affordances stay unconditional with no trust gate (`package-mutation` PM10).
+
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
 | `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **13** |
-| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **6** |
+| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **7** |
 
 ## ADDED Requirements
 
@@ -92,6 +102,17 @@ license, no dependency list, no install count, no deprecation flag, no disabled 
 because the tap inventory publishes none of them and obtaining any of them would require the
 tap-source read TM5 forbids. An absent fact MUST be absent rather than an empty string, a dash,
 `unknown` or any other placeholder.
+
+Round 5 adds one member that is **not** a seventh fact: the **installed receipt this machine already
+holds** for the hit, present for an installed hit in **either** installed state and absent for a
+not-installed one. It is a **mutation handoff**, carried so the shared mutation spine below can be
+handed the record it already requires, and it MUST be resolved by the **same tap-aware handoff** the
+offered version is resolved by — never by a bare `PackageID` lookup, which answers for a receipt whose
+tap names a different tap and would attach a colliding catalog package's record to a tap row. It
+therefore changes none of the prohibitions above: it introduces no tap-published value, costs no brew
+invocation, and the surface MUST present nothing from it beyond the shared components this requirement
+already names. The six facts remain six, and the offered version MUST continue to be derived from that
+same receipt under the receipt's own outdated rule rather than re-derived beside it.
 
 The offered version is **not** an exception to that prohibition: it is not read from the tap, from the
 tap's source or from the catalog. It is read from the **installed receipt this machine already holds**,
@@ -164,10 +185,28 @@ neutral statement of Homebrew's own resolution, carrying no recommendation, no w
 suggestion to disambiguate. It MUST be supplied by the same projection that answers the source, so the
 presenting surface composes none of that copy locally.
 
-Install MUST be offered on the **shared mutation spine, unconditionally**, with the existing
+Mutation MUST be offered on the **shared mutation spine, unconditionally**, with the existing
 bare-token argv. No new command family and no new argv shape MUST be introduced, and the mutation
 target MUST remain the bare `PackageID` even for a colliding hit: qualifying the token to disambiguate
-is forbidden by `package-mutation` PM10, whose prohibition binds every path on that spine. This
+is forbidden by `package-mutation` PM10, whose prohibition binds every path on that spine.
+
+The surface MUST hand that spine the **installed record for an installed hit** — in **both** installed
+states, resolved by the tap-aware handoff above — and **no record for a not-installed hit**, so the
+menu offers exactly what it offers on the Installed and catalog surfaces for the same package: the
+install-time affordances for a package this machine does not have, and the installed-time ones —
+Reinstall and Uninstall…, Uninstall and Zap… for a cask, Upgrade where the receipt reports the package
+outdated, and Pin or Unpin where the receipt makes them applicable — for a package it does. An
+installed tap row offering only an install is the same fact answered twice, differently, that II8 and
+PT5 forbid: the row already draws the shared **Installed** pill, and where the receipt reports it
+outdated the shared **update** pill, so a menu that denies both is contradicted by the row it sits on.
+
+The surface MUST NOT re-implement, re-word, re-order or extend any of those verbs, MUST NOT construct a
+mutation command, an argv or a mutation target of its own, and MUST NOT decide which of them applies:
+every one of those decisions belongs to the shared menu and the shipped command type, and this surface
+supplies only the record and the bare target they already take. The affordances stay **unconditional**
+— no trust gate on either granularity, no pre-launch block, no trust badge and no trust control
+(PM10) — and the record supplies **no catalog record**: a colliding hit still hands the spine the tap
+row's own receipt and never the catalog package's (`package-detail` PD6). This
 surface MUST NOT block, disable, hide, delay or pre-qualify the install — or any other affordance —
 on a tap's trust state or on per-package grant state, and MUST NOT read a trust report, store or
 projection to decide anything before launch (PM10). It MUST present no trust badge and no trust
@@ -281,6 +320,9 @@ method, same ceiling, unaffected by this source's existence.
 - AND no description, published version, homepage, license, dependency list, install count, deprecation
   flag, disabled flag or size exists in any member, and no exposed value is a placeholder standing for
   absence
+- AND the one further member is the **mutation handoff** added in round 5 — this machine's own installed
+  receipt for the hit — absent here because this hit is not installed, so the enumeration still exposes
+  six facts and carries no tap-published value
 - Verification: `unit`
 
 #### Scenario: The kind filter restricts the composed source
@@ -347,6 +389,12 @@ method, same ceiling, unaffected by this source's existence.
   up-to-date installed hit and a not-installed hit are indistinguishable on this fact
 - AND no hit's offered version equals the version that hit has installed, so the fact is the version
   being offered and never a restatement of the one already present
+- AND each hit's **mutation handoff** — the installed record it hands the shared mutation spine — is
+  present for the first, the second and the fourth, each being that hit's own receipt, and absent for
+  the third, resolved by the same tap-aware handoff rather than by a bare identity lookup
+- AND a hit whose bare token the catalog also carries, whose only resident receipt belongs to the
+  catalog's own tap rather than to the publishing tap, carries **no** record at all, so the catalog
+  package's receipt is never attached to a tap row
 - Verification: `unit`
 
 #### Scenario: An installed hit with an ambiguous identity is not routable
@@ -406,8 +454,8 @@ method, same ceiling, unaffected by this source's existence.
 - WHEN both are scanned for a tap-trust or per-package-trust type name, for a trust badge or a trust
   control, for the withheld-state and collision copies, for the two withdrawn strings, and for the
   component that draws the installed mark
-- THEN neither contains a trust type name, a trust badge or a trust control, and the install
-  affordance is offered for every hit whatever the origin tap's trust state
+- THEN neither contains a trust type name, a trust badge or a trust control, and the mutation
+  affordances are offered for every hit whatever the origin tap's trust state
 - AND the withheld-state note and the collision note are produced by the projection, with no such copy
   composed by the presenting surface itself, and neither file produces “Installed.” or “Not installed.”
 - AND the installed mark is the **one shared status-pill component the catalog result surface draws**,
@@ -425,6 +473,21 @@ method, same ceiling, unaffected by this source's existence.
   gates it on the offered version's presence alone rather than on any install state it re-derives
 - AND neither surface composes update wording of its own: the pill's label appears only where the
   component is declared
+- Verification: `unit-app`
+
+#### Scenario: An installed tap row reaches the shared mutation menu with its installed record
+
+- GIVEN the source of the surface that presents this source and the source of the shared mutation menu
+- WHEN the entry the surface hands that menu is inspected, together with the branch the menu takes on
+  it and every verb, argv, mutation target and command type the surface declares for itself
+- THEN the surface hands the menu the hit's **installed record**, so an installed hit takes the menu's
+  installed branch and a not-installed hit takes its install branch, with the bare mutation target
+  unchanged in both cases
+- AND the record it hands is the one the projection resolved, never one the surface looks up, derives
+  or re-keys, and it hands **no catalog record** at all
+- AND the surface declares no mutation command, no mutation target, no submission and no
+  formula-or-cask narrowing of its own, so Reinstall, Uninstall…, Uninstall and Zap…, Upgrade and
+  Pin/Unpin are the shared menu's and are worded only where that menu declares them
 - Verification: `unit-app`
 
 #### Scenario: Composing the tap source reaches no process layer
@@ -503,3 +566,18 @@ method, same ceiling, unaffected by this source's existence.
   DD-5 — which keeps a "latest version" fact row off the receipt **detail** pane, because `catalogVersion`
   falls back to the installed version when brew reports nothing — is likewise untouched: this fact is
   gated on the receipt's own `isOutdated`, so the fallback case is never the case that renders.
+- **Round 5 pins no copy and re-implements no verb.** The verbs the installed branch offers — Reinstall,
+  Uninstall…, Uninstall and Zap…, Upgrade and Pin/Unpin — are the shipped shared menu's, worded where that
+  component declares them, so this delta's pinned-copy table gains no row and its no-local-copy scan gains
+  no string. `package-mutation` is **activated, not changed** for the third time: PM10's argv enumeration
+  gains no family, because every one of those verbs is an existing family over the existing bare token, and
+  the affordances stay unconditional with no trust gate on either granularity. `installed-inventory` is
+  likewise **activated, not changed**: II4's outdated rule still gates the Upgrade verb through the
+  receipt, exactly as it gates the offered version.
+- **The round-5 member is a handoff, not a seventh fact.** The hit gains this machine's own installed
+  receipt so the shared mutation spine can be handed the record it already takes; it publishes nothing the
+  tap declares, so the six-fact ceiling and the tap-source prohibition TM5 states are both untouched. The
+  facts scenario enumerates it by name rather than letting an unlisted member sit in the enumeration it
+  reads. `package-detail` **PD6 is unaffected**: the record is the *installed* receipt, resolved by the
+  tap-aware handoff, so a colliding hit still hands over its own tap row's receipt and never the catalog
+  package's — the membership answer stays a collision `Bool` and contributes nothing to a hit's content.

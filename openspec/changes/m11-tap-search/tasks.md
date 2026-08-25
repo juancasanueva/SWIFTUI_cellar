@@ -1119,3 +1119,76 @@ round 4. No new copy is pinned — the pill's wording belongs to the shared comp
 - [x] 6‴.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
 - [x] 6‴.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 4 apply progress`.
+
+## Round-5 Work Units (`work-unit-commits`; conventional commits, **no `Co-Authored-By`, no AI attribution**)
+
+| Unit | Goal | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU18** | The amended artifacts land **first** — PS8's verbs clause and its handoff paragraph, the amended facts / offered-version / trust scenarios, one new `unit-app` scenario, `specs/README.md`'s revision-6 header, arithmetic and tables, `design.md` (**DD-20** new, **DD-9**'s entry clause superseded, the round-5 file-changes table and RED rows) and this file | N/A — artifacts only | N/A — no behaviour changes | Revert one docs commit; the branch returns to `2cba75b` |
+| **WU19** | `TapSearchHit.installed: InstalledPackage?`, stored, resolved once through `TapPackage.installedHandoff`; the row hands it to `MutationMenu` | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` then the whole package; `xcodebuild build …` | **Launch the app**: the `⋯` menu on an installed tap row offers Reinstall and Uninstall… (plus Uninstall and Zap… for a cask, Upgrade for an outdated one, Pin/Unpin for a formula); a not-installed row still offers Install and Copy install command only | Revert one commit across `TapPackageSearch.swift`, `TapSearchView.swift` and the unit test file. The member is **added**, never renamed, so nothing else on the branch stops compiling |
+| **WU20** | Composition guards: the row reaches the shared menu with its record, and still re-implements no verb | `xcodebuild test … -only-testing:cellarTests` | N/A — source-scan suite; the app harness is WU19's | Revert one test commit; no production line is its own |
+
+## Phase 1⁗: WU18 — the amended artifacts land first
+
+- [x] 1⁗.1 Amend `specs/package-search/spec.md`: the round-5 feedback paragraph, the **mutation handoff**
+      paragraph under the six-facts clause, the rewritten verbs clause (installed record in **both**
+      installed states, no record when not installed, no verb re-implemented, no trust gate, no catalog
+      record), the amended facts and offered-version `unit` scenarios, the amended trust `unit-app`
+      scenario, one new `unit-app` scenario, the class counts and the archive notes. **Never touch
+      `openspec/specs/**`.**
+- [x] 1⁗.2 Amend `specs/README.md`: revision 6 header, the round-5 paragraph, the `package-search`
+      arithmetic row (+20 / 39 sc), the totals correction, one new pinned-copy row (**no** copy pinned),
+      one new presentation-decisions row, and the six-fact ceiling in the exclusions list.
+- [x] 1⁗.3 Amend `design.md`: **DD-20** new; **DD-9**'s entry clause struck and superseded; the round-5
+      paragraph in the decisions preamble; the data-flow row and the two new legend lines; the round-5
+      file-changes table; the round-5 RED rows and the honesty note.
+- [x] 1⁗.4 Append this phase to `tasks.md`.
+- [x] 1⁗.5 Commit `docs(sdd): amend m11-tap-search so installed tap rows carry their installed record`.
+
+## Phase 2⁗: WU19 — the installed record reaches the menu (RED → GREEN)
+
+- [ ] 2⁗.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: `installed` added to the
+      `Mirror` label list in `aHitCarriesItsSixFactsAndItsCopyAndNothingElse`, the mutation-handoff
+      assertions appended to `onlyAnOutdatedInstalledHitOffersAVersion`, and a new
+      `aCollidingCatalogReceiptIsNeverAttachedToATapRow`. Confirm the failure is a **compile** failure
+      naming `installed`.
+- [ ] 2⁗.2 **GREEN** in `TapPackageSearch.swift`: `public let installed: InstalledPackage?` on
+      `TapSearchHit`, resolved once in `hits(…)` via `installedReceipt(for:)` keyed on
+      `TapPackage.installedHandoff`, with `nextVersion` derived from that same resolved receipt. Stored,
+      not computed — `Mirror` must see it.
+- [ ] 2⁗.3 `swift test --package-path Packages/CellarCore` whole against the **1,872** baseline measured
+      at `2cba75b`.
+- [ ] 2⁗.4 `TapSearchView.swift`: `PackageEntry(installed: hit.installed, catalog: nil, id: hit.mutationTarget)`,
+      with the stale "neither an installed nor a catalog record" comment rewritten. `MutationMenu.swift`,
+      `PackageRow.swift`, `StatusPill.swift` and `BrowseView.swift` are **not** touched — verify with
+      `git diff`.
+- [ ] 2⁗.5 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [ ] 2⁗.6 Commit `feat(taps): hand the mutation menu the installed record for an installed tap package`.
+
+## Phase 3⁗: WU20 — the composition guards
+
+- [ ] 3⁗.1 `TapSearchCompositionTests.swift`: replace the `PackageEntry(installed: nil, catalog: nil`
+      literal pin with `PackageEntry(installed: hit.installed, catalog: nil` in
+      `theTapSearchSurfaceComposesNoTrustGateAndNoBadge`, keeping `catalog: nil` pinned (PD6) and the
+      no-verb-re-implementation forbidden list intact; add
+      `anInstalledTapRowReachesTheMutationMenuWithItsRecord` asserting the menu's `entry.isInstalled`
+      branch and its one declaration of each verb.
+- [ ] 3⁗.2 Prove RED by **reversible mutation** of `TapSearchView.swift`: revert the entry literal to
+      `installed: nil`. Restore byte-identically and verify with `shasum -a 256 -c`.
+- [ ] 3⁗.3 Commit `test(taps): pin that installed tap rows reach the mutation menu with their record`.
+
+## Phase 6⁗: Verification and bindings (round 5)
+
+- [ ] 6⁗.1 `swift test --package-path Packages/CellarCore` — record the total against the **1,872**
+      baseline measured at `2cba75b`.
+- [ ] 6⁗.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+      round-4 baseline. **Redirect with `> log 2>&1`, never `tee`**, and extract the quoted id: an
+      interleaved status block only costs an id when it breaks inside the quotes. The full `-scheme cellar`
+      runner is **not** the gate — it is red on `main` from two pre-existing `cellarUITests` Taps failures.
+- [ ] 6⁗.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+      `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
+      `MutationCommand.swift`, `cellar/Activity/MutationMenu.swift`, `PackageDetailView.swift` and
+      `cellarUITests/` must print **nothing** under `git diff --stat main --`.
+- [ ] 6⁗.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+      `size:exception`; never trim.
+- [ ] 6⁗.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 5 apply progress`.
