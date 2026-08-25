@@ -853,3 +853,159 @@ insertions(+), 64 deletions(-)**. Both numbers are stated so neither has to be i
 still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
 pull request. Round 5's ledger is unchanged at 19 of 19, round 4's at 22 of 22, round 3's at 24 of 24,
 round 2's at 55 of 56, and round 1's 59 boxes are unchanged history with `6.7` void.
+
+---
+
+# Round 7 — colliding hits open the catalog detail
+
+**Maintainer product decision (binding, 2026-08-25).** The **collision** half of round 6's ambiguity rule
+is **reversed**. A hit whose bare token the catalog also carries is **selectable** and opens the
+**catalog's own detail**: Homebrew resolves the bare token to the catalog package, which is exactly what
+the row's own collision note already says, so the catalog pane is the package the row promises rather
+than "a different package than the row chosen". `PackageDetailView` already resolves catalog-first, so
+**no new branch** was needed — the hit simply became routable by its `PackageID`. The **only** remaining
+inert case is a **duplicate `PackageID` among the emitted hits**, which nothing can disambiguate.
+
+The production change is **one expression**: `TapPackageSearch.swift`'s
+`let routable = collides == false && unique` → `let routable = unique`. `unique` keeps being counted over
+**emitted tap hits only**, by the `occurrences` fold that already existed — a catalog record is not an
+emitted hit. `alsoInCatalog` stays a fact and `collisionNote` stays pinned and required.
+
+**Delivery.** `single-pr` with `size:exception` **accepted** (maintainer, 2026-08-25). Measured totals
+are reported below and are **not** trimmed. RDD disabled. Strict TDD active throughout.
+
+## Phase 0⁶ — baselines, measured at `6f18d2d`
+
+| Runner | Baseline |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,878 tests / 218 suites** passed, 1 known issue, **no flake** |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 261 distinct test ids**, 0 failures |
+| Working tree | clean after discarding `cellar/InfoPlist.xcstrings` churn |
+
+The `cellarTests` baseline **matches verify round 7's corrected figure of 261 exactly**, and it was
+reached by the counting rule the launch brief specifies rather than by a raw line count. The raw log
+carried **271** `Test case '…'` occurrences, of which **270** parse cleanly to **260** distinct ids; the
+one line that does not parse is corrupted mid-id by an interleaved xcodebuild status line
+(`AutomaticUpdateChecksTests/aFreshInsta` + timestamp). Recovering that quoted prefix and testing its
+membership against the cleanly parsed set shows it is **absent**, so it counts: **260 + 1 = 261**. The
+core flake round 6 recorded (`MutationRefreshReceiptTests.swift:214`) did **not** recur in any run this
+round.
+
+## Commits
+
+| Unit | Commit | What |
+|---|---|---|
+| WU25 | `917de65` | `docs(sdd): amend m11-tap-search so colliding tap hits open the catalog detail` — PS8's rewritten selectability clause, its colliding-route paragraph, the duplicate-only inert paragraph, the narrowed receipt/inventory-branch paragraphs and the corrected unreachable-note paragraph; two amended `unit` scenarios and one amended `unit-app` scenario; PD6's colliding-selection clause + `(Previously: …)` + one new `unit` scenario; `specs/README.md` revision 8; `design.md` (**DD-23**, round-7 preamble, file table, RED rows). **Delta specs only; `openspec/specs/**` untouched** |
+| WU26 | `7fafcdb` | `feat(search): route a colliding tap hit to the catalog detail it resolves to` — `let routable = unique`, the comment above it and the two `routableID`/`isInstalled` doc comments restated; two test rows **replaced**, two amended, one new PD6 row |
+| WU27 | `e7d203f` | `test(taps): pin that colliding tap rows open the catalog detail` — `TapSearchView`'s inert-row **comment** corrected (no behaviour line changed), the `unit-app` selection-rule scan's recorded reason restated to duplicate-only, the catalog-first ordering annotated as round 7's load-bearing assertion, and the design's mutation honesty note corrected (deviation 1) |
+| — | (this record) | `docs(sdd): record the m11-tap-search round 7 apply progress` |
+
+## Key design decision — DD-23
+
+**Routability is uniqueness among the emitted hits, and nothing else.** Round 6 had already removed the
+install state from the rule; round 7 removes the collision, leaving one conjunct. Three things make it
+the smallest honest change available:
+
+1. **The destination was already correct.** `DD-21` built the whole route — the identity handed over is
+   the bare `PackageID`, and `PackageDetailView.body`'s first branch is `catalog.package(id)`, unchanged
+   since m1. Both were already asserted. Round 7 stops withholding what they already resolve correctly.
+2. **The collision note is not withdrawn.** It answers a **mutation** question — which package an
+   install from this row installs — and that answer did not change. What changed is that the row now
+   also *opens* that package, so the sentence and the route agree instead of competing.
+3. **Uniqueness stays counted over emitted hits alone.** The `occurrences` fold is untouched. A catalog
+   record is not a hit this source emits and is not counted against one — which is exactly why deleting
+   the `collides` conjunct does not silently re-introduce it through the back door.
+
+Rejected: a fourth branch or a `routesToCatalog` flag on the hit (the destination is the resolution
+order's answer, not a fact the projection can know — a second opinion on it is the drift `DD-6`, `DD-7`
+and `DD-21` were each written to prevent); withdrawing the collision note; keeping `collides` and
+negating it only for the not-installed case (two rules where one will do); routing a colliding hit to
+the **tap inventory** pane (it would present the tap's name-only facts for a package Homebrew will not
+install from that tap — this round's own mismatch, inverted).
+
+## Work unit evidence — round 7
+
+| Unit | Focused test command and exact result | Runtime harness | Rollback boundary |
+|---|---|---|---|
+| **WU25** | N/A — artifacts only | N/A — no behaviour change | Revert `917de65`; the branch returns to `6f18d2d` |
+| **WU26** | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` → RED **36 tests, 4 failed, 7 issues**, every one an *assertion* failure reading `routableID → nil`; after GREEN → **36 tests passed**. Whole package → **1,879 tests / 218 suites passed**, 1 known issue | **N/A, with reason.** No runtime boundary is added: the destination is the shipped catalog branch, whose rendering the round-6 app harness already exercised. Round 7 introduces no new pane, no new process call and no new store read | Revert `7fafcdb` across `TapPackageSearch.swift` and one test file |
+| **WU27** | `xcodebuild test … -only-testing:cellarTests/TapSearchCompositionTests` under mutation → **`** TEST FAILED **`**, `theTapSearchSurfaceSelectsOnRoutabilityAlone()` failed; restored → whole suite `** TEST SUCCEEDED **`, **261 distinct ids**. `xcodebuild build …` → **`** BUILD SUCCEEDED **`** | N/A — source-scan suite | Revert `e7d203f` across one app file (comment only) and one test file; **no behaviour line is its own** |
+
+## TDD cycle evidence — round 7
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 2⁶.1–2⁶.2 the routability rule | `Packages/CellarCore/Tests/BrewClientTests/TapPackageSearchTests.swift` | Unit | ✅ 1,878 / 1,878 at `6f18d2d` | ✅ **written first**, run before any production edit: 4 tests failed with **7 assertion** failures, each printing `routableID → nil` against the expected `PackageID` — a reversed expectation, never a compile error | ✅ `let routable = unique` → 36/36 in-suite, **1,879** whole package | ✅ 5 fixtures in `onlyADuplicatedIdentityWithholdsTheRoute` — colliding+installed, colliding+absent, the duplicate pair, and an uncollided hit of **each** install state — so uniqueness is isolated against both retired variables; plus the collision/no-collision pair in `aCollidingHitIsShownAndIsRoutable` | ✅ the two `TapSearchHit` doc comments rewritten to the surviving rule; tests re-run green after |
+| 2⁶.1 PD6's new row | same file | Unit | ✅ same baseline | ✅ **written first**, failed on `hit.routableID → nil` before the production change | ✅ passes; asserts the catalog's record is byte-identical to the one returned with no tap inventory resident | ✅ triangulated against the tap's *other* packages, which stay ordinary not-founds, and against the index record count and search results | ➖ none needed |
+| 3⁶.1–3⁶.2 the app guard | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ 261 distinct ids at `6f18d2d` | ✅ **two reversible mutations**, proving different things (deviation 1): (a) `collides == false &&` restored in the projection → the 4 `unit` rows failed and the `unit-app` scan **did not**, which is correct and is why (b) exists; (b) `if let routable = hit.routableID, hit.alsoInCatalog == false` in the view → `theTapSearchSurfaceSelectsOnRoutabilityAlone()` **failed**. Both restored and verified `shasum -a 256 -c` → both files `OK` | ✅ `** TEST SUCCEEDED **`, 261 distinct ids | ➖ single scenario | ➖ none needed |
+
+### Test summary — round 7
+
+- **Tests written**: 1 new (`aCollidingSelectionResolvesToTheCatalogsOwnRecord`), 2 **replaced**
+  (`aCollidingHitIsShownAndIsNotRoutable` → `…IsRoutable`;
+  `anAmbiguousHitIsNotRoutableInEitherInstallState` → `onlyADuplicatedIdentityWithholdsTheRoute`),
+  2 amended in place (`aCollidingCatalogReceiptIsNeverAttachedToATapRow`'s two routability lines only;
+  `theTapSearchSurfaceSelectsOnRoutabilityAlone`'s recorded reason).
+- **Unchanged and deliberately so**: `twoTapsPublishingOneNameAreBothUnroutable` needed **no edit at
+  all** — which is itself the evidence that the rule narrowed rather than vanished.
+- **Counts**: CellarCore **1,878 → 1,879** (+1: two replaced by two, plus PD6's new row).
+  `cellarTests` **261 → 261** — round 7 adds no `unit-app` test, exactly as `DD-23` predicted, because
+  the view needed no edit and the catalog-first assertion it depends on was already pinned.
+- **Layers used**: Unit (3 touched, 1 new), `unit-app` (1 amended).
+- **Pure functions created**: 0 — the change is a deleted conjunct inside an existing pure projection.
+
+## Phase 6⁶ — verification and bindings
+
+| Gate | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **`Test run with 1879 tests in 218 suites passed`**, 1 known issue (baseline **1,878** → **+1**; no shipped test lost) |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 261 distinct test ids**, 0 failures (baseline **261** → **±0**). Both runs' id sets **union to exactly 261**, each losing a different single id to an interleaved status line (baseline: `AutomaticUpdateChecksTests/aFreshInstallReadsAsOff()`; final: `BrewfileExportCompositionTests/aFailedDumpNeverOpensAPanelAndNeverWrites()`), so the sets are provably identical rather than merely equal in size |
+| `xcodebuild build …` | **`** BUILD SUCCEEDED **`** |
+| Bindings — zero-diff vs `main` | `git diff --stat main --` printed **nothing** for `cellar/Browse/BrowseView.swift` (**DD-8**, sixth round running), `cellar/Activity/MutationMenu.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`, `MutationCommand.swift` and `cellarUITests/` |
+| Bindings — `PackageDetailView.swift` | `git diff --stat 6f18d2d -- cellar/Browse/PackageDetailView.swift` printed **nothing**: the file changed in round 6 and is **unchanged this round**. `DD-23` adds no branch, so the shared detail is untouched — the claim is "unchanged since `6f18d2d`", not "byte-identical to `main`" |
+| Files changed this round (`6f18d2d...HEAD`) | **9 files, +550 / −141** — of which **4** are docs artifacts. The production diff is `TapPackageSearch.swift` (one expression plus comments) and `TapSearchView.swift` (**comment only**) |
+| `git diff --shortstat main...HEAD` | **30 files changed, 9,720 insertions(+), 64 deletions(-)** — **9,784 changed lines**, measured at `e7d203f`, i.e. the commit immediately **before** this record. Reported under the accepted `size:exception` and **not trimmed**. Adding this record itself takes it to **+9,876 / −64 = 9,940**; both figures are given because a progress record cannot measure itself without circularity, and rounds 2–6 all used the same before-the-record convention |
+| Working tree | clean; `cellar/InfoPlist.xcstrings` churn discarded and never committed |
+
+## Deviations — round 7 (reported, not absorbed)
+
+1. **The design's mutation honesty note was wrong when first written, and was corrected in WU27.** It
+   claimed that restoring `collides == false &&` in the projection "is what proves the `unit-app` scan
+   still bites". It is not: that scan reads **app sources only** and is structurally blind to a
+   CellarCore edit. Running it confirmed this — the projection mutation failed 4 `unit` rows and left
+   the `unit-app` suite green. The round therefore needs **two** mutations, and both were run: the
+   projection one for the `unit` rows, and a **view** one (`hit.alsoInCatalog == false` added to the
+   selection gate) for the `unit-app` forbidden-token scan, which failed exactly as it should. Corrected
+   in `design.md` and in `tasks.md` step `3⁶.3` before the commit that depended on them, rather than
+   left as a claim no run supports.
+2. **`TapSearchView.swift` was edited, though the brief said it might need no change.** The brief's
+   condition — "needs no change **if** it keys `.selectionDisabled` on `routableID == nil`" — held, and
+   **no behaviour line changed**. What changed is the inert-row **comment**, which round 6 had restated
+   to name the catalog collision as a bar. That sentence is now false, and a comment asserting a retired
+   rule beside the code that no longer implements it is exactly the drift these files are scanned for.
+3. **Two `routableID == nil` assertions inside `aCollidingCatalogReceiptIsNeverAttachedToATapRow` had to
+   move**, though the brief listed that row as "unchanged". Its **subject** is unchanged and was
+   verified so: the tap row still carries its own receipt or none, never the catalog's, and every
+   assertion about the receipt keying (**DD-20**) is byte-identical. Only the two lines that pinned the
+   *retired routability rule* moved, because they were the retired rule stated inside a row about
+   something else. Reported rather than silently absorbed.
+4. **PS8's "unreachable collision note" paragraph contained a claim that round 7 falsifies**, and was
+   rewritten. It justified the name-only pane's absent collision note with **two** reasons — the catalog
+   branch resolves first, *and* the colliding row is unroutable. The second is now false. The paragraph
+   now says the branch **ordering** is the sole guarantee and notes that it is sufficient because that
+   ordering is itself asserted, in `theNameOnlyTapDetailComposesNothingItCannotKnow`.
+5. **`specs/README.md`'s "Excluded from these deltas" list still claimed the name-only pane was out of
+   scope** — stale since round 6 shipped it. Struck through and annotated rather than deleted, because
+   that list is the record of what each slice deliberately left out; deleting the entry would erase the
+   fact that the exclusion existed and stopped being true. Flagged as a **round-6 miss corrected in
+   round 7**, not as round-7 work.
+6. **`swift test --filter` was used at suite level for the RED/GREEN cycle**, never function level, and
+   the whole package for the gate — per the launch brief and round 6's own deviation 5.
+
+## Task ledger
+
+**Round 7: 24 of 24 complete.** Round 7 has **no** delivery task — the branch's one open delivery box is
+still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
+pull request. Round 6's ledger is unchanged at 25 of 25, round 5's at 19 of 19, round 4's at 22 of 22,
+round 3's at 24 of 24, round 2's at 55 of 56, and round 1's 59 boxes are unchanged history with `6.7`
+void.

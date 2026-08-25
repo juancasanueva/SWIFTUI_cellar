@@ -1392,18 +1392,18 @@ measured total; never trim. RDD disabled. Strict TDD active.
 
 ## Phase 6⁶: Verification and bindings (round 7)
 
-- [ ] 6⁶.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁶ baseline.
-- [ ] 6⁶.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+- [x] 6⁶.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁶ baseline.
+- [x] 6⁶.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
       phase-0⁶ baseline. **Redirect with `> log 2>&1`, never `tee`.** Count distinct ids by membership
       of each recovered quoted id against the cleanly parsed set: one line per run is corrupted by an
       interleaved status line. The full `-scheme cellar` runner is **not** the gate.
-- [ ] 6⁶.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+- [x] 6⁶.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
       `cellar/Browse/PackageDetailView.swift` **unchanged this round** against `6f18d2d`;
       `cellar/Activity/MutationMenu.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`,
       `PackageSearchIndex.swift`, `MutationCommand.swift` and `cellarUITests/` must print **nothing**
       under `git diff --stat main --`.
-- [ ] 6⁶.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+- [x] 6⁶.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
-- [ ] 6⁶.5 Merge the round-7 section into `apply-progress.md`, re-mirror it to Engram topic
+- [x] 6⁶.5 Merge the round-7 section into `apply-progress.md`, re-mirror it to Engram topic
       `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks`.
-- [ ] 6⁶.6 Commit `docs(sdd): record the m11-tap-search round 7 apply progress`.
+- [x] 6⁶.6 Commit `docs(sdd): record the m11-tap-search round 7 apply progress`.
