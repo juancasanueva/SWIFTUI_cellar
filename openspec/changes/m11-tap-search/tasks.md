@@ -1080,13 +1080,13 @@ round 4. No new copy is pinned — the pill's wording belongs to the shared comp
 
 ## Phase 3‴: WU16 — the shared update pill on the row
 
-- [ ] 3‴.1 `TapSearchView.swift`: draw `UpdateTag(nextVersion: next)` under
+- [x] 3‴.1 `TapSearchView.swift`: draw `UpdateTag(nextVersion: next)` under
       `if let next = hit.nextVersion`, immediately **after** `StatusPill.installed`. The second line
       (tap name) and everything below it are unchanged.
-- [ ] 3‴.2 `PackageRow.swift` and `StatusPill.swift` are **not** touched; `BrowseView.swift` stays
+- [x] 3‴.2 `PackageRow.swift` and `StatusPill.swift` are **not** touched; `BrowseView.swift` stays
       byte-identical to `main` — verify all three with `git diff`.
-- [ ] 3‴.3 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
-- [ ] 3‴.4 Commit `feat(taps): mark outdated tap packages with the shared update pill`.
+- [x] 3‴.3 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [x] 3‴.4 Commit `feat(taps): mark outdated tap packages with the shared update pill`.
 
 ## Phase 4‴: WU17 — the composition guards
 

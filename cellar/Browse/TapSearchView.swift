@@ -141,6 +141,17 @@ struct TapSearchView: View {
                         // none of it (PS8, DD-18).
                         StatusPill.installed
                     }
+                    // The **same** update chip the catalog rows, the Installed
+                    // list and the Updates list draw — immediately after the
+                    // installed pill, exactly where the catalog row puts it, so
+                    // "this has an update" reads identically on both search
+                    // surfaces. The offered version is handed over as a value:
+                    // this file words nothing about it, and the fact itself is
+                    // the projection's, gated on the receipt's own outdated
+                    // rule (PS8 round 4, DD-19).
+                    if let next = hit.nextVersion {
+                        UpdateTag(nextVersion: next)
+                    }
                     Spacer(minLength: 0)
                 }
                 Text(hit.tapName)
