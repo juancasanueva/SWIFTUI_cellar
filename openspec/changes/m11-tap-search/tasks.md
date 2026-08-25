@@ -987,24 +987,24 @@ sc), `package-detail` and `tap-management` are untouched by round 3. Nothing new
       delete `state(_:)` and the unconditional third `Text`; render the note line only when
       `[hit.stateNote, hit.collisionNote]` joins to something non-empty.
 - [x] 3″.4 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
-- [ ] 3″.5 Commit `feat(taps): mark installed tap packages with the shared Installed pill`.
+- [x] 3″.5 Commit `feat(taps): mark installed tap packages with the shared Installed pill`.
 
 ## Phase 4″: WU13 — the composition guards
 
-- [ ] 4″.1 `TapSearchCompositionTests.swift`: drop `"Installed."` and `"Not installed."` from
+- [x] 4″.1 `TapSearchCompositionTests.swift`: drop `"Installed."` and `"Not installed."` from
       `pinnedCopy`; add a `withdrawnCopy` list asserted **absent as complete literals** from the
       projection and the surface (a substring check would fail on the withheld sentence's first five
       characters); assert the surface carries no `"Installed"` literal at all, renders
       `StatusPill.installed`, `hit.stateNote` and `hit.collisionNote`; assert `PackageRow.swift` draws
       the same `StatusPill.installed`; assert `StatusPill.swift` declares the label exactly once.
-- [ ] 4″.2 Amend `notInstalledTapRowsAreNotSelectable`: `hit.isInstalled` leaves the forbidden list
+- [x] 4″.2 Amend `notInstalledTapRowsAreNotSelectable`: `hit.isInstalled` leaves the forbidden list
       (the pill reads it, and a `Bool` about installation cannot express routability), and the row that
       replaces it asserts the pill is gated on `hit.isInstalled` while routability still comes from
       `hit.routableID` alone. `alsoInCatalog`, `hit.state ==` and `== .notInstalled` stay forbidden.
-- [ ] 4″.3 Decide and record whether `StatusPill.swift` joins `PerPackageTrustSources.views()`. It does
+- [x] 4″.3 Decide and record whether `StatusPill.swift` joins `PerPackageTrustSources.views()`. It does
       **not**: that guard scans surfaces that present per-package trust, and the pill presents install
       state. Retarget nothing.
-- [ ] 4″.4 Prove RED for every new row by **reversible mutation** of the production files, restored
+- [x] 4″.4 Prove RED for every new row by **reversible mutation** of the production files, restored
       byte-identically and `shasum -a 256 -c` verified.
 - [ ] 4″.5 Commit `test(taps): pin the shared Installed pill and the withdrawn row copy`.
 

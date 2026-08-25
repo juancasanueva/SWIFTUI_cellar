@@ -241,12 +241,28 @@ struct TapSearchCompositionTests {
         }
         // Nothing here re-derives the rule the projection owns: routability is
         // read off the hit, and the facts behind it are never consulted.
-        for forbidden in ["alsoInCatalog", "hit.state ==", "hit.isInstalled", "== .notInstalled"] {
+        //
+        // `hit.isInstalled` left this list in round 3, deliberately and
+        // narrowly. The row now reads it to draw the shared pill, and a `Bool`
+        // about installation **cannot** express routability: routing
+        // additionally requires the hit to be uncollided and unique, and those
+        // are the two facts still forbidden below. The guard's subject is
+        // unchanged.
+        for forbidden in ["alsoInCatalog", "hit.state ==", "== .notInstalled", "occurrences"] {
             #expect(
                 surface.code.contains(forbidden) == false,
                 "the view re-derives routability through \(forbidden)"
             )
         }
+        // Proven rather than argued: the two reads are separate, and the one
+        // that gates selection is still `routableID`.
+        #expect(surface.code.contains("if hit.isInstalled {"))
+        #expect(surface.code.contains("if let routable = hit.routableID"))
+        #expect(
+            surface.code.contains(".selectionDisabled()")
+                && surface.code.contains("hit.isInstalled ? ") == false,
+            "selection is gated on installed-ness rather than on the projection's routability"
+        )
     }
 
     // MARK: - ps11's view half, DD-15 — no control that cannot answer
@@ -298,8 +314,21 @@ struct TapSearchCompositionTests {
                 "the view composes \(copy.debugDescription) locally"
             )
         }
+        // Round 3: the two withdrawn strings are produced by neither file, as
+        // complete literals. Anchored on the surviving withheld sentence above,
+        // so the absence is about these two strings and not about a scan that
+        // read nothing.
+        for source in [projection, surface] {
+            for withdrawn in TapSearchSources.withdrawnCopy {
+                #expect(
+                    source.raw.contains(withdrawn) == false,
+                    "\(source.name) still produces the withdrawn string \(withdrawn)"
+                )
+            }
+        }
+
         // What the view renders instead: the values, never the sentences.
-        #expect(surface.code.contains("hit.stateCopy"))
+        #expect(surface.code.contains("hit.stateNote"))
         #expect(surface.code.contains("hit.collisionNote"))
         #expect(surface.code.contains("presentation.emptyStateCopy"))
         // …and it derives no empty-state reason of its own: it switches over
@@ -312,6 +341,67 @@ struct TapSearchCompositionTests {
                 "the view re-derives the load state through \(local)"
             )
         }
+    }
+
+    /// PS8's round-3 clause: the **same** pill, not one that looks the same.
+    ///
+    /// The whole point of the extraction is that this can be asserted at all.
+    /// While the pill was `PackageRow`'s own `private func`, "the same pill"
+    /// was unrepresentable — Swift `private` is file-scoped — and the strongest
+    /// available claim would have been that two files draw a chip with matching
+    /// literals, which is exactly the drift II8 and PT5 forbid.
+    @Test("Both search surfaces draw the one shared installed pill")
+    func bothSearchSurfacesDrawTheOneSharedPill() throws {
+        let surface = try TapSearchSources.surface()
+        let row = try TapSearchSources.packageRow()
+        let pill = try TapSearchSources.pill()
+
+        // The component exists and owns the label, once.
+        #expect(pill.code.contains("struct StatusPill: View"))
+        #expect(pill.raw.contains("label: \"Installed\""))
+        #expect(
+            pill.code.components(separatedBy: "\"Installed\"").count == 2,
+            "the pinned label is declared more than once inside the component itself"
+        )
+
+        // Both surfaces reach for that one constant.
+        #expect(
+            row.code.contains("StatusPill.installed"),
+            "the catalog row no longer draws the shared pill"
+        )
+        #expect(
+            surface.code.contains("StatusPill.installed"),
+            "the tap row does not draw the shared pill"
+        )
+        // …and `PackageRow`'s private predecessor is gone, so there is no second
+        // pill left for either surface to drift towards.
+        #expect(row.code.contains("private func statusPill(") == false)
+
+        // Neither presenting surface composes the label.
+        for source in [surface, row] {
+            #expect(
+                source.raw.contains("\"Installed\"") == false,
+                "\(source.name) composes the pill's label locally"
+            )
+        }
+        // The tap row draws it on installed-ness alone — both installed states,
+        // which is why it reads the hit's fact rather than matching one case.
+        #expect(surface.code.contains("if hit.isInstalled {"))
+        // …and it sits in the title line, right after the kind chip, exactly
+        // where the catalog row puts it.
+        let tapMark = try #require(surface.code.range(of: "StatusPill.installed"))
+        let tapKind = try #require(surface.code.range(of: "KindTag(kind:"))
+        #expect(tapKind.upperBound < tapMark.lowerBound)
+        let rowMark = try #require(row.code.range(of: "StatusPill.installed"))
+        let rowKind = try #require(row.code.range(of: "KindTag(kind:"))
+        #expect(rowKind.upperBound < rowMark.lowerBound)
+
+        // The zero-diff file is untouched by the extraction: the declaration
+        // was in `PackageRow.swift` all along, which is the only reason this
+        // extraction was available at all (DD-8, DD-18).
+        let browse = try TapSearchSources.browse()
+        #expect(browse.code.contains("StatusPill") == false)
+        #expect(browse.code.contains("statusPill") == false)
     }
 
     // MARK: - ps15, PM10 — no trust gate, no badge, no control
@@ -410,17 +500,39 @@ nonisolated enum TapSearchSources {
         "cellar/Browse/BrowseView.swift"
     ]
 
-    /// The six sentences the projection owns and the view may never compose:
-    /// the four a hit carries, plus the two empty states the scope change
+    /// The four sentences the projection owns and the view may never compose:
+    /// the two a hit can carry, plus the two empty states the scope change
     /// added.
     static let pinnedCopy = [
-        "Installed.",
         "Installed. Homebrew withholds its tap while this tap is untrusted.",
-        "Not installed.",
         "Also in the catalog. Homebrew installs the catalog package.",
         "No packages from your taps.",
         "Your taps publish nothing yet."
     ]
+
+    /// The two strings round 3 **withdrew** from this surface, quoted as
+    /// complete Swift literals.
+    ///
+    /// The quotes are load-bearing, not decoration: `Installed.` is a prefix of
+    /// the withheld sentence, so a bare substring search would report the
+    /// projection guilty for carrying the copy it is *required* to carry. A
+    /// whole literal is the only honest shape for this absence.
+    ///
+    /// Both survive untouched in `TapProjection.statusExplanation`, which serves
+    /// the tap-detail rows TM5 governs — this claim is about these two files.
+    static let withdrawnCopy = [
+        "\"Installed.\"",
+        "\"Not installed.\""
+    ]
+
+    /// Where the installed mark's label is declared — once, for both surfaces.
+    static func pill() throws -> Source {
+        try source(at: "cellar/Browse/StatusPill.swift")
+    }
+
+    static func packageRow() throws -> Source {
+        try source(at: "cellar/Browse/PackageRow.swift")
+    }
 
     static var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
