@@ -533,3 +533,148 @@ believed; re-running at **suite** level produced the real `** TEST FAILED **`. A
 still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
 pull request. Round 3's ledger is unchanged at 24 of 24, round 2's at 55 of 56, and round 1's 59 boxes
 are unchanged history with `6.7` void.
+
+---
+
+# Round 5 — installed verbs (maintainer defect report, 2026-08-25)
+
+**The defect, as reported.** In "Search our taps", the `⋯` menu on an **installed** row offered only
+Install and Copy install command. Browse offers Reinstall, Uninstall… (plus Uninstall and Zap… for a
+cask, and Upgrade / Pin / Unpin where applicable) for the same package. **Root cause confirmed at
+`cellar/Browse/TapSearchView.swift:184`**: the row built `PackageEntry(installed: nil, catalog: nil,
+id: hit.mutationTarget)` for *every* hit, so `MutationMenu.swift:32`'s `if entry.isInstalled` branch
+could never be taken however installed the package was. No verb was missing; the record was.
+
+## Phase 0⁗ — baselines, measured at `2cba75b`
+
+| Runner | Baseline |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,872 tests / 217 suites passed, 1 known issue** |
+| `xcodebuild test … -only-testing:cellarTests` | **259 distinct test ids** |
+
+`cellar/InfoPlist.xcstrings` again carried working-tree churn and was discarded before any work, per the
+launch brief. The tree was clean at the first commit and at every commit after it.
+
+The 259 was measured **after** WU19's production change had landed in the working tree, so that run is
+also this round's RED proof for the pin: it returned `** TEST FAILED **` with exactly one failing id,
+`TapSearchCompositionTests/theTapSearchSurfaceComposesNoTrustGateAndNoBadge()`, whose
+`PackageEntry(installed: nil, catalog: nil` literal the change had just falsified. Every other id in the
+set passed, which is what makes 259 a usable baseline rather than a broken run.
+
+## Commits
+
+| Unit | Commit | What |
+|---|---|---|
+| WU18 | `496da52` | `docs(sdd): amend m11-tap-search so installed tap rows carry their installed record` — PS8's rewritten verbs clause and its new mutation-handoff paragraph, the amended facts / offered-version / trust scenarios, one new `unit-app` scenario, `specs/README.md` (rev 6 + an arithmetic correction), `design.md` (**DD-20** new, **DD-9**'s entry clause struck, round-5 file table, flow lines, RED rows), `tasks.md` Round 5 phases. **Delta specs only; `openspec/specs/**` untouched** |
+| WU19 | `9910de0` | `feat(taps): hand the mutation menu the installed record for an installed tap package` — stored `TapSearchHit.installed: InstalledPackage?`, `installedReceipt(for:)` keyed on `TapPackage.installedHandoff`, `offeredVersion(of:)` derived from that one resolved receipt, and `PackageEntry(installed: hit.installed, catalog: nil, id:)` on the row |
+| WU20 | `951145d` | `test(taps): pin that installed tap rows reach the mutation menu with their record` — the literal pin moved, plus `anInstalledTapRowReachesTheMutationMenuWithItsRecord` |
+| — | (this record) | `docs(sdd): record the m11-tap-search round 5 apply progress` |
+
+## Key design decision — DD-20
+
+The hit gains a **stored** `installed: InstalledPackage?`, and the row hands it to the shared
+`MutationMenu`. Three choices carry the round:
+
+1. **Resolved by the tap-aware handoff, and resolved exactly once.** `hits(…)` now calls
+   `installedReceipt(for:)` — `package.installedHandoff.flatMap { installed.package($0) }` — and both
+   the offered version and the handoff read that one result. A bare `PackageID` lookup was rejected
+   twice over: it answers for a receipt whose `tap` names a different tap, and it would attach a
+   **colliding catalog package's** receipt to a tap row, offering to uninstall a package the row does
+   not name. `aCollidingCatalogReceiptIsNeverAttachedToATapRow` pins exactly that, triangulated against
+   the same fixture with the receipt naming the publishing tap.
+2. **Stored, not computed**, for DD-19's reason: `Mirror` enumerates stored properties and PS8's facts
+   scenario reads that enumeration. The member is enumerated there **as a handoff, not a seventh fact** —
+   it publishes nothing the tap declares, costs no brew invocation, and the surface presents nothing from
+   it, so the six-fact ceiling and TM5's tap-source prohibition are both untouched.
+3. **The view resolves nothing.** Letting `TapSearchView` look the receipt up from `installed.inventory`
+   was rejected: the `unit` layer could then prove nothing about the keying — the exact thing that was
+   broken — and the view would own a rule. It supplies a record and a bare target and decides nothing.
+
+**`MutationMenu.swift` needed no edit at all**, which is the round's cheapest fact: `entry.isInstalled`,
+the `isOutdated` gate on Upgrade, the `isPinned` gate on Pin/Unpin, the `FormulaID`/`CaskID` narrowing,
+the confirmation rule and every label are already there. Round 5 costs `MutationMenu.swift`,
+`PackageRow.swift`, `StatusPill.swift`, `BrowseView.swift` and `project.pbxproj` a **zero-line diff** each.
+
+## Work unit evidence — round 5
+
+| Unit | Commit | Focused command and exact result | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU18** | `496da52` | N/A — artifacts only; 4 files, **+229 / −15** | N/A — no behaviour changes | `git revert 496da52`; the branch returns to `2cba75b` |
+| **WU19** | `9910de0` | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` → **35 tests / 1 suite passed** (was 34); whole core suite **1,873 / 217 passed, 1 known issue**; `xcodebuild build …` → **`** BUILD SUCCEEDED **`** | **Deferred to delivery** — launching the app is the one harness this run could not execute headlessly. What it would observe is pinned by runners: which branch the shared menu takes is `entry.isInstalled` (asserted over `MutationMenu.swift`), and which record reaches it is asserted over both the projection (`unit`) and the call site (`unit-app`) | Revert one commit across `TapPackageSearch.swift`, `TapSearchView.swift` and the unit test file. The member is **added**, never renamed, so nothing else on the branch stops compiling; `xcodebuild build …` was run at this commit to prove it |
+| **WU20** | `951145d` | `xcodebuild test … -only-testing:cellarTests` → **`** TEST SUCCEEDED **`, 260 distinct ids** | N/A — source-scan suite; the app harness is WU19's | Revert one test commit; no production line is its own |
+
+## TDD cycle evidence — round 5
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 2⁗.1–2⁗.3 `TapSearchHit.installed` | `Packages/CellarCore/Tests/BrewClientTests/TapPackageSearchTests.swift` | `unit` | ✅ 1,872 / 217, 1 known issue at `2cba75b` | ✅ **compile failure**, `TapPackageSearchTests.swift:188:21: error: value of type 'TapSearchHit' has no member 'installed'` (and 11 more sites) | ✅ filtered **35 / 1 suite passed**; whole core suite **1,873 / 217 passed** | ✅ 3 cases — the four-state fixture (installed-outdated, withheld-outdated, installed-current, absent), the up-to-date three-state fixture, and the colliding-receipt row with its own inverted triangulation (catalog's tap ⇒ `nil`, publishing tap ⇒ the receipt) | ✅ `offeredVersion(for:)` → `installedReceipt(for:)` + `static offeredVersion(of:)`; the lookup is performed once and read twice instead of twice |
+| 2⁗.4–2⁗.5 the row's entry | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ 259 distinct ids at `2cba75b` | ✅ `theTapSearchSurfaceComposesNoTrustGateAndNoBadge()` **failed** on the falsified `PackageEntry(installed: nil, catalog: nil` pin | ✅ pin updated to `installed: hit.installed`; suite **`** TEST SUCCEEDED **`** | ➖ single call site | ✅ the stale "neither an installed nor a catalog record" comment rewritten rather than left contradicting the code |
+| 3⁗.1–3⁗.2 the composition guard | `cellarTests/TapSearchCompositionTests.swift` | `unit-app` | ✅ 259 → 260 ids, no shipped id lost | ✅ **reversible mutation** — the entry literal reverted to `installed: nil`; `anInstalledTapRowReachesTheMutationMenuWithItsRecord()` **and** the pin both failed; restored and verified `shasum -a 256 -c` → `cellar/Browse/TapSearchView.swift: OK` | ✅ **`** TEST SUCCEEDED **`, 260 distinct ids** | ➖ single scenario | ➖ none needed |
+
+**Test summary — round 5.** 2 tests written (`aCollidingCatalogReceiptIsNeverAttachedToATapRow` `unit`,
+`anInstalledTapRowReachesTheMutationMenuWithItsRecord` `unit-app`), 2 existing tests amended
+(`aHitCarriesItsSixFactsAndItsCopyAndNothingElse`, `onlyAnOutdatedInstalledHitOffersAVersion`), 1
+existing pin corrected (`theTapSearchSurfaceComposesNoTrustGateAndNoBadge`). Layers: `unit` 1, `unit-app`
+1. No approval tests — no refactoring task. Pure functions created: 1 (`static offeredVersion(of:)`).
+
+## Phase 6⁗ — verification and bindings
+
+| Check | Result |
+|---|---|
+| `swift test --package-path Packages/CellarCore` | **1,873 tests / 217 suites passed, 1 known issue** (baseline 1,872 → **+1**, the one new `unit` test) |
+| `xcodebuild test … -only-testing:cellarTests` | **`** TEST SUCCEEDED **`, 260 distinct test ids** (baseline 259 → **+1**, the one new `unit-app` test; no shipped id lost) |
+| `cellar/Browse/BrowseView.swift` vs `main` | **byte-identical** (`git diff --quiet` clean) — fourth round running |
+| `cellar/Activity/MutationMenu.swift` vs `main` | **empty diff** — no verb re-implemented, none re-worded |
+| `project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`, `MutationCommand.swift`, `PackageDetailView.swift`, `cellarUITests/` vs `main` | **all empty** |
+| `PackageRow.swift`, `StatusPill.swift` vs `2cba75b` | **empty** — round 5 changes no mark |
+| `git diff --shortstat main...HEAD` | **26 files changed, 7,864 insertions(+), 55 deletions(-)** — reported, not trimmed, under the accepted `size:exception` |
+| `git diff --shortstat main...HEAD -- ':!openspec'` | **16 files changed, 3,336 insertions(+), 55 deletions(-)** — the code-only half of the same total |
+| `git diff --shortstat 2cba75b..HEAD` | **8 files changed, 452 insertions(+), 37 deletions(-)** — round 5's own cost |
+| Working tree | clean at every commit; `cellar/InfoPlist.xcstrings` churn discarded, never committed |
+
+Full `-scheme cellar` was **not** run: it is red on `main` from two pre-existing `cellarUITests` Taps
+failures and is not this change's gate. Distinct ids were counted from a `> log 2>&1` redirect over a
+whole-file `rg -o "Test case '[^']+'" | sort -u | wc -l`, per the round-4 measurement gotcha.
+
+## Deviations — round 5 (reported, not absorbed)
+
+1. **A stored member was added to a type whose requirement says "exactly six facts", and the spec was
+   amended to say why rather than left to be read as violated.** PS8 now carries a **mutation handoff**
+   paragraph: the receipt is carried so the shared spine can be handed the record it already takes, it
+   publishes nothing the tap declares, and the surface presents nothing from it — so the ceiling stays
+   six. The facts scenario and its `Mirror` row **enumerate it by name**, which is what keeps that claim
+   testable: a later member that *is* tap-published metadata cannot slip in behind this one.
+2. **DD-19 explicitly rejected "a computed `nextVersion` reading a stored `InstalledPackage` on the
+   hit". DD-20 is not that, and says so.** `nextVersion` stays **stored** and stays the fact; the receipt
+   is carried *additionally*, because `PackageEntry`'s `installed` slot is exactly this record and there
+   is no smaller value that satisfies the shared menu. What DD-19 rejected was replacing a stored fact
+   with a computed one, which would have made `Mirror` deny it.
+3. **My first draft of the new `unit-app` guard forbade `installed.inventory` in the surface and was
+   wrong.** `TapSearchView.swift:109` hands that whole inventory *to* the projection — the shipped
+   composition, and the opposite of resolving a record locally. The forbidden list was narrowed to a
+   genuine lookup (`installed.package(`, `inventory.package(`, `installedHandoff`, `.installed?.`) and
+   the reason is recorded in the test itself, so the next reader does not re-add the over-broad token.
+   Caught by the runner, at the cost of one red run — which is the process working.
+4. **`specs/README.md`'s totals line was already wrong before this round, and was corrected.** It read
+   “20 new scenarios (15 `unit`, 5 `unit-app`)” from revision 3 onward while the table above it said
+   19 + 1 + 2 = 22. Rounds 3 and 4 amended the table and never re-footed the summary. It now reads
+   **23 (16 `unit`, 7 `unit-app`)**, with the correction stated inline as a block quote rather than
+   silently applied. No row total moved.
+5. **One core-suite flake, identified this time.** The first full `swift test` after GREEN reported
+   `Test "Every tap terminal refreshes its declared domains exactly once" recorded an issue with 1
+   argument terminal → .cancellationBeforeSpawn at MutationRefreshReceiptTests.swift:214:13:
+   Expectation failed: (counts.services → 0) == (terminal.blockerServiceTerminals → 1)`. It is a
+   mutation-refresh timing flake with **no path to tap search** — the branch does not touch
+   `MutationRefreshReceipt`, `OperationCenter` or any refresh terminal. Re-running that suite alone
+   passed 9/9, and two subsequent whole-suite runs passed 1,873/217. Reported and **not** attributed to
+   this change; rounds 2, 3 and 4 recorded flakes of the same shape, and this is the first with an
+   identity attached, which is the round-4 “redirect, never `tee`” lesson paying off.
+6. **`swift test --filter` was used for the RED/GREEN cycle and the whole package for the gate.** The
+   filter is at **suite** level (`TapPackageSearchTests`), never function level, per the launch brief.
+
+## Task ledger
+
+**Round 5: 19 of 19 complete.** Round 5 has **no** delivery task — the branch's one open delivery box is
+still round 2's **`6′.7`**, deferred by this run's explicit instruction not to push and not to open a
+pull request. Round 4's ledger is unchanged at 22 of 22, round 3's at 24 of 24, round 2's at 55 of 56,
+and round 1's 59 boxes are unchanged history with `6.7` void.
