@@ -2,8 +2,8 @@
 
 Existing capability — `openspec/specs/package-search/spec.md` (**7 requirements / 19 scenarios**,
 established by `2026-08-01-m1-catalog-browse` and extended by `2026-08-02-m2-catalog-hardening`). This
-delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **17 scenarios** are added, taking the
-capability to **8 requirements / 36 scenarios**.
+delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **19 scenarios** are added, taking the
+capability to **8 requirements / 38 scenarios**.
 
 Nothing is removed, modified or renamed here, so `rules.archive`'s destructive-delta warning does not
 fire and PS1–PS7 stay byte-identical. In particular the index keeps its identity rule, its
@@ -45,12 +45,22 @@ sentence — so the two search surfaces present one install state one way. The s
 “Not installed.” are **withdrawn** as this surface's copy. The withheld state keeps TM5's sentence as
 its explanatory line **and** gains the pill, because it *is* installed; the collision note is unchanged.
 
+**Maintainer UI feedback, 2026-08-25 (round 4) — binding, and this revision's reason.** Round 3 gave the
+tap rows the catalog row's **Installed** pill; it did not give them the catalog row's **UPDATE** pill. An
+installed tap package whose own receipt already reports it outdated therefore reads as merely installed
+on this surface while the same package reads as updatable on the catalog surface and in the Installed
+list — the second half of exactly the drift round 3 closed. The offered version is **already resident**:
+the projection holds the installed inventory, and that receipt carries both the outdated flag and the
+version brew currently offers, so nothing new is read and no brew invocation is added. Round 4 makes the
+offered version a **fact of the hit**, gated on the receipt's own outdated rule, and marks the row with
+the **same shared update pill** the catalog surface and the Installed list already draw.
+
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
-| `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **12** |
-| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **5** |
+| `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **13** |
+| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **6** |
 
 ## ADDED Requirements
 
@@ -72,15 +82,25 @@ tap inventory, the installed inventory, the query, the query's kind filter, and 
 answer used solely for the collision fact below** — never for a hit's content — so the whole rule is
 observable with no process launcher to inject.
 
-A hit MUST carry exactly five facts: the package **kind**, the **bare token** brew installs by, the
-**published qualified name** the tap declares, the **tap of origin**, and its **install state** —
-together with the **projection-supplied explanatory copy** for that install state where any is pinned
-(the withheld state alone, below), and the collision note where the hit collides. It MUST carry nothing
-else — in particular no description, no version, no homepage, no
+A hit MUST carry exactly six facts: the package **kind**, the **bare token** brew installs by, the
+**published qualified name** the tap declares, the **tap of origin**, its **install state**, and the
+**offered version** where — and only where — this machine's own installed receipt reports the package
+outdated — together with the **projection-supplied explanatory copy** for that install state where any
+is pinned (the withheld state alone, below), and the collision note where the hit collides. It MUST
+carry nothing else — in particular no description, no **published** version, no homepage, no
 license, no dependency list, no install count, no deprecation flag, no disabled flag and no size —
 because the tap inventory publishes none of them and obtaining any of them would require the
 tap-source read TM5 forbids. An absent fact MUST be absent rather than an empty string, a dash,
 `unknown` or any other placeholder.
+
+The offered version is **not** an exception to that prohibition: it is not read from the tap, from the
+tap's source or from the catalog. It is read from the **installed receipt this machine already holds**,
+which is the same inventory the install state is resolved against, so it costs no brew invocation and is
+representable only for a package this machine has. It MUST be absent for every **not-installed** hit,
+and absent for an installed hit whose receipt does **not** report it outdated, by the receipt's **own**
+outdated rule — the one `installed-inventory` II4 already defines, including the self-updating-cask
+exclusion — so this surface can never disagree with the Installed list about which packages have an
+update.
 
 Matching MUST use the **same normalisation the index uses** (PS2) and MUST be applied to **both** the
 bare token and the published qualified name, so a query naming a tap — `gentleman`, say — surfaces
@@ -122,9 +142,15 @@ inventory is unavailable.
 The query's declared **kind** filter MUST restrict this source exactly as it restricts catalog results,
 and the declared filter set MUST NOT gain a member (PS4). Installed-state controls MUST be composed
 above this source on II8's terms: a hide-installed subtraction MUST remove its installed hits exactly
-as it removes installed catalog rows. The surface MUST offer **no outdated control**, because a tap hit
-carries no version and could never answer one; an enabled control that cannot change the visible
-results is what II8 forbids. The surface's own prompt MUST NOT present a catalog record count, and the
+as it removes installed catalog rows. The surface MUST offer **no outdated control**. Round 4 narrows
+that rule's reason without weakening the rule: the offered version is now representable, but only for a
+hit this machine has installed **and** whose receipt reports it outdated — a strict minority of what the
+surface lists — while every not-installed hit still has no version and no outdated state to be filtered
+by. An Outdated chip here would therefore not filter the listing so much as **replace** it, silently
+collapsing every published package this machine does not have; and the catalog's own chip is defined
+over published versions, which this source still does not read. A control whose enabled state does not
+answer the question its label asks is what II8 forbids. The surface's own prompt MUST NOT present a
+catalog record count, and the
 catalog query surface's prompt MUST continue to count **catalog records only** — this source changes
 neither.
 
@@ -162,6 +188,17 @@ answer one fact for every surface that shows it; two independently-worded instal
 application's two search surfaces is exactly the drift those rules exist to forbid. The label therefore
 belongs to that shared component — neither presenting surface composes it, and neither does the
 projection.
+
+An installed hit whose **offered version** is present MUST additionally be marked by the **same update
+pill the catalog result surface and the installed list already draw for an outdated row**, positioned
+**after** the installed pill exactly as the catalog row positions it. That pill MUST be **one shared
+component** referenced by every surface that draws it, never a second pill declared beside it and never a
+label a presenting surface composes for itself; the offered version MUST be handed to that component as
+a **value**, so the component alone words what it says about it. The same II8 and PT5 rules that forbid
+two install marks forbid two update marks: “this package has an update” is one fact, answered once, and a
+tap row that stays silent about an update the Installed list is already reporting is that fact answered
+twice, differently. A hit with **no** offered version MUST carry no update pill — the fact's absence is
+its own presentation, exactly as a not-installed row's absent installed pill is.
 
 The **withheld** state MUST carry that same pill **and, in addition**, the exact sentence “Installed.
 Homebrew withholds its tap while this tap is untrusted.” — TM5's exact string, scoped to the tap and
@@ -232,16 +269,17 @@ method, same ceiling, unaffected by this source's existence.
   in both runs, by bare token, then kind, then tap name
 - Verification: `unit`
 
-#### Scenario: A hit carries its five facts and its copy, and nothing else
+#### Scenario: A hit carries its six facts and its copy, and nothing else
 
 - GIVEN an installed tap publishing cask token `acme/tools/widget`, with no catalog record and no
   installed record for it
 - WHEN every fact the hit exposes is enumerated
 - THEN they are exactly kind `cask`, bare token `widget`, published name `acme/tools/widget`, tap of
-  origin `acme/tools`, an install state, and the projection-supplied note for that state — absent here,
-  because only the withheld state pins one — with a collision note present only when the hit collides
-- AND no description, version, homepage, license, dependency list, install count, deprecation flag,
-  disabled flag or size exists in any member, and no exposed value is a placeholder standing for
+  origin `acme/tools`, an install state, and an offered version — absent here, because this hit is not
+  installed — with the projection-supplied note for that install state, absent here because only the
+  withheld state pins one, and a collision note present only when the hit collides
+- AND no description, published version, homepage, license, dependency list, install count, deprecation
+  flag, disabled flag or size exists in any member, and no exposed value is a placeholder standing for
   absence
 - Verification: `unit`
 
@@ -294,6 +332,21 @@ method, same ceiling, unaffected by this source's existence.
 - AND only the withheld hit carries a note, exactly “Installed. Homebrew withholds its tap while this
   tap is untrusted.”, while the other two carry none
 - AND neither “Installed.” nor “Not installed.” is produced for any of the three
+- Verification: `unit`
+
+#### Scenario: Only an installed hit its receipt reports outdated exposes an offered version
+
+- GIVEN four tap packages under installed taps: one whose installed record reports the same tap and is
+  outdated toward a newer version, one whose installed record reports the same tap and is up to date,
+  one with no installed record at all, and one whose installed record withholds its tap under an
+  `untrusted` tap that publishes it and is outdated toward a different newer version
+- WHEN each hit's offered version is read
+- THEN the first reports exactly the version its own receipt offers, and the fourth reports exactly the
+  version its own receipt offers, so the withheld state — which is installed — is not silently excluded
+- AND the second and the third report none at all, as an absence rather than an empty string, so an
+  up-to-date installed hit and a not-installed hit are indistinguishable on this fact
+- AND no hit's offered version equals the version that hit has installed, so the fact is the version
+  being offered and never a restatement of the one already present
 - Verification: `unit`
 
 #### Scenario: An installed hit with an ambiguous identity is not routable
@@ -361,6 +414,19 @@ method, same ceiling, unaffected by this source's existence.
   referenced by both surfaces, with its label composed by neither of them and by no projection
 - Verification: `unit-app`
 
+#### Scenario: Both search surfaces mark an available update with the one shared update pill
+
+- GIVEN the source of the surface that presents this source and the source of the catalog result row
+- WHEN both are scanned for the component that draws the update mark, for where each draws it relative
+  to the installed mark, and for any update wording of their own
+- THEN both reference the **same** update-pill component, handing it the offered version as a value,
+  and that component is declared exactly once
+- AND the presenting surface draws it **after** the installed mark, as the catalog result row does, and
+  gates it on the offered version's presence alone rather than on any install state it re-derives
+- AND neither surface composes update wording of its own: the pill's label appears only where the
+  component is declared
+- Verification: `unit-app`
+
 #### Scenario: Composing the tap source reaches no process layer
 
 - GIVEN the source of the projection that answers the composed source and the source of the surface
@@ -424,3 +490,16 @@ method, same ceiling, unaffected by this source's existence.
   moves. What replaces them here is a **presentation** obligation, not copy: the installed state is
   marked by the one shared status pill the catalog result surface already draws, whose label lives in
   that component. The pinned-copy table in `specs/README.md` records the withdrawal.
+- **The offered version pins no copy and promotes none.** Round 4 adds a **fact**, not a sentence: the
+  version brew currently offers for a package this machine has installed. Its whole presentation is the
+  shared update pill's, whose label lives in that component exactly as the installed pill's does, so this
+  delta's pinned-copy table gains no row. `installed-inventory` is again **activated, not changed** — II4
+  already defines the outdated rule this fact is gated on, including the self-updating-cask exclusion, and
+  II5 already keeps `hasNewerVersion` out of that rule; this requirement reads both through the shipped
+  receipt rather than restating either.
+- **`package-detail` PD6 is unaffected by round 4.** The offered version comes from the **installed
+  receipt**, not from a catalog record and not from a tap-source read, so the catalog-membership answer
+  PD6 scopes stays exactly what it was: a collision `Bool`, never a contributor to a hit's content. m10's
+  DD-5 — which keeps a "latest version" fact row off the receipt **detail** pane, because `catalogVersion`
+  falls back to the installed version when brew reports nothing — is likewise untouched: this fact is
+  gated on the receipt's own `isOutdated`, so the fallback case is never the case that renders.

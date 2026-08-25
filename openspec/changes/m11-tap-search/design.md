@@ -66,6 +66,12 @@ withheld state keeps a projection-supplied note. **DD-18** is new and carries th
 "the same pill" literally true. Nothing else moves — **DD-8**'s zero-diff on `BrowseView.swift` is
 unaffected, because the pill is declared in `PackageRow.swift`.
 
+**Round 4 (2026-08-25 maintainer UI feedback).** **DD-19** is new: the hit gains a stored
+`nextVersion: String?`, derived from the installed receipt the projection already holds, and the tap row
+draws the shipped shared `UpdateTag` after the installed pill. Nothing else moves — **DD-8** is again
+unaffected, and this time `PackageRow.swift` needs no edit at all, because `UpdateTag` is already an
+internal component both surfaces can reach.
+
 ### Carried unchanged (shipped on `dbc5233`)
 
 | # | Decision | Where it lives now |
@@ -92,6 +98,7 @@ unaffected, because the pill is declared in `PackageRow.swift`.
 | **DD-15 (new)** | **Reuse `CatalogFilterBar`** with two new **defaulted** parameters — `showsOutdatedChip: Bool = true` and `showsCatalogPredicates: Bool = true` — so the tap surface renders kind chips plus a **Hide installed** toggle and nothing else. `BrowseView`'s call site stays **byte-identical** because both parameters default | A sibling `TapFilterBar` duplicating the chips; reusing the bar unchanged and letting three controls sit inert; hoisting the chips into a third shared view | Maintainer preference is reuse, and the defaults are what make it compatible with **DD-8**'s zero-diff requirement — a non-defaulted parameter would force a `BrowseView.swift` edit and fail the whole constraint. The two flags are not cosmetic: `Outdated` is unanswerable (a tap hit carries no version, **DD-6**) and `Hide deprecated`/`Hide disabled` are `SearchFilters` predicates the *published index* answers (`CatalogFilterBar.swift:10-16`) which the tap inventory does not publish. Rendering them would break the shipped "no enabled control is inert" rule (design D8d). **Honest cost:** the tap surface holds a `SearchFilters` whose two exclusion flags are dead, and passes `.constant(false)` for `outdatedOnly` — accepted because the alternative duplicates the `KindSelection` three-way picker (`CatalogFilterBar.swift:77-95`), whose whole purpose is making "neither kind selected" unrepresentable |
 | **DD-16 (new)** | An **empty query lists every tap package**. The `guard needle.isEmpty == false else { return [] }` at `TapPackageSearch.swift:125` is removed; an empty needle assigns **every** package `.exactToken`, so the ladder is uniform and the order falls entirely to **DD-5**'s remaining three keys | Returning `[]` (the landed behaviour); a separate `allPackages()` entry point; sorting the default listing by tap name first | Mirrors `PackageSearchIndex.defaultOrder(filters:limit:)`, which does exactly this — it assigns `.exactToken` to every record in the default listing (`PackageSearchIndex.swift:218-227`) — so the two surfaces answer an empty query by the same rule. A second entry point would duplicate the kind and `hideInstalled` filters and give a later reader two orders to keep in step. Grouping by tap was rejected because **DD-5**'s order is already total and reproducible, and the tap of origin is on every row anyway |
 | **DD-18 (new, r3)** | `PackageRow`'s `private func statusPill(_:background:foreground:)` is **extracted to an internal `StatusPill` view** in a new file `cellar/Browse/StatusPill.swift`, with a `static var installed` carrying the pinned `Installed` label and the success colours. `PackageRow` and `TapSearchView` both draw it; neither declares the label | A second pill literal in `TapSearchView`; relaxing `statusPill` to internal and calling it across files (impossible — Swift `private` is file-scoped, and a method on `PackageRow` is not reachable anyway); moving the pill into `KindTag`'s file as a free function; projection-supplied pill copy | PS8's round-3 clause asks for the **same** pill, not an identical-looking one, and `private` file scope makes "same" unrepresentable without extraction. `BrowseView.swift` is untouched by the move (`statusPill` lives in `PackageRow.swift`, which is not under the zero-diff constraint), so **DD-8 survives intact** — this is the extraction DD-10 could not do for `EmptyResults`, available here only because the declaration is in a file that may change. `project.pbxproj` needs no edit: `path = cellar` is a `PBXFileSystemSynchronizedRootGroup` (`:46`), the same reason `TapSearchView.swift` needed none. The label is *not* projection-supplied: it is a presentation constant of the shared component, and putting it in `TapPackageSearch` would give the catalog surface a reason to import the tap projection |
+| **DD-19 (new, r4)** | `TapSearchHit` gains a **stored** `nextVersion: String?`, computed in `hits(…)` as `match.package.installedHandoff.flatMap { installed.package($0) }.flatMap { $0.isOutdated ? $0.catalogVersion : nil }`. `TapSearchView`'s row draws the **shipped** `UpdateTag(nextVersion:)` immediately after `StatusPill.installed`, gated on `hit.nextVersion != nil`. `PackageRow.swift` is **not edited** | A computed `nextVersion` reading a stored `InstalledPackage` on the hit (drags a whole receipt, and its `Hashable`, into a value that carries facts); a `Bool` `isOutdated` plus a separate version lookup in the view; extracting `UpdateTag` to its own file for symmetry with `StatusPill`; reading the tap's published version (does not exist — TM5 forbids the source read) | **The receipt is the only honest source.** `InstalledInventory` is already a stored property of `TapPackageSearch`, and `InstalledPackage.isOutdated` is II4's shipped rule including the self-updating-cask exclusion — so the surface cannot disagree with the Installed list without one of them being rewritten. The lookup is keyed off **`TapPackage.installedHandoff`**, not off the raw `PackageID`: `TapProjection.installState` deliberately returns `.notInstalled` for a receipt whose `tap` names a *different* tap (`TapProjection.swift:239-247`), so keying off the id alone would hang an UPDATE pill on a row this surface calls not-installed. **Stored, not computed**, unlike `isInstalled`: a computed property is invisible to `Mirror`, and PS8's facts scenario reads that enumeration — an offered version that never appears there would be a fact the enumeration denies exists. The scenario and its test are amended to list it, and the requirement now says **six** facts. **`UpdateTag` needs no extraction**: it is already `internal` at `PackageRow.swift:114`, already drawn by the Installed and Updates lists, and already takes the version as a **value** — the shape DD-18 had to *create* for the installed pill exists here for free, so round 4 costs `PackageRow.swift` a zero-line diff. Leaving it in `PackageRow.swift` rather than moving it beside `StatusPill.swift` is deliberate: a move is a diff on a file with no reason to change, and `internal` already makes "the same component" representable, which was DD-18's whole problem |
 | **DD-17 (new)** | The surface's own copy — the search-field prompt, the section title and the four empty states — is **pinned by the spec**. The **count** behind the prompt and the shell title bar comes from a new pure `TapPackageSearch.packageCount(inventory:)`, not from a view-side sum | A view-side `inventory.taps.reduce(0)`; no count at all; reusing `TapProjection.packageSummary(for:)` | PS8's copy-ownership clause already requires the *hit's* sentences to come from the projection (**DD-7**, **DD-9**); a count rendered beside them is the same kind of claim and belongs in the same place, where a `unit` test can reach it. `packageSummary(for:)` (`TapProjection.swift:166`) is per-tap and formats a different sentence ("5 formulae · 1 cask"), so reusing it would mean reformatting its output. `sdd-apply` reproduces the pinned strings; it does not choose them |
 
 ### `AppSection.tapSearch` — the nine wiring sites (DD-14)
@@ -202,6 +209,7 @@ struct CatalogFilterBar: View {
                                            showsCatalogPredicates: false)
         List(selection: $selection)
           └─ ForEach(hits) ── name · KindTag · StatusPill.installed (hit.isInstalled)
+                              · UpdateTag(nextVersion:) (hit.nextVersion != nil)
                               · tapName · hit.stateNote · hit.collisionNote
                               · MutationMenu(PackageEntry(
                                     installed: nil, catalog: nil, id: hit.mutationTarget))
@@ -210,6 +218,10 @@ struct CatalogFilterBar: View {
         .overlay ── TapSearchEmptyState(presentation)   ← private sibling, not shared (DD-10)
 
     StatusPill ──────────────► one component, two surfaces: PackageRow and the row above (DD-18)
+    UpdateTag ───────────────► one shipped component, already internal, already drawn by the
+                               Installed and Updates lists; the row above joins them (DD-19)
+    InstalledInventory ──────► the offered version's only source: receipt.isOutdated ⇒
+                               receipt.catalogVersion. No brew invocation, no catalog read (DD-19)
 
     BrowseView ──────────────► unchanged. Byte-identical to `main`. (DD-8)
 
@@ -251,6 +263,21 @@ structural, and now **doubly** so: the catalog surface no longer even references
 **Budget.** Round-2 delta ≈ **700–950** changed lines, plus ~250–400 artifact lines. Cumulative branch
 total ≈ **2,050–2,600 against 5,000**. `400-line budget risk: N/A` (project budget is 5,000);
 **5,000-line budget risk: Low**. Single PR under the cached `single-pr` strategy.
+
+### File Changes — round-4 delta (maintainer UI feedback, the update pill)
+
+| File | Action | Est. delta | Description |
+|---|---|---|---|
+| `Packages/CellarCore/Sources/BrewClient/TapPackageSearch.swift` | Modify | +18 / −4 | **DD-19**: stored `nextVersion: String?` and its derivation from the installed receipt |
+| `Packages/CellarCore/Tests/BrewClientTests/Fakes/InstalledFixture.swift` | Modify | +12 / −2 | An `outdatedTo:` parameter on `receipt(…)`, defaulted, so every shipped call site is source-identical |
+| `Packages/CellarCore/Tests/BrewClientTests/Fakes/TapSearchFixture.swift` | Modify | +12 / −0 | An outdated four-state inventory beside the shipped three-state one |
+| `Packages/CellarCore/Tests/BrewClientTests/TapPackageSearchTests.swift` | Modify | +45 / −6 | The new offered-version row; the `Mirror` label list and the facts row renamed to six |
+| `cellar/Browse/TapSearchView.swift` | Modify | +9 / −0 | **DD-19**: `UpdateTag(nextVersion:)` after `StatusPill.installed` |
+| `cellarTests/TapSearchCompositionTests.swift` | Modify | +45 / −0 | The shared update pill asserted on both surfaces, positioned, and its copy asserted absent from the tap view |
+| `cellar/Browse/PackageRow.swift` | **Untouched** | **0** | **DD-19**: `UpdateTag` is already internal and already takes the version as a value |
+| `cellar/Browse/StatusPill.swift` | **Untouched** | **0** | Round 3's component; the update mark is a different, already-shipped one |
+| `cellar/Browse/BrowseView.swift` | **Untouched** | **0** | **DD-8** holds for the third round running |
+| `cellar.xcodeproj/project.pbxproj` | **Untouched** | **0** | No file is created this round at all |
 
 ## Removal plan (explicit, per the scope change)
 
@@ -325,6 +352,21 @@ Strict TDD: every row is RED before its implementation exists. **`unit`** =
 | `unit` | `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse` (amended) | The `Mirror` label set becomes `stateNote` rather than `stateCopy`, and a not-installed hit's note is `nil` — an absence, not `""` |
 | `unit-app` | `theSurfaceCopyLivesInTheProjectionNotTheView` (amended) | **DD-18**: `"Installed."` and `"Not installed."` appear as complete literals in **neither** the projection nor the surface; the surface carries no `"Installed"` literal at all; it renders `StatusPill.installed`, `hit.stateNote` and `hit.collisionNote`; and `PackageRow.swift` draws the **same** `StatusPill.installed`, whose label is declared once, in `StatusPill.swift` |
 | `unit-app` | `notInstalledTapRowsAreNotSelectable` (amended) | Unchanged in substance: routability is still read from `hit.routableID` alone. `hit.isInstalled` leaves the forbidden list because the pill legitimately reads it and a `Bool` about installation **cannot** express routability, which additionally needs non-collision and uniqueness — the two facts the row is still forbidden to consult (`alsoInCatalog`, `hit.state ==`, `== .notInstalled`) |
+
+**Round-4 rows (maintainer UI feedback, the update pill):**
+
+| Class | RED test | Asserts |
+|---|---|---|
+| `unit` | `onlyAnOutdatedInstalledHitOffersAVersion` (new) | **DD-19**: over a four-state fixture — installed-and-outdated, installed-and-current, not-installed, withheld-and-outdated — `nextVersion` is exactly the receipt's offered version for the first and the fourth, `nil` for the second and the third, and never equal to the version that hit has installed. An absence, never `""` |
+| `unit` | `aHitCarriesItsSixFactsAndItsCopyAndNothingElse` (renamed from `…ItsFiveFacts…`, amended) | The `Mirror` label set **gains `nextVersion`**, and a not-installed hit's is `nil`. The rename is the honest one: `nextVersion` is stored, so the enumeration this row reads would otherwise deny a fact the type carries |
+| `unit-app` | `bothSearchSurfacesDrawTheOneSharedUpdatePill` (new) | **DD-19**: both `TapSearchView.swift` and `PackageRow.swift` reference `UpdateTag(nextVersion:`; `struct UpdateTag: View` is declared **once** across the app sources; the tap row draws it **after** `StatusPill.installed` (range comparison, as the round-3 pill row does) and gates it on `hit.nextVersion` alone; and `TapSearchView.swift` contains no `"UPDATE"` or `"Update"` literal, so the pill's copy is the component's |
+
+**Round-4 honesty note.** `UpdateTag` is declared **inside `PackageRow.swift`**, not in a file of its
+own like `StatusPill`. The round-3 row could assert "neither presenting surface composes the label"
+symmetrically over both files; this one cannot, because for `PackageRow.swift` the presenting surface
+*and* the declaration are the same file. The claim is therefore asserted where it is true and provable —
+the declaration is unique across the app sources, and the tap surface carries no update literal — rather
+than restated in a shape one of the two files cannot satisfy.
 
 **Existing tests that MUST keep passing:** `TapProjectionTests`, `TapShippingProofTests`,
 `MutationCommandTests`, `MutationCommandTargetTests`, `SearchIndexTests`, `FilterTests`,

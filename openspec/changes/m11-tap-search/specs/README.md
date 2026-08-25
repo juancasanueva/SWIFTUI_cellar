@@ -1,8 +1,17 @@
 # Spec index — `m11-tap-search`
 
 Three delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
-the searchable mirror. **Revision 4** — the 2026-08-25 maintainer UI feedback, on top of revision 3's
-scope change.
+the searchable mirror. **Revision 5** — the 2026-08-25 maintainer UI feedback on the update pill, on top
+of revision 4's install pill and revision 3's scope change.
+
+**UI feedback, 2026-08-25 (round 4, binding).** Round 3 gave the tap rows the catalog row's **Installed**
+pill and stopped there. An installed tap package whose own receipt already reports it outdated therefore
+reads as merely installed here while the same package reads as updatable on the catalog surface and in
+the Installed list. The tap rows now carry the **same shared UPDATE pill**, in the same position — after
+the Installed pill — fed by an offered version the projection derives from the **installed receipt it
+already holds**. No brew invocation is added. **Scenario counts move by two**: one `unit` scenario for the
+fact and one `unit-app` scenario for the shared component, so `package-search` becomes **1 ADDED / 19
+scenarios** (→ 8 req / **38** sc). `package-detail` and `tap-management` are untouched by round 4.
 
 **UI feedback, 2026-08-25 (round 3, binding).** Observed in the running app: a tap row carried a third
 text line reading `Installed.` or `Not installed.`, where a catalog row carries a green **Installed**
@@ -25,7 +34,7 @@ restated **per surface** rather than as a shared keystroke turn. The string `Fro
 
 | Capability | Op | Block | Scenarios | Net |
 |---|---|---|---|---|
-| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +17 (12 `unit`, 5 `unit-app`) | 7 → **8** requirements, 19 → **36** scenarios |
+| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +19 (13 `unit`, 6 `unit-app`) | 7 → **8** requirements, 19 → **38** scenarios |
 | `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +1 (`unit`) | 8 requirements unchanged, 31 → **32** scenarios |
 | `tap-management` | **MODIFIED** — **TM5** and **TM11** (main-spec markers) | both whole blocks, all 12 existing scenarios byte-identical | +2 (`unit`) | 13 requirements unchanged, 58 → **60** scenarios |
 
@@ -66,6 +75,7 @@ requirements, following the precedent `2026-08-23-m7-tap-trust` recorded at
 | Install state — installed | ~~`Installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | Replaced by the **shared status pill** the catalog result surface already draws, reading `Installed`. Not copy this delta owns: the label lives in that one shared component, so neither search surface and no projection composes it |
 | Install state — tap withheld | `Installed. Homebrew withholds its tap while this tap is untrusted.` | TM5's exact shipped string, reused byte-for-byte. **Round 3**: the withheld row now carries the pill **and** this sentence — it is installed, and the sentence explains what Homebrew is withholding |
 | Install state — not installed | ~~`Not installed.`~~ — **WITHDRAWN 2026-08-25 (round 3)** | A not-installed row carries **no state copy and no pill**, exactly as the catalog result surface shows nothing for a row that is not installed |
+| Update available — installed and outdated | **no copy pinned here** — the **shared update pill** the catalog result surface and the Installed list already draw | **Round 4**: an installed hit whose receipt reports it outdated carries that pill, after the Installed pill, fed the **offered version as a value**. Not copy this delta owns: the label and the wording around the version live in that one shared component, so neither search surface and no projection composes them |
 
 Both withdrawn strings stay **unchanged in TM5** for the tap-detail rows TM5 governs; only this
 surface's copy is withdrawn. Neither is promoted by this change, and no MODIFIED block is needed to
@@ -100,6 +110,7 @@ carried into PS8:
 | ~~Section absent, never an error, when the tap inventory is unavailable~~ — **superseded 2026-08-25** | An ordinary empty state with pinned copy, never an error, distinguishing an unavailable inventory from an empty one: availability paragraph + `unit` empty-state scenario |
 | PS6's ceiling not regressed; no new brew invocation | latency paragraph + `unit` per-surface latency scenario + `unit-app` process-layer scan. **Restated 2026-08-25**: the surfaces answer separate keystroke turns, so the tap surface holds the same 8 ms p95 ceiling on its own turn and PS6's catalog measurement is unchanged |
 | ~~Install state shown as a row sentence: `Installed.` / `Not installed.`~~ — **superseded 2026-08-25 (round 3)** | The **shared `Installed` pill** the catalog row already draws, on both installed states, and **nothing** on a not-installed row: install-state paragraph + the `unit` install-state scenario + the `unit-app` copy-ownership scan. The withheld sentence survives as the row's explanatory line, beside the pill |
+| An available update is marked with the **shared UPDATE pill**, after the Installed pill — **added 2026-08-25 (round 4)** | The offered version becomes a **sixth fact** of the hit, derived from the installed receipt and gated on its own `isOutdated`: six-facts paragraph + offered-version paragraph + update-pill paragraph, the new `unit` offered-version scenario and the new `unit-app` shared-update-pill scenario. The **Outdated control stays absent** — its rule survives round 4 with a narrowed reason, stated in the filters paragraph |
 
 ## `package-mutation`: activated, not changed — no delta
 

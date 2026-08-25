@@ -1020,3 +1020,99 @@ sc), `package-detail` and `tap-management` are untouched by round 3. Nothing new
 - [x] 6″.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
       `size:exception`; never trim.
 - [x] 6″.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 3 apply progress`.
+
+---
+
+# Round 4 — maintainer UI feedback, the UPDATE pill (2026-08-25, binding)
+
+Observed in the running app: round 3 gave the tap rows the catalog row's green **Installed** pill and
+stopped there. An installed tap package whose own receipt already reports it outdated — `druk` at
+`1.21.1` against the offered `1.22.1` — reads as merely installed on "Search our taps" while the same
+package reads as updatable on the catalog surface and in the Installed list. The tap rows now carry the
+**same shared orange UPDATE pill** (`PackageRow.swift:114`, already drawn by the Installed and Updates
+lists), in the same position: after the Installed pill. Delivery is unchanged: **single-pr**,
+`size:exception` accepted (maintainer, 2026-08-25), `review_budget_lines: 5000` already exceeded on
+artifact lines — report the measured total, never trim. Branch `feat/m11-tap-search` continues from
+`03be818`.
+
+**Scenario arithmetic moves by two.** One `unit` scenario for the offered version and one `unit-app`
+scenario for the shared component: `package-search` becomes **1 ADDED / 19 scenarios** (→ 8 req / **38**
+sc; `unit` 12 → **13**, `unit-app` 5 → **6**). `package-detail` and `tap-management` are untouched by
+round 4. No new copy is pinned — the pill's wording belongs to the shared component.
+
+## Round-4 Work Units (`work-unit-commits`; conventional commits, **no `Co-Authored-By`, no AI attribution**)
+
+| Unit | Goal | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU14** | The amended artifacts land **first** — PS8's six-facts and update-pill clauses, the two new scenarios, `specs/README.md`'s revision-5 header and copy table, `design.md` (**DD-19** new, the round-4 file-changes table and RED rows) and this file | N/A — artifacts only | N/A — no behaviour changes | Revert one docs commit; the branch returns to `03be818` |
+| **WU15** | `TapSearchHit.nextVersion: String?`, stored, derived from the installed receipt through `TapPackage.installedHandoff` | `swift test --package-path Packages/CellarCore --filter 'TapPackageSearchTests'` | N/A — a pure projection over resident values | Revert one commit across `TapPackageSearch.swift`, the two fixtures and the test file. **Independently revertible from WU16** this round: the member is added, never renamed, so the app target still compiles without it |
+| **WU16** | The tap row draws `UpdateTag(nextVersion:)` after `StatusPill.installed` | `xcodebuild build -project cellar.xcodeproj -scheme cellar -destination 'platform=macOS,arch=arm64'` | **Launch the app**: an installed, outdated tap row shows the Installed pill **and** the orange UPDATE pill, in that order; an up-to-date installed row shows only the Installed pill; a not-installed row shows neither; Browse's rows are unchanged | `git checkout 03be818 -- cellar/Browse/TapSearchView.swift` |
+| **WU17** | Composition guards: the shared update pill on both surfaces, positioned, with no update copy in the tap view | `xcodebuild test … -only-testing:cellarTests` | N/A — source-scan suite; the app harness is WU16's | Revert one test commit; no production line is its own |
+
+## Phase 1‴: WU14 — the amended artifacts land first
+
+- [x] 1‴.1 Amend `specs/package-search/spec.md`: five facts → **six**, the offered-version paragraph, the
+      update-pill paragraph, the narrowed reason for the still-absent Outdated control, the ps4 scenario
+      renamed and restated, the new `unit` offered-version scenario, the new `unit-app` shared-update-pill
+      scenario, the revision header, the class counts and the archive notes. **Never touch
+      `openspec/specs/**`.**
+- [x] 1‴.2 Amend `specs/README.md`: revision 5 header, the arithmetic row, one new pinned-copy row
+      recording that **no** copy is pinned here, and one new presentation-decisions row.
+- [x] 1‴.3 Amend `design.md`: **DD-19** new, the round-4 file-changes table, the flow diagram's row and
+      source lines, the round-4 RED rows and the honesty note about `UpdateTag`'s declaring file.
+- [x] 1‴.4 Append this phase to `tasks.md`.
+- [x] 1‴.5 Commit `docs(sdd): amend m11-tap-search for the shared update pill on tap rows`.
+
+## Phase 2‴: WU15 — the offered version becomes a fact (RED → GREEN)
+
+- [ ] 2‴.1 **RED** in `TapPackageSearchTests.swift`, before any production edit: a new
+      `onlyAnOutdatedInstalledHitOffersAVersion` over a four-state fixture, and
+      `aHitCarriesItsFiveFactsAndItsCopyAndNothingElse` renamed to `…SixFacts…` with `nextVersion` added
+      to the `Mirror` label list. Confirm the failure is a **compile** failure naming `nextVersion`.
+- [ ] 2‴.2 Extend `InstalledFixture.receipt(…)` with a defaulted `outdatedTo: String? = nil` that sets
+      `catalogVersion` and `snapshotOutdated` **together**, so an incoherent receipt is unrepresentable;
+      add the outdated four-state inventory to `TapSearchFixture`.
+- [ ] 2‴.3 **GREEN** in `TapPackageSearch.swift`: `public let nextVersion: String?` on `TapSearchHit`,
+      derived in `hits(…)` from `match.package.installedHandoff` → `installed.package(_:)` →
+      `isOutdated ? catalogVersion : nil`. Stored, not computed — `Mirror` must see it.
+- [ ] 2‴.4 Run `swift test --package-path Packages/CellarCore` whole against the **1,870** baseline.
+- [ ] 2‴.5 Commit `feat(search): expose the offered version for an outdated installed tap package`.
+
+## Phase 3‴: WU16 — the shared update pill on the row
+
+- [ ] 3‴.1 `TapSearchView.swift`: draw `UpdateTag(nextVersion: next)` under
+      `if let next = hit.nextVersion`, immediately **after** `StatusPill.installed`. The second line
+      (tap name) and everything below it are unchanged.
+- [ ] 3‴.2 `PackageRow.swift` and `StatusPill.swift` are **not** touched; `BrowseView.swift` stays
+      byte-identical to `main` — verify all three with `git diff`.
+- [ ] 3‴.3 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [ ] 3‴.4 Commit `feat(taps): mark outdated tap packages with the shared update pill`.
+
+## Phase 4‴: WU17 — the composition guards
+
+- [ ] 4‴.1 `TapSearchCompositionTests.swift`: a new `bothSearchSurfacesDrawTheOneSharedUpdatePill` —
+      both files reference `UpdateTag(nextVersion:`; `struct UpdateTag: View` is declared exactly once
+      across the app sources; the tap row's reference sits **after** its `StatusPill.installed` (range
+      comparison, as the round-3 pill row does); the gate is `hit.nextVersion` alone; and
+      `TapSearchView.swift` carries no `"UPDATE"` or `"Update"` literal.
+- [ ] 4‴.2 Prove RED by **reversible mutation** of `TapSearchView.swift`: (a) replace the shared pill
+      with a local `Text("UPDATE")`; (b) move it **above** `StatusPill.installed`. Restore
+      byte-identically and verify with `shasum -a 256 -c`.
+- [ ] 4‴.3 Commit `test(taps): pin the shared update pill on outdated tap rows`.
+
+## Phase 6‴: Verification and bindings (round 4)
+
+- [ ] 6‴.1 `swift test --package-path Packages/CellarCore` — record the total against the **1,870**
+      baseline measured at `03be818`.
+- [ ] 6‴.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+      **257** baseline measured at `03be818`. Never quote the raw `Test case … passed` line count as an
+      id count: parameterized tests print one line per case. The full `-scheme cellar` runner is **not**
+      the gate — it is red on `main` from two pre-existing `cellarUITests` Taps failures.
+- [ ] 6‴.3 Bindings proof — `git diff --stat main --` over `cellar/Browse/BrowseView.swift`,
+      `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`, `PackageSearchIndex.swift`,
+      `MutationCommand.swift`, `PackageDetailView.swift` and `cellarUITests/` must print **nothing**.
+      `cellar/Browse/PackageRow.swift` and `cellar/Browse/StatusPill.swift` must have a zero diff
+      against `03be818`.
+- [ ] 6‴.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+      `size:exception`; never trim.
+- [ ] 6‴.5 Commit apply-progress `docs(sdd): record the m11-tap-search round 4 apply progress`.
