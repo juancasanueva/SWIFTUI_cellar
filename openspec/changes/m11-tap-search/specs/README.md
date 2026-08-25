@@ -1,10 +1,22 @@
 # Spec index — `m11-tap-search`
 
 **Four** delta files. Hybrid store: these files are canonical; Engram topic `sdd/m11-tap-search/spec` is
-the searchable mirror. **Revision 9** — the 2026-08-25 maintainer **UI feedback** that both tap-backed
-detail panes show the catalog pane's **Actions** section, on top of revision 8's colliding-hit route,
-revision 7's name-only detail, revision 6's mutation verbs, revision 5's update pill, revision 4's
-install pill and revision 3's scope change.
+the searchable mirror. **Revision 10** — the 2026-08-25 maintainer **UI feedback** that the tap rows
+carry the catalog row's **leading icon tile**, on top of revision 9's shared Actions section, revision
+8's colliding-hit route, revision 7's name-only detail, revision 6's mutation verbs, revision 5's
+update pill, revision 4's install pill and revision 3's scope change.
+
+**UI feedback, 2026-08-25 (round 9, binding, final).** Observed in the running app, comparing the
+catalog result rows against this surface's rows: every catalog row and every Installed row opens with a
+**leading icon tile** — the formula glyph for a formula, the coloured initial tile for a cask whose
+artwork is unavailable — and the tap rows opened with text. The tap rows now draw the **same shared
+component**, `PackageIconTile`, with the **same argument shape**, fed by the **same pipeline** the shell
+already hands the catalog surface. That component needed **no edit**: its cask branch already answers
+the coloured initial tile for a token the artwork registries do not carry, which is exactly a
+third-party tap's cask, and its formula branch is unconditional. No artwork load is started by this
+surface, so its no-process-layer obligation is untouched. **Scenario counts move by one**:
+`package-search` gains one `unit-app` scenario (→ **1 ADDED / 23 scenarios**, 8 req / **42** sc). The
+other three capabilities are untouched by round 9.
 
 **UI feedback, 2026-08-25 (round 8, binding).** Observed in the running app, comparing the catalog
 detail pane against the two tap-backed panes: the catalog pane presents its verbs as an **Actions**
@@ -91,13 +103,13 @@ restated **per surface** rather than as a shared keystroke turn. The string `Fro
 
 | Capability | Op | Block | Scenarios | Net |
 |---|---|---|---|---|
-| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +22 (14 `unit`, 8 `unit-app`) | 7 → **8** requirements, 19 → **41** scenarios |
+| `package-search` | **ADDED** — packages published by installed third-party taps are searchable as a composed source | new, promotes as **PS8** | +23 (14 `unit`, 9 `unit-app`) | 7 → **8** requirements, 19 → **42** scenarios |
 | `package-detail` | **MODIFIED** — **PD6** | whole block, all three existing scenarios byte-identical | +3 (`unit`) | 8 requirements unchanged, 31 → **34** scenarios |
 | `tap-management` | **MODIFIED** — **TM5** and **TM11** (main-spec markers) | both whole blocks, all 12 existing scenarios byte-identical | +3 (`unit`) | 13 requirements unchanged, 58 → **61** scenarios |
 | `installed-inventory` | **MODIFIED** — **II15** (round 8) | whole block, 11 of its 12 existing scenarios byte-identical, the twelfth amended in place | **+0** | 15 requirements unchanged, 79 → **79** scenarios |
 
-**Totals: 1 ADDED, 4 MODIFIED blocks across 3 capabilities, 0 REMOVED, 0 RENAMED — 28 new scenarios
-(20 `unit`, 8 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
+**Totals: 1 ADDED, 4 MODIFIED blocks across 3 capabilities, 0 REMOVED, 0 RENAMED — 29 new scenarios
+(20 `unit`, 9 `unit-app`).** No requirement is removed or renamed, so `rules.archive`'s
 destructive-delta warning does not fire. The `installed-inventory` row contributes **no** new scenario
 by design: round 8 changes how II15's verbs are *presented*, and the scenario that owned that claim is
 amended rather than joined by a second one that would restate it.
@@ -188,6 +200,7 @@ carried into PS8:
 | ~~Not-installed rows non-selectable~~ — **reversed 2026-08-25 (round 6)** | An unambiguous not-installed hit **is** selectable and opens a minimal detail composed exclusively from the resident tap inventory — identity, kind, tap of origin, TM5's `Not installed.`, the shared mutation menu and one pinned footer, and nothing that would need a tap-source read: selectability paragraph + detail paragraphs, the amended ambiguity `unit` scenario and surface-entry `unit-app` scenario, the new `unit` resolution scenario and the new `unit-app` composition scenario. **Ambiguity still withholds the route** in either install state, and no trust presentation is added |
 | ~~A colliding hit is non-selectable~~ — **reversed 2026-08-25 (round 7)** | A colliding hit **is** selectable and opens the **catalog's own detail** — the package Homebrew resolves its bare token to, and the one its own collision note names. Routability becomes **uniqueness among the emitted hits** and nothing else: rewritten selectability clause + the colliding-route paragraph, the amended collision `unit` scenario, the amended ambiguity `unit` scenario (now duplicate-only) and the amended surface-entry `unit-app` scenario, plus PD6's new `unit` scenario. **No routing branch is added** — the shipped catalog-first order already answers — the collision note is unchanged and still required, and the receipt and inventory branches are untouched. The **only** inert row left is a duplicate `PackageID` among emitted hits |
 | ~~The tap-backed panes offer their verbs through the row's `⋯` menu, in the header's primary slot~~ — **reversed 2026-08-25 (round 8)** | Both tap-backed detail panes — the receipt-backed one **II15** owns and the name-only one PS8 added — present the **same Actions section the catalog detail pane presents**, from **one** shared component, placed **last** in the pane, with the primary `brew …` command line and its copy affordance; both header primary slots are **empty**. The `⋯` menu is **unchanged on the list rows**. Lands as PS8's rewritten pane clause + its amended `unit-app` pane-composition scenario, and as a **new `installed-inventory` delta** whose MODIFIED **II15** amends the verb clause and the verb scenario in place. **No scenario is added**, no verb is re-implemented, no argv shape moves, and no trust presentation appears on either pane |
+| ~~The tap rows open with the package name~~ — **added 2026-08-25 (round 9, final)** | Every tap row opens with the **same leading icon tile the catalog result row and the Installed row open with**, from **one** shared component and with the **same argument shape** — the formula glyph for a formula, the cask artwork where it exists and the coloured initial tile where it does not, which for a third-party tap's cask is the ordinary case. The artwork dependencies are optional properties of the surface, filled at its one call site by the shell that already fills the catalog surface's. Lands as PS8's new tile clause + one new `unit-app` scenario. The shared component is **unedited** — its fallback already answered correctly for a token no registry carries — **no** load, refresh or asynchronous work joins this surface, and no trust presentation appears on the row |
 
 ## `package-mutation`: activated, not changed — no delta
 

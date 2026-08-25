@@ -1509,3 +1509,101 @@ measured total; never trim. RDD disabled. Strict TDD active.
 - [x] 6⁷.5 Merge the round-8 section into `apply-progress.md`, re-mirror it to Engram topic
       `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks`.
 - [x] 6⁷.6 Commit `docs(sdd): record the m11-tap-search round 8 apply progress`.
+
+## Work units — round 9
+
+**Maintainer UI feedback, 2026-08-25 (round 9) — binding, and the last of them.** In the “Search our
+taps” list, the rows must show the **same leading icon tile Browse rows show**: the default formula
+glyph for formulae, and the default colour + initial letter tile for casks. `PackageRow.swift:34` and
+`InstalledRow.swift:34` both draw `PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)`;
+`TapSearchView`'s row drew no tile at all.
+
+**One component, not a lookalike (DD-25).** The tile is `PackageIconTile`, reused exactly, with the
+argument shape `PackageRow.swift` uses, over the `PackageEntry` the row already builds for
+`MutationMenu`. `TapSearchView` gains the two optional artwork properties `BrowseView` declares, and
+`ContentView`'s one call site fills them with the same `caskAssets` / `caskIcons` it already passes to
+`BrowseView`. `BrowseView.swift` stays byte-identical to `main` (**DD-8**, eighth round).
+
+**No `.task` joins this file.** `BrowseView` loads the asset catalog in a `.task`; copying that here
+would put `.task`, `await ` and `async ` into a file PS8's process-layer scenario scans for exactly
+those tokens (**DD-12**) — and it would buy nothing, because the only thing that catalog gates is the
+CaskFlow rung for tokens it lists, and a third-party tap's cask is never one of them.
+
+**Delivery.** `single-pr` with `size:exception` **accepted** (maintainer, 2026-08-25). Report the
+measured total; never trim. RDD disabled. Strict TDD active.
+
+| Unit | Goal | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|
+| **WU31** | The amended artifacts land **first** — PS8's new tile clause and its new `unit-app` scenario (+1 scenario, the delta's only count movement), `specs/README.md` revision 10 with the re-footed arithmetic, `design.md` (**DD-25**, the round-9 preamble, file table and RED rows) and this file | N/A — artifacts only | N/A — no behaviour changes | Revert one docs commit; the branch returns to `2548e40` |
+| **WU32** | The feature: `TapSearchView` gains the two optional artwork properties and draws `PackageIconTile` first in its row; `ContentView` fills them at the one call site | `xcodebuild test … -only-testing:cellarTests/TapSearchCompositionTests`, plus `xcodebuild build …` | N/A — no runtime boundary is added: the tile, its pipeline and its fallback are the shipped ones, already exercised by every other package row | One commit across two files; reverting it restores the text-leading row |
+| **WU33** | The `unit-app` guard: `TapSearchCompositionTests` pins the shared call text, the two property declarations, the tile's position, the absent local image and the two `ContentView` call sites; one reversible mutation proves it bites | `xcodebuild test … -only-testing:cellarTests/TapSearchCompositionTests` | N/A — source-scan suite | Revert one commit in one test file; no production line is its own |
+
+## Phase 0⁸: baselines, measured at `2548e40`
+
+- [x] 0⁸.1 `swift test --package-path Packages/CellarCore` — record the total before any edit.
+- [x] 0⁸.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** before any edit.
+- [x] 0⁸.3 Confirm a clean working tree; discard `cellar/InfoPlist.xcstrings` churn, never commit it.
+
+## Phase 1⁸: WU31 — the amended artifacts land first
+
+- [x] 1⁸.1 Amend `specs/package-search/spec.md`: the round-9 UI-feedback paragraph; PS8's new leading
+      tile clause after the update-pill clause; one **new** `unit-app` scenario; the header arithmetic
+      (22 → **23** added, 41 → **42**) and the `unit-app` class count (8 → **9**).
+      **Never touch `openspec/specs/**`.**
+- [x] 1⁸.2 Amend `specs/README.md`: revision 10 header, the round-9 paragraph, the re-footed
+      `package-search` row and totals line, and the new decision row.
+- [x] 1⁸.3 Amend `design.md`: **DD-25** new; the round-9 preamble; the round-9 file-changes table with
+      the four untouched-component rows and the “why no `.task`” note; the round-9 RED rows.
+- [x] 1⁸.4 Append this phase to `tasks.md`.
+- [x] 1⁸.5 Commit `docs(sdd): amend m11-tap-search so tap rows carry the shared icon tile`.
+
+## Phase 2⁸: WU32 — the shared tile on the row
+
+- [ ] 2⁸.1 **Verify the component's fallback before relying on it**: read `PackageIconTile`'s cask
+      branch, `CaskIconView`'s `nil`-icon branch and `CaskIconURL.candidateURLs(for:isKnownToken:)`, and
+      state what an unknown tap cask renders. Fix the component **only** if it does not already degrade
+      to the letter tile, and report the diff if so.
+- [ ] 2⁸.2 `TapSearchView` gains `var assets: CaskBrowseAssets?` and `var iconLoader: CaskIconLoader?`,
+      declared between `operations` and the selection binding, spelled as `BrowseView` spells them.
+- [ ] 2⁸.3 `row(_:)` binds `let entry = entry(for: hit)` once, nests an `HStack(spacing: 10)` and draws
+      `PackageIconTile(id: entry.id, assets: assets, iconLoader: iconLoader)` before the name column;
+      `MutationMenu` takes the same bound entry. No `.task`, no `await`, no `async`.
+- [ ] 2⁸.4 `ContentView`'s one `TapSearchView(` call site gains `assets: caskAssets` and
+      `iconLoader: caskIcons`.
+- [ ] 2⁸.5 `xcodebuild build …` → `** BUILD SUCCEEDED **`.
+- [ ] 2⁸.6 Commit `feat(taps): draw the shared package icon tile on tap search rows`.
+
+## Phase 3⁸: WU33 — the composition guard
+
+- [ ] 3⁸.1 `cellarTests/TapSearchCompositionTests.swift`: new row
+      `bothSearchSurfacesDrawTheOneSharedIconTile` — `PackageIconTile` declared exactly once tree-wide;
+      the identical call text in `PackageRow.swift` and `TapSearchView.swift`; both property
+      declarations present; the tile before the name and the kind chip by range comparison; no local
+      `Image(`, `systemImage:`, `PackageTile(`, `FormulaIconTile(` or `CaskIconView(`; both
+      `ContentView` call sites scoped with `callSite(_:in:)` and carrying the same pair; `BrowseView`
+      still free of every tap token.
+- [ ] 3⁸.2 Prove RED by one reversible mutation: replace the tile with a local
+      `Image(systemName: "shippingbox")`. Restore byte-identically and verify with `shasum -a 256 -c`.
+- [ ] 3⁸.3 Confirm `PerPackageTrustCompositionTests`'s `views()` list is **unchanged** — no app-target
+      file is created this round.
+- [ ] 3⁸.4 Commit `test(taps): pin the shared icon tile on tap search rows`.
+
+## Phase 6⁸: Verification and bindings (round 9)
+
+- [ ] 6⁸.1 `swift test --package-path Packages/CellarCore` — record the total against the phase-0⁸
+      baseline. **Expected ±0**: round 9 touches no CellarCore file.
+- [ ] 6⁸.2 `xcodebuild test … -only-testing:cellarTests` — record **distinct test ids** against the
+      phase-0⁸ baseline. **Redirect with `> log 2>&1`, never `tee`.** Count distinct ids by membership
+      of each recovered quoted id against the cleanly parsed set. The full `-scheme cellar` runner is
+      **not** the gate.
+- [ ] 6⁸.3 Bindings proof — `cellar/Browse/BrowseView.swift` byte-identical to `main`;
+      `cellar/Activity/MutationMenu.swift`, `cellar/Browse/PackageRow.swift`,
+      `cellar/Casks/CaskIconView.swift`, `cellar.xcodeproj/project.pbxproj`, `openspec/specs/`,
+      `PackageSearchIndex.swift`, `MutationCommand.swift` and `cellarUITests/` must print **nothing**
+      under `git diff --stat main --`. If `PackageIconTile`'s fallback had to change, report that diff
+      explicitly instead.
+- [ ] 6⁸.4 `git diff --shortstat main...HEAD` — report the measured total under the accepted
+      `size:exception`; never trim.
+- [ ] 6⁸.5 Merge the round-9 section into `apply-progress.md`, re-mirror it to Engram topic
+      `sdd/m11-tap-search/apply-progress`, and re-mirror `tasks.md` to `sdd/m11-tap-search/tasks`.
+- [ ] 6⁸.6 Commit `docs(sdd): record the m11-tap-search round 9 apply progress`.

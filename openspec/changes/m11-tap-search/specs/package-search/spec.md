@@ -2,8 +2,8 @@
 
 Existing capability — `openspec/specs/package-search/spec.md` (**7 requirements / 19 scenarios**,
 established by `2026-08-01-m1-catalog-browse` and extended by `2026-08-02-m2-catalog-hardening`). This
-delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **22 scenarios** are added, taking the
-capability to **8 requirements / 41 scenarios**.
+delta is **1 ADDED, 0 modified, 0 removed, 0 renamed**: **23 scenarios** are added, taking the
+capability to **8 requirements / 42 scenarios**.
 
 Nothing is removed, modified or renamed here, so `rules.archive`'s destructive-delta warning does not
 fire and PS1–PS7 stay byte-identical. In particular the index keeps its identity rule, its
@@ -108,12 +108,24 @@ shape moves, and the pane still composes no trust presentation of any kind. The 
 **on the rows**, where it is the right affordance and where this surface still draws it. The
 receipt-backed pane `installed-inventory` II15 owns takes the identical change, in its own delta.
 
+**Maintainer UI feedback, 2026-08-25 (round 9) — binding, and this revision's reason.** Observed in the
+running app, comparing the catalog result rows against this surface's rows: every catalog row — and
+every Installed row — opens with a **leading icon tile**, the formula glyph for a formula and the
+coloured initial tile for a cask whose artwork is unavailable. The tap rows opened with text. A row that
+carries the same kind chip, the same install pill, the same update pill and the same `⋯` menu as a
+catalog row, but no tile, does not read as the same kind of row; it reads as a lesser one. Rounds 3, 4
+and 5 closed the chip, the pill and the verb halves of that drift, and this is the last visible half.
+Nothing new is read: the tile component already degrades to the coloured initial tile for a token no
+artwork registry carries, which is exactly a third-party tap's cask, and it draws the formula glyph off
+a bundled asset. This surface therefore adds **no** artwork pipeline of its own, starts **no** load, and
+still reaches no process layer.
+
 ## Verification classes
 
 | Class | Meaning | Runner | Count |
 |---|---|---|---|
 | `unit` | RED-first assertion over an observable CellarCore behaviour, per `config.yaml` `rules.specs` ("observable behavior of CellarCore types without referencing SwiftUI views") | `swift test --package-path Packages/CellarCore` | **14** |
-| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **8** |
+| `unit-app` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom that reads the repository source off disk — the established class for app-target composition and source-scan assertions (`openspec/specs/app-updates/spec.md:17`) | `xcodebuild test … -only-testing:cellarTests` | **9** |
 
 ## ADDED Requirements
 
@@ -281,6 +293,22 @@ two install marks forbid two update marks: “this package has an update” is o
 tap row that stays silent about an update the Installed list is already reporting is that fact answered
 twice, differently. A hit with **no** offered version MUST carry no update pill — the fact's absence is
 its own presentation, exactly as a not-installed row's absent installed pill is.
+
+Every hit, in **every** install state, MUST additionally carry the **same leading icon tile the catalog
+result row carries**, in the same leading position and drawn by the **same shared component**, never a
+tile this surface composes, declares or approximates for itself. A formula hit MUST show that
+component's formula glyph and a cask hit MUST show its cask artwork where artwork is available and its
+coloured initial tile where it is not — which, for a cask published by a third-party tap, is the
+ordinary case rather than a failure, because the artwork registries that component consults are
+catalogs of catalog casks. The tile is therefore **not** conditional on a catalog record: a hit the
+catalog has never heard of MUST still carry it. The same II8 and PT5 one-fact-one-presentation rules
+that forbid two install marks forbid two package tiles; "what this package looks like" is one
+presentation, answered once, and a row whose leading edge is text where every other package row in the
+application has a tile is that answer withheld. The component's artwork dependencies MUST be **handed
+to this surface** by the shell that already hands them to the catalog surface, and MUST be optional, so
+a surface not given them still draws the tile. Presenting this surface MUST still start no load,
+no refresh and no asynchronous work of any kind — the tile's own lookup is the component's, on the
+component's terms, and this surface's no-process-layer obligation below is unchanged.
 
 The **withheld** state MUST carry that same pill **and, in addition**, the exact sentence “Installed.
 Homebrew withholds its tap while this tap is untrusted.” — TM5's exact string, scoped to the tap and
@@ -642,6 +670,24 @@ method, same ceiling, unaffected by this source's existence.
   gates it on the offered version's presence alone rather than on any install state it re-derives
 - AND neither surface composes update wording of its own: the pill's label appears only where the
   component is declared
+- Verification: `unit-app`
+
+#### Scenario: Both search surfaces open their rows with the one shared package icon tile
+
+- GIVEN the source of the surface that presents this source, the source of the catalog result row, and
+  the source in which the shared icon-tile component is declared
+- WHEN both rows are scanned for the component that draws their leading tile, for the arguments each
+  hands it, and for any tile, glyph or image either composes for itself
+- THEN both reference the **same** icon-tile component, with the **same** argument shape — the row's
+  package identity plus the two optional artwork dependencies — and that component is declared exactly
+  once
+- AND the presenting surface draws it **first** in the row, before the name and the kind chip, as the
+  catalog result row does, and composes no image, symbol or tile of its own
+- AND the artwork dependencies are declared as optional properties of the presenting surface and are
+  passed to it at its one call site by the shell that already passes the identical values to the
+  catalog surface, so the tile is drawn from the same pipeline rather than a second one
+- AND presenting the surface still starts no load and no refresh: the surface's source contains no
+  asynchronous work at all
 - Verification: `unit-app`
 
 #### Scenario: An installed tap row reaches the shared mutation menu with its installed record
