@@ -3,6 +3,8 @@
 //  cellarTests
 //
 
+import BrewClient
+import Catalog
 import Foundation
 import Testing
 
@@ -129,8 +131,7 @@ struct MenuBarCompositionTests {
 
         // Nothing in this surface reaches for the data stores: a preference is
         // not data, and this project reserves SwiftData for data.
-        let menuBar = try Self.menuBarSources()
-        #expect(menuBar.isEmpty == false, "no menu-bar source was found to scan")
+        let menuBar = try MenuBarSources.load()
         #expect(menuBar.contains { $0.name == "MenuBarPreference.swift" })
         for source in menuBar {
             for token in ["SwiftData", "LocalStores", "@Model", "ModelContainer"] {
@@ -190,14 +191,134 @@ struct MenuBarCompositionTests {
         }
     }
 
+    // MARK: - T8 — the surface reads, and does nothing else (spec:290, :299)
+
+    /// The whole menu-bar directory, swept for the tokens this surface may not
+    /// contain.
+    ///
+    /// The prohibitions are asserted **before** the first `#require`, so a throw
+    /// on the way to a later assertion cannot skip them.
+    @Test("No menu-bar source loads, egresses or confirms")
+    func noMenuBarSourceLoadsEgressesOrConfirms() throws {
+        let sources = try MenuBarSources.load()
+
+        for source in sources {
+            for token in MenuBarSources.forbidden {
+                #expect(source.code.contains(token) == false, "\(source.name) contains \(token)")
+            }
+        }
+
+        // The verbs the surface actually offers, and their confirmation
+        // requirement read rather than assumed. A request raised with no window
+        // open would latch unanswered on the shared channel and block every
+        // later confirmation in the app, so none of these may need one.
+        let target = try #require(ServiceTarget(name: "atuin"))
+        #expect(MutationCommand.upgradeAll.requiresConfirmation == false)
+        for command in ServiceCommand.allVerbs(for: target) {
+            #expect(command.requiresConfirmation == false, "\(command.verb) asks for confirmation")
+        }
+        // And a verb that does need one is genuinely excluded, so the sweep
+        // above is not vacuous.
+        let cask = try #require(CaskID(name: "docker"))
+        #expect(MutationCommand.zap(cask).requiresConfirmation)
+    }
+
+    // MARK: - T13 — uncounted, disclosed, and pure SwiftUI (spec:183, :192, :360)
+
+    @Test("The upgrade verb is uncounted and disclosed, and no AppKit activation exists")
+    func theUpgradeVerbIsUncountedDisclosedAndTheWindowEntryIsPureSwiftUI() throws {
+        let sources = try MenuBarSources.load()
+        let popover = try #require(sources.first { $0.name == "MenuBarPopoverView.swift" })
+
+        #expect(popover.code.contains("operations.submit(.upgradeAll)"))
+        #expect(popover.code.contains("CopyCommandButton(text: MutationCommand.upgradeAll.displayCommand)"))
+
+        // The badge carries the number; the button carries none. A label with no
+        // count cannot announce a number different from the set `brew upgrade`
+        // acts on.
+        let label = try #require(popover.code.range(of: "\"Upgrade all\""))
+        #expect(popover.code[label].contains("\\(") == false)
+        let afterLabel = popover.code[label.upperBound...].prefix(24)
+        #expect(afterLabel.hasPrefix(" (") == false, "a parenthesised total follows the label")
+        #expect(popover.code.contains("Upgrade all (") == false)
+
+        // No fan-out, and no second command family.
+        for token in ["submitUpgrades(", "upgradableIDs(", "MutationCommand.upgrade("] {
+            #expect(popover.code.contains(token) == false, "the popover reaches for \(token)")
+        }
+
+        // The disclosed command is the shipped one, worded nowhere here, so the
+        // popover and the installed list cannot disclose two different commands
+        // for one submission.
+        for source in sources {
+            #expect(source.code.contains("brew upgrade") == false, "\(source.name) composes the command")
+            for token in ["NSApplication", "NSApp", ".activate("] {
+                #expect(source.code.contains(token) == false, "\(source.name) contains \(token)")
+            }
+        }
+        // Anchored: the shipped command really is the string the popover
+        // discloses.
+        #expect(MutationCommand.upgradeAll.displayCommand == "brew upgrade")
+    }
+
     // MARK: - Support
 
-    /// Every `.swift` under `cellar/MenuBar/`, comments stripped.
+    /// Every `.swift` under `cellar/MenuBar/`, read off disk and stripped of
+    /// comments.
     ///
-    /// Selected by name from the app-wide sweep rather than enumerated a second
-    /// time, so a file that never joined the target cannot be scanned into a
-    /// clean result here either.
-    private static func menuBarSources() throws -> [AppSecuritySources.Source] {
-        try AppSecuritySources.load().filter { $0.name.hasPrefix("MenuBar") }
+    /// The directory is enumerated rather than named file by file, so a source
+    /// added to this surface later joins the sweep the moment it exists. The
+    /// stripper is `AppSecuritySources`' own, so a prohibition *described* in a
+    /// doc comment is never mistaken for one *violated* in code.
+    private enum MenuBarSources {
+        /// Every token this surface may not contain. The one permitted
+        /// asynchronous hop lives one file up, in the scene block, which is what
+        /// makes this list absolute rather than "except for the one we needed".
+        static let forbidden = [
+            ".task", "Task {", "await ", "async ",
+            "Process(", "URLSession",
+            "CaskIconLoader", "PackageIconTile", "CaskIconView(",
+            "ImageRenderer", "NSImage", "NSStatusItem",
+            "pendingConfirmation", ".mutationConfirmation",
+            "MutationCommand.uninstall", ".zap",
+            "setVisible(", "setActive(", "refreshEverything",
+            "SwiftData", "LocalStores"
+        ]
+
+        static var directory: URL {
+            URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()   // cellarTests
+                .deletingLastPathComponent()   // repository root
+                .appendingPathComponent("cellar")
+                .appendingPathComponent("MenuBar")
+        }
+
+        static func load() throws -> [AppSecuritySources.Source] {
+            var sources: [AppSecuritySources.Source] = []
+            for url in try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil
+            ) where url.pathExtension == "swift" {
+                let text = try String(contentsOf: url, encoding: .utf8)
+                sources.append(
+                    AppSecuritySources.Source(
+                        name: url.lastPathComponent,
+                        code: AppSecuritySources.stripComments(from: text)
+                    )
+                )
+            }
+            let sorted = sources.sorted { $0.name < $1.name }
+
+            // Positive anchor. A scan that read nothing sweeps clean, so the
+            // enumeration has to find the surface — and every file it found has
+            // to be one the app target itself compiles, which is what proves
+            // the directory joined the target.
+            #expect(sorted.count >= 3, "the menu-bar sweep found \(sorted.count) file(s)")
+            let compiled = Set(try AppSecuritySources.load().map(\.name))
+            for source in sorted {
+                #expect(compiled.contains(source.name), "\(source.name) is not in the app target's sources")
+            }
+            return sorted
+        }
     }
 }

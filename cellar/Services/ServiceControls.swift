@@ -31,6 +31,14 @@ struct ServiceControls: View {
     /// the list by passing `ServiceRowControl.compactControls(for:)` — the rule
     /// still lives in `BrewClient`, and this view still owns none.
     var controls: [ServiceRowControl] = ServiceRowControl.allCases
+    /// Prefixes an accessibility identifier onto each button, for a surface that
+    /// needs to name them.
+    ///
+    /// Defaulted to `nil`, which applies no identifier at all, so the Services
+    /// section renders byte-for-byte what it renders today — a secondary surface
+    /// asking for identifiers must not change the section's own accessibility
+    /// tree.
+    var identifierPrefix: String?
 
     /// `nil` only for a name brew could read as an option, in which case every
     /// control is simply absent — an unvalidated command is not representable,
@@ -51,9 +59,14 @@ struct ServiceControls: View {
 
     @ViewBuilder
     private func button(_ control: ServiceRowControl, _ target: ServiceTarget) -> some View {
-        Button(control.label) { invoke(control, target) }
+        let button = Button(control.label) { invoke(control, target) }
             .buttonStyle(ActionPillStyle())
             .accessibilityLabel("\(control.label) \(service.name)")
+        if let identifierPrefix {
+            button.accessibilityIdentifier("\(identifierPrefix)-\(service.name)-\(control)")
+        } else {
+            button
+        }
     }
 
     /// One entry point for every control, so the submission rule is applied in
