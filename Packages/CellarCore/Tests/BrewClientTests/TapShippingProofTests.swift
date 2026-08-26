@@ -368,6 +368,28 @@ struct TapShippingProofTests {
 
     /// **PT6 :334-344, TM11, R3.** Every string is either the state brew
     /// reported or an accounting of it. Nothing here inspects a package.
+    @Test("The capability sweep inspects control labels, never prose")
+    func capabilitySweepInspectsControlLabelsNotProse() throws {
+        // The pre-#90 official-source pane cross-referenced Search catalog in
+        // prose; that is a pointer to another section, not a control for it.
+        let prose = """
+        Text("Browse and install its packages from Search catalog.")
+        Button("Untap") { untap(tap) }
+        """
+        #expect(try excludedCapabilityViolations(in: prose) == [])
+
+        let controls = """
+        Button("Search catalog") { openSearch() }
+        Menu("Cleanup") { EmptyView() }
+        Toggle("Security scan", isOn: $scan)
+        Link("Disk usage", destination: url)
+        NavigationLink("Brewfile") { EmptyView() }
+        """
+        #expect(try excludedCapabilityViolations(in: controls) == [
+            "Search catalog", "Security scan", "Cleanup", "Disk usage", "Brewfile"
+        ])
+    }
+
     @Test("Every per-package string is positive and never a verdict")
     func everyPerPackageStringIsPositiveAndNeverAVerdict() throws {
         let tap = TapRecord(
@@ -605,28 +627,51 @@ struct TapShippingProofTests {
         ])
         #expect(tapUI.contains("Button {") == false, "an unenumerated dynamic tap button exists")
 
-        for excludedCapability in [
-            "Install package", "Search catalog", "Clone official source",
-            "Security scan", "Git management", "Cleanup", "Disk usage", "Service behavior",
-            // The M5 D3 carve-out is repealed (2026-08-17): the Brewfile
-            // section owns its own sidebar place and both affordances now,
-            // so the word — and with it any Brewfile surface or logic — is
-            // excluded here outright again.
-            "Brewfile"
-        ] {
-            #expect(
-                tapUI.localizedCaseInsensitiveContains(excludedCapability) == false,
-                "excluded capability appeared in tap UI: \(excludedCapability)"
-            )
-        }
+        // Scoped to control labels: the proof is that the tap surface offers
+        // no *control* for these capabilities, not that prose never names them.
+        let offered = try excludedCapabilityViolations(in: tapUI)
+        #expect(offered.isEmpty, "excluded capability offered as a tap control: \(offered)")
 
         // No sheets and no destination: every tap action acts in place.
         #expect(tapUI.contains(".sheet(isPresented:") == false)
         #expect(tapUI.contains("navigationDestination") == false)
     }
 
+    /// Capabilities the tap surface must never offer a control for.
+    private static let excludedCapabilities = [
+        "Install package", "Search catalog", "Clone official source",
+        "Security scan", "Git management", "Cleanup", "Disk usage", "Service behavior",
+        // The M5 D3 carve-out is repealed (2026-08-17): the Brewfile
+        // section owns its own sidebar place and both affordances now,
+        // so the word — and with it any Brewfile surface or logic — is
+        // excluded here outright again.
+        "Brewfile"
+    ]
+
+    /// The excluded capabilities the source offers as a control label.
+    ///
+    /// Only labels count: prose may cross-reference another section (the
+    /// official-source pane points at Search), and that is not a control.
+    private func excludedCapabilityViolations(in source: String) throws -> [String] {
+        let labels = try controlLabels(in: source)
+        return Self.excludedCapabilities.filter { capability in
+            labels.contains { $0.localizedCaseInsensitiveContains(capability) }
+        }
+    }
+
     private func staticButtonLabels(in source: String) throws -> Set<String> {
-        let expression = try NSRegularExpression(pattern: #"Button\("([^"]+)""#)
+        try staticLabels(of: "Button", in: source)
+    }
+
+    /// Every statically titled control constructor: buttons plus the menus,
+    /// toggles, links and navigation links a tap view could otherwise hide
+    /// a capability behind.
+    private func controlLabels(in source: String) throws -> Set<String> {
+        try staticLabels(of: "Button|Menu|Toggle|Link|NavigationLink", in: source)
+    }
+
+    private func staticLabels(of constructors: String, in source: String) throws -> Set<String> {
+        let expression = try NSRegularExpression(pattern: #"\b(?:"# + constructors + #")\("([^"]+)""#)
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
         return Set(expression.matches(in: source, range: range).compactMap { match in
             guard let range = Range(match.range(at: 1), in: source) else { return nil }
