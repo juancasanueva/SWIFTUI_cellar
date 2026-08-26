@@ -11,8 +11,9 @@ import SwiftUI
 /// Only rows with something real behind them are rendered: the brew binary is
 /// the detection store's answer, and the accent swatches write the one
 /// `ThemeStore` every tinted surface reads. Rows the design sketches for
-/// capabilities Cellar does not have (background schedules, a menu bar extra)
-/// are deliberately absent rather than present-but-inert.
+/// capabilities Cellar does not have (background checks that run on their own,
+/// and the alerts that would announce them) are deliberately absent rather than
+/// present-but-inert.
 struct SettingsView: View {
     let brewDetection: BrewDetectionStore
     @Environment(ThemeStore.self) private var theme
@@ -75,6 +76,8 @@ struct SettingsView: View {
                 // Its own file and its own card, so the whole update surface
                 // rolls back by deleting one file and this one line.
                 UpdatesSettingsGroup()
+
+                MenuBarSettingsGroup()
 
                 freeCard
             }
