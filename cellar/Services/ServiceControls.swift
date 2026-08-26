@@ -24,6 +24,13 @@ import SwiftUI
 struct ServiceControls: View {
     let service: ServiceRecord
     let operations: OperationCenter
+    /// Which of the five this instance offers.
+    ///
+    /// Defaulted to all of them, so the Services section's call site needs no
+    /// argument and stays byte-identical. A compact secondary surface narrows
+    /// the list by passing `ServiceRowControl.compactControls(for:)` — the rule
+    /// still lives in `BrewClient`, and this view still owns none.
+    var controls: [ServiceRowControl] = ServiceRowControl.allCases
 
     /// `nil` only for a name brew could read as an option, in which case every
     /// control is simply absent — an unvalidated command is not representable,
@@ -33,7 +40,7 @@ struct ServiceControls: View {
     var body: some View {
         if let target {
             HStack(spacing: 8) {
-                ForEach(ServiceRowControl.allCases, id: \.self) { control in
+                ForEach(controls, id: \.self) { control in
                     button(control, target)
                 }
             }

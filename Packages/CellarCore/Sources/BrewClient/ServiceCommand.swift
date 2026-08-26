@@ -282,4 +282,28 @@ public enum ServiceRowControl: Sendable, Equatable, CaseIterable {
         case .copyCommand: nil
         }
     }
+
+    /// The controls a compact secondary surface offers for a service in this
+    /// status.
+    ///
+    /// **Narrows the list; never collapses start-at-login and run-once into
+    /// one.** A single switch whose "on" position starts a service would have to
+    /// silently choose between registering a login item and not registering
+    /// one, which SM5 forbids on every surface, not only on the roomy one.
+    ///
+    /// Exhaustive over all **eight** `ServiceStatus` cases with no `default:`
+    /// arm, deliberately. `ServiceStatus` is not `CaseIterable` — it carries an
+    /// `unrecognised(String)` for a status this build does not know — so a
+    /// ninth status brew starts emitting has to be a compile-time decision
+    /// here. A `default:` would hand it a control set by accident.
+    ///
+    /// The rule lives here rather than in the app target so "every reportable
+    /// status is offered exactly one set, never both and never neither" is a
+    /// claim over a returned array in the `swift test` inner loop.
+    public static func compactControls(for status: ServiceStatus) -> [ServiceRowControl] {
+        switch status {
+        case .started: [.stop, .restart]
+        case .none, .scheduled, .stopped, .error, .unknown, .other, .unrecognised: [.start, .run]
+        }
+    }
 }
