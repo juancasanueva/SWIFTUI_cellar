@@ -235,4 +235,103 @@ struct ServicesRefreshControlTests {
         #expect(harness.source.callCount - baseline == 1)
         #expect(harness.inventoryTerminals.value == 0)
     }
+
+    // MARK: - SM3's secondary read-only surface (menu-bar D3)
+
+    /// A surface that shows services state **without being** the services
+    /// section may freshen it once. It may not join the visibility conjunction
+    /// that gates the poll.
+    ///
+    /// The conjunction has exactly two halves on purpose, reported from two
+    /// places, and folding a third in is the class of bug it exists to prevent:
+    /// a secondary surface that reported visibility would leave the poll running
+    /// after the section itself closed. This asserts it cannot, because it never
+    /// reaches either half.
+    @Test("A baseline refresh starts no poll and reports no visibility")
+    func aBaselineRefreshStartsNoPollAndReportsNoVisibility() async throws {
+        let harness = harness()
+        defer { harness.stop() }
+
+        // Deliberately not visible, and never made visible before the baseline.
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+        #expect(harness.coordinator.isPolling == false)
+
+        await harness.coordinator.refreshBaseline()
+        await settle()
+
+        #expect(
+            harness.source.callCount - baseline == 1,
+            "the baseline performed \(harness.source.callCount - baseline) refreshes rather than one"
+        )
+        #expect(harness.coordinator.isPolling == false, "a secondary refresh started a poll")
+
+        // Sixty seconds is twelve poll intervals. Nothing was scheduled on the
+        // clock, so nothing ticks.
+        await harness.clock.advance(by: .seconds(60))
+        await settle()
+        #expect(
+            harness.source.callCount - baseline == 1,
+            "advancing the clock produced \(harness.source.callCount - baseline - 1) further invocation(s)"
+        )
+        #expect(harness.coordinator.isPolling == false)
+
+        // Neither half of the conjunction was consumed: the section becoming
+        // visible still starts the poll normally, with its own baseline.
+        harness.coordinator.setVisible(true)
+        await harness.source.waitForCalls(atLeast: baseline + 2)
+        await settle()
+        #expect(harness.coordinator.isPolling, "the section could no longer start the poll")
+        #expect(harness.source.callCount - baseline == 2)
+
+        await harness.clock.waitForSleepers(atLeast: 1)
+        await harness.clock.advance(by: .seconds(5))
+        await settle()
+        #expect(harness.source.callCount - baseline == 3, "the poll did not tick after the section appeared")
+        harness.coordinator.setVisible(false)
+    }
+
+    /// The one refresh is **skipped**, not deferred: the mutation's terminal
+    /// already owes its own, and queueing a second would make a restart refresh
+    /// twice at the moment it settles.
+    @Test("A baseline refresh is skipped entirely while a mutation is in flight")
+    func aBaselineRefreshIsSkippedEntirelyWhileAMutationIsInFlight() async throws {
+        let harness = harness()
+        defer { harness.stop() }
+
+        await harness.coordinator.refresh(using: TestInstallation.appleSilicon)
+        let baseline = harness.source.callCount
+
+        let item = harness.center.submit(service: .restart(try target("atuin")))
+        await harness.launcher.waitForLaunches(atLeast: 1)
+        await settle()
+        #expect(harness.servicesGate.isMutating, "the services gate never opened")
+
+        await harness.coordinator.refreshBaseline()
+        await settle()
+        #expect(
+            harness.source.callCount == baseline,
+            "\(harness.source.callCount - baseline) refresh(es) ran during a mutation"
+        )
+
+        // The terminal owes exactly one — not two, so nothing was queued behind
+        // the skip.
+        harness.launcher.launchedProcesses[0].terminate(with: BrewExit(status: 0, reason: .exited))
+        await harness.source.waitForCalls(atLeast: baseline + 1)
+        await settle()
+
+        #expect(item.isTerminal)
+        #expect(
+            harness.source.callCount - baseline == 1,
+            "the terminal produced \(harness.source.callCount - baseline) refreshes rather than one"
+        )
+        #expect(harness.servicesGate.isMutating == false)
+
+        // Released, the next call refreshes once again — the skip suppressed it
+        // for the duration, it did not disable it.
+        await harness.coordinator.refreshBaseline()
+        await settle()
+        #expect(harness.source.callCount - baseline == 2)
+        #expect(harness.coordinator.isPolling == false, "none of this started a poll")
+    }
 }

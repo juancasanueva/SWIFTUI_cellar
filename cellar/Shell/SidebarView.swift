@@ -214,8 +214,18 @@ struct SidebarView: View {
             .count
     }
 
+    /// The one snooze-aware projection every count-bearing surface reads (D1;
+    /// installed-inventory "Every surface that announces the outdated count
+    /// derives it from one snooze-aware projection").
+    ///
+    /// This badge used to filter the packages itself, so a snoozed package
+    /// still bumped it while the Updates list, the Updates lens and Health had
+    /// already left it out. The lookup expression is `HealthView.swift:295`'s:
+    /// a cold or unavailable metadata store degrades to the inventory's own
+    /// answer inside the projection, with no branch here.
     private var outdatedCount: Int {
-        installed.inventory.packages.filter(\.isOutdated).count
+        let browse = InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+        return browse.outdatedCount(metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil)
     }
 
     private var runningServicesCount: Int {

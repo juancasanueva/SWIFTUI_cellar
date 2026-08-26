@@ -221,4 +221,79 @@ struct ServiceCommandTests {
         ]
         #expect(Set(verbs).isDisjoint(with: packageVerbs))
     }
+
+    // MARK: - SM5 on a compact surface (menu-bar "Service controls are two
+    // labelled sets, and never one toggle")
+
+    /// Every status brew can report maps to exactly one of the two control
+    /// sets — never both and never neither.
+    ///
+    /// The array below is written out rather than taken from `allCases`, because
+    /// `ServiceStatus` is deliberately **not** `CaseIterable`: it carries an
+    /// `unrecognised(String)` case for a status this build does not know, so
+    /// there is no finite set to iterate. Naming all eight is what makes a ninth
+    /// brew status a compile-time decision in the switch rather than a silent
+    /// fall-through here.
+    @Test("Every reportable status maps to exactly one control set")
+    func everyReportableStatusMapsToExactlyOneControlSet() throws {
+        let atuin = try Self.target("atuin")
+        let running: [ServiceRowControl] = [.stop, .restart]
+        let stopped: [ServiceRowControl] = [.start, .run]
+
+        let everyStatus: [ServiceStatus] = [
+            .started, .none, .scheduled, .stopped,
+            .error, .unknown, .other,
+            .unrecognised("a-status-this-build-does-not-know")
+        ]
+        #expect(Set(everyStatus).count == 8, "two statuses collapsed into one")
+
+        #expect(ServiceRowControl.compactControls(for: .started) == running)
+
+        for status in everyStatus where status != .started {
+            #expect(
+                ServiceRowControl.compactControls(for: status) == stopped,
+                "\(status.raw) offered \(ServiceRowControl.compactControls(for: status))"
+            )
+        }
+
+        for status in everyStatus {
+            let controls = ServiceRowControl.compactControls(for: status)
+
+            // Never neither, and never both.
+            #expect(controls.isEmpty == false, "\(status.raw) was offered no controls")
+            #expect(
+                controls == running || controls == stopped,
+                "\(status.raw) was offered a set that is neither: \(controls)"
+            )
+            #expect(
+                (controls == running) != (controls == stopped),
+                "\(status.raw) matched both sets or neither: \(controls)"
+            )
+
+            // Registering a login item is never something one control decides on
+            // the user's behalf.
+            #expect(controls.count(where: { $0.isLoginRegistering }) <= 1)
+            #expect(controls != [.start], "\(status.raw) was offered start alone")
+            #expect(controls != [.run], "\(status.raw) was offered run alone")
+
+            // A compact surface composes no verb of its own.
+            #expect(controls.allSatisfy { ServiceRowControl.allCases.contains($0) })
+            #expect(controls.contains(.copyCommand) == false)
+        }
+
+        // The two start controls stay two commands, so neither is a flag on the
+        // other on this surface either.
+        let start = try #require(ServiceRowControl.start.command(for: atuin))
+        let run = try #require(ServiceRowControl.run.command(for: atuin))
+        #expect(start.arguments == ["services", "start", "atuin"])
+        #expect(run.arguments == ["services", "run", "atuin"])
+
+        // The shipped surface and its words are unchanged: this narrows the
+        // list, it does not reword or extend it.
+        #expect(ServiceRowControl.allCases == [.start, .run, .stop, .restart, .copyCommand])
+        #expect(
+            ServiceRowControl.allCases.map(\.label)
+                == ["Start at login", "Run once", "Stop", "Restart", "Copy command"]
+        )
+    }
 }

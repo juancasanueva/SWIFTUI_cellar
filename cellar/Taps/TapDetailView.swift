@@ -79,7 +79,7 @@ struct TapDetailView: View {
                 Text(source.explanation)
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.textPrimary)
-                Text("Homebrew serves this source from its API, so there is nothing to clone, trust or untap here. Browse and install its packages from Search catalog.")
+                Text("Homebrew serves this source from its API, so there is nothing to clone, trust or untap here. Browse and install its packages from the Search section.")
                     .font(.system(size: 11.5))
                     .lineSpacing(2)
                     .foregroundStyle(Theme.textBody)

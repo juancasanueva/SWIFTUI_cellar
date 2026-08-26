@@ -112,6 +112,22 @@ Polling MUST be suppressed while a service mutation is in flight, so a restart i
 produce a flickering status. The refresh owed at a service mutation's terminal outcome is required by
 "A service operation invalidates services state only" and MUST NOT be duplicated by the poll.
 
+A **secondary read-only surface** — one that presents services state without being the services section
+— MAY perform **exactly one baseline refresh** when it appears. Such a surface MUST NOT report
+visibility to the coordinator that owns the poll: the visibility conjunction that gates the poll MUST
+keep exactly the halves it has today, so a secondary surface can neither start a poll nor keep one alive
+after the section itself stops being visible. It MUST NOT start, extend, restart or reschedule a poll of
+any cadence, and MUST schedule nothing on the injected clock. Its one refresh MUST be **skipped
+entirely** while a service mutation is in flight, on the same terms as the poll and for the same reason,
+and MUST NOT be deferred to run at that mutation's terminal outcome, which already owes its own refresh.
+Such a surface presents last-known state; a state it cannot obtain MUST read as ordinary last-known
+state rather than as an error.
+(Previously: the requirement described visibility solely as the services section's own — one refresh on
+becoming visible followed by a 5-second cadence — and named exactly two reasons a surface stops being
+visible. A read-only surface that shows services state without being that section had no described home,
+so it could only overload the shared visibility boolean and leave the poll running past the section's
+own disappearance, or show nothing current at all.)
+
 #### Scenario: The list refreshes on the poll cadence while visible
 
 - GIVEN a visible services surface and an injected clock
@@ -139,6 +155,17 @@ produce a flickering status. The refresh owed at a service mutation's terminal o
   outcome
 - THEN no poll refresh ran while the mutation was in flight
 - AND exactly one refresh ran at the mutation's terminal outcome
+
+#### Scenario: A secondary read-only surface refreshes once, reports nothing, and starts no poll
+
+- GIVEN a services section that is not visible, an injected clock, and a secondary read-only surface
+- WHEN that surface appears and the clock is then advanced by 60 seconds
+- THEN exactly one refresh was performed, at its appearance, and advancing the clock produced no further
+  brew invocation
+- AND no visibility was reported, so the poll's gating conjunction is unchanged and no poll loop started
+- AND when the same surface appears while a service mutation is in flight, no refresh runs at all and
+  none is deferred to that mutation's terminal outcome
+- Verification: `unit`
 
 ### Requirement: Exactly four service verbs, one invocation per service
 
@@ -518,3 +545,36 @@ the services list. `brew` remains the single source of truth for both, read thro
   with no package identity, and no null-package entry is titled "All packages") were run in the built
   app on 2026-08-03 and both PASS; MV-3, MV-4, MV-5 and MV-11 were obtained in part. The remainder is
   deferred by an explicit user decision and registered as owed in the M3-1 archive report.
+- **Amended by change `m12-menu-bar`** (archived `2026-08-26` —
+  `openspec/changes/archive/2026-08-26-m12-menu-bar/`), **1 MODIFIED (SM3, *"The services surface polls
+  only while visible, on an injected clock"*), 0 added, 0 removed, 0 renamed** — **12 req / 40 sc → 12
+  req / 41 sc**. `rules.archive`'s destructive-delta warning did not fire: the replacement block is a
+  **strict superset** of the shipped one. Verified mechanically at archive — the only two differences
+  between the shipped block and the promoted block are the new secondary-surface paragraph with its
+  `(Previously: …)` note and the new scenario; **every other line, including all four shipped scenarios,
+  is byte-identical**, and those scenarios still carry no `- Verification:` line, exactly as before. The
+  promoted block is byte-identical to
+  `openspec/changes/archive/2026-08-26-m12-menu-bar/specs/service-management/spec.md:40-108` (empty
+  diff), and SM1–SM2 and SM4–SM12 plus the whole prior `## Provenance` section were proven untouched by
+  byte-slicing against a pre-merge copy. Archived on branch `feat/m12-menu-bar` at `270f41e`; **no PR
+  was open and nothing was merged** when this amendment was promoted.
+  - **What was missing.** The requirement described visibility solely as the services *section's* own —
+    one refresh on becoming visible, then a 5-second cadence — and named exactly two reasons a surface
+    stops being visible. A read-only surface that shows services state **without being that section**
+    (the menu-bar popover) had no described home. Its only options were to overload the shared
+    visibility boolean, leaving the poll running past the section's own disappearance, or to show
+    nothing current at all.
+  - **The gating conjunction is unchanged, and that is the point.** `isVisible = isSectionVisible &&
+    isAppActive` keeps exactly the two halves it had. A secondary surface reports no visibility, so it
+    can neither start a poll nor keep one alive; it performs exactly one baseline refresh on appearance
+    and schedules nothing on the injected clock.
+  - **Its one refresh is skipped, not deferred.** While a service mutation is in flight the baseline
+    refresh does not run **and is not queued** for the mutation's terminal outcome — that outcome already
+    owes exactly one refresh under *"A service operation invalidates services state only"*, and
+    duplicating it is what the poll-suppression paragraph has always existed to prevent.
+  - **The consumer is `menu-bar`**, whose MB5 honours this clause without restating the poll contract.
+    The popover's own service controls reuse the shipped `ServiceRowControl` labels byte-for-byte, so one
+    verb cannot read differently in the popover and in the Services section.
+  - **`cellar/Services/ServicesListView.swift` is a 0-line diff** across the whole change: the compact
+    control set arrived as a **defaulted** parameter, so the shipped list's call sites did not move.
+  - The archived delta spec is the verbatim audit trail.

@@ -193,10 +193,20 @@ struct cellarApp: App {
     /// terminals consumer takes a slot here.
     @State private var loops = LoopOwner()
 
+    /// Whether Cellar puts a status item in the menu bar. Off unless the user
+    /// turns it on, and the **only** condition the third scene is inserted
+    /// under.
+    @State private var menuBar: MenuBarPreference
+
     /// Whether the app itself is in the foreground. One of the two reported
     /// halves of "the services surface is visible"; the other is the view's
     /// `onAppear`/`onDisappear`.
     @Environment(\.scenePhase) private var scenePhase
+
+    /// Opens the main window by its scene identifier, the way the About window
+    /// is already opened. No AppKit activation path, and nothing else on the
+    /// menu-bar surface opens, requires or checks for a window.
+    @Environment(\.openWindow) private var openWindow
 
     init() {
         let isUITesting = AppTestFixtures.isEnabled
@@ -466,10 +476,29 @@ struct cellarApp: App {
                 }
             )
         )
+        // The status item is opt-in and off by default, so a missing key reads
+        // `false` and the third scene is simply not inserted.
+        //
+        // Under a UI-test launch the preference goes to a throwaway suite, for
+        // the same reason the release-notes grant and the update-check answer
+        // do: a UI test must never write the developer's real preferences.
+        // Gated on `AppTestFixtures.isEnabled` rather than a feature-specific
+        // flag, because there is no menu-bar fixture — every UI-test launch has
+        // to be kept out of the real domain, not only the ones that opted in.
+        _menuBar = State(
+            initialValue: MenuBarPreference(
+                defaults: isUITesting
+                    ? UserDefaults(suiteName: "cellar-ui-menu-bar-\(UUID().uuidString)") ?? .standard
+                    : .standard
+            )
+        )
     }
 
     var body: some Scene {
-        WindowGroup {
+        // Identified so `openWindow(id:)` can serve it, which is what lets
+        // "Open Cellar" work with every window closed — the route the About
+        // window already uses, rather than an AppKit activation path.
+        WindowGroup(id: "main") {
             ContentView(
                 brewDetection: brewDetection,
                 catalog: catalog,
@@ -512,6 +541,9 @@ struct cellarApp: App {
                 .preferredColorScheme(.dark)
                 .environment(releaseNotes)
                 .environment(releaseNotesConsent)
+                // Read by the Settings card, which is the only surface in the
+                // window that knows about the status item at all.
+                .environment(menuBar)
                 .environment(\.releaseNotesCredentials, releaseNotesCredentials)
                 .environment(\.appUpdater, updater)
                 // Evaluate at launch, and again whenever the app comes back to
@@ -568,6 +600,60 @@ struct cellarApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+
+        // The third scene: a status item carrying the outdated count, inserted
+        // only while the preference says so.
+        //
+        // The title argument is where the projection's **absence** meets a
+        // framework that wants a `String`, and it is the only place that
+        // adaptation happens — no source under `cellar/MenuBar/` ever sees it.
+        //
+        // The outer ternary is load-bearing rather than defensive. `?:`
+        // short-circuits, so with the feature off — the default — the
+        // projection is never composed, `installed.inventory` is never read
+        // inside `App.body`, and no observation is established at App level at
+        // all. That is what makes "no other observable difference" structural
+        // rather than hoped for.
+        MenuBarExtra(
+            menuBar.isShown ? (menuBarProjection.statusItemTitle ?? "") : "",
+            systemImage: "shippingbox",
+            isInserted: Binding(get: { menuBar.isShown }, set: { menuBar.isShown = $0 })
+        ) {
+            MenuBarPopoverView(
+                projection: menuBarProjection,
+                operations: operations,
+                openMainWindow: { openWindow(id: "main") }
+            )
+                // Environment injection is per-scene, so the three the About
+                // window repeats are repeated here for the same reason: a scene
+                // that omits them renders in system chrome while the rest of
+                // the app is the design's dark surface.
+                .environment(theme)
+                .tint(theme.base)
+                .preferredColorScheme(.dark)
+                // The one asynchronous hop this surface is allowed, and it
+                // lives here rather than in the popover so the prohibition on
+                // `cellar/MenuBar/` can be absolute. It reports no visibility,
+                // starts no poll and schedules nothing on the clock.
+                .task { await servicesRefresher.refreshBaseline() }
+        }
+        .menuBarExtraStyle(.window)
+    }
+
+    /// Everything the menu bar shows, composed from the instances the window
+    /// already reads.
+    ///
+    /// Recomputed per body evaluation and never memoized: a cache would be a
+    /// second source of truth, and this is one set-membership filter over an
+    /// array the sidebar badge already walks on every render.
+    @MainActor
+    private var menuBarProjection: MenuBarProjection {
+        let browse = InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+        return MenuBarProjection(
+            browse: browse,
+            metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil,
+            services: services.services
+        )
     }
 
     /// Detection first, then everything that depends on it.

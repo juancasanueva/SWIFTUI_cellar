@@ -140,6 +140,26 @@ public final class ServicesRefreshCoordinator {
         syncPolling()
     }
 
+    /// One refresh for a **secondary read-only surface** that has just appeared
+    /// — a surface that presents services state without being the services
+    /// section.
+    ///
+    /// Deliberately reaches neither half of the visibility conjunction. It does
+    /// not touch `isSectionVisible`, `isAppActive`, `applyVisibility()` or
+    /// `syncPolling()`, and it schedules nothing on the injected clock, so it
+    /// can neither start a poll nor keep one alive after the section itself
+    /// stops being visible — the exact bug the two-half gate exists to prevent
+    /// (SM3's secondary-surface clause).
+    ///
+    /// **Skipped, not deferred**, while one of our own service mutations is in
+    /// flight: the same rule the poll applies, for the same reason, and the
+    /// terminal already owes its own refresh, so queueing one behind the skip
+    /// would make a restart refresh twice at the moment it settles.
+    public func refreshBaseline() async {
+        guard mutations?.isMutating != true else { return }
+        await performRefresh()
+    }
+
     // MARK: - Visibility
 
     /// Reports whether the services section is the one being shown.
