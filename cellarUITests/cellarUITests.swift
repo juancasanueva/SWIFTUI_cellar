@@ -134,7 +134,7 @@ final class cellarUITests: XCTestCase {
     @MainActor
     func testCleanupRouteShowsStablePackageFirstOnDiskRows() throws {
         let app = launchDiskFixture()
-        app.staticTexts["Cleanup"].click()
+        app.openSidebarSection("sidebar-cleanup")
 
         XCTAssertTrue(app.outlines["disk-usage-list"].waitForExistence(timeout: 2))
         // The rows are hand-built disclosures (buttons), not DisclosureGroups:
@@ -153,12 +153,12 @@ final class cellarUITests: XCTestCase {
     @MainActor
     func testCleanupAbsenceWarningsAndReadOnlyBoundary() throws {
         let absent = launchDiskFixture("--ui-testing-m3-disk-usage-absent")
-        absent.staticTexts["Cleanup"].click()
+        absent.openSidebarSection("sidebar-cleanup")
         XCTAssertTrue(absent.staticTexts["Homebrew is not installed"].waitForExistence(timeout: 2))
         absent.terminate()
 
         let warning = launchDiskFixture("--ui-testing-m3-disk-usage-warning")
-        warning.staticTexts["Cleanup"].click()
+        warning.openSidebarSection("sidebar-cleanup")
         XCTAssertTrue(warning.staticTexts["Some storage could not be measured"].waitForExistence(timeout: 2))
         XCTAssertTrue(warning.buttons["disk-package-formula-wget"].exists)
         XCTAssertFalse(warning.buttons["Uninstall"].exists)
@@ -354,7 +354,7 @@ final class cellarUITests: XCTestCase {
 
     @MainActor
     private func openCleanup(in app: XCUIApplication) {
-        app.staticTexts["Cleanup"].click()
+        app.openSidebarSection("sidebar-cleanup")
         XCTAssertTrue(app.staticTexts["Cleanup"].waitForExistence(timeout: 2))
     }
 
