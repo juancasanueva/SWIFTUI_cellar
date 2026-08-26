@@ -139,7 +139,13 @@ struct HomeView: View {
 
     private var attention: [AttentionItem] {
         var items: [AttentionItem] = []
-        let outdated = installed.inventory.packages.filter(\.isOutdated)
+        // The one snooze-aware projection every count-bearing surface reads
+        // (D1). This card used to filter the packages itself, so a snoozed
+        // package still counted here while the Updates list had already left it
+        // out. The lookup expression is `HealthView.swift:295`'s.
+        let browse = InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+        let outdatedIDs = browse.outdatedIDs(metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil)
+        let outdated = installed.inventory.packages.filter { outdatedIDs.contains($0.id) }
         if !outdated.isEmpty {
             let formulae = outdated.filter { $0.id.kind == .formula }.count
             let casks = outdated.count - formulae
