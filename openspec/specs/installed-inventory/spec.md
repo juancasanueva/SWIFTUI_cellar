@@ -907,6 +907,57 @@ Where the reduced detail is presented:
 - AND no copy states or implies a third-party tap, an untrusted origin, or an unverified package
 - Verification: `unit-app`
 
+### Requirement: Every surface that announces the outdated count derives it from one snooze-aware projection
+
+Any surface that announces **how many** installed packages are outdated MUST derive that number from
+`InstalledBrowse.outdatedCount(metadata:)`, and any set of outdated packages it presents alongside MUST
+be `InstalledBrowse.outdatedIDs(metadata:)`, evaluated over the same inventory and the same metadata
+lookup. This binds a sidebar badge, a home attention sentence or card, a menu-bar status item, and any
+future count-bearing surface alike.
+
+No such surface MUST compute the number for itself. In particular it MUST NOT filter the installed
+packages by `InstalledPackage.isOutdated`, MUST NOT read the snapshot's own outdated flag, and MUST NOT
+read `InstalledInventory.outdatedIDs` or `InstalledInventory.outdatedCount` without the snooze
+exclusion — those are the inputs the projection consumes, not answers a surface may consume directly.
+
+It MUST be **impossible for two surfaces to announce two different outdated numbers** for one inventory
+and one metadata lookup. Agreement MUST be structural rather than coincidental: a surface that
+reimplemented the derivation and happened to agree today would still violate this requirement, because
+the next rule added to the projection would silently pass it by. This is the same failure the
+`upgradableIDs` projection was created to prevent, generalised from one bulk control to every surface
+that states the number.
+
+Where a surface presents both a count and a set — a badge beside a list, a status title above entries —
+the two MUST come from that one projection, so the set a user reads can never be inconsistent with the
+number they were shown.
+
+#### Scenario: The sidebar badge, the Home attention card and the menu bar read one projection
+
+- GIVEN the sources of the sidebar, the home attention surface and the menu-bar surface
+- WHEN each one's outdated number is traced to its source
+- THEN each derives it from `InstalledBrowse.outdatedCount(metadata:)` with the app's metadata lookup
+- AND none of the three filters the installed packages itself or reads `InstalledPackage.isOutdated`
+- Verification: `unit-app`
+
+#### Scenario: No surface in the app announces a self-computed outdated count
+
+- GIVEN every `.swift` source in the app target, with comments stripped so a rule described is never
+  mistaken for one violated
+- WHEN they are scanned for a count or set of outdated packages computed by filtering the inventory
+- THEN no such derivation exists in any surface
+- AND every remaining reference to the un-snoozed inventory count is inside the projection that owns the
+  snooze exclusion
+- Verification: `unit-app`
+
+#### Scenario: The count and the set a surface presents cannot disagree
+
+- GIVEN an inventory with one snoozed outdated package, one outdated self-updating cask and three other
+  outdated packages, and the metadata lookup recording the snooze
+- WHEN the projection's count and its set are read together
+- THEN the count is 3 and the set is exactly those three packages
+- AND the count equals the size of the set, so a surface presenting both states one consistent fact
+- Verification: `unit`
+
 ## Provenance
 
 - Established by change `m2-installed-inventory` (archived `2026-08-02`), ADDED-only delta — **11
@@ -1254,4 +1305,39 @@ Where the reduced detail is presented:
   - **No `## Verification classes` table was promoted**; the delta's table stayed delta-local provenance
     and only the per-scenario inline `- Verification:` lines promoted. Verified after the merge: zero
     matches in this file.
+  - The archived delta spec is the verbatim audit trail.
+- **Amended by change `m12-menu-bar`** (archived `2026-08-26` —
+  `openspec/changes/archive/2026-08-26-m12-menu-bar/`), **1 ADDED (II16), 0 modified, 0 removed, 0
+  renamed** — **15 req / 79 sc → 16 req / 82 sc**. `rules.archive`'s destructive-delta warning did not
+  fire. II1–II15 are **byte-identical**, and so is the whole prior `## Provenance` section — verified at
+  archive by byte-slicing this file against a pre-merge copy (empty diffs). The promoted block is
+  byte-identical to
+  `openspec/changes/archive/2026-08-26-m12-menu-bar/specs/installed-inventory/spec.md:45-94` (empty
+  diff). Archived on branch `feat/m12-menu-bar` at `270f41e`; **no PR was open and nothing was merged**
+  when this amendment was promoted.
+  - **Why ADDED and not MODIFIED.** II12 (*"Snoozed packages leave the outdated section and its count"*)
+    already forbids a snoozed package contributing to "the outdated count **or badge**", so the sidebar
+    badge and the Home attention card — which read `packages.filter(\.isOutdated).count` in the shipped
+    app — were **non-compliant with existing text**, not evidence of a missing rule. Fixing them is
+    compliance, so II12 was left untouched. What was genuinely absent is the **generalisation**: a rule
+    binding *every* count-bearing surface, present and future, to one projection. That is II16, and it
+    is what makes a third consumer (the menu-bar status item) structurally safe.
+  - **II16 names the mechanism, not the surfaces.** Any surface announcing how many packages are
+    outdated derives it from `InstalledBrowse.outdatedCount(metadata:)`, and any set presented alongside
+    from `outdatedIDs(metadata:)`, over the same inventory and lookup. Filtering by
+    `InstalledPackage.isOutdated`, reading the snapshot flag, or reading un-snoozed
+    `InstalledInventory.outdatedIDs`/`outdatedCount` is forbidden for that purpose. Agreement between two
+    surfaces MUST be structural, not coincidental.
+  - **Per-package reads stay legitimate.** II16 forbids *collection-derivation* shapes only. A row asking
+    whether *this* package is outdated (`BulkActionBar`, `InstalledRow`, `PackageRow`, `HomeView`'s row
+    helpers) is untouched, and the app-wide scenario is scoped to derivation shapes so it cannot flag
+    them.
+  - **`system-health` was already compliant and was deliberately not migrated.** `HealthComposition`
+    reads `browse.outdatedIDs(metadata:)` today, which is exactly what II16 requires; routing it through
+    the menu-bar projection would have coupled a shipped surface to a new capability for no gain.
+  - **`menu-bar` is where the status item's own rules live**, not here. This capability gained only the
+    counting rule; the scene, the preference, the popover's prohibitions and the services contract are
+    MB1–MB10 in `openspec/specs/menu-bar/spec.md`.
+  - **No `## Verification classes` table was promoted**; the delta's table stayed delta-local provenance
+    and only the per-scenario inline `- Verification:` lines promoted.
   - The archived delta spec is the verbatim audit trail.
