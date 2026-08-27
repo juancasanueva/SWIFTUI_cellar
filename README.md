@@ -1,13 +1,15 @@
-# Cellar
+<p align="center"><img src="cellar/Assets.xcassets/AppIcon.appiconset/icon256.png" width="128" alt="Home-Cellar icon"></p>
+
+<h1 align="center">Home-Cellar</h1>
 
 **A native Homebrew GUI for macOS.** Pure SwiftUI, no backend, free.
 
-Cellar is a full-featured visual layer over the `brew` binary already on your Mac. It surfaces everything that is tedious from the command line — searching 14,000+ formulae and casks, pending updates, per-package disk usage, service status, dependency trees, CVE exposure — and executes the same `brew` commands you would type, with real-time progress and logs.
+Home-Cellar is a full-featured visual layer over the `brew` binary already on your Mac. It surfaces everything that is tedious from the command line — searching 14,000+ formulae and casks, pending updates, per-package disk usage, service status, dependency trees, CVE exposure — and executes the same `brew` commands you would type, with real-time progress and logs.
 
 ## Principles
 
 1. **Native or nothing.** Pure SwiftUI, feels like part of macOS. No web views, no Electron.
-2. **brew is the source of truth.** Cellar never manipulates the Cellar/Caskroom directories directly; every mutation shells out to `brew`. The CLI and the GUI can coexist mid-task.
+2. **brew is the source of truth.** Home-Cellar never manipulates the Cellar/Caskroom directories directly; every mutation shells out to `brew`. The CLI and the GUI can coexist mid-task.
 3. **Local-first, private.** No accounts, no telemetry, no backend. Network calls are limited to package metadata (formulae.brew.sh), cask artwork (CaskFlow / App-Fair), release notes (GitHub), and CVE feeds (OSV/NVD).
 4. **Free forever.** All features free, ad-free.
 
@@ -22,12 +24,12 @@ Cellar is a full-featured visual layer over the `brew` binary already on your Ma
 - **Security** — CVE advisory coverage for installed packages, opt-in.
 - **Cleanup** — per-package disk usage, old versions, and download cache, with safe remediation.
 - **Taps & Brewfile** — tap management plus Brewfile import/export.
-- **History** — a searchable log of every operation Cellar ran.
+- **History** — a searchable log of every operation Home-Cellar ran.
 
 ## Requirements
 
 - macOS 26 (Tahoe) or later, Apple Silicon
-- [Homebrew](https://brew.sh) installed — Cellar detects it and guides you if it is missing; it never installs Homebrew itself
+- [Homebrew](https://brew.sh) installed — Home-Cellar detects it and guides you if it is missing; it never installs Homebrew itself
 
 ## Install
 
@@ -47,8 +49,8 @@ this tap.
 A word about the fully-qualified form, `juancasanueva/cellar/home-cellar`: on
 Homebrew 6, naming a qualified token on a command line **is** a per-package
 trust grant, so it is not a neutral way to disambiguate a token collision. The
-tap line above is. Cellar never builds a qualified token — every command it
-spawns names the bare token and lets the trusted tap resolve it — and Cellar
+tap line above is. Home-Cellar never builds a qualified token — every command it
+spawns names the bare token and lets the trusted tap resolve it — and Home-Cellar
 grants and revokes nothing for an individual package. It shows the per-package
 grants `brew trust --json v1` already reports, and it says so plainly when a
 Homebrew reports none.
@@ -75,21 +77,21 @@ The build is notarized and stapled, so the first launch is a single ordinary
 get past Gatekeeper. Apple Silicon and macOS 26 only.
 
 To remove a cask install, `brew uninstall --cask --zap home-cellar` also deletes
-Cellar's caches, catalog, metadata and preferences. It cannot delete the two
-Keychain items Cellar creates — `com.juancasanueva.cellar.nvd-api-key` and
+Home-Cellar's caches, catalog, metadata and preferences. It cannot delete the two
+Keychain items Home-Cellar creates — `com.juancasanueva.cellar.nvd-api-key` and
 `com.juancasanueva.cellar.github-pat` — because Homebrew's uninstall has no
 Keychain facility. Remove those in Keychain Access if you want them gone.
 
 ## Updates
 
-Cellar updates itself with [Sparkle](https://sparkle-project.org), from an
+Home-Cellar updates itself with [Sparkle](https://sparkle-project.org), from an
 EdDSA-signed appcast published alongside each release. The feed URL and the
 public verification key are compiled into the app, so an update is only ever
 installed if its signature matches the key the running copy already carries.
 
 **Automatic checking is off by default.** A check is a network request, and
-Cellar asks before making one: turn it on in **Settings → Updates**, or leave it
-off and use **Cellar → Check for Updates…** whenever you want. The Settings card
+Home-Cellar asks before making one: turn it on in **Settings → Updates**, or leave it
+off and use **Home-Cellar → Check for Updates…** whenever you want. The Settings card
 also shows when the last check actually happened, and says so plainly when there
 has never been one.
 
