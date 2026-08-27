@@ -63,10 +63,13 @@ struct CaskCardView: View {
                 loadsRemote: remoteIcons
             )
             VStack(alignment: .leading, spacing: 2) {
-                Text(package.displayName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(package.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(2)
+                    CaskInstalledTag(package: package, installed: installed)
+                }
                 // The Discover rule kept catalog-adjacent text inert; the
                 // category pages amend it. On a page that can navigate the
                 // label is a link to the primary category's page, styled as
@@ -118,16 +121,11 @@ struct CaskCardView: View {
             }
         case .installed(let target):
             HStack(spacing: 8) {
-                // Not a button: the state itself asks for nothing further.
-                Text("● Installed")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(Theme.successText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 28)
-                    .background(
-                        Theme.successTint(0.15),
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    )
+                // The state pill's place went to the launch verb; the
+                // installed fact moved beside the title as `CaskInstalledTag`.
+                if let appURL = CaskAppLauncher.installedAppURL(for: package) {
+                    openButton(appURL)
+                }
                 uninstallButton(target)
             }
         case .install(let target):
@@ -137,6 +135,31 @@ struct CaskCardView: View {
         case nil:
             EmptyView()
         }
+    }
+
+    /// Launches the installed app — a local open, not a brew verb, so it is
+    /// never disabled with the mutation buttons.
+    private func openButton(_ appURL: URL) -> some View {
+        Button {
+            CaskAppLauncher.open(appURL)
+        } label: {
+            Text("Open")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.infoText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .background(
+                    Theme.infoTint(0.15),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Theme.infoTint(0.35), lineWidth: 0.5)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("cask-open-\(package.name)")
     }
 
     /// The destructive verb beside whichever state an installed cask shows.

@@ -30,6 +30,10 @@ struct MutationMenu: View {
         Menu {
             if let target {
                 if entry.isInstalled {
+                    if let appURL = CaskAppLauncher.installedAppURL(for: entry) {
+                        Button("Open") { CaskAppLauncher.open(appURL) }
+                        Divider()
+                    }
                     installedActions(target)
                 } else {
                     action("Install", .install(target))

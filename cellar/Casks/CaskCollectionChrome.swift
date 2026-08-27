@@ -235,6 +235,27 @@ enum CaskActionState {
     }
 }
 
+/// The compact installed marker beside a title — shown for any installed
+/// package, because the trailing verb no longer says it: the Open button took
+/// the state pill's place. Renders nothing for an uninstalled one.
+struct CaskInstalledTag: View {
+    let package: CatalogPackage
+    let installed: InstalledStore
+
+    var body: some View {
+        if installed.inventory.package(package.id) != nil {
+            Text("● Installed")
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(Theme.successText)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Theme.successTint(0.15), in: Capsule())
+                .fixedSize()
+                .accessibilityIdentifier("cask-installed-\(package.name)")
+        }
+    }
+}
+
 /// The list-mode row: the card's facts at row density.
 struct CaskListRow: View {
     let package: CatalogPackage
@@ -261,10 +282,13 @@ struct CaskListRow: View {
                 loadsRemote: remoteIcons
             )
             VStack(alignment: .leading, spacing: 1) {
-                Text(package.displayName)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(package.displayName)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    CaskInstalledTag(package: package, installed: installed)
+                }
                 if let desc = package.desc {
                     Text(desc)
                         .font(.system(size: 11))
@@ -305,12 +329,11 @@ struct CaskListRow: View {
             }
             uninstallPill(target)
         case .installed(let target):
-            // Not a button: the state itself asks for nothing further.
-            Text("● Installed")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.successText)
-                .frame(width: 100, height: 25)
-                .background(Theme.successTint(0.15), in: Capsule())
+            // The state pill's place went to the launch verb; the installed
+            // fact moved beside the title as `CaskInstalledTag`.
+            if let appURL = CaskAppLauncher.installedAppURL(for: package) {
+                openPill(appURL)
+            }
             uninstallPill(target)
         case .install(let target):
             pillButton("↓ Install", identifier: "cask-install-\(package.name)") {
@@ -319,6 +342,24 @@ struct CaskListRow: View {
         case nil:
             EmptyView()
         }
+    }
+
+    /// Launches the installed app — a local open, not a brew verb, so it is
+    /// never disabled with the mutation pills.
+    private func openPill(_ appURL: URL) -> some View {
+        Button {
+            CaskAppLauncher.open(appURL)
+        } label: {
+            Text("Open")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.infoText)
+                .frame(width: 100, height: 25)
+                .background(Theme.infoTint(0.15), in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.infoTint(0.35), lineWidth: 0.5))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("cask-open-\(package.name)")
     }
 
     /// The destructive verb at pill density, beside whichever state pill an

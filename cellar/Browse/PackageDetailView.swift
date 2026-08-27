@@ -218,40 +218,47 @@ struct PackageDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader("Actions")
                 HStack(spacing: 8) {
-                    if let installedPackage {
-                        if installedPackage.isOutdated {
-                            quietButton("Upgrade", identifier: "detail-action-upgrade") {
-                                submit(.upgrade(target))
+                    if let appURL = CaskAppLauncher.installedAppURL(for: entry) {
+                        openAppButton(appURL)
+                    }
+                    Group {
+                        if let installedPackage {
+                            if installedPackage.isOutdated {
+                                quietButton("Upgrade", identifier: "detail-action-upgrade") {
+                                    submit(.upgrade(target))
+                                }
                             }
-                        }
-                        quietButton("Reinstall", identifier: "detail-action-reinstall") {
-                            submit(.reinstall(target))
-                        }
-                        if let formula = FormulaID(entry.id) {
-                            quietButton(
-                                installedPackage.isPinned ? "Unpin" : "Pin version",
-                                identifier: "detail-action-pin"
-                            ) {
-                                submit(installedPackage.isPinned ? .unpin(formula) : .pin(formula))
+                            quietButton("Reinstall", identifier: "detail-action-reinstall") {
+                                submit(.reinstall(target))
                             }
-                        }
-                        snoozeButton(for: entry)
-                        dangerButton("Uninstall…", identifier: "detail-action-uninstall") {
-                            submit(.uninstall(target))
-                        }
-                        if let cask = CaskID(entry.id) {
-                            dangerButton("Uninstall and Zap…", identifier: "detail-action-zap") {
-                                submit(.zap(cask))
+                            if let formula = FormulaID(entry.id) {
+                                quietButton(
+                                    installedPackage.isPinned ? "Unpin" : "Pin version",
+                                    identifier: "detail-action-pin"
+                                ) {
+                                    submit(installedPackage.isPinned ? .unpin(formula) : .pin(formula))
+                                }
                             }
-                        }
-                    } else {
-                        accentButton("Install", identifier: "detail-action-install") {
-                            submit(.install(target))
+                            snoozeButton(for: entry)
+                            dangerButton("Uninstall…", identifier: "detail-action-uninstall") {
+                                submit(.uninstall(target))
+                            }
+                            if let cask = CaskID(entry.id) {
+                                dangerButton("Uninstall and Zap…", identifier: "detail-action-zap") {
+                                    submit(.zap(cask))
+                                }
+                            }
+                        } else {
+                            accentButton("Install", identifier: "detail-action-install") {
+                                submit(.install(target))
+                            }
                         }
                     }
+                    // Only the brew verbs go quiet without a runner; Open is a
+                    // local launch and stays live.
+                    .disabled(!operations.isAvailable)
                     Spacer(minLength: 0)
                 }
-                .disabled(!operations.isAvailable)
                 HStack(spacing: 8) {
                     Text(primaryCommand(for: entry, target: target).displayCommand)
                         .font(Theme.mono(11))
@@ -350,6 +357,31 @@ struct PackageDetailView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
+    }
+
+    /// Launches the installed app, in the Discover surfaces' informational
+    /// blue — a local open, not a brew verb, so it sits outside the mutation
+    /// row's `.disabled`.
+    private func openAppButton(_ appURL: URL) -> some View {
+        Button {
+            CaskAppLauncher.open(appURL)
+        } label: {
+            Text("Open")
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Theme.infoText)
+                .padding(.horizontal, 13)
+                .frame(height: 29)
+                .background(
+                    Theme.infoTint(0.12),
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(Theme.infoTint(0.28), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("detail-action-open")
     }
 
     private func dangerButton(
