@@ -79,7 +79,10 @@ struct AboutView: View {
 
     private var linksCard: some View {
         card {
-            linkRow("Web page", label: "juancasanueva.vercel.app",
+            linkRow("Website", label: "home-brew-cellar.vercel.app",
+                    url: URL(string: "https://home-brew-cellar.vercel.app")!)
+            HairlineDivider()
+            linkRow("Developer", label: "juancasanueva.vercel.app",
                     url: URL(string: "https://juancasanueva.vercel.app")!)
             HairlineDivider()
             linkRow("Email", label: "juancasanueva@gmail.com",
