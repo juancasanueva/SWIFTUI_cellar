@@ -4,6 +4,8 @@
 
 **A native Homebrew GUI for macOS.** Pure SwiftUI, no backend, free.
 
+<p align="center"><img src="docs/images/hero.png" alt="Home-Cellar screenshot" width="100%"></p>
+
 Home-Cellar is a full-featured visual layer over the `brew` binary already on your Mac. It surfaces everything that is tedious from the command line — searching 14,000+ formulae and casks, pending updates, per-package disk usage, service status, dependency trees, CVE exposure — and executes the same `brew` commands you would type, with real-time progress and logs.
 
 ## Principles
