@@ -48,15 +48,12 @@ struct CaskBrowseView: View {
                         heroCard(for: housePick)
                     }
                     ForEach(Array(content.sections.enumerated()), id: \.element.id) { index, shelf in
-                        // A hairline between shelves, never before the first:
-                        // the hero card already separates it from the top bar.
-                        if index > 0 {
-                            Rectangle()
-                                .fill(Theme.separator)
-                                .frame(height: 0.5)
-                                .padding(.vertical, 12)
-                        }
+                        // Breathing room between shelves, never before the
+                        // first: the hero card already separates it from the
+                        // top bar. The 40 keeps the retired divider's total
+                        // gap, so removing the line moved nothing.
                         shelfView(shelf)
+                            .padding(.top, index > 0 ? 40 : 0)
                     }
                 } else {
                     searchResults
