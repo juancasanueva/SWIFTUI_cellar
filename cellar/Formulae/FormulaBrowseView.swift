@@ -164,9 +164,14 @@ struct FormulaBrowseView: View {
 
     private var shelfView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 10) {
+                // The cask shelves' header idiom: the ranked shelf reuses its
+                // sidebar section's icon.
+                Image(systemName: AppSection.formulaTopCharts.systemImage)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
                 Text("Most Popular")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 0)
                 Button("View All") { section = .formulaTopCharts }

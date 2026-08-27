@@ -47,7 +47,15 @@ struct CaskBrowseView: View {
                     if let housePick = content.housePick {
                         heroCard(for: housePick)
                     }
-                    ForEach(content.sections) { shelf in
+                    ForEach(Array(content.sections.enumerated()), id: \.element.id) { index, shelf in
+                        // A hairline between shelves, never before the first:
+                        // the hero card already separates it from the top bar.
+                        if index > 0 {
+                            Rectangle()
+                                .fill(Theme.separator)
+                                .frame(height: 0.5)
+                                .padding(.vertical, 12)
+                        }
                         shelfView(shelf)
                     }
                 } else {
@@ -175,14 +183,32 @@ struct CaskBrowseView: View {
 
     private func shelfView(_ shelf: CaskBrowseSection) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 10) {
+                Image(systemName: shelfIcon(for: shelf.destination))
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
                 Text(shelf.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 0)
                 viewAllButton(for: shelf.destination)
             }
             casksView(shelf.casks)
+        }
+    }
+
+    /// The header's leading symbol: the two ranked shelves reuse their sidebar
+    /// sections' icons, and a category shelf uses its vendored category icon —
+    /// the same symbol the Categories pane draws for that row.
+    private func shelfIcon(for destination: CaskBrowseDestination) -> String {
+        switch destination {
+        case .topCharts:
+            AppSection.caskTopCharts.systemImage
+        case .recentlyAdded:
+            AppSection.caskRecentlyAdded.systemImage
+        case .category(let id):
+            content.categories.first { $0.id == id }?.icon
+                ?? AppSection.caskCategory.systemImage
         }
     }
 
