@@ -89,7 +89,7 @@ struct AboutView: View {
 
     private var footer: some View {
         VStack(spacing: 3) {
-            Text("© \(String(Calendar.current.component(.year, from: .now))) Juan Casanueva")
+            Text("MIT license")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.textSecondary)
             Text("Made with care using SwiftUI")

@@ -29,8 +29,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copyright © 2026 Juan Casanueva. All rights reserved."
+            "state" : "new",
+            "value" : ""
           }
         }
       }
