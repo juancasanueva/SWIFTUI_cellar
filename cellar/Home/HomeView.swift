@@ -32,6 +32,10 @@ struct HomeView: View {
     /// card's fallback signal. The store is populated by the app's own
     /// launch-and-activation refresh; this view still acquires nothing.
     let health: HealthStore
+    /// Read for the score card's inputs only — the same two cleanup evidence
+    /// readings `HealthView.inputs` composes, so Home and Health can never
+    /// show two different numbers.
+    let cleanup: CleanupStore
     /// The cask artwork pipeline, for the favorites column's cask rows;
     /// `nil` — a preview, say — keeps the letter tile (see `PackageIconTile`).
     var assets: CaskBrowseAssets?
@@ -56,13 +60,16 @@ struct HomeView: View {
                         .padding(.top, 20)
                         .themeCard()
                 } else {
-                    VStack(spacing: 9) {
-                        ForEach(attention) { item in
-                            AttentionCard(item: item)
+                    HStack(alignment: .top, spacing: 9) {
+                        VStack(spacing: 9) {
+                            ForEach(attention) { item in
+                                AttentionCard(item: item)
+                            }
+                            ForEach(maintenance) { item in
+                                AttentionCard(item: item)
+                            }
                         }
-                        ForEach(maintenance) { item in
-                            AttentionCard(item: item)
-                        }
+                        healthScoreCard
                     }
                     .padding(.top, 24)
 
@@ -84,6 +91,54 @@ struct HomeView: View {
         // The manifest gate behind the favorites' icon lookups; idempotent, so
         // the Discover pages and this page can all ask (see `CaskBrowseAssets`).
         .task { await assets?.load() }
+        // The score card's projection — `HealthView`'s own `.task(id:)`,
+        // verbatim: pure composition over values the app already holds, so
+        // rendering this page still acquires nothing.
+        .task(id: healthInputs) {
+            await health.project(healthInputs, now: now)
+        }
+    }
+
+    /// Held rather than read per render, `HealthView.now`'s reason verbatim: a
+    /// `Date()` inside `healthInputs` would rebuild the projection every pass.
+    @State private var now = Date()
+
+    /// `HealthView.inputs`, the same composition over the same stores — the
+    /// one way the card's number cannot drift from the section's.
+    private var healthInputs: HealthInputs {
+        HealthComposition.inputs(
+            browse: InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil),
+            metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil,
+            scan: security.state(for: .cveScan),
+            coverage: security.coverage(for: .cveScan),
+            orphans: cleanup.state(for: .autoremove).result?.evidence.orphans,
+            reclaimable: cleanup.state(for: .global).result?.evidence.total,
+            snapshot: diskUsage.visibleSnapshot,
+            lastUpdate: health.lastUpdate,
+            doctor: health.doctor,
+            now: now
+        )
+    }
+
+    /// The Health hero's ring at card size — one tap, one destination. Absent
+    /// entirely while the score is unscorable: a card with no number would be
+    /// a door pretending to be a gauge.
+    @ViewBuilder
+    private var healthScoreCard: some View {
+        let presentation = HealthScorePresentation(health.content?.score ?? .unscorable(unknownInputs: []))
+        if presentation.isScored, let value = Int(presentation.headline) {
+            Button {
+                section = .health
+            } label: {
+                HealthScoreRing(value: value, headline: presentation.headline)
+                    .padding(.horizontal, 26)
+                    .frame(maxHeight: .infinity)
+                    .themeCard(fill: Theme.cardFillLoud)
+            }
+            .buttonStyle(.plain)
+            .pointerStyle(.link)
+            .accessibilityIdentifier("home-health-score")
+        }
     }
 
     // MARK: - Header

@@ -102,7 +102,8 @@ struct HealthView: View {
             }
             Spacer(minLength: 0)
             if presentation.isScored, let value = Int(presentation.headline) {
-                scoreRing(value: value, headline: presentation.headline)
+                HealthScoreRing(value: value, headline: presentation.headline)
+                    .padding(.top, 4)
             }
             breakdownButton
         }
@@ -130,32 +131,6 @@ struct HealthView: View {
                 .frame(width: 420, height: 460)
                 .background(Theme.windowBackground)
         }
-    }
-
-    /// The design's 118-point ring: quiet full track, accent arc by score.
-    private func scoreRing(value: Int, headline: String) -> some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.07), lineWidth: 9)
-            Circle()
-                .trim(from: 0, to: CGFloat(min(max(value, 0), 100)) / 100)
-                .stroke(theme.base, style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            VStack(spacing: 0) {
-                Text(headline)
-                    .font(Theme.mono(30, weight: .semibold))
-                    .kerning(-0.9)
-                    .foregroundStyle(Theme.textPrimary)
-                    .accessibilityIdentifier("health-score")
-                Text(HealthCopy.scoreRingCaption)
-                    .font(.system(size: 10, weight: .semibold))
-                    .kerning(0.6)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Color.white.opacity(0.38))
-            }
-        }
-        .frame(width: 118, height: 118)
-        .padding(.top, 4)
     }
 
     // MARK: - The two acquisitions, both behind a control

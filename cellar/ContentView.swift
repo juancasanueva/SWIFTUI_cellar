@@ -296,6 +296,7 @@ struct ContentView: View {
                 history: history,
                 operations: operations,
                 health: health,
+                cleanup: cleanup,
                 assets: caskAssets,
                 iconLoader: caskIcons,
                 section: $section,
