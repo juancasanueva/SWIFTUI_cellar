@@ -31,6 +31,9 @@ struct HistoryView: View {
             List {
                 ForEach(history.records) { record in
                     HistoryRow(record: record)
+                        // On top of the list's default inset, this lands the
+                        // row icon on the title's own 34-point leading edge.
+                        .padding(.leading, 14)
                 }
             }
             .scrollContentBackground(.hidden)
