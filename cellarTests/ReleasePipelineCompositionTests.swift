@@ -360,7 +360,7 @@ struct ReleaseMetadataTests {
         }
     }
 
-    private static let copyright = "Copyright © 2026 Juan Casanueva. All rights reserved."
+    private static let copyright = "Copyright © 2026 Juan Casanueva. MIT License."
     private static let catalogFile = "cellar/InfoPlist.xcstrings"
     private static let runbookFile = "RELEASING.md"
 }

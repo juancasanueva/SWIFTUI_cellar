@@ -29,8 +29,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : ""
+            "state" : "translated",
+            "value" : "Copyright © 2026 Juan Casanueva. MIT License."
           }
         }
       }
