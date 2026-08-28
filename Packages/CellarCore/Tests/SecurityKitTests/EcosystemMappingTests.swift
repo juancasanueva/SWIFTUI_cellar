@@ -200,12 +200,13 @@ struct EcosystemMappingTests {
     }
 
     /// The table's whole purpose stated as a number. U1 measured genuine curated
-    /// coverage at roughly 3–5% of a real inventory, so a single-digit table
-    /// against a 159-formula machine is the *correct* size, not an unfinished
-    /// one. A table that had quietly grown to hundreds would mean somebody
-    /// started guessing.
+    /// coverage at roughly 3–5% of a real inventory; U11 raised it to ~8% by
+    /// verifying six more upstreams one at a time. A table in the tens against
+    /// a 159-formula machine is the *correct* size, not an unfinished one. A
+    /// table that had quietly grown to hundreds would mean somebody started
+    /// guessing.
     @Test("The table is the size honest curation produces, not the size guessing produces")
-    func theTableIsSingleDigit() throws {
+    func theTableIsCuratedSized() throws {
         let installed = try Fixture.corpusRows("Versions/installed-versions.txt")
             .compactMap { $0.split(separator: " ").first.map(String.init) }
 
@@ -214,9 +215,9 @@ struct EcosystemMappingTests {
         let mapped = installed.filter { EcosystemMapping.entry(forFormula: $0) != nil }
         let coverage = Double(mapped.count) / Double(installed.count)
 
-        #expect(EcosystemMapping.entries.count < 10)
+        #expect(EcosystemMapping.entries.count < 30)
         #expect(coverage > 0.02, "the table covers nothing of a real inventory")
-        #expect(coverage < 0.08, "the table covers more of a real inventory than U1 measured")
+        #expect(coverage < 0.15, "the table covers more of a real inventory than curation can verify")
     }
 
     // MARK: - Not covered

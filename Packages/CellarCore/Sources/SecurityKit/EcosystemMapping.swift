@@ -72,9 +72,15 @@ public enum EcosystemMappingResult: Sendable, Hashable {
 /// software the user never installed, and a user has no way to tell such a
 /// finding from a real one.
 ///
-/// A single-digit table against a 159-formula machine is therefore the
+/// A table in the tens against a 159-formula machine is therefore the
 /// **correct** size. A table that had grown to hundreds would mean somebody
-/// started guessing, and `theTableIsSingleDigit` fails when that happens.
+/// started guessing, and `theTableIsCuratedSized` fails when that happens.
+///
+/// Revision 2 (U11) added six entries, each verified the same way: the
+/// registry's own `repository` field and the formula's source URL name the
+/// same repository, and the package is the whole program rather than a
+/// binding. Two of them (`pnpm`, `gemini-cli`) are formulae that install the
+/// registry tarball itself.
 ///
 /// ## Why the revision has a fingerprint
 ///
@@ -87,16 +93,16 @@ public enum EcosystemMappingResult: Sendable, Hashable {
 /// captured.
 public enum EcosystemMapping {
     /// Bump **together with** `revisionFingerprint` whenever `entries` changes.
-    public static let revision = 1
+    public static let revision = 2
 
     /// The fingerprint of `entries` at `revision`.
     public static let revisionFingerprint =
-        "34ff0434282560fbff35b23e7b53e702f4223f96d38569b5cffaad0419580255"
+        "b4d3715eadab27986a794c5d26ff47981c98f09b845753f3bb8edc497b224efc"
 
     /// The table.
     ///
-    /// Sourced from probe U1 (Engram obs 7451), which checked each candidate's
-    /// upstream repository rather than its name. The two cross-language entries
+    /// Sourced from probe U1 (Engram obs 7451) and curation batch U11, which
+    /// checked each candidate's upstream repository rather than its name. The two cross-language entries
     /// carry their caveat in their own provenance rather than in a comment
     /// somewhere else.
     public static let entries: [EcosystemMappingEntry] = [
@@ -177,6 +183,71 @@ public enum EcosystemMapping {
                 is the JavaScript and WebAssembly build. Both are produced from \
                 the one parser definition, so parser-level advisories apply to \
                 both, but a binding-specific one may not.
+                """
+        ),
+        EcosystemMappingEntry(
+            formulaName: "fd",
+            ecosystem: "crates.io",
+            ecosystemPackageName: "fd-find",
+            sharedUpstream: "github.com/sharkdp/fd",
+            provenance: """
+                U11: the formula builds this crate from the same repository, and the \
+                crate is the whole program. The crate is published under `fd-find` \
+                because `fd` was already taken on crates.io; the binary both install \
+                is `fd`.
+                """
+        ),
+        EcosystemMappingEntry(
+            formulaName: "zoxide",
+            ecosystem: "crates.io",
+            ecosystemPackageName: "zoxide",
+            sharedUpstream: "github.com/ajeetdsouza/zoxide",
+            provenance: """
+                U11: same repository, same program. The crate is published by the \
+                project the formula builds.
+                """
+        ),
+        EcosystemMappingEntry(
+            formulaName: "atuin",
+            ecosystem: "crates.io",
+            ecosystemPackageName: "atuin",
+            sharedUpstream: "github.com/atuinsh/atuin",
+            provenance: """
+                U11: the formula's source tarball is the release asset of the same \
+                repository the crate is published from, and the crate is the whole \
+                program.
+                """
+        ),
+        EcosystemMappingEntry(
+            formulaName: "websocat",
+            ecosystem: "crates.io",
+            ecosystemPackageName: "websocat",
+            sharedUpstream: "github.com/vi/websocat",
+            provenance: """
+                U11: same repository, same program. The crate is published by the \
+                project the formula builds.
+                """
+        ),
+        EcosystemMappingEntry(
+            formulaName: "pnpm",
+            ecosystem: "npm",
+            ecosystemPackageName: "pnpm",
+            sharedUpstream: "github.com/pnpm/pnpm",
+            provenance: """
+                U11: the formula installs the npm registry tarball of this very \
+                package, so the two are the same artifact rather than two builds of \
+                one source.
+                """
+        ),
+        EcosystemMappingEntry(
+            formulaName: "gemini-cli",
+            ecosystem: "npm",
+            ecosystemPackageName: "@google/gemini-cli",
+            sharedUpstream: "github.com/google-gemini/gemini-cli",
+            provenance: """
+                U11: the formula installs the npm registry tarball of this very \
+                package, so the two are the same artifact rather than two builds of \
+                one source.
                 """
         )
     ]
