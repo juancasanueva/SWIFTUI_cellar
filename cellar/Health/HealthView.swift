@@ -211,7 +211,8 @@ struct HealthView: View {
                         remediate: HealthComposition.command(for: row.remediation).map { command in
                             { remediate(command) }
                         },
-                        isRemediationEnabled: operations.isAvailable
+                        isRemediationEnabled: operations.isAvailable,
+                        warnings: row.input == .doctor ? health.doctor?.evidence?.warnings ?? [] : []
                     )
                     .padding(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                     .background(Theme.rowFill)

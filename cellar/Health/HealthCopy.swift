@@ -148,6 +148,15 @@ nonisolated enum HealthCopy {
         + "with debugging\" a reported issue. Most working Macs have some. They are weighted "
         + "lightly here for exactly that reason."
 
+    static func showDoctorWarnings(_ count: Int) -> String {
+        count == 1 ? "Show warning" : "Show \(count) warnings"
+    }
+
+    static let hideDoctorWarnings = "Hide warnings"
+
+    /// A `Warning:` line brew left empty; the block is still listed.
+    static let untitledDoctorWarning = "Warning without a headline"
+
     // MARK: - The rows
 
     static let rowsTitle = "Signals"
