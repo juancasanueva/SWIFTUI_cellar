@@ -40,6 +40,44 @@ struct HealthCompositionTests {
     /// looks redundant next to the first and is not — it is the assertion that
     /// still fails if `HealthSignal` ever grows a third case that a careless
     /// mapping could reach.
+    /// Coverage is measured against the packages the curated table can map at
+    /// all. The table is a few percent of any inventory by design, so measuring
+    /// against the whole inventory would be a fixed penalty on every Mac rather
+    /// than a fact about this one. The gap is not hidden: it is the summary.
+    @Test("Advisory coverage is measured against mappable packages, and names the unmappable rest")
+    func advisoryCoverageIsMeasuredAgainstMappablePackages() {
+        let state = SecurityScanState.content(Self.result(partial: false))
+
+        let fullyAnswered = HealthComposition.advisoryCoverage(
+            state: state,
+            totals: HealthFixtures.totals(vulnerable: 0, clean: 7, notCovered: 177, unavailable: 0)
+        )
+        #expect(fullyAnswered.signal == .answered(1.0))
+        #expect(fullyAnswered.measurement?.summary == "7 of 7 checkable packages answered · 177 cannot be checked yet")
+        #expect(fullyAnswered.measurement?.unanswered == .notCovered)
+
+        let halfUnavailable = HealthComposition.advisoryCoverage(
+            state: state,
+            totals: HealthFixtures.totals(vulnerable: 1, clean: 4, notCovered: 100, unavailable: 5)
+        )
+        #expect(halfUnavailable.signal == .answered(0.0))
+        #expect(halfUnavailable.measurement?.summary == "5 of 10 checkable packages answered · 100 cannot be checked yet")
+
+        let everythingMappable = HealthComposition.advisoryCoverage(
+            state: state,
+            totals: HealthFixtures.totals(vulnerable: 0, clean: 10, notCovered: 0, unavailable: 0)
+        )
+        #expect(everythingMappable.measurement?.summary == "10 of 10 checkable packages answered")
+        #expect(everythingMappable.measurement?.unanswered == nil)
+
+        let nothingMappable = HealthComposition.advisoryCoverage(
+            state: state,
+            totals: HealthFixtures.totals(vulnerable: 0, clean: 0, notCovered: 12, unavailable: 0)
+        )
+        #expect(nothingMappable.signal == .unknown(.notCovered))
+        #expect(nothingMappable.measurement == nil)
+    }
+
     @Test("Security coverage that answered nothing is unknown, never zero vulnerable")
     func securityCoverageThatAnsweredNothingIsUnknown() {
         let uncovered = HealthFixtures.totals(vulnerable: 0, clean: 0, notCovered: 12, unavailable: 0)
@@ -268,7 +306,7 @@ struct HealthCompositionTests {
         )
         let content = await HealthProjection.build(inputs: inputs, now: Date(timeIntervalSince1970: 2_000_000))
 
-        #expect(content.rows.count == 7)
+        #expect(content.rows.count == 8)
         #expect(launcher.spawned.isEmpty, "rendering Health spawned \(launcher.spawned)")
         #expect(store.doctor == nil, "the section acquired a doctor outcome nobody asked for")
     }

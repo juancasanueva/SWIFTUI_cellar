@@ -74,7 +74,7 @@ struct HealthProjectionTests {
         #expect(first.rows == second.rows)
         #expect(first.score == second.score)
         // Non-trivial: a real, mixed projection rather than an empty one.
-        #expect(first.rows.count == 7)
+        #expect(first.rows.count == HealthInput.allCases.count)
     }
 
     /// An unmeasured signal stays unmeasured. It is not substituted with a
@@ -125,25 +125,22 @@ struct HealthProjectionTests {
         #expect(content.score == later.score)
     }
 
-    // MARK: - 7.2 — seven rows, each naming what it does not know
+    // MARK: - 7.2 — one row per input, each naming what it does not know
 
-    /// Seven rows over eight inputs, deliberately. `advisoryCoverage` is scored
-    /// in its own right but is **rendered as the vulnerable row's other half** —
-    /// which is what makes "a partially answered scan reports both halves"
-    /// expressible at all.
-    @Test("The projection has exactly seven rows, in a fixed order")
-    func thereAreExactlySevenRows() async {
+    /// One row per input. `advisoryCoverage` carries 15 points of the score, so
+    /// it gets a row of its own directly under the vulnerabilities it qualifies:
+    /// a weighted signal with no row is a number the user cannot explain.
+    @Test("The projection has exactly one row per input, in a fixed order")
+    func thereIsOneRowPerInput() async {
         let content = await HealthProjection.build(inputs: Self.inputs(), now: Self.now)
 
         #expect(content.rows.map(\.input) == [
-            .outdated, .vulnerable, .orphans, .duplicateVersions, .cache, .lastUpdate, .doctor
+            .outdated, .vulnerable, .advisoryCoverage, .orphans, .duplicateVersions, .cache, .lastUpdate, .doctor
         ])
-        #expect(content.rows.count == 7)
-        #expect(HealthInput.allCases.count == 8)
-        #expect(content.rows.contains { $0.input == .advisoryCoverage } == false)
+        #expect(content.rows.count == HealthInput.allCases.count)
         // Every row is titled, and no two share a title.
         #expect(content.rows.allSatisfy { $0.title.isEmpty == false })
-        #expect(Set(content.rows.map(\.title)).count == 7)
+        #expect(Set(content.rows.map(\.title)).count == content.rows.count)
     }
 
     /// The M4 substitution, forbidden per reason rather than per row: an
@@ -354,7 +351,7 @@ struct HealthProjectionTests {
         #expect(unknownInputs.count == 8)
         // The rows are still there, each naming its own reason — the surface has
         // something honest to show rather than a blank panel.
-        #expect(content.rows.count == 7)
+        #expect(content.rows.count == HealthInput.allCases.count)
         #expect(content.rows.allSatisfy { $0.summary == nil })
         #expect(content.rows.allSatisfy { $0.unknownReason == .unmeasured })
     }

@@ -109,7 +109,7 @@ nonisolated enum HealthCopy {
     /// one of them reads like good news if it is rendered as a blank.
     static func reasonName(_ reason: HealthUnknownReason) -> String {
         switch reason {
-        case .notCovered: "no package in the inventory is covered by an advisory source"
+        case .notCovered: "only packages in Cellar's curated advisory table can be checked"
         case .unavailable: "the source could not be reached"
         case .partial: "only part of the inventory was answered"
         case .unmeasured: "not measured yet"
@@ -184,8 +184,10 @@ nonisolated enum HealthCopy {
             : "\(vulnerable) vulnerable of \(answered) answered"
     }
 
-    static func coverageSummary(answered: Int, total: Int) -> String {
-        "\(answered) of \(total) packages answered"
+    static func coverageSummary(answered: Int, mappable: Int, notCovered: Int) -> String {
+        notCovered > 0
+            ? "\(answered) of \(mappable) checkable packages answered · \(notCovered) cannot be checked yet"
+            : "\(answered) of \(mappable) checkable packages answered"
     }
 
     static func orphansSummary(count: Int) -> String {

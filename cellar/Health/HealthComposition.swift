@@ -100,14 +100,27 @@ nonisolated enum HealthComposition {
 
     /// Coverage is scored in its own right — the M4 lesson given a weight, so an
     /// unanswered inventory costs points instead of being invisible.
+    ///
+    /// Measured against the packages the curated ecosystem table can map at all,
+    /// not the whole inventory. That table covers a few percent of any inventory
+    /// by design (exact pairings only), so scoring against the inventory would be
+    /// the same fixed penalty on every Mac — a fact about the table, not about
+    /// this machine. What the table cannot map is still said, in the summary and
+    /// as the row's `.notCovered` half; it is simply no longer scored as if the
+    /// user could do something about it.
     static func advisoryCoverage(state: SecurityScanState, totals: CoverageTotals) -> HealthReading {
         if let reason = scanGap(state) { return .unknown(reason) }
         guard totals.total > 0 else { return .unknown(.unmeasured) }
 
         let answered = totals.vulnerable + totals.clean
+        let mappable = answered + totals.unavailable
+        // A table that maps nothing here has no coverage to measure.
+        guard mappable > 0 else { return .unknown(.notCovered) }
+
         return .answered(
-            HealthThresholds.advisoryCoverageHealth(answered: answered, total: totals.total),
-            HealthCopy.coverageSummary(answered: answered, total: totals.total)
+            HealthThresholds.advisoryCoverageHealth(answered: answered, total: mappable),
+            HealthCopy.coverageSummary(answered: answered, mappable: mappable, notCovered: totals.notCovered),
+            unanswered: totals.notCovered > 0 ? .notCovered : nil
         )
     }
 

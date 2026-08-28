@@ -56,15 +56,13 @@ public struct HealthContent: Sendable, Hashable {
 /// Pure, in the `DiscoverProjection` idiom, so all of the above is testable with
 /// no store, no clock and no process.
 public enum HealthProjection {
-    /// Seven rows over eight inputs.
+    /// One row per input.
     ///
-    /// `advisoryCoverage` is scored in its own right but has no row of its own:
-    /// it is rendered as the **vulnerable row's other half**, which is what makes
-    /// "a partially answered scan reports both halves" expressible at all. A scan
-    /// that answered part of the inventory has one result and one gap, and they
-    /// belong on the same line.
+    /// `advisoryCoverage` sits directly under the vulnerabilities it qualifies.
+    /// It carries 15 points of the score, and a weighted signal with no row of
+    /// its own is a number the user cannot explain from the screen.
     static let rowOrder: [HealthInput] = [
-        .outdated, .vulnerable, .orphans, .duplicateVersions, .cache, .lastUpdate, .doctor
+        .outdated, .vulnerable, .advisoryCoverage, .orphans, .duplicateVersions, .cache, .lastUpdate, .doctor
     ]
 
     /// Titles as named constants rather than body literals, so the copy is
