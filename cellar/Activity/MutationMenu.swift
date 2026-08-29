@@ -26,22 +26,31 @@ struct MutationMenu: View {
     /// not representable, so there is nothing to disable (design D9, PM9).
     private var target: PackageTarget? { PackageTarget(entry.id) }
 
+    /// Which executable's availability gates this menu: brew's for a formula
+    /// or cask, npm's for a global package (design D13).
+    private var source: PackageSource { entry.id.kind.source }
+
     var body: some View {
         Menu {
-            if let target {
-                if entry.isInstalled {
-                    if let appURL = CaskAppLauncher.installedAppURL(for: entry) {
-                        Button("Open") { CaskAppLauncher.open(appURL) }
-                        Divider()
+            switch source {
+            case .homebrew:
+                if let target {
+                    if entry.isInstalled {
+                        if let appURL = CaskAppLauncher.installedAppURL(for: entry) {
+                            Button("Open") { CaskAppLauncher.open(appURL) }
+                            Divider()
+                        }
+                        installedActions(target)
+                    } else {
+                        action("Install", .install(target))
                     }
-                    installedActions(target)
-                } else {
-                    action("Install", .install(target))
+                    Divider()
+                    Button("Copy install command") {
+                        copy(MutationCommand.install(target).displayCommand)
+                    }
                 }
-                Divider()
-                Button("Copy install command") {
-                    copy(MutationCommand.install(target).displayCommand)
-                }
+            case .npm:
+                npmActions
             }
         } label: {
             Label("Package actions", systemImage: "ellipsis.circle")
@@ -51,8 +60,23 @@ struct MutationMenu: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .disabled(!center.isAvailable)
-        .help(center.unavailableGuidance ?? "Install, upgrade or remove \(entry.displayName)")
+        .disabled(!center.isAvailable(for: source))
+        .help(center.unavailableGuidance(for: source) ?? "Install, upgrade or remove \(entry.displayName)")
+    }
+
+    /// npm's verbs, read from the one projection the detail pane also reads
+    /// (`NpmCommand.available(for:)`), so the two surfaces cannot drift.
+    /// Uninstall sits below a divider for the reason brew's does: destructive,
+    /// and therefore confirmed, apart from the reversible verb above it.
+    @ViewBuilder
+    private var npmActions: some View {
+        let commands = NpmCommand.available(for: entry)
+        ForEach(commands, id: \.displayCommand) { command in
+            if case .uninstall = command, commands.count > 1 {
+                Divider()
+            }
+            Button(command.title) { submit(command) }
+        }
     }
 
     @ViewBuilder
@@ -87,7 +111,17 @@ struct MutationMenu: View {
 
     /// One entry point for every command, so the confirmation rule is applied
     /// in exactly one place rather than restated per button.
+    /// Leading-dot literals (`.upgrade(target)`) cannot infer a base against a
+    /// generic parameter, so the brew call sites keep this concrete overload.
     private func submit(_ command: MutationCommand) {
+        submitMutation(command)
+    }
+
+    private func submit(_ command: NpmCommand) {
+        submitMutation(command)
+    }
+
+    private func submitMutation(_ command: some BrewMutating) {
         if center.request(command) == nil {
             center.submit(command)
         }
