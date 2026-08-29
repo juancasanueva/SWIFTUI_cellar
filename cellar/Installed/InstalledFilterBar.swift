@@ -94,7 +94,7 @@ struct InstalledFilterBar: View {
     /// for the surfaces that do want to say it.
     @ViewBuilder
     private var sourceChips: some View {
-        FilterChip(label: "Any source", isOn: source == nil) { source = nil }
+        FilterChip(label: "All sources", isOn: source == nil) { source = nil }
             .disabled(isDisabled)
         FilterChip(label: "Homebrew", isOn: source == .homebrew) { source = .homebrew }
             .disabled(isDisabled)
