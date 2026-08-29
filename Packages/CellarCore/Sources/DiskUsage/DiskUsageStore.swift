@@ -35,6 +35,17 @@ public final class DiskUsageStore {
         isStale = initiallyStale && initialSnapshot != nil
     }
 
+    /// Whether a view arriving on screen has any scanning left to ask for.
+    ///
+    /// `false` while a scan is in flight — restarting it on entry would throw
+    /// away its progress — and while the held snapshot is still fresh, since
+    /// mutations already invalidate the areas they touch and the store rescans
+    /// itself on invalidation.
+    public var needsEntryScan: Bool {
+        if isScanning { return false }
+        return visibleSnapshot == nil || isStale
+    }
+
     public var visiblePackages: [DiskPackageUsage] {
         guard !incrementalPackages.isEmpty else { return visibleSnapshot?.packages ?? [] }
         var overlaid = Dictionary(

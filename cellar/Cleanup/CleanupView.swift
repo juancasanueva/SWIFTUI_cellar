@@ -42,7 +42,7 @@ struct CleanupView: View {
             .accessibilityIdentifier("disk-usage-list")
         }
         .background(Theme.windowBackground)
-        .task(id: detection.state.installation?.executableURL) { await refreshStorage() }
+        .task(id: detection.state.installation?.executableURL) { await refreshStorageOnEntry() }
     }
 
     /// The design's one-sentence summary: how much Homebrew is using, and how
@@ -145,10 +145,10 @@ struct CleanupView: View {
                             }
                         }
                         Spacer(minLength: 0)
-                        // A scan runs on entry and after a confirmed cleanup —
-                        // this is for the change those never see, like a
-                        // `brew cleanup` run from a terminal while this page
-                        // is open. Absent mid-scan: Cancel owns that state.
+                        // A scan runs on first arrival and after a confirmed
+                        // cleanup — this is for the change those never see,
+                        // like a `brew cleanup` run from a terminal while this
+                        // page is open. Absent mid-scan: Cancel owns that state.
                         if !diskUsage.isScanning {
                             Button("Rescan storage") { Task { await refreshStorage() } }
                                 .buttonStyle(ActionPillStyle())
@@ -318,13 +318,29 @@ struct CleanupView: View {
         )
     }
 
-    private func refreshStorage() async {
+    /// Where a scan would look right now; `nil` until brew is detected.
+    private var currentRoots: HomebrewRoots? {
         guard let installation = detection.state.installation,
               !AppTestFixtures.isEnabled
-        else { return }
+        else { return nil }
         let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let roots = HomebrewRoots(installation: installation, userCacheDirectory: cacheDirectory)
+        return HomebrewRoots(installation: installation, userCacheDirectory: cacheDirectory)
+    }
+
+    /// Arrival only scans when the store has nothing fresh to show — a first
+    /// visit, an invalidated snapshot, or roots that moved under it. A fresh
+    /// snapshot renders as-is: mutations already invalidate the areas they
+    /// touch, and the manual Rescan button covers everything else.
+    private func refreshStorageOnEntry() async {
+        guard let roots = currentRoots else { return }
+        guard diskUsage.needsEntryScan || diskUsage.visibleSnapshot?.roots != roots.identity
+        else { return }
+        await refreshStorage()
+    }
+
+    private func refreshStorage() async {
+        guard let roots = currentRoots else { return }
         await diskUsage.loadCached(for: roots.identity)
         let links = Dictionary(
             uniqueKeysWithValues: installed.inventory.packages.map { ($0.id, $0.formulaLinkState) }

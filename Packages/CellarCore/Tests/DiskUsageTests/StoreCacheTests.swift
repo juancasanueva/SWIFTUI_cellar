@@ -49,6 +49,21 @@ struct StoreCacheTests {
         #expect(try await cache.load()?.packages.first?.observation.allocatedBytes == 3)
     }
 
+    @Test("Entry scans are needed only without a fresh snapshot and never mid-scan")
+    func entryScanNeededOnlyWithoutFreshSnapshot() async {
+        let store = DiskUsageStore(cache: MemoryDiskUsageCache())
+        #expect(store.needsEntryScan)
+
+        let generation = store.beginScan()
+        #expect(store.needsEntryScan == false)
+
+        await store.accept(.completed(snapshot(roots: identity("a"), bytes: 1)), generation: generation)
+        #expect(store.needsEntryScan == false)
+
+        store.invalidate([.cache])
+        #expect(store.needsEntryScan)
+    }
+
     @Test("Progress is monotonic and cancellation keeps the accepted snapshot")
     func progressAndCancellationPreserveAcceptedData() async {
         let cache = MemoryDiskUsageCache(initial: snapshot(roots: identity("a"), bytes: 5))
