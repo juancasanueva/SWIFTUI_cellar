@@ -37,4 +37,11 @@ struct cellarTests {
         #expect(InstalledSelection.adopting(missing, into: current, available: current) == current)
     }
 
+    @Test("Only the Updates lens seeds the Dependencies filter on")
+    func updatesLensSeedsDependenciesFilter() {
+        #expect(InstalledLens.updates.includesDependenciesByDefault)
+        #expect(!InstalledLens.all.includesDependenciesByDefault)
+        #expect(!InstalledLens.favorites.includesDependenciesByDefault)
+    }
+
 }

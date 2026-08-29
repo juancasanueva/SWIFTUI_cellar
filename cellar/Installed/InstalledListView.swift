@@ -29,10 +29,18 @@ enum InstalledSelection {
 ///
 /// `.favorites` and `.updates` are the design's sidebar promotions of the two
 /// existing lenses — the same projections, preset rather than re-derived.
-enum InstalledLens {
+nonisolated enum InstalledLens {
     case all
     case favorites
     case updates
+
+    /// Whether the Dependencies filter starts switched on under this lens.
+    ///
+    /// Under Updates every outdated package is actionable, dependency or not,
+    /// so hiding dependencies there would under-report what an upgrade touches.
+    var includesDependenciesByDefault: Bool {
+        self == .updates
+    }
 }
 
 struct InstalledListView: View {
@@ -47,9 +55,11 @@ struct InstalledListView: View {
     @Binding var selection: PackageID?
     var lens: InstalledLens = .all
 
-    /// Off by default: a machine with 160 packages installed usually has ~40
-    /// the user chose and 120 that came along for the ride.
-    @State private var includeDependencies = false
+    /// Off by default under the plain lenses: a machine with 160 packages
+    /// installed usually has ~40 the user chose and 120 that came along for
+    /// the ride. The Updates lens seeds it on instead — see
+    /// `InstalledLens.includesDependenciesByDefault`.
+    @State private var includeDependencies: Bool
     /// The kind narrowing, `nil` for both — the Search catalog's three-way
     /// choice, applied here as a display filter like the in-pane query.
     @State private var kind: PackageKind?
@@ -63,6 +73,29 @@ struct InstalledListView: View {
     /// A local, name-and-description filter over the projected entries — the
     /// design's in-pane search. It narrows what is shown and nothing else.
     @State private var query = ""
+
+    /// Explicit only to seed `includeDependencies` from the lens; every other
+    /// parameter mirrors the memberwise initializer this replaces.
+    init(
+        installed: InstalledStore,
+        catalog: CatalogStore,
+        operations: OperationCenter,
+        metadata: MetadataStore,
+        assets: CaskBrowseAssets? = nil,
+        iconLoader: CaskIconLoader? = nil,
+        selection: Binding<PackageID?>,
+        lens: InstalledLens = .all
+    ) {
+        self.installed = installed
+        self.catalog = catalog
+        self.operations = operations
+        self.metadata = metadata
+        self.assets = assets
+        self.iconLoader = iconLoader
+        self._selection = selection
+        self.lens = lens
+        self._includeDependencies = State(initialValue: lens.includesDependenciesByDefault)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
