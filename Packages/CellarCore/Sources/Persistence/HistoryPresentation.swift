@@ -1,7 +1,29 @@
 import BrewClient
+import Catalog
 import Foundation
 
 extension HistoryRecord {
+    /// Which package manager ran this operation, derived from the identity the
+    /// row already stores.
+    ///
+    /// Derived rather than stored: `kindRaw` is the durable fact, and a second
+    /// column recording the source could disagree with it after a migration.
+    /// A row with no identity — a grouped upgrade, a service toggle, a cleanup —
+    /// has no source to claim, so it falls back to Homebrew, which is the only
+    /// manager any of those verbs has ever belonged to (design D12).
+    public var source: PackageSource { packageID?.kind.source ?? .homebrew }
+
+    /// The badge a row carries, naming the manager that ran it.
+    public var sourceLabel: String { source.displayName }
+
+    /// The command as a person reads it, and as the copy affordance produces it.
+    ///
+    /// **One-way**, exactly like `BrewMutating.displayCommand`: the prefix comes
+    /// from the derived source and the rest is the stored argv joined. Nothing
+    /// anywhere parses this back into a command, which is what keeps a history
+    /// row incapable of running anything.
+    public var displayCommand: String { source.commandName + " " + commandText }
+
     enum CleanupAction: String {
         case global = "cleanupGlobal"
         case package = "cleanupPackage"
@@ -24,13 +46,28 @@ extension HistoryRecord {
     }
 
     /// Human-readable terminal vocabulary shared by every history surface.
+    ///
+    /// Source-aware in exactly the two places the source changes what happened:
+    /// an exit status belongs to the program that produced it, and a permissions
+    /// refusal names the command a person would have to re-run in Terminal.
+    /// Every other label is source-neutral already, and Homebrew's wording is
+    /// unchanged character for character (`installation-history`).
     public var outcomeLabel: String {
         switch outcomeRaw {
         case "succeeded": "Done"
         case "noChange": "No change"
-        case "failed": exitStatus.map { "Failed (\($0))" } ?? "Failed"
+        case "failed":
+            switch source {
+            case .homebrew: exitStatus.map { "Failed (\($0))" } ?? "Failed"
+            case .npm: exitStatus.map { "npm failed (\($0))" } ?? "npm failed"
+            }
         case "busy": "Homebrew busy"
-        case "needsPrivileges": "Needs Terminal"
+        case "needsPrivileges":
+            switch source {
+            case .homebrew: "Needs Terminal"
+            case .npm: "Needs npm in Terminal"
+            }
+        case "networkUnavailable": "No network"
         case "cancelled": "Cancelled"
         case "abandoned": "Cancelled, still running"
         case "launchFailed": "Could not start"

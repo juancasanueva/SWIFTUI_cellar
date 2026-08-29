@@ -45,7 +45,14 @@ public enum DiscoveryRosterDiff {
         var logged = Set(previous.arrivals.map(\.id))
         var recorded = previous.arrivals
 
-        for package in packages where !roster.contains(package.id) {
+        // The source guard is not redundant with `roster.contains`, it is the
+        // reason it cannot be trusted alone. `contains` answers `false` for every
+        // npm identity by construction, so "not in the roster" would read as
+        // "new to this machine" and an npm global would be announced as a
+        // freshly published Homebrew package. The roster's union already skips
+        // npm; the arrivals log has to skip it for the same reason.
+        for package in packages
+        where package.kind.source == .homebrew && !roster.contains(package.id) {
             guard logged.insert(package.id).inserted else { continue }
             recorded.append(
                 PackageArrival(kind: package.kind, name: package.name, firstSeenAt: now)
@@ -67,6 +74,11 @@ public enum DiscoveryRosterDiff {
             switch package.kind {
             case .formula: formulae.insert(package.name)
             case .cask: casks.insert(package.name)
+            // Nothing to record. The roster has two namespaces because the
+            // catalog has two, and an npm package cannot arrive in either. It is
+            // skipped here rather than given a third set, so a "new package"
+            // badge can never appear for something Homebrew never published.
+            case .npm: break
             }
         }
 

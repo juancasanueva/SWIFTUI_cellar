@@ -155,6 +155,29 @@ MUST correspond to the request most recently asked for.
   released
 - THEN exactly one probe is performed and both callers observe the same resulting state
 
+### Requirement: npm detection is a sibling state model and widens nothing in brew's
+
+Brew detection's state, prefix and invalidity vocabularies MUST remain exactly as shipped: no npm case,
+no npm reason and no npm prefix MUST be added to them. npm detection MUST be a separate observable state
+with its own store, sharing only the `ExecutableProbing` seam and the request-keyed coalescing idiom.
+Brew detection MUST NOT probe, wait on or be republished because of an npm evaluation, and vice versa.
+
+#### Scenario: Brew's vocabularies are unchanged
+
+- GIVEN the brew detection state, prefix and invalidity types
+- WHEN their cases are enumerated
+- THEN the case lists are exactly the shipped ones, with no npm-named case
+- Verification: `unit`
+
+#### Scenario: The two evaluations do not couple
+
+- GIVEN an npm evaluation that does not answer until released and a brew re-evaluation requested
+  meanwhile
+- WHEN the brew evaluation completes
+- THEN brew observers receive their transition before the npm evaluation is released
+- AND releasing npm republishes no brew state
+- Verification: `unit`
+
 ## Provenance
 
 - Established by change `m1-brewrunner-core` (archived `2026-08-01`), ADDED-only delta —
@@ -226,3 +249,17 @@ MUST correspond to the request most recently asked for.
      the request key still fails the suite.
   "Absent brew is a soft signal" names neither prefix and was **not** touched. Capability total
   after the merge: **5 requirements / 17 scenarios**.
+- **Amended by change `npm-package-source`** (archived `2026-08-30` —
+  `openspec/changes/archive/2026-08-30-npm-package-source/`), which closed PRD **M13 — npm package
+  source** (`PRD.md` §7 :219-220). **ADDED-only delta — 1 requirement / 2 scenarios**, 0 modified, 0
+  removed, 0 renamed, so `rules.archive`'s destructive-delta warning did not fire. The requirement body
+  is promoted **byte-identical** from
+  `openspec/changes/archive/2026-08-30-npm-package-source/specs/brew-detection/spec.md:10-31` (verified
+  by an empty `diff` at archive); this file gained only that block and this bullet.
+- **The added requirement is BD6 in file order.** It states that npm detection is a **sibling** state
+  model: brew's state, prefix and invalidity vocabularies are unchanged, the two stores share only the
+  `ExecutableProbing` seam and the request-coalescing idiom, and the two evaluations do not couple. Its
+  second scenario is proved at runtime by `NpmDetectionStoreTests.heldNpmEvaluationDoesNotCoupleToBrewDetection`,
+  added by the change's C1 remediation.
+- **Brew's own five requirements were not touched.** No brew vocabulary was widened to accommodate a
+  second source; npm's state model lives in the new `npm-source` capability.

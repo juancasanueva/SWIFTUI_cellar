@@ -1,0 +1,63 @@
+npm fixture probe manifest
+==========================
+
+Captured on 2026-08-29 for change `npm-package-source`, task 1.1.
+
+Host npm
+--------
+which npm    -> /opt/homebrew/bin/npm
+npm --version -> 11.19.0            (exit 0)
+npm prefix -g -> /Users/example/.npm-global   (exit 0; real value's home directory
+                                               replaced, see "Redaction" below)
+
+Redaction
+---------
+Every captured byte is verbatim except the home directory component of absolute
+paths, which was rewritten from the capturing machine's `/Users/<user>/` to
+`/Users/example/`. Nothing else was edited: no key was added, removed, reordered
+or reformatted. The substitution keeps a committed fixture from pinning one
+developer's home directory while preserving the exact document shape the decoder
+must read.
+
+Real captures
+-------------
+| Fixture | Command | Exit | Notes |
+|---|---|---|---|
+| version.stdout | `npm --version` | 0 | Verbatim. |
+| prefix-g.stdout | `npm prefix -g` | 0 | Redacted home directory. |
+| ls-g-depth0.json | `npm ls -g --json --depth=0` | 0 | Verbatim, 23 real globals, plain and scoped names. Top level carries `name` but no `version`. |
+| ls-g-empty.json | `npm ls -g --json --depth=0 --prefix <empty scratch prefix>` | 0 | Verbatim. A prefix with nothing installed emits `{"name": "lib"}` with **no** `dependencies` key, so the decoder must treat that key as optional and yield an empty inventory rather than a failure. |
+| outdated-g.json | `npm outdated -g --json` | 1 | Verbatim apart from the redacted `location` paths. Exit 1 with a complete, parseable document is npm's normal "something is outdated" result; this fixture is the evidence for accepting exit 1. |
+| outdated-g-none.stdout | `npm outdated -g --json uipro-cli` | 0 | Verbatim. 3 bytes: `{}` and a newline. `uipro-cli` was the one global already at `latest`. |
+| outdated-g-offline.stderr | `npm outdated -g --json --registry=https://registry.doesnotexist.invalid/` | 1 | Redacted log path. Real `ENOTFOUND` network failure. |
+| outdated-g-offline.stdout | same run as above | 1 | Verbatim. Discovery: on a network failure npm still writes JSON to stdout, but it is an `{"error": {...}}` object, not the package map. The decoder must classify by the stderr signature before attempting to read the document, otherwise a network failure would surface as a malformed payload. |
+| install-g.stdout | `npm install -g --dry-run --prefix <scratch prefix> left-pad@1.3.0` | 0 | Verbatim. See "Deviation" below. |
+
+Deviation from the read-only command list
+-----------------------------------------
+The task allowed `--version`, `ls -g --json --depth=0`, `outdated -g --json` and
+`prefix -g`. `install-g.stdout` was captured with a fifth invocation:
+`npm install -g --dry-run --prefix <session scratch directory> left-pad@1.3.0`.
+`--dry-run` writes nothing, and `--prefix` pointed at a throwaway directory
+inside the session scratchpad, so the machine's global packages were neither
+read from nor written to. The directory listing after the run was empty,
+confirming no file was created. Recorded here rather than silently taken.
+
+Hand-authored fixtures
+----------------------
+These could not be produced on this machine without corrupting the real global
+prefix or a system-owned directory. Each is written to npm 11's exact error
+format, which the real `outdated-g-offline.stderr` capture above establishes
+(`npm error code <CODE>` first, `npm error A complete log ...` last).
+
+| Fixture | Why it is hand-authored |
+|---|---|
+| ls-g-problems.stdout / ls-g-problems.stderr (exit 1) | `ELSPROBLEMS` needs a global package with an unsatisfied dependency. Two read-only attempts were made in a scratch prefix — a broken `package.json` beside the installed package, then a root manifest naming a missing and an out-of-range dependency — and npm 11 reported neither at `--depth=0`, exiting 0 both times. Producing it for real would mean breaking the machine's actual global prefix. The document keeps the shape the real `ls` capture shows and adds the `problems` array npm emits alongside it. |
+| install-g-eacces.stderr | Requires a prefix the user cannot write to, i.e. an attempted write into a root-owned directory. Modelled on npm 11's `EACCES` output for `/usr/local/lib/node_modules`. |
+| uninstall-g.stdout | The real removal line needs a package actually installed and then removed. A dry-run uninstall against an empty scratch prefix printed `up to date`, which is the wrong shape to fixture. Written as npm 11's `removed 1 package in <n>ms`. |
+
+Consumers
+---------
+`ls-g-*` and `outdated-g-*` back the unit 1 decoder and payload tests.
+`install-g*` and `uninstall-g.stdout` back the unit 2 outcome classification
+tests; nothing in unit 1 reads them.

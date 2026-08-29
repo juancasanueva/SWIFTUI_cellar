@@ -1,0 +1,15 @@
+npm error code EACCES
+npm error syscall mkdir
+npm error path /usr/local/lib/node_modules/typescript
+npm error errno -13
+npm error Error: EACCES: permission denied, mkdir '/usr/local/lib/node_modules/typescript'
+npm error  [Error: EACCES: permission denied, mkdir '/usr/local/lib/node_modules/typescript'] {
+npm error   errno: -13,
+npm error   code: 'EACCES',
+npm error   syscall: 'mkdir',
+npm error   path: '/usr/local/lib/node_modules/typescript'
+npm error }
+npm error
+npm error The operation was rejected by your operating system.
+npm error It is likely you do not have the permissions to access this file as the current user
+npm error A complete log of this run can be found in: /Users/example/.npm/_logs/2026-08-29T17_46_00_000Z-debug-0.log

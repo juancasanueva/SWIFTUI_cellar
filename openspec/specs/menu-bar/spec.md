@@ -20,10 +20,10 @@ channel has exactly one presenter, the main window.
 ### Requirement: The menu-bar projection is a pure value that delegates outdated-ness rather than recomputing it
 
 The value the menu-bar surface reads MUST be a `nonisolated`, `Sendable` value **totally derived** from
-three inputs — an installed browse projection, the metadata lookup that owns snoozes, and a services
-snapshot. It MUST perform no I/O, cause no brew invocation, start or schedule no refresh, consult no
-catalog value, and take no process launcher, URL session or store as a dependency: there MUST be
-nothing of that kind to inject into it.
+four inputs — an installed browse projection, the metadata lookup that owns snoozes, a services
+snapshot, and the npm outdated freshness state. It MUST perform no I/O, cause no brew or npm
+invocation, start or schedule no refresh, consult no catalog value, and take no process launcher, URL
+session or store as a dependency: there MUST be nothing of that kind to inject into it.
 
 Its outdated count MUST equal `InstalledBrowse.outdatedCount(metadata:)` for the same inputs, and the
 outdated set it exposes MUST be exactly `InstalledBrowse.outdatedIDs(metadata:)` for the same inputs.
@@ -35,8 +35,9 @@ must be structural, not coincidental — this is the `upgradableIDs` idiom that 
 and a submission once computed one number twice.
 
 An unavailable or empty inventory MUST yield a count of zero, no entries and no remainder, and MUST NOT
-throw, present an error, or be distinguishable from a healthy inventory with nothing outdated. This
-capability adds **no** freshness cue in this slice: the value states what is known, not how old it is.
+throw, present an error, or be distinguishable from a healthy inventory with nothing outdated. The only
+freshness cue this capability carries is the npm one stated above; brew freshness remains uncued.
+(Previously: three inputs, and no freshness cue of any kind.)
 
 #### Scenario: The count equals the snooze-aware projection under a snooze
 
@@ -70,6 +71,13 @@ capability adds **no** freshness cue in this slice: the value states what is kno
 - WHEN its inputs are enumerated and it is composed twice over identical inputs
 - THEN no input is a process launcher, a URL session, a store refresh or a clock
 - AND the two compositions are equal, so the value is pure over its inputs
+- Verification: `unit`
+
+#### Scenario: The npm freshness input is a value, not a store
+
+- GIVEN the projection composed over an npm freshness of `notChecked`, and again over `fresh`
+- WHEN both are composed with no store, launcher or clock available
+- THEN both compose, and only the first carries the `npm not checked` copy
 - Verification: `unit`
 
 ### Requirement: At most five outdated entries, in the inventory's name order, with a remainder count
@@ -376,6 +384,37 @@ property of one value rather than of two view files that happen to concur.
   reads
 - Verification: `unit-app`
 
+### Requirement: The status item counts both sources and says when npm was not checked
+
+The count MUST include npm entries exactly as the delegated projection reports them, so the status
+item and the Updates lens cannot disagree. The projection MUST expose the per-source updates summary
+`installed-inventory` defines; when npm is `notChecked` or `failed`, the popover MUST carry the copy
+`npm not checked` (with the reason when known) and MUST NOT present "up to date". When npm outdated
+entries exist, the popover MUST state beside `Upgrade all` that npm packages update from the Updates
+list, because that affordance submits bare `brew upgrade` and nothing else. When the npm source is off
+or undetected, no npm copy MUST appear and the surface MUST be byte-identical to the shipped one.
+
+#### Scenario: npm outdated entries reach the count and the entries
+
+- GIVEN two outdated brew packages and one outdated npm package, all fresh and unsnoozed
+- WHEN the projection is read
+- THEN the title is `3` and the npm package is among the entries in name order
+- Verification: `unit`
+
+#### Scenario: Offline npm is stated, not hidden
+
+- GIVEN no outdated brew package and npm `failed(network)`
+- WHEN the projection is read
+- THEN the title is absent, the copy carries `npm not checked`, and no "up to date" copy is produced
+- Verification: `unit`
+
+#### Scenario: npm off leaves the surface unchanged
+
+- GIVEN the npm source off
+- WHEN the projection is read
+- THEN it carries no npm component and equals the shipped projection over the same brew inputs
+- Verification: `unit`
+
 ## Provenance
 
 - **Established by change `m12-menu-bar`** (archived `2026-08-26` —
@@ -411,3 +450,28 @@ property of one value rather than of two view files that happen to concur.
   (seven commits over `main` @ `f2efbdd`). **No PR was open and nothing was merged when this spec was
   promoted** — the archive was performed on the branch by maintainer instruction.
 - The archived delta spec is the verbatim audit trail.
+- **Amended by change `npm-package-source`** (archived `2026-08-30` —
+  `openspec/changes/archive/2026-08-30-npm-package-source/`), which closed PRD **M13 — npm package
+  source** (`PRD.md` §7 :219-220). **1 ADDED requirement / 3 scenarios and 1 MODIFIED requirement
+  (MB1)**, 0 removed, 0 renamed. The bodies are promoted **byte-identical** from
+  `openspec/changes/archive/2026-08-30-npm-package-source/specs/menu-bar/spec.md` — ADDED from `:11-40`,
+  MODIFIED MB1 from `:44-105` (both verified by an empty `diff` at archive).
+- **The added requirement is MB11 in file order.** The status item's count includes npm **by
+  delegation**, the popover carries `npm not checked` with its reason whenever npm freshness is
+  `notChecked` or `failed` — never "up to date" — and, when npm packages are outdated, a note beside
+  `Upgrade all` says npm packages update from the Updates list. With the npm preference off the surface
+  is byte-identical to the shipped one.
+- **`rules.archive`'s destructive-delta warning did not fire, and MB1's amendment was checked line by
+  line.** All **four** shipped MB1 scenarios promoted **byte-identical** and a fifth was appended; the
+  only replaced text is two prose paragraphs — three pure inputs became **four** (adding the npm
+  outdated freshness value) and the "no freshness cue" sentence became "the only freshness cue is the
+  npm one; brew freshness remains uncued". Both replacements carry the project's `(Previously: …)` note.
+  Measured at archive: **6 lines replaced, 14 added, 0 scenarios and 0 requirements removed**.
+- **MB4 was not touched.** `Upgrade all` still submits bare `brew upgrade`; npm is disclosed beside it
+  rather than fanned out into it, so the uncounted-command guarantee MB4 states is unchanged.
+- **This capability still does not own outdated-ness.** MB1 delegates to
+  `InstalledBrowse.outdatedCount(metadata:)`/`outdatedIDs(metadata:)` exactly as before; the npm
+  freshness input is a *value*, provably composable with no store, launcher or clock available.
+- **Delivery state at archive**: implemented and verified on branch `feat/npm-package-source`,
+  committed and pushed, with **PR #92 open against `main` and not merged**. This spec therefore
+  describes branch behaviour until that PR lands.

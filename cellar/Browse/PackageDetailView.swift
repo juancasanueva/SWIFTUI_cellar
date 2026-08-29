@@ -213,6 +213,56 @@ struct PackageDetailView: View {
     /// this file.
     @ViewBuilder
     func actionsSection(for entry: PackageEntry) -> some View {
+        switch entry.id.kind.source {
+        case .homebrew: brewActionsSection(for: entry)
+        case .npm: npmActionsSection(for: entry)
+        }
+    }
+
+    /// npm's verbs, from the one projection the row menu also reads, so the
+    /// pane and the menu cannot disagree. Upgrade keeps the accent tone here
+    /// because this pane has no header primary button to carry it
+    /// (installed-inventory II15, design DD-24).
+    @ViewBuilder
+    private func npmActionsSection(for entry: PackageEntry) -> some View {
+        let commands = NpmCommand.available(for: entry)
+        if let primary = commands.first {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader("Actions")
+                HStack(spacing: 8) {
+                    ForEach(commands, id: \.displayCommand) { command in
+                        switch command {
+                        case .upgrade:
+                            accentButton(command.title, identifier: "detail-action-upgrade") {
+                                submit(command)
+                            }
+                        case .uninstall:
+                            dangerButton(command.title, identifier: "detail-action-uninstall") {
+                                submit(command)
+                            }
+                        }
+                    }
+                    .disabled(!operations.isAvailable(for: .npm))
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 8) {
+                    Text(primary.displayCommand)
+                        .font(Theme.mono(11))
+                        .foregroundStyle(Theme.textFaint)
+                        .textSelection(.enabled)
+                    CopyCommandButton(text: primary.displayCommand)
+                }
+                if let guidance = operations.unavailableGuidance(for: .npm) {
+                    Text(guidance)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func brewActionsSection(for entry: PackageEntry) -> some View {
         if let target = PackageTarget(entry.id) {
             let installedPackage = entry.installed
             VStack(alignment: .leading, spacing: 12) {
@@ -314,7 +364,17 @@ struct PackageDetailView: View {
 
     /// One entry point for every command, so the confirmation rule is applied
     /// in exactly one place rather than restated per button.
+    /// Leading-dot literals (`.upgrade(target)`) cannot infer a base against a
+    /// generic parameter, so the brew call sites keep this concrete overload.
     private func submit(_ command: MutationCommand) {
+        submitMutation(command)
+    }
+
+    private func submit(_ command: NpmCommand) {
+        submitMutation(command)
+    }
+
+    private func submitMutation(_ command: some BrewMutating) {
         if operations.request(command) == nil {
             operations.submit(command)
         }
@@ -462,7 +522,9 @@ struct PackageDetailView: View {
                             .foregroundStyle(Theme.textSecondary)
                         Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
                     }
-                    Text(id.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
+                    // The header and the fact pane below must not describe the
+                    // same package differently, so both read the one projection.
+                    Text(InstalledDetailProjection.typeCopy(id.kind))
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.textSecondary)
                     statusBadge(installed: installedPackage)
@@ -604,7 +666,11 @@ struct PackageDetailView: View {
                 // presentation beside the tap it belongs to — never as a field
                 // of the catalog projection, whose field set PD7 keeps closed.
                 fact("Tap", package.tap, mono: true, note: grantMarker(for: package))
-                fact("Type", package.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
+                // `package` is a `CatalogPackage`, which is never npm — the
+                // catalog publishes two namespaces and npm is in neither. Read
+                // through the projection anyway, so this cannot become the one
+                // place that disagrees if that ever changes.
+                fact("Type", InstalledDetailProjection.typeCopy(package.kind))
                 if let license = package.license {
                     fact("License", license)
                 }

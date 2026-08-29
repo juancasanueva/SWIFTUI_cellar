@@ -25,15 +25,45 @@ extension OperationCenter {
     /// transition, out of the snapshot the caller is **already holding**.
     /// Nothing is re-snapshotted and nothing is diffed either side of the
     /// operation (design D7).
+    /// Each identity becomes its **own source's** upgrade — a brew one for a
+    /// formula or cask, an npm one for a global package — in selection order and
+    /// through the one queue (`package-mutation`).
     @discardableResult
     public func submitUpgrades(
         for ids: [PackageID],
         in inventory: InstalledInventory? = nil
     ) -> [ActivityItem] {
         ids.compactMap { id in
-            MutationCommand.naming(id, MutationCommand.upgrade).map { command in
+            Self.upgrade(naming: id).map { command in
                 submit(command, versions: Self.transition(for: id, in: inventory))
             }
+        }
+    }
+
+    /// The upgrade for one identity, whichever source owns it.
+    ///
+    /// Erased at the point of construction rather than switched on at every
+    /// call site: the two families build different argv from different
+    /// validated wrappers, and beyond that the spine treats them identically.
+    /// An identity that could not survive argv composition produces `nil`, so a
+    /// caller that cannot build one renders the affordance unavailable rather
+    /// than failing at spawn time — exactly as it already did for brew.
+    static func upgrade(naming id: PackageID) -> AnyBrewMutation? {
+        switch id.kind.source {
+        case .homebrew:
+            MutationCommand.naming(id, MutationCommand.upgrade).map(AnyBrewMutation.init)
+        case .npm:
+            NpmCommand.naming(id, NpmCommand.upgrade).map(AnyBrewMutation.init)
+        }
+    }
+
+    /// The removal for one identity, whichever source owns it.
+    static func uninstall(naming id: PackageID) -> AnyBrewMutation? {
+        switch id.kind.source {
+        case .homebrew:
+            MutationCommand.naming(id, MutationCommand.uninstall).map(AnyBrewMutation.init)
+        case .npm:
+            NpmCommand.naming(id, NpmCommand.uninstall).map(AnyBrewMutation.init)
         }
     }
 
@@ -83,22 +113,29 @@ extension OperationCenter {
     /// arm here — a silent no-op returning an empty batch, which the type system
     /// could never catch and which would submit nothing while looking like it
     /// had. It travels its own app-side path instead (design HD11).
+    ///
+    /// Erased rather than `[MutationCommand]` since the npm source landed: the
+    /// two verbs both sources own — upgrade and uninstall — expand per package
+    /// **by source**, and a return type naming brew's enum could only have
+    /// dropped the npm members silently. Pin and unpin are unaffected in either
+    /// direction: they are formula-only by construction, so an npm identity
+    /// produces no command for the same structural reason a cask does not.
     public func commands(
         for action: BulkSelection.Action,
         over ids: [PackageID]
-    ) -> [MutationCommand] {
+    ) -> [AnyBrewMutation] {
         ids.compactMap { id in
             switch action {
-            case .upgrade: MutationCommand.naming(id, MutationCommand.upgrade)
-            case .uninstall: MutationCommand.naming(id, MutationCommand.uninstall)
+            case .upgrade: Self.upgrade(naming: id)
+            case .uninstall: Self.uninstall(naming: id)
             // `FormulaID(_ id:)` and **not** `.pin(formula: id.name)`: the
             // name-based factory rebuilds the identity as a formula, so a cask's
             // name would silently become `pin --formula iterm2`. The identity
             // initialiser checks the kind and returns `nil` for a cask, which is
             // what makes "a cask never enters a pin set" true here rather than
             // only in the eligibility derivation.
-            case .pin: FormulaID(id).map(MutationCommand.pin)
-            case .unpin: FormulaID(id).map(MutationCommand.unpin)
+            case .pin: FormulaID(id).map(MutationCommand.pin).map(AnyBrewMutation.init)
+            case .unpin: FormulaID(id).map(MutationCommand.unpin).map(AnyBrewMutation.init)
             }
         }
     }

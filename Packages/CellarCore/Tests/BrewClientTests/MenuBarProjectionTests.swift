@@ -222,9 +222,18 @@ struct MenuBarProjectionTests {
 
         // The stored facts are the declared ones, and none of them is a store,
         // a launcher, a session or a clock.
+        //
+        // **Restated, not relaxed**, for the npm slice: MB1 is modified into a
+        // strict superset with a fourth pure input, so `updates` — the
+        // per-source summary the fourth input feeds — joins the roster. It is a
+        // value like the other five, which is what the effectful-token sweep
+        // below still proves.
         let labels = Mirror(reflecting: first).children.compactMap(\.label)
         #expect(
-            Set(labels) == ["outdatedCount", "outdatedIDs", "topOutdated", "services", "runningServiceCount"],
+            Set(labels) == [
+                "outdatedCount", "outdatedIDs", "topOutdated", "services", "runningServiceCount",
+                "updates",
+            ],
             "the projection stores \(labels)"
         )
         let effectful = ["Store", "Coordinator", "Launch", "URLSession", "Clock", "Process"]

@@ -61,12 +61,28 @@ public struct PackageEntry: Sendable, Hashable, Identifiable {
 /// refines design D7, which put the whole resolution in the app.
 public struct InstalledBrowse: Sendable {
     public let inventory: InstalledInventory
-    /// Whether the inventory means anything yet — false when brew is absent.
+    /// Whether the inventory means anything yet.
+    ///
+    /// With a second source this is "either source has something to say", not
+    /// "brew loaded": an npm-only machine has a real inventory, and reporting it
+    /// as unavailable would collapse every installed-state filter to `all` over
+    /// rows that are genuinely there.
     public let isAvailable: Bool
+    /// Whether the Source dimension may be used, and why not when it may not.
+    ///
+    /// Defaulted, so every existing call site — and there are many — keeps
+    /// compiling and keeps behaving exactly as it did: an unavailable source
+    /// control filters nothing.
+    public let npmSource: NpmSourceAvailability
 
-    public init(inventory: InstalledInventory, isAvailable: Bool) {
+    public init(
+        inventory: InstalledInventory,
+        isAvailable: Bool,
+        npmSource: NpmSourceAvailability = .disabled
+    ) {
         self.inventory = inventory
         self.isAvailable = isAvailable
+        self.npmSource = npmSource
     }
 
     /// Whether the picker should be interactive.

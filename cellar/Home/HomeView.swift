@@ -21,6 +21,11 @@ struct HomeView: View {
     let brewDetection: BrewDetectionStore
     let catalog: CatalogStore
     let installed: InstalledStore
+    /// Read for two values: whether npm is contributing at all, and how current
+    /// its answer is. Both are resident state; this view still refreshes
+    /// nothing.
+    let npmDetection: NpmDetectionStore
+    let npm: NpmStore
     let metadata: MetadataStore
     let security: SecurityStore
     let diskUsage: DiskUsageStore
@@ -107,7 +112,8 @@ struct HomeView: View {
     /// one way the card's number cannot drift from the section's.
     private var healthInputs: HealthInputs {
         HealthComposition.inputs(
-            browse: InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil),
+            browse: InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+                .withNpmSource(NpmSourceAvailability(npmDetection.state)),
             metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil,
             scan: security.state(for: .cveScan),
             coverage: security.coverage(for: .cveScan),
@@ -116,7 +122,8 @@ struct HomeView: View {
             snapshot: diskUsage.visibleSnapshot,
             lastUpdate: health.lastUpdate,
             doctor: health.doctor,
-            now: now
+            now: now,
+            npmFreshness: npm.inventory.outdated
         )
     }
 
@@ -177,17 +184,15 @@ struct HomeView: View {
         return facts
     }
 
+    /// The claim about how current this Mac is, decided by the projection rather
+    /// than here: an npm nobody could check must not be summarised away in a
+    /// sentence composed inside a view body.
     private var attentionSentence: String {
-        guard brewDetection.state.installation != nil else {
-            return "Cellar is a window onto the brew already on your Mac."
-        }
-        switch attention.count {
-        case 0: return "Everything on this Mac is current."
-        case 1: return "One thing wants your attention today. Everything else on this Mac is current."
-        default:
-            let words = ["Two", "Three", "Four"][min(attention.count - 2, 2)]
-            return "\(words) things want your attention today. Everything else on this Mac is current."
-        }
+        HomeAttentionCopy.sentence(
+            attentionCount: attention.count,
+            hasHomebrew: brewDetection.state.installation != nil,
+            updates: updates
+        )
     }
 
     // MARK: - Attention
@@ -202,18 +207,17 @@ struct HomeView: View {
         let outdatedIDs = browse.outdatedIDs(metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil)
         let outdated = installed.inventory.packages.filter { outdatedIDs.contains($0.id) }
         if !outdated.isEmpty {
-            let formulae = outdated.filter { $0.id.kind == .formula }.count
-            let casks = outdated.count - formulae
+            // Counted by kind rather than "formulae and everything else": that
+            // subtraction was correct only while there were two kinds, and an
+            // npm global would have been announced as a cask.
             items.append(
                 AttentionItem(
                     id: "updates",
-                    title: outdated.count == 1
-                        ? "1 package has an update"
-                        : "\(outdated.count) packages have updates",
-                    sub: [
-                        formulae > 0 ? "\(formulae) formula\(formulae == 1 ? "" : "e")" : nil,
-                        casks > 0 ? "\(casks) cask\(casks == 1 ? "" : "s")" : nil,
-                    ].compactMap(\.self).joined(separator: " · "),
+                    title: HomeAttentionCopy.outdatedTitle(count: outdated.count),
+                    sub: HomeAttentionCopy.outdatedSubtitle(
+                        breakdown: OutdatedKindBreakdown(ids: outdatedIDs),
+                        updates: updates
+                    ),
                     systemImage: "arrow.up.circle",
                     tone: .accent(theme),
                     buttonLabel: "Upgrade all",
@@ -663,5 +667,22 @@ struct PackageTile: View {
                 pair.background,
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
+    }
+}
+
+private extension HomeView {
+    /// The per-source split every sentence on this page reads.
+    ///
+    /// In an extension rather than the body: this view is already at the
+    /// type-length ceiling, and a projection that composes three stores into one
+    /// value belongs next to the other reading helpers rather than among the
+    /// sections.
+    var updates: InstalledUpdatesSummary {
+        let browse = InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+        return InstalledUpdatesSummary(
+            browse: browse.withNpmSource(NpmSourceAvailability(npmDetection.state)),
+            metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil,
+            npmFreshness: npm.inventory.outdated
+        )
     }
 }

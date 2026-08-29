@@ -311,3 +311,241 @@ struct HomeCompositionTests {
         return nil
     }
 }
+
+/// The Home page's two npm-sensitive sentences, and the empty list's.
+///
+/// Both were literals inside `body` before this slice, which is exactly why they
+/// were wrong in the same way: the attention card split its subtitle into
+/// "formulae and everything else", so an npm global counted as a cask, and the
+/// greeting under it claimed "everything on this Mac is current" from an empty
+/// attention list — a claim an unreachable npm registry makes false and that a
+/// user acts on by doing nothing (`installed-inventory`: an unchecked npm never
+/// reads as up to date).
+///
+/// They are values here rather than source scans, so what is asserted is what
+/// the page says rather than which tokens its file happens to contain.
+@Suite("Home, the npm source and the empty list")
+struct HomeNpmCompositionTests {
+    private static let checkedAt = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private static func summary(
+        _ packages: [InstalledPackage],
+        npmSource: NpmSourceAvailability = .available,
+        freshness: NpmOutdatedState
+    ) -> InstalledUpdatesSummary {
+        InstalledUpdatesSummary(
+            browse: InstalledBrowse(
+                inventory: InstalledInventory(packages: packages),
+                isAvailable: true,
+                npmSource: npmSource
+            ),
+            metadata: nil,
+            npmFreshness: freshness
+        )
+    }
+
+    private static func npm(_ name: String, outdated: Bool) -> InstalledPackage {
+        HealthFixtures.package(
+            name,
+            kind: .npm,
+            installed: outdated ? "5.6.0" : "5.7.0",
+            offering: "5.7.0",
+            outdated: outdated,
+            tap: ""
+        )
+    }
+
+    // MARK: - The card's subtitle
+
+    /// The defect this projection exists to make impossible: the card used to
+    /// count formulae and call **everything else** a cask.
+    @Test("An npm global is counted as npm, never as a cask")
+    func npmIsNeverCountedAsACask() {
+        let breakdown = OutdatedKindBreakdown(ids: [
+            PackageID(kind: .formula, name: "git"),
+            PackageID(kind: .cask, name: "iterm2"),
+            PackageID(kind: .npm, name: "typescript"),
+            PackageID(kind: .npm, name: "corepack"),
+        ])
+
+        #expect(breakdown.formulae == 1)
+        #expect(breakdown.casks == 1)
+        #expect(breakdown.npm == 2)
+        #expect(breakdown.total == 4)
+        #expect(breakdown.summary == "1 formula · 1 cask · 2 npm packages")
+    }
+
+    /// Triangulation over the shipped shape: a brew-only breakdown reads exactly
+    /// as it always did, with no empty npm clause trailing it.
+    @Test("A brew-only breakdown keeps the shipped wording and drops empty clauses")
+    func brewOnlyBreakdownIsUnchanged() {
+        let formulaeOnly = OutdatedKindBreakdown(ids: [
+            PackageID(kind: .formula, name: "git"),
+            PackageID(kind: .formula, name: "wget"),
+        ])
+        #expect(formulaeOnly.summary == "2 formulae")
+
+        let mixed = OutdatedKindBreakdown(ids: [
+            PackageID(kind: .formula, name: "git"),
+            PackageID(kind: .cask, name: "iterm2"),
+            PackageID(kind: .cask, name: "raycast"),
+        ])
+        #expect(mixed.summary == "1 formula · 2 casks")
+
+        let npmOnly = OutdatedKindBreakdown(ids: [PackageID(kind: .npm, name: "typescript")])
+        #expect(npmOnly.summary == "1 npm package")
+    }
+
+    @Test("The card's title counts every source and its subtitle carries npm's cue")
+    func theCardCountsEverySourceAndCarriesTheCue() {
+        let ids: Set<PackageID> = [
+            PackageID(kind: .formula, name: "git"),
+            PackageID(kind: .npm, name: "typescript"),
+        ]
+        let updates = Self.summary(
+            [HealthFixtures.package("git", offering: "2.48.0", outdated: true), Self.npm("typescript", outdated: true)],
+            freshness: .fresh(
+                ["typescript": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0")],
+                at: Self.checkedAt
+            )
+        )
+
+        #expect(HomeAttentionCopy.outdatedTitle(count: 2) == "2 packages have updates")
+        #expect(HomeAttentionCopy.outdatedTitle(count: 1) == "1 package has an update")
+        #expect(
+            HomeAttentionCopy.outdatedSubtitle(breakdown: OutdatedKindBreakdown(ids: ids), updates: updates)
+                == "1 formula · 1 npm package"
+        )
+    }
+
+    @Test("An unchecked npm adds its reason to the card's subtitle")
+    func anUncheckedNpmDisclosesItselfOnTheCard() {
+        let updates = Self.summary(
+            [
+                HealthFixtures.package("git", offering: "2.48.0", outdated: true),
+                Self.npm("typescript", outdated: false),
+            ],
+            freshness: .failed(.networkUnavailable)
+        )
+        let subtitle = HomeAttentionCopy.outdatedSubtitle(
+            breakdown: OutdatedKindBreakdown(ids: [PackageID(kind: .formula, name: "git")]),
+            updates: updates
+        )
+
+        #expect(subtitle.contains("1 formula"))
+        #expect(subtitle.contains("npm not checked"))
+        #expect(subtitle.contains("network"))
+    }
+
+    // MARK: - The greeting's currency claim
+
+    @Test("With nothing to report and npm unchecked, the page never claims the Mac is current")
+    func anUncheckedNpmNeverReadsAsCurrent() {
+        let sentence = HomeAttentionCopy.sentence(
+            attentionCount: 0,
+            hasHomebrew: true,
+            updates: Self.summary(
+                [HealthFixtures.package("git"), Self.npm("typescript", outdated: false)],
+                freshness: .failed(.networkUnavailable)
+            )
+        )
+
+        #expect(sentence.contains("Everything on this Mac is current") == false)
+        #expect(sentence.contains("npm not checked"))
+        #expect(sentence.contains("Homebrew"))
+    }
+
+    /// Triangulation: with npm answered — and with the source off — the shipped
+    /// sentences come back word for word, so the hedge above is caused by the
+    /// state rather than applied to everyone.
+    @Test("A checked npm and an off source both leave the shipped sentences intact")
+    func aCheckedOrOffNpmKeepsTheShippedSentences() {
+        let checked = Self.summary(
+            [HealthFixtures.package("git")], freshness: .fresh([:], at: Self.checkedAt)
+        )
+        let off = Self.summary(
+            [HealthFixtures.package("git")], npmSource: .disabled, freshness: .failed(.networkUnavailable)
+        )
+
+        for updates in [checked, off] {
+            #expect(
+                HomeAttentionCopy.sentence(attentionCount: 0, hasHomebrew: true, updates: updates)
+                    == "Everything on this Mac is current."
+            )
+            #expect(
+                HomeAttentionCopy.sentence(attentionCount: 1, hasHomebrew: true, updates: updates)
+                    == "One thing wants your attention today. Everything else on this Mac is current."
+            )
+            #expect(
+                HomeAttentionCopy.sentence(attentionCount: 2, hasHomebrew: true, updates: updates)
+                    == "Two things want your attention today. Everything else on this Mac is current."
+            )
+            #expect(
+                HomeAttentionCopy.sentence(attentionCount: 0, hasHomebrew: false, updates: updates)
+                    == "Cellar is a window onto the brew already on your Mac."
+            )
+        }
+    }
+
+    @Test("With something wanting attention and npm unchecked, the hedge still applies")
+    func theHedgeSurvivesAnAttentionItem() {
+        let sentence = HomeAttentionCopy.sentence(
+            attentionCount: 1,
+            hasHomebrew: true,
+            updates: Self.summary(
+                [HealthFixtures.package("git", offering: "2.48.0", outdated: true)],
+                freshness: .notChecked(.notYetChecked)
+            )
+        )
+
+        #expect(sentence.hasPrefix("One thing wants your attention today."))
+        #expect(sentence.contains("Everything else on this Mac is current") == false)
+        #expect(sentence.contains("npm not checked"))
+    }
+
+    // MARK: - The empty list
+
+    /// "You have no npm globals" and "nothing is installed on request" are
+    /// different facts, and offering the dependency toggle to somebody looking
+    /// at an empty npm list points them at a control that would show them
+    /// nothing.
+    @Test("The empty list is worded for npm exactly when npm is the only source in play")
+    func theEmptyListDistinguishesNpmFromDependencies() {
+        // The user narrowed to npm: whatever else is true, this is an npm list.
+        #expect(
+            InstalledEmptyState.isNpmEmptiness(
+                source: .npm, isNpmContributing: true, isBrewAbsent: false
+            )
+        )
+        #expect(
+            InstalledEmptyState.isNpmEmptiness(
+                source: .npm, isNpmContributing: false, isBrewAbsent: false
+            )
+        )
+        // No narrowing, npm on, and no Homebrew to have a brew half at all.
+        #expect(
+            InstalledEmptyState.isNpmEmptiness(
+                source: nil, isNpmContributing: true, isBrewAbsent: true
+            )
+        )
+        // npm off with brew absent is the shipped brew-absent guidance, not an
+        // npm sentence.
+        #expect(
+            InstalledEmptyState.isNpmEmptiness(
+                source: nil, isNpmContributing: false, isBrewAbsent: true
+            ) == false
+        )
+        // Homebrew present: an empty list is the dependency-toggle case, even
+        // with npm contributing nothing.
+        #expect(
+            InstalledEmptyState.isNpmEmptiness(
+                source: nil, isNpmContributing: true, isBrewAbsent: false
+            ) == false
+        )
+        #expect(
+            InstalledEmptyState.isNpmEmptiness(
+                source: .homebrew, isNpmContributing: true, isBrewAbsent: true
+            ) == false
+        )
+    }
+}

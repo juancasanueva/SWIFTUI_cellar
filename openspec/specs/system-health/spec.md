@@ -541,6 +541,39 @@ none, rather than an inert control.
 - THEN neither offers a remediation control
 - AND no disabled or inert control is presented in its place
 
+### Requirement: The outdated row names both sources in its copy, and the score counts Homebrew only
+
+The outdated row MUST announce the merged count from the shared snooze-aware projection and MUST add
+the per-source summary `installed-inventory` defines: when npm is `notChecked` or `failed` the row copy
+MUST say npm was not checked, naming the reason when known, and MUST NOT describe the installation as up
+to date. The score's outdated input MUST be computed over Homebrew identities only, and its breakdown
+entry MUST say so, so an unchecked npm neither penalises nor flatters the number. The row's remediation
+MUST remain the shipped upgrade-all, which acts on Homebrew only, and its copy MUST NOT claim it updates
+npm packages. When the npm source is off or undetected, the row and the score MUST be byte-identical
+to the shipped ones.
+
+#### Scenario: The row says npm was not checked
+
+- GIVEN one outdated brew package and npm `failed(network)`
+- WHEN the outdated row is projected
+- THEN it announces 1 outdated and its copy says npm was not checked, naming the network
+- AND it does not describe the installation as up to date
+- Verification: `unit`
+
+#### Scenario: The score ignores npm in both directions
+
+- GIVEN two input sets identical except that the second adds three fresh outdated npm packages
+- WHEN both are scored
+- THEN the numbers are equal and the outdated contribution names Homebrew only
+- Verification: `unit`
+
+#### Scenario: npm off leaves the row and score unchanged
+
+- GIVEN the npm source off
+- WHEN the row and the score are projected over brew-only inputs
+- THEN both equal the shipped projections and no npm copy appears
+- Verification: `unit`
+
 ## Provenance
 
 - **The doctor exit-code rule is licensed by `brew-execution`, not a contradiction of it.**
@@ -609,3 +642,19 @@ none, rather than an inert control.
   and `.health` did not take the landing spot. The stale comment that asserted otherwise in
   `cellar/Shell/AppSection.swift` was corrected under a real RED→GREEN cycle. Read every "Home
   stays" above with this correction applied.
+- **Amended by change `npm-package-source`** (archived `2026-08-30` —
+  `openspec/changes/archive/2026-08-30-npm-package-source/`), which closed PRD **M13 — npm package
+  source** (`PRD.md` §7 :219-220). **ADDED-only delta — 1 requirement / 3 scenarios**, 0 modified, 0
+  removed, 0 renamed, so `rules.archive`'s destructive-delta warning did not fire. The requirement body
+  is promoted **byte-identical** from
+  `openspec/changes/archive/2026-08-30-npm-package-source/specs/system-health/spec.md:10-41` (verified
+  by an empty `diff` at archive); this file gained only that block and this bullet.
+- **The added requirement is SH12 in file order.** The outdated row announces the **merged** count and
+  carries the npm not-checked copy, while the **score** counts Homebrew identities only — in both the
+  numerator and the denominator — and the breakdown says so, renaming its input to
+  `Outdated Homebrew packages`. The remediation stays brew upgrade-all and its copy does not claim to
+  update npm.
+- **Health takes npm as copy, not as signal, by maintainer decision.** Scoring a second source would
+  have made the number move for reasons the remediation cannot fix. The row therefore tells the truth
+  about both sources while the score keeps meaning exactly what its control can act on. With the npm
+  preference off, the row and the score are unchanged.

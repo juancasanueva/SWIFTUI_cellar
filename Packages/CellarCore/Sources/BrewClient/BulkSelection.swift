@@ -77,6 +77,12 @@ public struct BulkSelection: Sendable {
         let live = selection.filter { present[$0] != nil }
 
         uninstallable = live
+        // Both sources, in selection order: `commands(for:over:)` builds each
+        // identity its own source's upgrade — `brew upgrade` for a formula or
+        // cask, `npm install -g <name>@latest` for a global — so a mixed
+        // selection fans out per package rather than dropping the npm members
+        // (package-mutation PM12, maintainer ruling 2026-08-30). Pinned and
+        // snoozed rules apply to both; npm simply never reports a pin.
         upgradable = live.filter { id in
             guard let installed = present[id]?.installed, installed.isOutdated else { return false }
             guard !installed.isPinned else { return false }

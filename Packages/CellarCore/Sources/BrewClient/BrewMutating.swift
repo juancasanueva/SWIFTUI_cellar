@@ -48,6 +48,14 @@ public struct InvalidationScope: OptionSet, Sendable, Hashable {
     public static let taps = InvalidationScope(rawValue: 1 << 2)
     /// Which Homebrew roots must be remeasured.
     public static let diskUsage = InvalidationScope(rawValue: 1 << 3)
+    /// What `npm ls -g --json --depth=0` and `npm outdated -g --json` answer for.
+    ///
+    /// Its own bit rather than a reuse of `installedInventory`: a `brew info`
+    /// re-snapshot cannot observe an npm change and an `npm ls -g` cannot
+    /// observe a brew one, so sharing the bit would pay for two probes on every
+    /// mutation of either source and still leave PM6's "exactly one refresh per
+    /// declared domain" claiming something untrue (design D11).
+    public static let npmInventory = InvalidationScope(rawValue: 1 << 4)
 }
 
 /// Everything the mutation spine needs from a command, whichever capability owns
@@ -72,6 +80,19 @@ public protocol BrewMutating: Sendable {
     /// The package this command acts on — `nil` for every non-package family,
     /// and for the grouped `upgradeAll`.
     var packageID: PackageID? { get }
+    /// Which package manager runs this command.
+    ///
+    /// A **declared projection** rather than something recovered from
+    /// `packageID`, and the difference is not stylistic: `upgradeAll`, `update`,
+    /// the service verbs, the tap verbs and the cleanup verbs all name no
+    /// package at all, so a derivation would have nothing to derive from and
+    /// would have to guess Homebrew — which is right today only by accident
+    /// (design D12).
+    ///
+    /// The extension default below is what keeps it from being a burden: every
+    /// shipped family is Homebrew's and says nothing, and only npm declares
+    /// otherwise.
+    var source: PackageSource { get }
     /// Whether this command destroys something and must be agreed first.
     var requiresConfirmation: Bool { get }
     /// The state domains one terminal outcome of this command invalidates.
@@ -121,6 +142,9 @@ public protocol BrewMutating: Sendable {
 }
 
 extension BrewMutating {
+    /// Every shipped family is Homebrew's, so the default is the fact rather
+    /// than a placeholder.
+    public var source: PackageSource { .homebrew }
     public var diskAreas: Set<DiskArea> { [] }
     public var environmentOverrides: Set<BrewEnvironment.CommandOverride> { [] }
     public var declaredDisclosure: ConfirmationDisclosure? { nil }
@@ -132,8 +156,12 @@ extension BrewMutating {
     /// Display only. Nothing parses this back into argv, which is what makes
     /// the confirmation sheet and the copy affordance incapable of changing
     /// what runs.
+    /// The prefix comes from the `source` projection and from **nothing else**:
+    /// no downcast, no type test, no inspection of the verb string. That is what
+    /// makes an erased npm command incapable of rendering as a brew one
+    /// (`operation-activity`, `package-mutation`).
     public var displayCommand: String {
-        "brew " + arguments.joined(separator: " ")
+        source.commandName + " " + arguments.joined(separator: " ")
     }
 
     /// The runnable form, always serialized as a mutation — so a new family
@@ -199,6 +227,16 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
     /// Erasure must discard neither, because an erased batch is exactly where
     /// the batch rule has to work (design DD-3).
     public let declaredDisclosure: ConfirmationDisclosure?
+    /// The tenth projection, and the one a downcast could never recover.
+    ///
+    /// Every surface downstream of erasure — the activity list, the copy
+    /// affordance, the confirmation sheet, the terminal funnel — reads this
+    /// value rather than the concrete command, so an npm command that lost its
+    /// source here would render, copy and record as a brew one. Carrying it
+    /// widens equality on purpose: two commands with the same argv under
+    /// different executables are not the same thing to run, and they hash apart
+    /// (`package-mutation`, design D12).
+    public let source: PackageSource
 
     public init(_ command: some BrewMutating) {
         arguments = command.arguments
@@ -210,6 +248,7 @@ public struct AnyBrewMutation: BrewMutating, Sendable, Equatable, Hashable {
         environmentOverrides = command.environmentOverrides
         disclosure = command.disclosure
         declaredDisclosure = command.declaredDisclosure
+        source = command.source
     }
 }
 
@@ -314,6 +353,7 @@ public final class MutationGates {
         case .installedInventory: .installedInventory
         case .services: .services
         case .diskUsage: .diskUsage
+        case .npmInventory: .npmInventory
         default: nil
         }
     }

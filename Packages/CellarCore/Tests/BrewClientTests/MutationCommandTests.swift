@@ -589,8 +589,12 @@ struct MutationCommandTests {
             .filter { $0.value.contains("var invalidates: InvalidationScope") }
             .keys
             .sorted()
+        // `NpmCommand.swift` joined this census deliberately: npm enters through
+        // the shared abstraction exactly as services and taps did, which is what
+        // keeps PM1's "exactly six" package commands literally true while a
+        // second source exists (`package-mutation`, design D14).
         #expect(declaring == [
-            "CleanupCommand.swift", "ServiceCommand.swift", "TapCommand.swift"
+            "CleanupCommand.swift", "NpmCommand.swift", "ServiceCommand.swift", "TapCommand.swift"
         ], "the spine's command families changed: \(declaring)")
         // `MutationCommand`'s own declaration lives in `BrewMutating.swift`,
         // which is why it is not in the list above and is asserted here instead.

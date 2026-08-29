@@ -77,6 +77,10 @@ public final class SwiftDataHistoryRecorder: HistoryRecording {
         case .failed(let status): ("failed", Int(status))
         case .busy: ("busy", nil)
         case .needsPrivileges: ("needsPrivileges", nil)
+        // The command ran and could not reach the registry. No status is
+        // recorded because the one npm reports for it says nothing a reader
+        // could act on, and the outcome already names the cause.
+        case .networkUnavailable: ("networkUnavailable", nil)
         case .cancelled: ("cancelled", nil)
         case .abandoned: ("abandoned", nil)
         case .launchFailed: ("launchFailed", nil)

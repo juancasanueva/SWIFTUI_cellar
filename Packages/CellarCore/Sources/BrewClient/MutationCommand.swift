@@ -39,10 +39,17 @@ public struct PackageTarget: Sendable, Hashable {
     public var name: String { id.name }
 
     /// Fails when the name could be read by brew as an option rather than as a
-    /// package. The single gate: `FormulaID` and `CaskID` are expressed over it,
-    /// so `isSafe` has exactly one definition.
+    /// package, or when the identity belongs to another source. The single gate:
+    /// `FormulaID` and `CaskID` are expressed over it, so `isSafe` has exactly
+    /// one definition.
+    ///
+    /// The source guard is what keeps brew argv from ever naming an npm package.
+    /// Refusing here makes the whole affordance unavailable — no bulk entry, no
+    /// submitted upgrade, no command to cancel — rather than producing a
+    /// well-formed `brew upgrade --formula typescript` for a package brew does
+    /// not have (design D3).
     public init?(_ id: PackageID) {
-        guard MutationName.isSafe(id.name) else { return nil }
+        guard id.kind.source == .homebrew, MutationName.isSafe(id.name) else { return nil }
         self.id = id
     }
 
@@ -330,6 +337,13 @@ public enum MutationCommand: Sendable, Equatable {
         let flag: Flag = switch id.kind {
         case .formula: .formula
         case .cask: .cask
+        // Unreachable by construction: every path here goes through a
+        // `PackageTarget`, and its init refuses any identity whose source is not
+        // Homebrew. Trapping rather than inventing a flag is the point — brew
+        // has no argv that names an npm package, so there is no third answer
+        // that would be correct, and a `default:` returning `[id.name]` would
+        // quietly ship the wrong one (design D3).
+        case .npm: preconditionFailure("brew argv cannot name an npm package")
         }
         return [flag.rawValue, id.name]
     }

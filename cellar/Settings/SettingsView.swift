@@ -16,6 +16,7 @@ import SwiftUI
 /// present-but-inert.
 struct SettingsView: View {
     let brewDetection: BrewDetectionStore
+    let npmDetection: NpmDetectionStore
     @Environment(ThemeStore.self) private var theme
 
     var body: some View {
@@ -75,6 +76,11 @@ struct SettingsView: View {
 
                 // Its own file and its own card, so the whole update surface
                 // rolls back by deleting one file and this one line.
+                // Its own file and its own card, on the same terms: the whole
+                // npm opt-in surface rolls back by deleting one file and this
+                // one line.
+                NpmSettingsGroup(detection: npmDetection)
+
                 UpdatesSettingsGroup()
 
                 MenuBarSettingsGroup()

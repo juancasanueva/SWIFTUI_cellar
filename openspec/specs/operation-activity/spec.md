@@ -260,6 +260,35 @@ singular, which no longer matches the per-domain invalidation scope `package-mut
 - THEN exactly one entry was submitted for it, carrying its verb, its exact argv and its outcome
 - AND that entry carries no package identity, and none was synthesized from its arguments
 
+### Requirement: Activity items carry their source, and their command prefix derives from it
+
+Every enumerated item MUST carry the source of its command. The display command and the copy-command
+text MUST be the source's executable name (`brew` or `npm`) followed by the exact argv, in every state,
+identical between pending and terminal. The idle summary copy MUST NOT name packages of one source only.
+Cancel, log streaming and terminal enumeration MUST be offered on identical terms for both sources.
+
+#### Scenario: An npm item copies and displays as an npm command
+
+- GIVEN a submitted npm upgrade of `typescript`
+- WHEN its display command and copy text are read while pending and once terminal
+- THEN both are exactly `npm install -g typescript@latest` in both states
+- AND the item's source reports npm
+- Verification: `unit`
+
+#### Scenario: A brew item is unchanged
+
+- GIVEN a submitted install for the cask `iterm2`
+- WHEN its copy text is read
+- THEN it is exactly `brew install --cask iterm2`
+- Verification: `unit`
+
+#### Scenario: An erased npm item never renders as brew
+
+- GIVEN an npm uninstall erased to the spine's erased type before submission
+- WHEN its item is enumerated
+- THEN the display command begins with `npm ` and not with `brew `
+- Verification: `unit`
+
 ## Provenance
 
 - Established by change `m2-mutations-activity` (archived `2026-08-02`, PRD milestone **M2**, slice
@@ -363,3 +392,17 @@ singular, which no longer matches the per-domain invalidation scope `package-mut
     returns the running item's `displayCommand` for any family, so a live service operation does show
     its own argv; the package-specific wording appears only when nothing is running. Stale copy, not
     a false statement, and deliberately deferred to a vocabulary review when a third family lands.
+- **Amended by change `npm-package-source`** (archived `2026-08-30` —
+  `openspec/changes/archive/2026-08-30-npm-package-source/`), which closed PRD **M13 — npm package
+  source** (`PRD.md` §7 :219-220). **ADDED-only delta — 1 requirement / 3 scenarios**, 0 modified, 0
+  removed, 0 renamed, so `rules.archive`'s destructive-delta warning did not fire. The requirement body
+  is promoted **byte-identical** from
+  `openspec/changes/archive/2026-08-30-npm-package-source/specs/operation-activity/spec.md:12-39`
+  (verified by an empty `diff` at archive); this file gained only that block and this bullet.
+- **The added requirement is OA7 in file order.** Activity items carry their source, and the display and
+  copy string derive their prefix — `brew` or `npm` — from it rather than from a hard-coded literal.
+  Pending and terminal presentation is otherwise identical across sources, an **erased** npm item never
+  renders as brew, and the idle copy stopped being brew-only.
+- **The erasure scenario is the one that matters.** `AnyBrewMutation` copies the source, so a command
+  that has lost its concrete type cannot silently reacquire a `brew` prefix on the way to the activity
+  log or the clipboard.

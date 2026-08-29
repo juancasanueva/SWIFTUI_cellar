@@ -92,7 +92,12 @@ nonisolated enum HealthCopy {
 
     static func inputName(_ input: HealthInput) -> String {
         switch input {
-        case .outdated: "Outdated packages"
+        // Named for what the *score* counts, which is Homebrew and only
+        // Homebrew. The row above it announces the merged number; this line is
+        // the one that explains the points, so it has to say which packages
+        // earned them (`system-health`: the score counts Homebrew only, and its
+        // breakdown entry must say so).
+        case .outdated: "Outdated Homebrew packages"
         case .vulnerable: "Known vulnerabilities"
         case .advisoryCoverage: "Advisory coverage"
         case .lastUpdate: "Homebrew itself"
@@ -174,8 +179,22 @@ nonisolated enum HealthCopy {
 
     // MARK: - The measured summaries
 
-    static func outdatedSummary(outdated: Int, installed: Int) -> String {
-        "\(outdated) of \(installed) packages are behind"
+    /// The outdated row's measurement.
+    ///
+    /// The two npm clauses are **absent** rather than empty on a brew-only Mac
+    /// and on every Mac with the source off, so the shipped sentence survives
+    /// byte for byte. Neither is worded here: both come from `BrewClient`, next
+    /// to the state they describe, so this row and the menu-bar popover cannot
+    /// word one fact two ways.
+    static func outdatedSummary(
+        outdated: Int,
+        installed: Int,
+        npmNotChecked: String? = nil,
+        npmScope: String? = nil
+    ) -> String {
+        ["\(outdated) of \(installed) packages are behind", npmNotChecked, npmScope]
+            .compactMap(\.self)
+            .joined(separator: " · ")
     }
 
     static func vulnerableSummary(vulnerable: Int, answered: Int, unanswered: Int) -> String {

@@ -144,27 +144,39 @@ struct OperationCenterCancelTests {
         #expect(pendingBehind.outcome == .succeeded)
     }
 
-    /// A cancel that arrives while the start is still in flight is **not**
-    /// settled by `cancel(_:)` — it is handed to `run(_:for:on:)`, which guards
-    /// at entry and again after start. Here the entry guard wins, so the cancel
-    /// costs nothing at all: no process is ever spawned.
-    @Test("A cancel racing the submission is replayed rather than lost, and spawns nothing")
-    func aCancelRacingTheSubmissionIsReplayed() async throws {
+    /// A cancel that arrives before the item has reached a runner settles it
+    /// **immediately**, and nothing is ever spawned.
+    ///
+    /// This is the cross-source chain's doing (design D13). Every submission now
+    /// waits its turn at the centre before it is handed to a runner, so between
+    /// `submit` returning and that hand-off the item holds nothing at all: no
+    /// process, no operation id, no entry in any runner's queue. Settling it
+    /// there is honest rather than optimistic, and it is what makes cancelling a
+    /// queued mutation free instead of a promise redeemed whenever its
+    /// predecessor happens to finish.
+    ///
+    /// The replay guard inside `run(_:for:on:)` is unchanged and still the
+    /// answer for the narrower window after the hand-off; what changed is that
+    /// this window is no longer the one a person's cancel usually lands in.
+    @Test("A cancel racing the submission settles at once and spawns nothing")
+    func aCancelRacingTheSubmissionSettlesAtOnce() async throws {
         let harness = CenterHarness(honoursInterrupt: false)
         let item = harness.center.submit(.install(try Self.wget()))
 
-        // No settle: the start task has not run yet, so there is no handle and
+        // No settle: the chain gate has not run yet, so there is no handle and
         // nothing has been launched.
         #expect(item.operation == nil)
-        #expect(item.isStartInFlight)
+        #expect(item.isChainQueued)
+        #expect(item.isStartInFlight == false)
         #expect(harness.launcher.launchCount == 0)
 
         harness.center.cancel(item)
-        #expect(item.isTerminal == false, "cancel settled an item whose start was in flight")
 
-        await harness.poll { item.isTerminal }
-
+        #expect(item.isTerminal, "a cancel before the hand-off left the item live")
         #expect(item.outcome == .cancelled, "the cancel was lost")
+
+        await harness.settle()
+
         #expect(harness.launcher.launchCount == 0, "a cancelled submission was still spawned")
         #expect(item.isStartInFlight == false)
     }

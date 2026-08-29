@@ -99,6 +99,10 @@ private struct AnalyticsItem: Decodable {
         switch kind {
         case .formula: formula
         case .cask: cask
+        // Homebrew's analytics endpoints publish two item keys and neither is
+        // npm's. An npm identity has no measurement here, and absent is not
+        // zero: the caller reads `nil` and says nothing about install counts.
+        case .npm: nil
         }
     }
 

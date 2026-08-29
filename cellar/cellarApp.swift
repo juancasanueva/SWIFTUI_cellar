@@ -34,6 +34,11 @@ struct cellarApp: App {
 
     /// What this machine has installed.
     @State private var installed: InstalledStore
+    /// npm's detection state. Off by default, so nothing here spawns anything
+    /// until the Settings switch is on.
+    @State private var npmDetection: NpmDetectionStore
+    /// npm's globals and their freshness, contributed into `installed`.
+    @State private var npm: NpmStore
     /// The seam driven while a Cellar-initiated mutation that invalidates the
     /// **installed set** runs.
     @State private var mutations: InstalledMutationGate
@@ -53,6 +58,15 @@ struct cellarApp: App {
     @State private var tapsRefresher: TapRefreshCoordinator
     @State private var diskUsage: DiskUsageStore
     @State private var diskMutations: InstalledMutationGate
+    /// The fifth invalidation domain. Registered unconditionally and simply
+    /// never opened while npm is off: only an `NpmCommand` declares
+    /// `.npmInventory`, and none can be built without a detected npm
+    /// (design D11).
+    @State private var npmMutations: InstalledMutationGate
+    /// Owns npm's two cadences. The local listing rides the ordinary baseline;
+    /// the registry check runs on detection, on npm terminals, on an explicit
+    /// refresh and on a one-hour floor — **never** on activation (design D10).
+    @State private var npmRefresher: NpmRefreshCoordinator
     @State private var diskRefresher: DiskUsageRefreshCoordinator
     @State private var cleanup: CleanupStore
     private let cleanupPreviewSource: any CleanupPreviewSourcing
@@ -227,6 +241,7 @@ struct cellarApp: App {
         let serviceMutations = InstalledMutationGate()
         let tapMutations = InstalledMutationGate()
         let diskMutations = InstalledMutationGate()
+        let npmMutations = InstalledMutationGate()
         let refreshRegistry = MutationRefreshRegistry()
         let services = ServicesStore()
         // Under the Health fixture this points at an empty temporary file rather
@@ -271,10 +286,27 @@ struct cellarApp: App {
         }))
         _brewDetection = State(initialValue: BrewDetectionStore(locator: locator))
         _installed = State(initialValue: installed)
+        // Constructed unconditionally and *inert* until the preference is on:
+        // the store publishes `.disabled` and probes nothing, so a build with
+        // the switch off behaves exactly as a build without this capability.
+        _npmDetection = State(initialValue: NpmDetectionStore())
+        let npm = NpmStore(installed: installed)
+        _npm = State(initialValue: npm)
+        // Inert for the same reason: with no detected npm it has no environment
+        // to read, so its cadence never starts and its terminals stream never
+        // yields — the fifth gate is only ever opened by an `NpmCommand`.
+        _npmRefresher = State(
+            initialValue: NpmRefreshCoordinator(
+                store: npm,
+                mutations: npmMutations,
+                refreshRegistry: refreshRegistry
+            )
+        )
         _mutations = State(initialValue: mutations)
         _serviceMutations = State(initialValue: serviceMutations)
         _tapMutations = State(initialValue: tapMutations)
         _diskMutations = State(initialValue: diskMutations)
+        _npmMutations = State(initialValue: npmMutations)
         _diskUsage = State(initialValue: diskUsage)
         _cleanup = State(initialValue: CleanupStore(source: cleanupPreviewSource))
         self.cleanupPreviewSource = cleanupPreviewSource
@@ -467,6 +499,7 @@ struct cellarApp: App {
                     (.services, serviceMutations),
                     (.taps, tapMutations)
                     ,(.diskUsage, diskMutations)
+                    ,(.npmInventory, npmMutations)
                 ]),
                 history: SwiftDataHistoryRecorder(store: stores.history),
                 refreshRegistry: refreshRegistry,
@@ -501,6 +534,8 @@ struct cellarApp: App {
         WindowGroup(id: "main") {
             ContentView(
                 brewDetection: brewDetection,
+                npmDetection: npmDetection,
+                npm: npm,
                 catalog: catalog,
                 installed: installed,
                 operations: operations,
@@ -581,6 +616,18 @@ struct cellarApp: App {
                         }
                     }
                 }
+                // The npm terminals consumer, on the same terms as the four
+                // above. It costs nothing while the source is off: no npm
+                // command can be built without a detected npm, so the fifth gate
+                // never settles and this loop never wakes.
+                .task { loops.start("npm") { await npmRefresher.run() } }
+                // Detection is the only thing that starts or stops npm's
+                // cadence. `initial: true` covers a launch with the source
+                // already on; the change covers the switch being flipped while
+                // the app runs, which is the "without a relaunch" requirement.
+                .onChange(of: npmDetection.state, initial: true) { _, state in
+                    Task { await npmRefresher.apply(state) }
+                }
         }
         // The design's window: traffic lights floating over the sidebar, no
         // separate title bar, 1440×900 by default.
@@ -650,9 +697,12 @@ struct cellarApp: App {
     private var menuBarProjection: MenuBarProjection {
         let browse = InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
         return MenuBarProjection(
-            browse: browse,
+            browse: browse.withNpmSource(NpmSourceAvailability(npmDetection.state)),
             metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil,
-            services: services.services
+            services: services.services,
+            // A value, never the store: the projection stays pure over its four
+            // inputs and can neither start a check nor learn one is running.
+            npmFreshness: npm.inventory.outdated
         )
     }
 
@@ -679,16 +729,42 @@ struct cellarApp: App {
             .locations(for: installed.inventory.packages)
     }
 
+    /// Pushes the stored preference into detection and re-evaluates it.
+    ///
+    /// The preference lives in `UserDefaults` and has to be honoured at launch,
+    /// not only while the Settings pane happens to be open — "the choice MUST
+    /// survive relaunch" (`npm-source`). With the source off this sets
+    /// `isEnabled` to the `false` it already holds, publishes `.disabled`, and
+    /// spawns nothing: the store gates the probe at its source.
+    ///
+    /// It attaches the environment to the operation centre per source, so a Mac
+    /// with no Homebrew still runs npm mutations and a Mac with npm off still
+    /// runs brew's (PM7 as modified). It starts no cadence: only detection does
+    /// that, through the scene's `onChange`.
+    @MainActor
+    private func refreshNpm() async {
+        let preference = NpmSourcePreference()
+        npmDetection.isEnabled = preference.isEnabled
+        npmDetection.configuredPath = preference.configuredPath
+        await npmDetection.refresh()
+        operations.attach(npm: npmDetection.state.environment)
+    }
+
     @MainActor
     private func refreshEverything() async {
         await brewDetection.refresh()
         operations.attach(installation: brewDetection.state.installation)
+        await refreshNpm()
         await refresher.refresh(for: brewDetection.state)
         await tapsRefresher.refresh(for: brewDetection.state)
         // Services becomes available the moment brew does, and the poll starts
         // itself if the surface is already showing — which is the ordinary
         // launch order, since detection resolves after the first render.
         await servicesRefresher.refresh(for: brewDetection.state)
+        // The npm listing rides the same baseline brew's inventory does; the
+        // registry check deliberately does not (`npm-source`: activation does
+        // not trigger the npm check).
+        await npmRefresher.activate()
         readHomebrewAge()
         startDiskMeasurement()
     }

@@ -1,0 +1,3 @@
+npm error code ELSPROBLEMS
+npm error missing: left-pad@^1.3.0, required by example-cli@2.0.0
+npm error A complete log of this run can be found in: /Users/example/.npm/_logs/2026-08-29T17_46_00_000Z-debug-0.log

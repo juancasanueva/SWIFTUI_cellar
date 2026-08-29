@@ -1,10 +1,36 @@
 import Foundation
 import Synchronization
 
-/// Which Homebrew namespace a package belongs to.
+/// Which tool installed a package, and therefore which tool can change it.
+///
+/// Derived from `PackageKind` rather than stored beside it: one identity keeps
+/// favourites, snooze, history and every count keyed on the pair they already
+/// use, and no persisted row gains a column (design D1).
+public enum PackageSource: String, Codable, Sendable, Hashable, CaseIterable {
+    case homebrew
+    case npm
+}
+
+/// Which namespace a package belongs to.
+///
+/// `formula` and `cask` are Homebrew's two. `npm` is not a Homebrew namespace at
+/// all — it joins this enum so that one `PackageID` spans both sources, which is
+/// what lets the merged inventory, the outdated set and every persisted row stay
+/// single-typed. The consequence is recorded and accepted: `Catalog` now carries
+/// a kind the catalog itself never publishes, and every switch over this enum
+/// has to say so explicitly.
 public enum PackageKind: String, Codable, Sendable, Hashable, CaseIterable {
     case formula
     case cask
+    case npm
+
+    /// The tool that installed a package of this kind.
+    public var source: PackageSource {
+        switch self {
+        case .formula, .cask: .homebrew
+        case .npm: .npm
+        }
+    }
 }
 
 /// A package's identity.

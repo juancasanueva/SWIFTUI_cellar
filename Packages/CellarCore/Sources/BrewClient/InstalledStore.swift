@@ -59,14 +59,49 @@ public enum InstalledLoadState: Sendable, Equatable {
 @MainActor
 @Observable
 public final class InstalledStore {
-    /// The most recent snapshot. Survives a failed refresh.
+    /// The most recent snapshot, merged across every contributing source.
+    ///
+    /// Recomposed rather than assigned: `brewInventory` and `contributions` are
+    /// each replaced only by their own source, and this is what they add up to.
     public private(set) var inventory: InstalledInventory = .empty
     public private(set) var state: InstalledLoadState = .idle
+
+    /// The Homebrew half, kept apart from the merged view.
+    ///
+    /// `state`, `absence` and every refresh rule below describe **Homebrew**, and
+    /// they stay exactly as accurate as they were: a brew failure or absence is
+    /// still a fact about brew alone. Splitting the storage is what lets that
+    /// remain true while `inventory` answers for both.
+    @ObservationIgnored private var brewInventory: InstalledInventory = .empty
+
+    /// Rows contributed by every source other than Homebrew.
+    ///
+    /// Keyed by source, so each one's rows are replaced only by that source's own
+    /// next successful acquisition (installed-inventory: one source's failure
+    /// does not evict the other). A brew acquisition that failed must not empty
+    /// the npm rows, and a `clear` for a missing Homebrew must not either — the
+    /// npm packages are still installed, and saying otherwise would report a mass
+    /// uninstall that did not happen.
+    @ObservationIgnored private var contributions: [PackageSource: [InstalledPackage]] = [:]
 
     /// Why the inventory is empty, when that is the reason it is.
     public var absence: InstalledAbsence? {
         guard case .brewAbsent(let absence) = state else { return nil }
         return absence
+    }
+
+    /// Whether the merged inventory means anything yet.
+    ///
+    /// Used to be "Homebrew is not absent", read directly at the call site. With
+    /// a second source that is wrong in a way nothing would catch: an npm-only
+    /// machine has a real inventory, and reporting it unavailable collapses
+    /// every installed-state filter to `all` over rows that are genuinely there.
+    ///
+    /// It lives here rather than as an expression in the view so it is one rule
+    /// with one test, and so the next source does not have to find every place
+    /// the old expression was written out.
+    public var hasAnyInventory: Bool {
+        absence == nil || contributions.values.contains { $0.isEmpty == false }
     }
 
     @ObservationIgnored private let source: any InstalledPayloadSourcing
@@ -203,7 +238,8 @@ public final class InstalledStore {
         case .success(let snapshot):
             // One main-actor assignment: there is no window in which the store
             // is between inventories.
-            inventory = snapshot
+            brewInventory = snapshot
+            recompose()
             state = .loaded
         case .failure(let error):
             // The last good inventory stays resident — the catalog's discipline.
@@ -226,12 +262,72 @@ public final class InstalledStore {
 
         nextToken += 1
         installedSequence = nextToken
-        inventory = .empty
+        // Homebrew's rows go; every other source's stay. There is no Homebrew to
+        // ask, which says nothing at all about what npm has installed.
+        brewInventory = .empty
+        recompose()
         state = .brewAbsent(absence)
     }
 
     private func vacate(_ token: Int) {
         guard inFlight?.token == token else { return }
         inFlight = nil
+    }
+
+    // MARK: - Other sources
+
+    /// Installs one source's rows, replacing whatever it contributed before.
+    ///
+    /// Deliberately synchronous and unguarded by the ordinal: the brew ordinal
+    /// exists because two `brew info` acquisitions can overlap and land out of
+    /// order, and a caller here is handing over an already-decoded result rather
+    /// than starting a race. The npm store owns its own ordering, on its own
+    /// cadence, and giving the two sources one shared sequence would let a slow
+    /// brew snapshot discard a fresh npm adoption for no reason.
+    ///
+    /// An empty array is a legitimate result — a machine with no globals — and
+    /// means exactly that. It is not the same act as `clearContributions(from:)`,
+    /// which says the source is gone.
+    public func adopt(_ packages: [InstalledPackage], from source: PackageSource) {
+        precondition(
+            source != .homebrew,
+            "Homebrew's rows come from its own acquisition, not from a contribution"
+        )
+        contributions[source] = packages
+        recompose()
+    }
+
+    /// Removes a source's rows entirely, because the source is off or gone.
+    public func clearContributions(from source: PackageSource) {
+        guard contributions.removeValue(forKey: source) != nil else { return }
+        recompose()
+    }
+
+    /// The one merged inventory, rebuilt from its parts.
+    ///
+    /// `InstalledInventory.init` sorts and builds both membership sets, so
+    /// ordering and `outdatedIDs` are decided in exactly one place for both
+    /// sources — which is why the six existing readers of `outdatedIDs` need no
+    /// change at all.
+    ///
+    /// The skipped-record count stays Homebrew's: it counts records *brew's
+    /// payload* carried and this build could not read, and folding another
+    /// source into it would make a number that names one payload describe two.
+    private func recompose() {
+        guard contributions.isEmpty == false else {
+            inventory = brewInventory
+            return
+        }
+
+        // Sorted by source so the input order is stable; the inventory sorts the
+        // rows itself, but a stable input keeps two equal rows from swapping.
+        let contributed = contributions
+            .sorted { $0.key.rawValue < $1.key.rawValue }
+            .flatMap(\.value)
+
+        inventory = InstalledInventory(
+            packages: brewInventory.packages + contributed,
+            skippedRecordCount: brewInventory.skippedRecordCount
+        )
     }
 }

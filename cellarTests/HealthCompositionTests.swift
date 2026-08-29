@@ -593,3 +593,179 @@ nonisolated enum HealthSources {
         return found
     }
 }
+
+/// What the outdated row says once npm can contribute, and what the score is
+/// still allowed to count.
+///
+/// The binding decision for this capability is **copy only**: Health gains a
+/// sentence and loses nothing. The score's outdated input stays Homebrew's,
+/// because an npm nobody could reach would otherwise flatter the number — three
+/// unchecked npm packages would silently read as three packages that are fine —
+/// and an npm that *was* reached would move a number the user cannot act on from
+/// this section, since the row's remediation is `brew upgrade` and always has
+/// been (`system-health`: the outdated row names both sources in its copy, and
+/// the score counts Homebrew only).
+@Suite("Health and the npm source")
+struct HealthNpmCompositionTests {
+    private static let checkedAt = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private static func browse(
+        _ packages: [InstalledPackage],
+        npmSource: NpmSourceAvailability = .available
+    ) -> InstalledBrowse {
+        InstalledBrowse(
+            inventory: InstalledInventory(packages: packages),
+            isAvailable: true,
+            npmSource: npmSource
+        )
+    }
+
+    private static func npm(_ name: String, outdated: Bool) -> InstalledPackage {
+        HealthFixtures.package(
+            name,
+            kind: .npm,
+            installed: outdated ? "5.6.0" : "5.7.0",
+            offering: "5.7.0",
+            outdated: outdated,
+            tap: ""
+        )
+    }
+
+    private static let brewInventory = [
+        HealthFixtures.package("git", offering: "2.48.0", outdated: true),
+        HealthFixtures.package("wget"),
+        HealthFixtures.package("jq"),
+        HealthFixtures.package("fd"),
+    ]
+
+    // MARK: - The row's copy
+
+    @Test("The row announces the merged count and says npm was not checked, naming the network")
+    func theRowSaysNpmWasNotChecked() throws {
+        let reading = HealthComposition.outdated(
+            browse: Self.browse(Self.brewInventory + [Self.npm("typescript", outdated: false)]),
+            metadata: nil,
+            npmFreshness: .failed(.networkUnavailable)
+        )
+
+        let summary = try #require(reading.measurement).summary
+        #expect(summary.contains("1"), "the merged outdated count is missing from \(summary)")
+        #expect(summary.contains("npm not checked"))
+        #expect(summary.contains("network"))
+        #expect(
+            summary.localizedCaseInsensitiveContains("up to date") == false,
+            "an unchecked npm was described as up to date"
+        )
+    }
+
+    /// Triangulation: a completed check leaves the row saying only what it
+    /// always said, so the disclosure above is caused by the state rather than
+    /// stapled to every row.
+    @Test("A completed npm check adds no not-checked disclosure")
+    func aCompletedCheckAddsNoDisclosure() throws {
+        let reading = HealthComposition.outdated(
+            browse: Self.browse(Self.brewInventory + [Self.npm("typescript", outdated: false)]),
+            metadata: nil,
+            npmFreshness: .fresh([:], at: Self.checkedAt)
+        )
+
+        let summary = try #require(reading.measurement).summary
+        #expect(summary.contains("npm not checked") == false)
+    }
+
+    // MARK: - The score
+
+    @Test("Three fresh outdated npm packages change the score in neither direction")
+    func theScoreIgnoresNpmInBothDirections() {
+        let brewOnly = HealthComposition.outdated(
+            browse: Self.browse(Self.brewInventory), metadata: nil, npmFreshness: .fresh([:], at: Self.checkedAt)
+        )
+        let withNpm = HealthComposition.outdated(
+            browse: Self.browse(Self.brewInventory + [
+                Self.npm("typescript", outdated: true),
+                Self.npm("corepack", outdated: true),
+                Self.npm("pnpm", outdated: true),
+            ]),
+            metadata: nil,
+            npmFreshness: .fresh(
+                [
+                    "typescript": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0"),
+                    "corepack": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0"),
+                    "pnpm": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0"),
+                ],
+                at: Self.checkedAt
+            )
+        )
+
+        #expect(brewOnly.signal == withNpm.signal, "npm moved the score")
+        // And the breakdown entry says which packages the number is about, so a
+        // user reading 1-of-4 against a seven-package list is not left guessing.
+        #expect(HealthCopy.inputName(.outdated).contains("Homebrew"))
+    }
+
+    /// The row still announces the merged number even though the score does not
+    /// count it — the two are deliberately different questions, which is why the
+    /// breakdown entry has to name Homebrew.
+    @Test("The row's count is merged even though the score's is not")
+    func theRowCountsBothWhileTheScoreCountsOne() throws {
+        let reading = HealthComposition.outdated(
+            browse: Self.browse(Self.brewInventory + [Self.npm("typescript", outdated: true)]),
+            metadata: nil,
+            npmFreshness: .fresh(
+                ["typescript": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0")],
+                at: Self.checkedAt
+            )
+        )
+
+        let summary = try #require(reading.measurement).summary
+        #expect(summary.hasPrefix("2 "), "the row did not announce the merged count: \(summary)")
+    }
+
+    // MARK: - npm off
+
+    @Test("With the source off the row and the score are the shipped ones")
+    func npmOffLeavesTheRowAndScoreUnchanged() {
+        let shipped = HealthComposition.outdated(
+            browse: HealthFixtures.browse(Self.brewInventory), metadata: nil
+        )
+
+        for freshness in [
+            NpmOutdatedState.notChecked(.notYetChecked),
+            .failed(.networkUnavailable),
+            .fresh([:], at: Self.checkedAt),
+        ] {
+            let reading = HealthComposition.outdated(
+                browse: Self.browse(Self.brewInventory, npmSource: .disabled),
+                metadata: nil,
+                npmFreshness: freshness
+            )
+            #expect(reading == shipped)
+        }
+    }
+
+    // MARK: - Remediation
+
+    /// The row's button is `brew upgrade` and stays `brew upgrade`. What it
+    /// leaves behind is *said*, next to the number, rather than fixed by
+    /// widening a verb this capability has no business widening.
+    @Test("The remediation stays Homebrew's and its copy claims nothing about npm")
+    func remediationStaysHomebrewsAndClaimsNothingAboutNpm() throws {
+        #expect(HealthComposition.command(for: .upgradeAll) == .mutation(.upgradeAll))
+        #expect(MutationCommand.upgradeAll.displayCommand == "brew upgrade")
+
+        let title = try #require(HealthCopy.remediationTitle(.upgradeAll))
+        #expect(title.localizedCaseInsensitiveContains("npm") == false)
+
+        // And the row discloses the gap when there is one.
+        let reading = HealthComposition.outdated(
+            browse: Self.browse(Self.brewInventory + [Self.npm("typescript", outdated: true)]),
+            metadata: nil,
+            npmFreshness: .fresh(
+                ["typescript": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0")],
+                at: Self.checkedAt
+            )
+        )
+        let summary = try #require(reading.measurement).summary
+        #expect(summary.contains(InstalledUpdatesSummary.npmUpgradeScopeNote))
+    }
+}

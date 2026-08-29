@@ -1,0 +1,156 @@
+{
+  "@colbymchenry/codegraph": {
+    "current": "1.1.1",
+    "wanted": "1.6.0",
+    "latest": "1.6.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@colbymchenry/codegraph"
+  },
+  "@earendil-works/pi-coding-agent": {
+    "current": "0.82.1",
+    "wanted": "0.84.4",
+    "latest": "0.84.4",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent"
+  },
+  "@fission-ai/openspec": {
+    "current": "1.1.1",
+    "wanted": "1.11.0",
+    "latest": "1.11.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@fission-ai/openspec"
+  },
+  "@google/gemini-cli": {
+    "current": "0.49.0",
+    "wanted": "0.57.0",
+    "latest": "0.57.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@google/gemini-cli"
+  },
+  "@houtini/gemini-mcp": {
+    "current": "2.3.0",
+    "wanted": "2.6.2",
+    "latest": "2.6.2",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@houtini/gemini-mcp"
+  },
+  "@juicesharp/rpiv-ask-user-question": {
+    "current": "1.9.1",
+    "wanted": "2.8.0",
+    "latest": "2.8.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@juicesharp/rpiv-ask-user-question"
+  },
+  "@juicesharp/rpiv-todo": {
+    "current": "1.9.1",
+    "wanted": "2.8.0",
+    "latest": "2.8.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@juicesharp/rpiv-todo"
+  },
+  "@openai/codex": {
+    "current": "0.149.0",
+    "wanted": "0.151.0",
+    "latest": "0.151.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@openai/codex"
+  },
+  "@playwright/cli": {
+    "current": "0.1.8",
+    "wanted": "0.1.18",
+    "latest": "0.1.18",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@playwright/cli"
+  },
+  "@qwen-code/qwen-code": {
+    "current": "0.19.7",
+    "wanted": "0.22.3",
+    "latest": "0.22.3",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@qwen-code/qwen-code"
+  },
+  "@upstash/context7-mcp": {
+    "current": "2.1.7",
+    "wanted": "4.0.4",
+    "latest": "4.0.4",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/@upstash/context7-mcp"
+  },
+  "gentle-engram": {
+    "current": "0.1.7",
+    "wanted": "0.1.10",
+    "latest": "0.1.10",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/gentle-engram"
+  },
+  "gentle-pi": {
+    "current": "0.3.8",
+    "wanted": "2.2.0",
+    "latest": "2.2.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/gentle-pi"
+  },
+  "opencode-ai": {
+    "current": "1.18.23",
+    "wanted": "1.18.25",
+    "latest": "1.18.25",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/opencode-ai"
+  },
+  "pi-btw": {
+    "current": "0.4.0",
+    "wanted": "0.4.1",
+    "latest": "0.4.1",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/pi-btw"
+  },
+  "pi-intercom": {
+    "current": "0.6.0",
+    "wanted": "0.12.1",
+    "latest": "0.12.1",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/pi-intercom"
+  },
+  "pi-lens": {
+    "current": "3.8.44",
+    "wanted": "4.1.3",
+    "latest": "4.1.3",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/pi-lens"
+  },
+  "pi-mcp-adapter": {
+    "current": "2.6.1",
+    "wanted": "2.31.0",
+    "latest": "2.31.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/pi-mcp-adapter"
+  },
+  "pi-subagents": {
+    "current": "0.24.3",
+    "wanted": "0.59.0",
+    "latest": "0.59.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/pi-subagents"
+  },
+  "pi-web-access": {
+    "current": "0.10.7",
+    "wanted": "0.27.0",
+    "latest": "0.27.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/pi-web-access"
+  },
+  "pnpm": {
+    "current": "10.13.1",
+    "wanted": "11.24.0",
+    "latest": "11.24.0",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/pnpm"
+  },
+  "skillui": {
+    "current": "1.3.3",
+    "wanted": "1.3.4",
+    "latest": "1.3.4",
+    "dependent": "global",
+    "location": "/Users/example/.npm-global/lib/node_modules/skillui"
+  }
+}

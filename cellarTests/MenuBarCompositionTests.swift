@@ -589,3 +589,233 @@ struct MenuBarCompositionTests {
         }
     }
 }
+
+/// What the status item and its popover say once a second source can contribute.
+///
+/// Added by the npm slice, beside the composition claims above rather than in a
+/// file of its own, because the rule under test is the same one: **the number
+/// and the sentence come from one value**. The npm half only makes the stakes
+/// higher — a count is merely wrong when it disagrees, but "up to date" over an
+/// unreachable registry is a claim the user acts on by doing nothing
+/// (`menu-bar`: the status item counts both sources and says when npm was not
+/// checked; MB1 as modified).
+@Suite("Menu bar and the npm source")
+struct MenuBarNpmCompositionTests {
+    private static let checkedAt = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private static func browse(
+        _ packages: [InstalledPackage],
+        npmSource: NpmSourceAvailability = .available
+    ) -> InstalledBrowse {
+        InstalledBrowse(
+            inventory: InstalledInventory(packages: packages),
+            isAvailable: true,
+            npmSource: npmSource
+        )
+    }
+
+    private static func npm(_ name: String, outdated: Bool) -> InstalledPackage {
+        HealthFixtures.package(
+            name,
+            kind: .npm,
+            installed: outdated ? "5.6.0" : "5.7.0",
+            offering: "5.7.0",
+            outdated: outdated,
+            tap: ""
+        )
+    }
+
+    // MARK: - The count
+
+    @Test("Outdated npm packages reach the count and the entries, by delegation")
+    func npmEntriesReachTheCountAndTheEntries() {
+        let browse = Self.browse([
+            HealthFixtures.package("git", offering: "2.48.0", outdated: true),
+            HealthFixtures.package("iterm2", kind: .cask, offering: "3.6.0", outdated: true),
+            HealthFixtures.package("wget"),
+            Self.npm("typescript", outdated: true),
+        ])
+        let projection = MenuBarProjection(
+            browse: browse,
+            metadata: nil,
+            services: [],
+            npmFreshness: .fresh(
+                ["typescript": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0")],
+                at: Self.checkedAt
+            )
+        )
+
+        #expect(projection.statusItemTitle == "3")
+        #expect(projection.outdatedCount == browse.outdatedCount(metadata: nil))
+        #expect(projection.outdatedIDs == browse.outdatedIDs(metadata: nil))
+        #expect(projection.topOutdated.map(\.name) == ["git", "iterm2", "typescript"])
+        // Nothing needs disclosing: npm answered, and the count is simply right.
+        #expect(projection.npmNotCheckedCopy == nil)
+    }
+
+    // MARK: - Offline is stated, not hidden
+
+    @Test("An offline npm is stated and never rendered as up to date")
+    func offlineNpmIsStatedNotHidden() throws {
+        let projection = MenuBarProjection(
+            browse: Self.browse([HealthFixtures.package("wget"), Self.npm("typescript", outdated: false)]),
+            metadata: nil,
+            services: [],
+            npmFreshness: .failed(.networkUnavailable)
+        )
+
+        #expect(projection.statusItemTitle == nil, "an unchecked npm invented a count")
+        #expect(projection.upToDateCopy == nil, "an unreachable registry read as up to date")
+
+        let copy = try #require(projection.npmNotCheckedCopy, "the offline state was hidden")
+        #expect(copy.contains("npm not checked"))
+        #expect(copy.contains("network"))
+    }
+
+    /// Triangulation: the same shape with a completed check says the sentence
+    /// the case above refuses, so the refusal is a decision rather than a
+    /// missing branch.
+    @Test("A completed check with nothing outdated is allowed to say up to date")
+    func aCompletedCleanCheckMaySayUpToDate() {
+        let projection = MenuBarProjection(
+            browse: Self.browse([HealthFixtures.package("wget"), Self.npm("typescript", outdated: false)]),
+            metadata: nil,
+            services: [],
+            npmFreshness: .fresh([:], at: Self.checkedAt)
+        )
+
+        #expect(projection.statusItemTitle == nil)
+        #expect(projection.upToDateCopy == InstalledUpdatesSummary.upToDateLabel)
+        #expect(projection.npmNotCheckedCopy == nil)
+    }
+
+    // MARK: - The disclosure beside `Upgrade all`
+
+    /// `Upgrade all` submits bare `brew upgrade` and nothing else, so a popover
+    /// that showed an npm package in its list and offered that button would be
+    /// promising something it does not do.
+    @Test("The disclosure appears exactly when npm has something outdated")
+    func theDisclosureFollowsTheNpmCount() throws {
+        let withNpmOutdated = MenuBarProjection(
+            browse: Self.browse([
+                HealthFixtures.package("git", offering: "2.48.0", outdated: true),
+                Self.npm("typescript", outdated: true),
+            ]),
+            metadata: nil,
+            services: [],
+            npmFreshness: .fresh(
+                ["typescript": NpmOutdatedRecord(current: "5.6.0", wanted: nil, latest: "5.7.0")],
+                at: Self.checkedAt
+            )
+        )
+        let disclosure = try #require(
+            withNpmOutdated.npmUpgradeDisclosure,
+            "an npm entry was listed beside a button that will not upgrade it"
+        )
+        #expect(disclosure.contains("npm"))
+        #expect(disclosure.contains("Updates"))
+
+        // Only brew is behind, so the button does exactly what the list implies.
+        let brewOnly = MenuBarProjection(
+            browse: Self.browse([
+                HealthFixtures.package("git", offering: "2.48.0", outdated: true),
+                Self.npm("typescript", outdated: false),
+            ]),
+            metadata: nil,
+            services: [],
+            npmFreshness: .fresh([:], at: Self.checkedAt)
+        )
+        #expect(brewOnly.npmUpgradeDisclosure == nil)
+    }
+
+    /// MB4 is untouched: the verb is still bare, still uncounted, and still
+    /// fans out to nothing.
+    @Test("The upgrade verb is unchanged by this capability")
+    func theUpgradeVerbIsUnchanged() {
+        #expect(MutationCommand.upgradeAll.displayCommand == "brew upgrade")
+        #expect(MutationCommand.upgradeAll.source == .homebrew)
+    }
+
+    // MARK: - npm off
+
+    @Test("With the source off the projection is identical to the shipped one")
+    func npmOffIsIdenticalToTheShippedProjection() {
+        let packages = [
+            HealthFixtures.package("git", offering: "2.48.0", outdated: true),
+            HealthFixtures.package("wget"),
+        ]
+        let shipped = MenuBarProjection(
+            browse: Self.browse(packages, npmSource: .disabled), metadata: nil, services: []
+        )
+
+        // Every freshness, including the two that would otherwise disclose:
+        // with the source off there is no npm half to say anything about.
+        for freshness in [
+            NpmOutdatedState.notChecked(.notYetChecked),
+            .failed(.networkUnavailable),
+            .fresh([:], at: Self.checkedAt),
+        ] {
+            let projection = MenuBarProjection(
+                browse: Self.browse(packages, npmSource: .disabled),
+                metadata: nil,
+                services: [],
+                npmFreshness: freshness
+            )
+
+            #expect(projection == shipped)
+            #expect(projection.npmNotCheckedCopy == nil)
+            #expect(projection.npmUpgradeDisclosure == nil)
+            #expect(projection.statusItemTitle == "1")
+        }
+    }
+
+    // MARK: - MB1: four pure inputs, none of them effectful
+
+    @Test("The projection takes four inputs and none of them is effectful")
+    func theProjectionTakesFourPureInputs() throws {
+        let projection = try Self.coreSource("MenuBarProjection.swift")
+
+        for label in ["browse:", "metadata:", "services:", "npmFreshness:"] {
+            #expect(projection.contains(label), "the projection lost the \(label) input")
+        }
+        for effect in [
+            "ProcessLaunching", "URLSession", "Clock", "Store", "launcher", "session", "refresh",
+        ] {
+            #expect(projection.contains(effect) == false, "\(effect) became an input")
+        }
+        // Still delegated, still not re-derived.
+        #expect(projection.contains("outdatedCount(metadata:"))
+        #expect(projection.contains("outdatedIDs(metadata:"))
+        #expect(projection.contains("isOutdated") == false)
+    }
+
+    /// The popover reads the projection's sentences rather than composing its
+    /// own, which is what makes "MUST NOT present up to date" a property of one
+    /// value instead of a review note on one view.
+    @Test("The popover words nothing itself")
+    func thePopoverWordsNothingItself() throws {
+        let popover = try #require(
+            try AppSecuritySources.load().first { $0.name == "MenuBarPopoverView.swift" }
+        ).code
+
+        #expect(popover.contains("projection.upToDateCopy"))
+        #expect(popover.contains("projection.npmNotCheckedCopy"))
+        #expect(popover.contains("projection.npmUpgradeDisclosure"))
+        #expect(
+            popover.contains("\"Everything is up to date\"") == false,
+            "the popover still owns the one sentence it may not decide"
+        )
+    }
+
+    private static func coreSource(_ name: String) throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // cellarTests
+            .deletingLastPathComponent()   // repository root
+            .appendingPathComponent("Packages/CellarCore/Sources/BrewClient")
+            .appendingPathComponent(name)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        let stripped = AppSecuritySources.stripComments(from: text)
+        #expect(stripped.isEmpty == false, "\(name) was read as empty")
+        return stripped
+    }
+}

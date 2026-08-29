@@ -5,6 +5,7 @@
 
 import BrewClient
 import BrewProcess
+import Catalog
 import SwiftUI
 
 /// Why the Installed list is empty — which is never the same reason twice.
@@ -20,6 +21,45 @@ struct InstalledEmptyState: View {
     /// the first user the second sentence sends them hunting for a toggle that
     /// would show them nothing.
     var lens: InstalledLens = .all
+    /// Which source the user narrowed to, when they narrowed to one.
+    ///
+    /// "You have no npm globals" and "nothing is installed on request" are
+    /// different facts, and offering the dependency toggle to somebody looking
+    /// at an empty npm list points them at a control that would show them
+    /// nothing.
+    var source: PackageSource?
+    /// Whether the npm source is on and detected. Only meaningful when the whole
+    /// list is empty: with npm off there are no npm rows to be missing, so the
+    /// sentence is the brew-only one this list always showed.
+    var isNpmContributing = false
+
+    /// Whether the only source that could have contributed rows is npm.
+    ///
+    /// With Homebrew absent the list has no brew half to be empty, so the brew
+    /// wording would be answering a question nobody asked.
+    private var isNpmOnlyView: Bool {
+        if case .brewAbsent = state { return true }
+        return false
+    }
+
+    /// Whether an empty `all` list should be worded for npm.
+    ///
+    /// Extracted as a static function so the branch is provable without a
+    /// window: which of two sentences an empty list shows is a decision, and a
+    /// decision made inside `body` is a decision no test can reach. Rendering
+    /// still happens below; only the choice moved.
+    ///
+    /// - Parameters:
+    ///   - source: which source the user narrowed to, if any.
+    ///   - isNpmContributing: whether npm is on and reporting.
+    ///   - isBrewAbsent: whether there is a Homebrew half at all.
+    static func isNpmEmptiness(
+        source: PackageSource?,
+        isNpmContributing: Bool,
+        isBrewAbsent: Bool
+    ) -> Bool {
+        source == .npm || (source == nil && isNpmContributing && isBrewAbsent)
+    }
 
     var body: some View {
         switch state {
@@ -41,11 +81,25 @@ struct InstalledEmptyState: View {
                     description: Text("Click the star on any package to keep it here.")
                 )
             case .all:
-                ContentUnavailableView(
-                    "Nothing installed on request",
-                    systemImage: "shippingbox",
-                    description: Text("Turn on “Show dependencies” to see everything brew installed.")
-                )
+                if Self.isNpmEmptiness(
+                    source: source,
+                    isNpmContributing: isNpmContributing,
+                    isBrewAbsent: isNpmOnlyView
+                ) {
+                    ContentUnavailableView(
+                        "No npm packages installed globally",
+                        systemImage: "shippingbox",
+                        description: Text("Global npm packages appear here once you install one.")
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Nothing installed on request",
+                        systemImage: "shippingbox",
+                        description: Text(
+                            "Turn on “Show dependencies” to see everything brew installed."
+                        )
+                    )
+                }
             }
 
         case .brewAbsent(let absence):
