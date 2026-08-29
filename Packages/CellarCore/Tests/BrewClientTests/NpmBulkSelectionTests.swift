@@ -124,8 +124,8 @@ struct NpmBulkSelectionTests {
         #expect(MutationCommand.naming(Self.typescript, MutationCommand.reinstall) == nil)
     }
 
-    @Test("The eligible sets exclude npm from pin, unpin and the bulk upgrade")
-    func eligibleSetsExcludeNpm() {
+    @Test("The eligible sets exclude npm from pin and unpin, and admit it to the bulk upgrade")
+    func eligibleSetsExcludeNpmFromPinOnly() {
         let inventory = InstalledFixture.inventory(
             outdated: [Self.wget: "2.0.0", Self.typescript: "5.7.0"],
             upToDate: [Self.iterm]
@@ -139,7 +139,9 @@ struct NpmBulkSelectionTests {
         #expect(inventory.package(Self.typescript)?.isOutdated == true)
         #expect(selection.uninstallable.contains(Self.typescript))
 
-        #expect(selection.upgradable == [Self.wget])
+        // Selection order, both sources: the toolbar's "Upgrade N" counts the
+        // npm member and `commands(for:over:)` builds it an `npm install -g`.
+        #expect(selection.upgradable == [Self.wget, Self.typescript])
         #expect(selection.pinnable.contains(Self.typescript) == false)
         #expect(selection.unpinnable.contains(Self.typescript) == false)
     }

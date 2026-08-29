@@ -77,14 +77,13 @@ public struct BulkSelection: Sendable {
         let live = selection.filter { present[$0] != nil }
 
         uninstallable = live
-        // Homebrew-only, by maintainer decision: an npm global is upgraded from
-        // its own row, or from select-all under the Updates lens, rather than
-        // from the multi-selection toolbar. Removal is **not** restricted the
-        // same way — an npm identity is uninstallable in bulk like any other,
-        // and `commands(for:over:)` builds it an `npm uninstall -g` (design D14,
-        // `package-mutation`).
+        // Both sources, in selection order: `commands(for:over:)` builds each
+        // identity its own source's upgrade — `brew upgrade` for a formula or
+        // cask, `npm install -g <name>@latest` for a global — so a mixed
+        // selection fans out per package rather than dropping the npm members
+        // (package-mutation PM12, maintainer ruling 2026-08-30). Pinned and
+        // snoozed rules apply to both; npm simply never reports a pin.
         upgradable = live.filter { id in
-            guard id.kind.source == .homebrew else { return false }
             guard let installed = present[id]?.installed, installed.isOutdated else { return false }
             guard !installed.isPinned else { return false }
             return !PackageMetadata.isSnoozed(
