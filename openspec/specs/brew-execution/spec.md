@@ -227,6 +227,39 @@ Every type crossing an isolation boundary (`LogLine`, results, errors, configura
 - WHEN `swift test --package-path Packages/CellarCore` runs without Xcode or a GUI
 - THEN it builds with zero concurrency warnings and all tests pass
 
+### Requirement: The runner is generalised over an executable and an environment composer
+
+The runner MUST be constructible from an executable path, an environment composer and a process
+launcher, with the existing brew-installation initializer preserved as a convenience over that form.
+The runner MUST read the executable and compose the environment only through those injected values; it
+MUST NOT reach a brew-specific environment type directly. A runner composed for npm MUST spawn the npm
+executable under the `npm-source` environment, and a runner composed for brew MUST behave byte-identically
+to the shipped runner: same pins, same FIFO, same SIGINT→SIGTERM escalation, same retention. A brew
+runner MUST NOT be able to spawn npm and vice versa; source-keyed runners MUST be distinct instances.
+
+#### Scenario: The brew convenience initializer is unchanged in behaviour
+
+- GIVEN a runner built from a brew installation and a recording launcher
+- WHEN any command runs
+- THEN the recorded executable is the installation's and the environment is the pinned brew environment
+- AND every shipped runner test passes unchanged
+- Verification: `unit`
+
+#### Scenario: An npm runner spawns npm under the npm environment
+
+- GIVEN a runner built from `/opt/homebrew/bin/npm`, the npm composer and a recording launcher
+- WHEN `ls -g --json --depth=0` runs
+- THEN the recorded executable is `/opt/homebrew/bin/npm`
+- AND the recorded environment contains `npm_config_progress=false` and no `HOMEBREW_*` key
+- Verification: `unit`
+
+#### Scenario: The runner reaches no brew environment type directly
+
+- GIVEN the runner's source
+- WHEN it is scanned for a direct reference to the brew environment composer
+- THEN none exists outside the brew convenience initializer
+- Verification: `unit`
+
 ## Provenance
 
 - Established by change `m1-brewrunner-core` (archived `2026-08-01`), ADDED-only delta —
@@ -341,3 +374,18 @@ Every type crossing an isolation boundary (`LogLine`, results, errors, configura
   - **"Serialized mutations with concurrent reads" is unchanged and load-bearing.** Every command
     family this slice introduces is a mutation and inherits the existing FIFO gate, the read/mutation
     split, the SIGINT→SIGTERM escalation and the SIGKILL ban verbatim.
+- **Amended by change `npm-package-source`** (archived `2026-08-30` —
+  `openspec/changes/archive/2026-08-30-npm-package-source/`), which closed PRD **M13 — npm package
+  source** (`PRD.md` §7 :219-220). **ADDED-only delta — 1 requirement / 3 scenarios**, 0 modified, 0
+  removed, 0 renamed, so `rules.archive`'s destructive-delta warning did not fire. The requirement body
+  is promoted **byte-identical** from
+  `openspec/changes/archive/2026-08-30-npm-package-source/specs/brew-execution/spec.md:13-44` (verified
+  by an empty `diff` at archive); this file gained only that block and this bullet.
+- **The added requirement is BE7 in file order.** The runner is generalised over an *(executable,
+  environment composer, launcher)* triple so a second package source can reuse the whole process spine.
+  `BrewRunner.init(installation:)` survives as a **delegating convenience initializer** whose behaviour
+  is byte-identical to the shipped one, and the generalised runner source reaches no brew environment
+  type directly outside that convenience initializer.
+- **This capability did not gain an npm vocabulary.** npm's environment composition — the bin-directory
+  PATH prepend and the seven pinned `npm_config_*`/`NO_COLOR` variables — is stated by `npm-source`,
+  not here. This spec only stops assuming its executable is `brew`.

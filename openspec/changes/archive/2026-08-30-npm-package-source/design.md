@@ -143,3 +143,38 @@ No migration. Feature is dark until the Settings toggle is on and npm is detecte
 
 - [ ] Initial `ActivityItem.queuePhase` for a chain-queued item (D13): confirm it renders as "queued" without a runner snapshot; otherwise set it explicitly in `perform`.
 - [ ] Whether `npm` and `corepack` themselves should be listed (default: listed; they are global packages).
+
+## Deviations (appended at archive, 2026-08-30)
+
+Nine decisions in this document were superseded during apply. **Every one of them was driven by the
+delta spec text**, which is authoritative over the design when the two disagree; each was located and
+accepted during verification, and none is an unreviewed drift. Recorded here so a future reader of the
+archived design is not misled by a decision the shipped code does not implement.
+
+| # | Design said | Shipped instead | Driven by |
+|---|---|---|---|
+| 1 | D12/D14 bare history verbs `upgrade`/`uninstall` | namespaced `npmUpgrade` / `npmUninstall` | `installation-history` delta requires namespaced verbs |
+| 2 | D7 network stderr maps onto an existing failure | new `MutationOutcome.networkUnavailable` case | `npm-source` NS9 requires network errors to be their own classified outcome |
+| 3 | bulk expansion returns concrete commands | `commands(for:over:)` returns `[AnyBrewMutation]` | `package-mutation` PM12 fans out **per package by source**, which needs the erased form |
+| 4 | history presentation carries a source badge only | badge **plus** an `npm` prefix on the command line | `installation-history` delta requires a source-aware `displayCommand` |
+| 5 | Home copy composed inline | new `cellar/Home/HomeAttentionCopy.swift` | `installed-inventory` II19 — the inline version could not express "brew clean, npm not checked" |
+| 6 | empty state keyed off inventory emptiness | `InstalledEmptyState.isNpmEmptiness` | II18's typed-reason rule: an npm-shaped emptiness must say why |
+| 7 | Browse projection gains a source predicate | `InstalledBrowse.withNpmSource` | II18 makes the Source filter a `CellarCore` projection, not a view-level filter |
+| 8 | D-level Health wording only | Health score denominator is **Homebrew-only** in both directions | `system-health` SH12 states the score counts Homebrew identities only |
+| 9 | MB1 keeps three pure inputs | `MenuBarProjection` gains a **sixth** member for npm freshness | `menu-bar` MB1 as modified by this change requires the npm freshness input |
+
+**One defect in unit 1 was found and fixed by unit 3's integration pass**, not by a spec change:
+`DefaultNpmLocator` resolved symlinks before composing the environment, so the PATH prepend pointed at
+the resolved target rather than the selected npm's own bin directory. The fix stores
+`NpmEnvironment.binDirectory` and makes `DefaultNpmLocator.validate` take the **candidate** directory.
+This is a genuine bug fix, not a design deviation, and it is the reason unit 3 came in at roughly twice
+its line estimate.
+
+**The two open questions above were answered during apply.** A chain-queued item keeps
+`queuePhase == .pending` and reads "Queued" with no explicit assignment in `perform`, so D13 needed no
+fallback. `npm` and `corepack` are listed, as the default anticipated.
+
+**The line estimate was wrong in both directions.** Unit 1's production estimate held; unit 2 came in
+far under (~415 changed production lines) because the shared spine absorbed npm through existing seams;
+unit 3 came in at roughly 2x. Final staged production total: **3,742 lines**, inside the 8,000 budget
+under the maintainer's production-only ruling (Engram `#7968`).

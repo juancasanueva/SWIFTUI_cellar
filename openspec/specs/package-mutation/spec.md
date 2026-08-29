@@ -485,12 +485,18 @@ nothing MUST be thrown or blocked, and the same read-only guidance the inventory
 apply. When brew later becomes available, mutations MUST become available without restarting the
 app.
 
-This rule MUST hold for every command family submitted through the mutation spine, not only for
-package mutations. Each family's own surface MUST render the same read-only guidance rather than
-failing at spawn time, MUST spawn nothing while brew is absent or invalid, and MUST become available
-again when brew appears without restarting the app.
-(Previously: the rule was written for package mutations only, so a new family's availability
-behaviour was unspecified.)
+This rule MUST hold for every **Homebrew-sourced** command family submitted through the mutation
+spine, not only for package mutations. Each family's own surface MUST render the same read-only
+guidance rather than failing at spawn time, MUST spawn nothing while brew is absent or invalid, and
+MUST become available again when brew appears without restarting the app.
+
+Availability MUST be evaluated **per source**. A command whose source is npm MUST be gated by npm
+detection and the npm preference alone, on the terms `npm-source` states, and MUST NOT be made
+unavailable because brew is absent; a Homebrew-sourced command MUST NOT be made unavailable because
+npm is absent or disabled. A submission for a source that has no attached runner MUST settle as a
+launch failure recording exactly one history entry, on the terms `operation-activity` already states.
+(Previously: the rule gated every family on brew detection alone, which would have made npm commands
+unavailable on a Mac without Homebrew and left an npm-absent Mac unspecified.)
 
 #### Scenario: Absent brew spawns nothing
 
@@ -518,6 +524,22 @@ behaviour was unspecified.)
 - WHEN a command from another family is requested through the shared mutation spine
 - THEN no process is spawned and nothing is thrown
 - AND that family's affordance reports itself unavailable with the same read-only guidance
+
+#### Scenario: Availability is independent per source
+
+- GIVEN brew `absent` and npm detected, and separately brew detected and npm `absent`
+- WHEN an npm upgrade and a brew upgrade are requested in each case
+- THEN in the first case the npm upgrade is submitted and the brew one reports unavailable
+- AND in the second the brew upgrade is submitted and the npm one reports unavailable, with guidance
+  naming npm
+- Verification: `unit`
+
+#### Scenario: A source with no attached runner settles as a launch failure
+
+- GIVEN a queue with a brew runner attached and no npm runner
+- WHEN an npm upgrade is submitted
+- THEN it settles as a failed launch, spawns nothing, and records exactly one history entry
+- Verification: `unit`
 
 ### Requirement: A bulk selection expands to one invocation per selected package
 
@@ -766,6 +788,79 @@ guard would not fire.)
 - THEN the operation renders the typed untrusted-tap refusal
 - AND brew's own `brew trust …` line is visible in the verbatim log
 - Verification: `manual-evidence`
+
+### Requirement: Every spine command projects its source, and the erased form preserves it
+
+The shared abstraction MUST expose a `source` projection — Homebrew or npm — defaulting to Homebrew
+for every existing conformer. The display command and the copy-command text MUST derive their prefix
+(`brew ` or `npm `) from that projection and from nothing else. The erased command type MUST copy
+`source` exactly as it copies argv, verb and disclosure, so an erased npm command never renders,
+copies or records as a brew command. No consumer MUST recover the source by downcast, type test or
+verb-string inspection.
+
+#### Scenario: Existing families default to Homebrew and npm declares npm
+
+- GIVEN one package, one service, one tap and one npm command
+- WHEN each command's source and display command are read, unerased and erased
+- THEN the first three report Homebrew with a `brew ` prefix and the npm command reports npm with an
+  `npm ` prefix
+- AND each erased form equals its unerased form in source and display command
+- Verification: `unit`
+
+### Requirement: A brew argv can never name an npm package
+
+`PackageTarget` construction MUST fail for an identity of kind `npm`, so no brew package command can be
+built for it: the six brew verbs MUST report themselves unavailable for an npm entry rather than
+produce an argv. A bulk selection MUST expand per package by source — brew identities into brew
+commands, npm identities into npm commands — in selection order and through the one queue. Bulk pin,
+unpin and reinstall MUST exclude npm identities from their eligible sets. The grouped `upgrade` (all)
+MUST remain a bare `brew upgrade` naming no npm package; npm updates apply per package only. This MUST
+be asserted structurally: no argv any brew command family can produce contains an npm identity.
+
+#### Scenario: A brew verb is unavailable for an npm identity
+
+- GIVEN the identity `(npm, typescript)`
+- WHEN `PackageTarget` is constructed and each of the six brew verbs is requested for it
+- THEN construction fails and every verb reports unavailable
+- AND no argv containing `typescript` was produced by any brew command
+- Verification: `unit`
+
+#### Scenario: A mixed bulk upgrade fans out by source in selection order
+
+- GIVEN a selection of `wget` (formula), `typescript` (npm) and `iterm2` (cask), in that order
+- WHEN a bulk upgrade is built
+- THEN exactly three operations are enqueued: `brew upgrade --formula wget`, `npm install -g
+  typescript@latest`, `brew upgrade --cask iterm2`, in that order
+- Verification: `unit`
+
+#### Scenario: Pin, unpin and reinstall never see an npm identity
+
+- GIVEN a selection holding one unpinned formula and one npm package
+- WHEN the pin, unpin and reinstall eligible sets are read
+- THEN none contains the npm identity
+- Verification: `unit`
+
+### Requirement: Mutations are serialized across sources through one FIFO
+
+At most one mutation MAY be in flight across all sources. Queued mutations MUST run in submission
+order regardless of source, so a brew mutation submitted after an npm mutation waits for it and vice
+versa. Reads of either source MUST NOT be blocked by a mutation of the other. Cancel, activity
+enumeration and history MUST treat both sources identically.
+
+#### Scenario: A brew mutation waits for an in-flight npm mutation
+
+- GIVEN an npm upgrade in flight
+- WHEN a brew upgrade is submitted
+- THEN the brew process is not spawned until the npm operation reaches a terminal outcome
+- AND the enumeration reports the npm operation running and the brew one pending
+- Verification: `unit`
+
+#### Scenario: A brew read proceeds during an npm mutation
+
+- GIVEN an npm mutation in flight
+- WHEN a brew inventory refresh is requested
+- THEN it starts and completes without waiting
+- Verification: `unit`
 
 ## Provenance
 
@@ -1054,3 +1149,36 @@ guard would not fire.)
     one-rolling-note-per-block convention. PM10 carried none before this change; it now carries the note
     about the tap-only gate rule, recorded above.
   - The archived delta spec is the verbatim audit trail.
+- **Amended by change `npm-package-source`** (archived `2026-08-30` —
+  `openspec/changes/archive/2026-08-30-npm-package-source/`), which closed PRD **M13 — npm package
+  source** (`PRD.md` §7 :219-220). **3 ADDED requirements / 6 scenarios and 1 MODIFIED requirement
+  (PM7)**, 0 removed, 0 renamed. The bodies are promoted **byte-identical** from
+  `openspec/changes/archive/2026-08-30-npm-package-source/specs/package-mutation/spec.md` — ADDED from
+  `:13-84`, MODIFIED PM7 from `:88-150` (both verified by an empty `diff` at archive).
+- **The added requirements are PM11–PM13 in file order.** PM11 gives every spine command a `source`
+  projection, defaulting to Homebrew and **copied by the erased form**, from which the display prefix
+  derives. PM12 is the safety rule: `PackageTarget.init?` fails for an npm identity, so the six brew
+  verbs are unavailable for npm packages, a mixed bulk upgrade fans out **per package by source in
+  selection order**, pin/unpin/reinstall never see an npm identity, and upgrade-all stays bare
+  `brew upgrade`. PM13 serializes mutations across sources through **one** FIFO while leaving reads
+  unblocked.
+- **PM12 is enforced structurally, not only by review.** A shipped assertion scans every `*Command.swift`
+  for argv interpolation and now globs the npm command file too, and `MutationCommand.vector`'s `.npm`
+  arm is an unreachable `preconditionFailure`. No brew argv can name an npm package.
+- **`rules.archive`'s destructive-delta warning did not fire, and PM7's amendment was checked line by
+  line.** All **four** shipped PM7 scenarios promoted **byte-identical** and two were appended; the
+  replaced text is the family-scope paragraph, now scoped to **Homebrew-sourced** families, plus a new
+  per-source availability paragraph. Measured at archive: **6 lines replaced, 28 added, 0 scenarios and
+  0 requirements removed**.
+- **One historical note was superseded rather than kept.** PM7's earlier
+  `(Previously: the rule was written for package mutations only, …)` note — added when the rule was
+  generalised beyond package mutations — is replaced by the new note explaining the per-source split.
+  The superseded wording survives verbatim in the archived delta and in the earlier change that wrote
+  it; it was not silently dropped.
+- **PM7 now reads per source.** npm commands are gated on npm detection and the npm preference alone and
+  are **not** made unavailable by a missing Homebrew; brew commands are never gated on npm. A
+  submission for a source with no attached runner settles as a launch failure recording exactly one
+  history entry.
+- **Delivery state at archive**: implemented and verified on branch `feat/npm-package-source`,
+  committed and pushed, with **PR #92 open against `main` and not merged**. This spec therefore
+  describes branch behaviour until that PR lands.

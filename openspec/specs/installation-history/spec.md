@@ -354,6 +354,50 @@ Presentation MUST label the verbs respectively “Cleanup,” “Package cleanup
 - WHEN searches run for `cleanup`, `FULL`, `autoremove`, and the package name
 - THEN each query returns only matching entries with the labels and subjects above
 - AND reverting cleanup-specific presentation leaves every entry readable and non-replayable
+
+### Requirement: npm entries store the npm identity, namespaced verbs and a source-aware presentation
+
+An npm operation MUST write exactly one entry at its terminal outcome on the shipped terms, carrying the
+package identity `(npm, name)` through the existing `kindRaw` string `npm` with no schema migration, one
+of exactly two namespaced verbs — `npmUpgrade`, `npmUninstall` — the version moved from and to when
+both are known, the outcome and the exact argv. The stored argv MUST remain display-only. Presentation
+MUST derive a source badge from the stored kind, MUST prefix the displayed command with `npm`, and MUST
+word the outcome label for npm (an npm exit status, an npm permissions failure) rather than for
+Homebrew. Search MUST match `npm`, the bare terms `upgrade` and `uninstall`, the package name and the
+argv, case-insensitively. A build without the npm kind MUST decode such rows as absent rather than fail
+or misattribute them.
+
+#### Scenario: Each npm verb writes one identity-bearing entry
+
+- GIVEN `install -g typescript@latest` (from `5.6.2` to `5.7.0`) and `uninstall -g corepack` each reaching a
+  terminal outcome
+- WHEN the history is read
+- THEN exactly two entries exist carrying `npmUpgrade` and `npmUninstall`, identity kind `npm`, their
+  argvs and outcomes, and the upgrade carries from `5.6.2` to `5.7.0`
+- Verification: `unit`
+
+#### Scenario: Presentation is source-aware
+
+- GIVEN a failed `npmUpgrade` entry with exit status `243` and an `EACCES` classification
+- WHEN it is presented
+- THEN the command reads `npm install -g typescript@latest`, the badge names npm, and the outcome label
+  names npm permissions rather than Homebrew
+- Verification: `unit`
+
+#### Scenario: npm entries are searchable by source, verb and name
+
+- GIVEN one `npmUpgrade` entry for `typescript` and one brew `upgrade` entry for `wget`
+- WHEN the history is searched for `NPM`, then `typescript`, then `upgrade`
+- THEN the first two return only the npm entry and the third returns both
+- Verification: `unit`
+
+#### Scenario: A stored npm row degrades safely without the kind
+
+- GIVEN a persisted row with `kindRaw` `npm`
+- WHEN it is decoded by a decoder that does not know that kind
+- THEN it decodes as absent, nothing throws, and no brew identity is inferred
+- Verification: `unit`
+
 ## Provenance
 
 - Established by change `m2-local-metadata-history` (archived `2026-08-03`, PRD milestone **M2**,
@@ -490,3 +534,22 @@ Presentation MUST label the verbs respectively “Cleanup,” “Package cleanup
   Management)**: **2 MODIFIED** requirements replaced as whole-block strict supersets — IH1 and IH5 —
   adding namespaced tap verbs, null-package tap history, launch-failure/cancellation coverage, and tap
   family/action/target search. 7 requirements / 28 scenarios → **7 requirements / 31 scenarios**.
+- **Amended by change `npm-package-source`** (archived `2026-08-30` —
+  `openspec/changes/archive/2026-08-30-npm-package-source/`), which closed PRD **M13 — npm package
+  source** (`PRD.md` §7 :219-220). **ADDED-only delta — 1 requirement / 4 scenarios**, 0 modified, 0
+  removed, 0 renamed, so `rules.archive`'s destructive-delta warning did not fire. The requirement body
+  is promoted **byte-identical** from
+  `openspec/changes/archive/2026-08-30-npm-package-source/specs/installation-history/spec.md:9-50`
+  (verified by an empty `diff` at archive); this file gained only that block and this bullet.
+- **The added requirement is IH10 in file order.** npm entries carry the npm identity through `kindRaw`
+  `"npm"`, the namespaced verbs `npmUpgrade`/`npmUninstall`, from/to versions and a display-only argv,
+  and they present with a source badge, an `npm` prefix and npm-worded outcome labels. Search matches
+  source, verb, name and argv, and an unknown stored kind degrades to an absent identity rather than
+  failing the decode.
+- **No schema migration was performed and none was needed.** `"npm"` round-trips through the existing
+  `kindRaw` column, so a build without `PackageKind.npm` decodes those rows to a nil identity and hides
+  them instead of crashing — the rollback path the change's proposal recorded.
+- **The namespaced verbs are a recorded deviation from the change's own design.** `design.md` D12/D14
+  named bare `upgrade`/`uninstall` verbs; this delta's text requires namespaced ones, and the
+  implementation followed the spec. The deviation is recorded in the archived `design.md` **Deviations**
+  note and in Engram `#7973`.
