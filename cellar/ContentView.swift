@@ -20,6 +20,13 @@ import SwiftUI
 /// against the new catalog instead of showing a stale copy.
 struct ContentView: View {
     let brewDetection: BrewDetectionStore
+    /// npm's detection state, read by the Settings card and by the Source chip.
+    /// A sibling of `brewDetection` rather than a widening of it: nothing about
+    /// Homebrew's own detection changes.
+    let npmDetection: NpmDetectionStore
+    /// What npm reports. Read for the Source chip's availability and for the
+    /// freshness the summary copy needs.
+    let npm: NpmStore
     let catalog: CatalogStore
     let installed: InstalledStore
     let operations: OperationCenter
@@ -288,6 +295,8 @@ struct ContentView: View {
                 brewDetection: brewDetection,
                 catalog: catalog,
                 installed: installed,
+                npmDetection: npmDetection,
+                npm: npm,
                 metadata: metadata,
                 security: security,
                 diskUsage: diskUsage,
@@ -398,6 +407,7 @@ struct ContentView: View {
         case .installed:
             InstalledListView(
                 installed: installed,
+                npmDetection: npmDetection,
                 catalog: catalog,
                 operations: operations,
                 metadata: metadata,
@@ -408,6 +418,7 @@ struct ContentView: View {
         case .favorites:
             InstalledListView(
                 installed: installed,
+                npmDetection: npmDetection,
                 catalog: catalog,
                 operations: operations,
                 metadata: metadata,
@@ -419,6 +430,7 @@ struct ContentView: View {
         case .updates:
             InstalledListView(
                 installed: installed,
+                npmDetection: npmDetection,
                 catalog: catalog,
                 operations: operations,
                 metadata: metadata,
@@ -456,6 +468,8 @@ struct ContentView: View {
                 // Six of the eight signals, read where they already live. The
                 // section holds none of them and refreshes none of them.
                 installed: installed,
+                npmDetection: npmDetection,
+                npm: npm,
                 metadata: metadata,
                 security: security,
                 cleanup: cleanup,
@@ -485,7 +499,7 @@ struct ContentView: View {
         case .history:
             HistoryView(history: history)
         case .settings:
-            SettingsView(brewDetection: brewDetection)
+            SettingsView(brewDetection: brewDetection, npmDetection: npmDetection)
         }
     }
 

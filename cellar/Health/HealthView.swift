@@ -30,6 +30,11 @@ struct HealthView: View {
     let health: HealthStore
     let brewDetection: BrewDetectionStore
     let installed: InstalledStore
+    /// Read for two values and nothing else: whether npm is contributing at all,
+    /// and how current its answer is. The section still acquires nothing — both
+    /// are resident state, exactly like the six signals above.
+    let npmDetection: NpmDetectionStore
+    let npm: NpmStore
     let metadata: MetadataStore
     let security: SecurityStore
     let cleanup: CleanupStore
@@ -267,7 +272,8 @@ struct HealthView: View {
 
     private var inputs: HealthInputs {
         HealthComposition.inputs(
-            browse: InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil),
+            browse: InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+                .withNpmSource(NpmSourceAvailability(npmDetection.state)),
             metadata: metadata.availability.isAvailable ? metadata.snapshot.lookup : nil,
             scan: security.state(for: .cveScan),
             coverage: security.coverage(for: .cveScan),
@@ -276,7 +282,8 @@ struct HealthView: View {
             snapshot: diskUsage.visibleSnapshot,
             lastUpdate: health.lastUpdate,
             doctor: health.doctor,
-            now: now
+            now: now,
+            npmFreshness: npm.inventory.outdated
         )
     }
 

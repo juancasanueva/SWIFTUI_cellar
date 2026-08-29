@@ -127,6 +127,12 @@ public struct InstalledPackage: Sendable, Hashable, Identifiable {
         switch kind {
         case .formula: snapshotOutdated
         case .cask: snapshotOutdated && !isSelfUpdating
+        // The flag verbatim, like a formula's. The cask conjunction exists for
+        // apps that update themselves; a global npm package never does, and
+        // `declaresAutoUpdates` is not a field npm's payload can even carry, so
+        // borrowing that rule here would only make the answer depend on a value
+        // no npm projection sets (npm-source: outdated iff `current != latest`).
+        case .npm: snapshotOutdated
         }
     }
 
@@ -192,7 +198,22 @@ public struct InstalledInventory: Sendable, Hashable {
     /// unique — so two adjacent rows can never swap between refreshes.
     private static func precedes(_ lhs: InstalledPackage, _ rhs: InstalledPackage) -> Bool {
         if lhs.name != rhs.name { return lhs.name < rhs.name }
-        return lhs.kind == .formula && rhs.kind == .cask
+        return rank(lhs.kind) < rank(rhs.kind)
+    }
+
+    /// A rank rather than the pairwise comparison this used to be.
+    ///
+    /// With two kinds, `lhs == .formula && rhs == .cask` was a total order. With
+    /// three it silently is not — every pair involving npm would compare equal
+    /// in both directions, and `sorted(by:)` is only defined for a strict weak
+    /// ordering. The rank makes the order total again by construction, so adding
+    /// a fourth kind cannot reintroduce the same defect quietly.
+    private static func rank(_ kind: PackageKind) -> Int {
+        switch kind {
+        case .formula: 0
+        case .cask: 1
+        case .npm: 2
+        }
     }
 
     /// The badge count. Counts `isOutdated` only, so a self-updating cask with a

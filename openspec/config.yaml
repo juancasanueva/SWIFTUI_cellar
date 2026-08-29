@@ -5,7 +5,7 @@ artifact_store: hybrid
 execution_mode: interactive
 delivery_strategy: single-pr
 # Raised from 2000 (M3) to 5000 per the M5 session decision every M5 slice already ran under.
-review_budget_lines: 5000
+review_budget_lines: 8000
 
 context: |
   Cellar! is a native macOS SwiftUI GUI for Homebrew; product scope and milestones live in PRD.md.
@@ -40,7 +40,7 @@ testing:
 
 rules:
   proposal:
-    - Anchor scope to a PRD.md milestone (M1..M6) and name it explicitly.
+    - Anchor scope to a PRD.md milestone (M1..M13) and name it explicitly.
     - Include a rollback plan for anything touching the Xcode project file or target membership.
   specs:
     - Use Given/When/Then scenarios and RFC 2119 keywords (MUST, SHALL, SHOULD, MAY).

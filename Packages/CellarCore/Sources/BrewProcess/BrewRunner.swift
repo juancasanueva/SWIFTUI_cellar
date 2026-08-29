@@ -16,7 +16,22 @@ public actor BrewRunner {
     /// `live handles + this` (see `OperationRecord`'s retention notes).
     public static let defaultRetainedTerminalRecords = 200
 
-    private let installation: BrewInstallation
+    /// The binary every submission of this runner spawns.
+    ///
+    /// Stored instead of a `BrewInstallation` because the FIFO, the cancel
+    /// escalation, the pump and the retention rules never needed a brew
+    /// installation — they needed a path to spawn. Narrowing the dependency to
+    /// exactly that is what lets a second source reuse this actor rather than
+    /// grow a second one (design D4, `brew-execution`).
+    private let executableURL: URL
+    /// How this runner composes the environment its subprocesses run under.
+    ///
+    /// Injected rather than reached for, so the runner holds no opinion about
+    /// *which* environment is correct: a brew runner is handed brew's composer
+    /// by the convenience initializer below, and an npm runner is handed npm's.
+    /// A runner that reached `BrewEnvironment` directly could only ever spawn
+    /// brew, whatever executable it was pointed at.
+    private let environment: @Sendable (Set<BrewEnvironment.CommandOverride>) -> [String: String]
     private let launcher: any ProcessLaunching
     private let policy: CancellationPolicy
     private let clock: any Clock<Duration>
@@ -38,6 +53,36 @@ public actor BrewRunner {
     public nonisolated let queue: AsyncStream<QueueSnapshot>
     private nonisolated let queueContinuation: AsyncStream<QueueSnapshot>.Continuation
 
+    /// The general form: an executable, a composer for the environment it runs
+    /// under, and the seams every runner already took.
+    public init(
+        executableURL: URL,
+        environment: @escaping @Sendable (Set<BrewEnvironment.CommandOverride>) -> [String: String],
+        launcher: any ProcessLaunching = SystemProcessLauncher(),
+        policy: CancellationPolicy = .default,
+        clock: any Clock<Duration> = ContinuousClock(),
+        retainedTerminalRecords: Int = BrewRunner.defaultRetainedTerminalRecords
+    ) {
+        self.executableURL = executableURL
+        self.environment = environment
+        self.launcher = launcher
+        self.policy = policy
+        self.clock = clock
+        self.retainedTerminalRecords = max(0, retainedTerminalRecords)
+        (queue, queueContinuation) = AsyncStream<QueueSnapshot>.makeStream(
+            bufferingPolicy: .bufferingNewest(1)
+        )
+    }
+
+    /// The brew form, preserved exactly as it shipped.
+    ///
+    /// The **one** place in this file that names a brew-specific environment,
+    /// which is what makes "a runner composed for brew behaves byte-identically
+    /// to the shipped runner" a property a reader can check by looking at a
+    /// single initializer rather than at every spawn site.
+    ///
+    /// Delegating rather than `convenience`: an actor's initializers are never
+    /// spelled with that keyword, and `self.init(...)` is how one forwards.
     public init(
         installation: BrewInstallation,
         launcher: any ProcessLaunching = SystemProcessLauncher(),
@@ -45,13 +90,13 @@ public actor BrewRunner {
         clock: any Clock<Duration> = ContinuousClock(),
         retainedTerminalRecords: Int = BrewRunner.defaultRetainedTerminalRecords
     ) {
-        self.installation = installation
-        self.launcher = launcher
-        self.policy = policy
-        self.clock = clock
-        self.retainedTerminalRecords = max(0, retainedTerminalRecords)
-        (queue, queueContinuation) = AsyncStream<QueueSnapshot>.makeStream(
-            bufferingPolicy: .bufferingNewest(1)
+        self.init(
+            executableURL: installation.executableURL,
+            environment: { BrewEnvironment.current(commandOverrides: $0) },
+            launcher: launcher,
+            policy: policy,
+            clock: clock,
+            retainedTerminalRecords: retainedTerminalRecords
         )
     }
 
@@ -148,11 +193,9 @@ public actor BrewRunner {
     /// it ever touches Homebrew.
     public func start(_ command: BrewCommand) async throws(BrewProcessError) -> BrewOperation {
         let spec = ProcessSpec(
-            executableURL: installation.executableURL,
+            executableURL: executableURL,
             arguments: command.arguments,
-            environment: BrewEnvironment.current(
-                commandOverrides: command.environmentOverrides
-            )
+            environment: environment(command.environmentOverrides)
         )
 
         nextOrdinal += 1
@@ -175,7 +218,7 @@ public actor BrewRunner {
             } catch {
                 // Nothing is recorded before the launch attempt, so a failed
                 // spawn leaves no half-built operation behind.
-                throw Self.mapLaunchFailure(error, executableURL: installation.executableURL)
+                throw Self.mapLaunchFailure(error, executableURL: executableURL)
             }
             install(submission, process: process)
 
@@ -209,11 +252,9 @@ public actor BrewRunner {
             environmentOverrides: environmentOverrides
         )
         let spec = ProcessSpec(
-            executableURL: installation.executableURL,
+            executableURL: executableURL,
             arguments: mutation.arguments,
-            environment: BrewEnvironment.current(
-                commandOverrides: environmentOverrides
-            )
+            environment: environment(environmentOverrides)
         )
         nextOrdinal += 1
         let (lines, continuation) = AsyncStream<LogLine>.makeStream()
@@ -274,10 +315,7 @@ public actor BrewRunner {
         do {
             process = try launcher.launch(spec)
         } catch {
-            let fault = Self.mapLaunchFailure(
-                error,
-                executableURL: installation.executableURL
-            )
+            let fault = Self.mapLaunchFailure(error, executableURL: executableURL)
             operations[id]?.terminal = .process(
                 BrewExit(status: 127, reason: .exited),
                 fault: fault

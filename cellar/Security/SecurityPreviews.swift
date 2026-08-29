@@ -34,10 +34,13 @@ import SwiftUI
 
 #Preview("Shell") {
     let services = ServicesStore()
+    let installed = InstalledStore()
     return ContentView(
         brewDetection: BrewDetectionStore(),
+        npmDetection: NpmDetectionStore(),
+        npm: NpmStore(installed: installed),
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
-        installed: InstalledStore(),
+        installed: installed,
         operations: OperationCenter(),
         metadata: MetadataStore(container: nil),
         history: HistoryStore(container: nil),

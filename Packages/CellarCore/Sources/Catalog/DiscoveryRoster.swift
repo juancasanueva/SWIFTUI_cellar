@@ -72,6 +72,11 @@ public struct KnownPackageRoster: Codable, Sendable, Hashable {
         switch id.kind {
         case .formula: formulaSet.contains(id.name)
         case .cask: caskSet.contains(id.name)
+        // The roster is the set of identities *the Homebrew catalog* has
+        // published to this machine. npm publishes into no catalog Cellar syncs,
+        // so an npm identity has never been observed here and never will be —
+        // and `false` is the honest answer rather than a gap.
+        case .npm: false
         }
     }
 

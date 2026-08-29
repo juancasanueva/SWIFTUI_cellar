@@ -76,8 +76,25 @@ public final class OperationCenter {
     /// as it did before history existed — and so reverting the feature is one
     /// injection away (installation-history IH7 sc1).
     @ObservationIgnored private let history: any HistoryRecording
-    @ObservationIgnored private let launcherFactory: (BrewInstallation) -> any ProcessLaunching
-    @ObservationIgnored private var runner: BrewRunner?
+    /// How a runner for one executable gets its process seam.
+    ///
+    /// Keyed on the **executable URL** rather than on a `BrewInstallation`,
+    /// because the centre now builds runners for two sources and npm has no
+    /// installation to hand over. Every shipped call site passes `{ _ in … }`
+    /// and is unaffected.
+    @ObservationIgnored private let launcherFactory: (URL) -> any ProcessLaunching
+    /// One runner per source, built as each source becomes available.
+    ///
+    /// Two runners rather than one runner told which executable to spawn: the
+    /// runner's FIFO, cancel escalation and retention are per-instance, and a
+    /// single instance spawning both would make an npm mutation wait behind a
+    /// ten-minute `brew upgrade` for reasons brew's queue knows nothing about.
+    /// Serialisation *across* sources is a separate, deliberate rule, imposed at
+    /// this level rather than inside either runner (design D13).
+    @ObservationIgnored private var runners: [PackageSource: BrewRunner] = [:]
+    /// What each attached runner spawns, so an item can record the executable
+    /// its refresh receipt belongs to.
+    @ObservationIgnored private var executables: [PackageSource: URL] = [:]
     @ObservationIgnored private var installation: BrewInstallation?
     @ObservationIgnored private let refreshRegistry: MutationRefreshRegistry?
     @ObservationIgnored lazy var forceRecovery: ForceDenialRecoveryCoordinator? = refreshRegistry.map {
@@ -85,11 +102,24 @@ public final class OperationCenter {
     }
     @ObservationIgnored var forceRecoveryContexts: [UUID: ForceRecoveryContext] = [:]
 
+    /// The chain gate of the most recently submitted mutation.
+    ///
+    /// One mutation at a time **across sources** (`package-mutation`). Each
+    /// runner already serialises its own, but two runners know nothing about
+    /// each other, so the rule has to be imposed where both are visible — here.
+    ///
+    /// Invariant, and the reason this is read and written with no `await`
+    /// between: the tail is captured and replaced synchronously inside `perform`,
+    /// so however submissions interleave, the order they were submitted in is
+    /// the order they run in. It is the same invariant `BrewRunner`'s own gate
+    /// holds, one level up (design D13).
+    @ObservationIgnored private var mutationTail: Task<Void, Never>?
+
     public init(
         gates: MutationGates,
         history: any HistoryRecording = NoHistoryRecording(),
         refreshRegistry: MutationRefreshRegistry? = nil,
-        launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
+        launcherFactory: @escaping (URL) -> any ProcessLaunching = { _ in
             SystemProcessLauncher()
         }
     ) {
@@ -110,7 +140,7 @@ public final class OperationCenter {
         gate: InstalledMutationGate? = nil,
         history: any HistoryRecording = NoHistoryRecording(),
         refreshRegistry: MutationRefreshRegistry? = nil,
-        launcherFactory: @escaping (BrewInstallation) -> any ProcessLaunching = { _ in
+        launcherFactory: @escaping (URL) -> any ProcessLaunching = { _ in
             SystemProcessLauncher()
         }
     ) {
@@ -122,17 +152,36 @@ public final class OperationCenter {
 
     // MARK: - Attachment
 
-    /// Whether mutations can run at all right now.
-    public var isAvailable: Bool { runner != nil }
+    /// Whether Homebrew mutations can run at all right now.
+    ///
+    /// Kept source-free so every shipped call site reads exactly what it read
+    /// before. Homebrew is what it always meant, and stating that here is what
+    /// keeps "a Homebrew command MUST NOT be made unavailable because npm is
+    /// absent" true by construction (package-mutation PM7 as modified).
+    public var isAvailable: Bool { isAvailable(for: .homebrew) }
+
+    /// Whether `source`'s mutations can run right now.
+    public func isAvailable(for source: PackageSource) -> Bool {
+        runners[source] != nil
+    }
 
     /// Why they cannot, when they cannot. Read-only guidance, never an error:
     /// affordances go unavailable rather than failing at spawn time
     /// (package-mutation PM7).
-    public var unavailableGuidance: String? {
-        isAvailable
-            ? nil
-            : "Homebrew is not available, so package changes are turned off. "
+    public var unavailableGuidance: String? { unavailableGuidance(for: .homebrew) }
+
+    /// The same guidance, per source, naming the source the user would have to
+    /// fix — never the other one.
+    public func unavailableGuidance(for source: PackageSource) -> String? {
+        guard !isAvailable(for: source) else { return nil }
+        return switch source {
+        case .homebrew:
+            "Homebrew is not available, so package changes are turned off. "
                 + "Check the brew location in Settings."
+        case .npm:
+            "npm is not available, so npm package changes are turned off. "
+                + "Turn the npm source on in Settings and check its location there."
+        }
     }
 
     /// Points the centre at an installation, building the runner it needs.
@@ -144,18 +193,46 @@ public final class OperationCenter {
     /// old queue finishes on its own terms.
     public func attach(installation: BrewInstallation?) {
         guard let installation else {
-            runner = nil
+            runners[.homebrew] = nil
+            executables[.homebrew] = nil
             self.installation = nil
             return
         }
         guard installation.executableURL != self.installation?.executableURL else { return }
 
         self.installation = installation
+        executables[.homebrew] = installation.executableURL
         let runner = BrewRunner(
             installation: installation,
-            launcher: launcherFactory(installation)
+            launcher: launcherFactory(installation.executableURL)
         )
-        self.runner = runner
+        runners[.homebrew] = runner
+        watchQueue(of: runner)
+    }
+
+    /// Points the centre at a detected npm, on exactly the terms brew is
+    /// attached: mutations become available the moment detection resolves, with
+    /// no relaunch, and detaching removes only this source's runner.
+    ///
+    /// The npm runner is the **generalised** `BrewRunner` — same FIFO, same
+    /// SIGINT→SIGTERM escalation, same retention — handed npm's executable and
+    /// npm's environment composer rather than brew's (`brew-execution`,
+    /// design D4).
+    public func attach(npm environment: NpmEnvironment?) {
+        guard let environment else {
+            runners[.npm] = nil
+            executables[.npm] = nil
+            return
+        }
+        guard environment.executableURL != executables[.npm] else { return }
+
+        executables[.npm] = environment.executableURL
+        let runner = BrewRunner(
+            executableURL: environment.executableURL,
+            environment: { _ in environment.processEnvironment() },
+            launcher: launcherFactory(environment.executableURL)
+        )
+        runners[.npm] = runner
         watchQueue(of: runner)
     }
 
@@ -265,7 +342,7 @@ public final class OperationCenter {
             command: command,
             versions: versions,
             refreshToken: refreshToken,
-            installationURL: installation?.executableURL
+            installationURL: executables[command.source]
         )
         items.append(item)
 
@@ -284,7 +361,7 @@ public final class OperationCenter {
         // whole of the scoping, and why the change observer needs no edit.
         gates?.begin(command.invalidates)
 
-        guard let runner else {
+        guard let runner = runners[command.source] else {
             item.queuePhase = .terminal(BrewExit(status: 127, reason: .exited), fault: nil)
             // Through the funnel, never beside it. Settling inline here is what
             // made a terminal outcome with no history entry possible at all: the
@@ -294,14 +371,38 @@ public final class OperationCenter {
             return item
         }
 
-        // Marked before the task is created, so a cancel arriving between here
-        // and `run(_:for:on:)` is replayed rather than settling an operation
-        // that is about to exist (design D10).
-        item.isStartInFlight = true
-        Task { [weak self] in
-            await self?.run(command, for: item, on: runner, authorizer: authorizer)
+        // Marked before the task is created, so a cancel arriving while this
+        // item waits its turn settles it here and now rather than reaching a
+        // runner that has never heard of it (design D13).
+        item.isChainQueued = true
+        let predecessor = mutationTail
+        let gate = Task { [weak self] in
+            await predecessor?.value
+            await self?.runChained(command, for: item, on: runner, authorizer: authorizer)
         }
+        mutationTail = gate
         return item
+    }
+
+    /// Waits for the previous submission's terminal outcome, then runs this one.
+    ///
+    /// Every line between the `await` above and the `await run(...)` below is
+    /// synchronous and main-isolated, so the hand-off from "queued at the
+    /// centre" to "about to have a handle" cannot be observed half-done: a
+    /// cancel either arrived before it and already settled the item, or arrives
+    /// after it and is replayed by `run(_:for:on:)`.
+    private func runChained(
+        _ command: some BrewMutating,
+        for item: ActivityItem,
+        on runner: BrewRunner,
+        authorizer: any MutationLaunchAuthorizing
+    ) async {
+        item.isChainQueued = false
+        // Cancelled while it waited: it is already terminal, and nothing may be
+        // spawned for it (design D13).
+        guard item.outcome == nil else { return }
+        item.isStartInFlight = true
+        await run(command, for: item, on: runner, authorizer: authorizer)
     }
 
     // MARK: - One operation, start to finish
@@ -428,10 +529,15 @@ public final class OperationCenter {
             Task { await operation.cancel() }
             return
         }
-        // No handle. If a start is in flight, `run(_:for:on:)` replays the
-        // request — it guards at entry and again after start. Only a submission
-        // that never had a runner is terminal here.
-        if !item.isStartInFlight {
+        // No handle. An item still waiting its turn in the centre's chain has
+        // nothing spawned and nothing to signal, so it settles here — which is
+        // what makes cancelling a queued mutation free rather than a promise
+        // redeemed whenever its predecessor happens to finish.
+        //
+        // If a start is in flight instead, `run(_:for:on:)` replays the request
+        // — it guards at entry and again after start. Only a submission that
+        // never had a runner at all is terminal here for the third reason.
+        if item.isChainQueued || !item.isStartInFlight {
             finish(item, with: .cancelled)
         }
     }

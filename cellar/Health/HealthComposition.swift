@@ -61,17 +61,53 @@ nonisolated enum HealthComposition {
     /// Outdated is measured against the inventory the user can actually see, so
     /// the number matches the Installed list's own count including its snooze
     /// narrowing.
-    static func outdated(browse: InstalledBrowse, metadata: MetadataLookup?) -> HealthReading {
+    ///
+    /// **The row and the score answer two different questions**, and the split
+    /// is deliberate (`system-health`: the outdated row names both sources in
+    /// its copy, and the score counts Homebrew only):
+    ///
+    /// - the *row* announces the merged count, because that is the number every
+    ///   other count-bearing surface announces and a Health row disagreeing with
+    ///   the sidebar badge would be its own defect;
+    /// - the *score* is computed over Homebrew identities alone. An npm nobody
+    ///   could reach would otherwise flatter the number — three unchecked
+    ///   globals reading as three packages that are fine — and an npm that *was*
+    ///   reached would move a number whose only remediation here is
+    ///   `brew upgrade`, which touches none of them.
+    ///
+    /// The breakdown entry names Homebrew (`HealthCopy.inputName`) so a user
+    /// reading "1 of 4" against a seven-package list is not left guessing.
+    static func outdated(
+        browse: InstalledBrowse,
+        metadata: MetadataLookup?,
+        npmFreshness: NpmOutdatedState = .notChecked(.notYetChecked)
+    ) -> HealthReading {
         guard browse.isAvailable else { return .unknown(.unavailable) }
         let installed = browse.inventory.packages.count
         // An inventory that has not loaded is not an inventory with nothing wrong
         // with it.
         guard installed > 0 else { return .unknown(.unmeasured) }
 
-        let outdated = browse.outdatedIDs(metadata: metadata).count
+        let summary = InstalledUpdatesSummary(
+            browse: browse, metadata: metadata, npmFreshness: npmFreshness
+        )
+        let homebrewInstalled = browse.inventory.packages
+            .filter { $0.kind.source == .homebrew }
+            .count
+        // A machine whose only packages are npm globals has no Homebrew half to
+        // score, which is a gap rather than a perfect one.
+        guard homebrewInstalled > 0 else { return .unknown(.unmeasured) }
+
         return .answered(
-            HealthThresholds.outdatedHealth(outdated: outdated, installed: installed),
-            HealthCopy.outdatedSummary(outdated: outdated, installed: installed)
+            HealthThresholds.outdatedHealth(
+                outdated: summary.homebrewCount, installed: homebrewInstalled
+            ),
+            HealthCopy.outdatedSummary(
+                outdated: summary.total,
+                installed: installed,
+                npmNotChecked: summary.npmNotCheckedCopy,
+                npmScope: summary.npmUpgradeScopeCopy
+            )
         )
     }
 
@@ -242,10 +278,11 @@ nonisolated enum HealthComposition {
         snapshot: DiskUsageSnapshot?,
         lastUpdate reading: HomebrewLastUpdate?,
         doctor outcome: DoctorOutcome?,
-        now: Date
+        now: Date,
+        npmFreshness: NpmOutdatedState = .notChecked(.notYetChecked)
     ) -> HealthInputs {
         let readings: [HealthInput: HealthReading] = [
-            .outdated: outdated(browse: browse, metadata: metadata),
+            .outdated: outdated(browse: browse, metadata: metadata, npmFreshness: npmFreshness),
             .vulnerable: vulnerable(state: scan, totals: coverage),
             .advisoryCoverage: advisoryCoverage(state: scan, totals: coverage),
             .lastUpdate: lastUpdate(reading, now: now),

@@ -112,6 +112,13 @@ nonisolated enum HomebrewUpdateNeed {
         switch package.kind {
         case .formula: package.tap == "homebrew/core"
         case .cask: package.tap == "homebrew/cask" && !package.isSelfUpdating
+        // The card is about Homebrew being behind what Homebrew publishes. An
+        // npm global's version disagreement says nothing about that, and no
+        // `brew update` could ever resolve it — the same reason a third-party
+        // tap's package is excluded here. Counting it would be worse than
+        // useless: a comparison that "answered" also suppresses the fetch-marker
+        // age fallback, so a genuinely stale Homebrew would stop being reported.
+        case .npm: false
         }
     }
 }

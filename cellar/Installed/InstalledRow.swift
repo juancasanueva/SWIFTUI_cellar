@@ -72,9 +72,23 @@ struct InstalledRow: View {
         // without it the row identifier replaces every child's, which left
         // `release-notes-open-<name>` unaddressable (the A9 gotcha, m5-brewfile).
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(
-            "installed-row-\(entry.id.kind == .formula ? "formula" : "cask")-\(entry.id.name)"
-        )
+        .accessibilityIdentifier(Self.identifier(for: entry.id))
+    }
+
+    /// The row's addressable identity.
+    ///
+    /// Extracted from the two-way ternary it used to be, which labelled
+    /// *everything that was not a formula* a cask. With a third kind that is no
+    /// longer a restatement of the type — an npm package would have been
+    /// addressable as `installed-row-cask-typescript`, so a UI test asserting
+    /// about casks would quietly have started matching npm rows too.
+    nonisolated static func identifier(for id: PackageID) -> String {
+        let kind: String = switch id.kind {
+        case .formula: "formula"
+        case .cask: "cask"
+        case .npm: "npm"
+        }
+        return "installed-row-" + kind + "-" + id.name
     }
 
     /// "What's new?", beside `MutationMenu` and deliberately **not inside it**.

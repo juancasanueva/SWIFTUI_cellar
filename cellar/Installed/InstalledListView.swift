@@ -4,6 +4,7 @@
 //
 
 import BrewClient
+import BrewProcess
 import Catalog
 import Persistence
 import SwiftUI
@@ -45,6 +46,14 @@ nonisolated enum InstalledLens {
 
 struct InstalledListView: View {
     let installed: InstalledStore
+    /// npm's detection state, for the Source chip alone.
+    ///
+    /// Required rather than defaulted: a main-actor default expression is left
+    /// out of the synthesised memberwise initialiser, so a default here would be
+    /// silently unpassable. Every caller hands over the app's one store, and a
+    /// preview constructs an inert one — which publishes `.disabled` and probes
+    /// nothing, rendering exactly the bar this list had before npm existed.
+    let npmDetection: NpmDetectionStore
     let catalog: CatalogStore
     let operations: OperationCenter
     let metadata: MetadataStore
@@ -63,6 +72,10 @@ struct InstalledListView: View {
     /// The kind narrowing, `nil` for both — the Search catalog's three-way
     /// choice, applied here as a display filter like the in-pane query.
     @State private var kind: PackageKind?
+    /// The source narrowing, `nil` for all. Its own dimension rather than a
+    /// fourth kind chip: "npm" is not a kind of Homebrew package, and folding it
+    /// into `kind` would make "Formulae + npm" unrepresentable.
+    @State private var source: PackageSource?
 
     /// The native multi-select binding. A `Set` cannot carry order.
     @State private var selected: Set<PackageID> = []
@@ -78,6 +91,7 @@ struct InstalledListView: View {
     /// parameter mirrors the memberwise initializer this replaces.
     init(
         installed: InstalledStore,
+        npmDetection: NpmDetectionStore,
         catalog: CatalogStore,
         operations: OperationCenter,
         metadata: MetadataStore,
@@ -87,6 +101,7 @@ struct InstalledListView: View {
         lens: InstalledLens = .all
     ) {
         self.installed = installed
+        self.npmDetection = npmDetection
         self.catalog = catalog
         self.operations = operations
         self.metadata = metadata
@@ -105,7 +120,9 @@ struct InstalledListView: View {
                 kind: $kind,
                 includeDependencies: $includeDependencies,
                 upgradableCount: upgradableIDs.count,
-                state: installed.state
+                state: installed.state,
+                source: $source,
+                npmSource: NpmSourceAvailability(npmDetection.state)
             )
             if !bulk.isEmpty {
                 BulkActionBar(
@@ -155,7 +172,12 @@ struct InstalledListView: View {
             .accessibilityIdentifier("installed-list")
             .overlay {
                 if entries.isEmpty {
-                    InstalledEmptyState(state: installed.state, lens: lens)
+                    InstalledEmptyState(
+                        state: installed.state,
+                        lens: lens,
+                        source: browse.effectiveSource(source),
+                        isNpmContributing: browse.isSourceFilterEnabled
+                    )
                 }
             }
             .onChange(of: selected) { _, current in
@@ -283,7 +305,11 @@ struct InstalledListView: View {
     // MARK: - Sections
 
     private var browse: InstalledBrowse {
-        InstalledBrowse(inventory: installed.inventory, isAvailable: installed.absence == nil)
+        InstalledBrowse(
+            inventory: installed.inventory,
+            isAvailable: installed.hasAnyInventory,
+            npmSource: NpmSourceAvailability(npmDetection.state)
+        )
     }
 
     /// `nil` when there is no metadata to compose, which is exactly what makes
@@ -302,6 +328,12 @@ struct InstalledListView: View {
         var narrowed = base
         if let kind {
             narrowed = narrowed.filter { $0.id.kind == kind }
+        }
+        // Through `effectiveSource`, so a selection left over from before the
+        // npm switch was turned off narrows to nothing rather than emptying the
+        // list — the same rule `effectiveMode` follows for the state filters.
+        if let source = browse.effectiveSource(source) {
+            narrowed = narrowed.filter { $0.id.kind.source == source }
         }
         if lens == .updates {
             let outdated = browse.outdatedIDs(metadata: lookup)
@@ -351,6 +383,7 @@ struct InstalledListView: View {
     @Previewable @State var selection: PackageID?
     return InstalledListView(
         installed: InstalledStore(),
+        npmDetection: NpmDetectionStore(),
         catalog: CatalogStore(directory: FileManager.default.temporaryDirectory),
         operations: OperationCenter(),
         metadata: MetadataStore(container: nil),

@@ -86,6 +86,15 @@ nonisolated struct ArtifactLocator {
             switch package.kind {
             case .formula: formulaLocations(for: package)
             case .cask: caskLocations(for: package)
+            // Nothing to assess, and deliberately so. Both branches above read a
+            // Homebrew tree — `Cellar/<name>/<version>/bin` and
+            // `Caskroom/<token>/<version>` — that an npm global has no entry in.
+            // A `default:` would have sent every npm package down the formula
+            // path, where `Cellar/typescript/…` may well exist and belong to a
+            // *different* package of the same name. Artifact integrity is not
+            // extended to npm in this change; producing no location is the
+            // honest report of that, not a gap (design D2).
+            case .npm: [ArtifactLocation]()
             }
         }
     }

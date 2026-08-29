@@ -1,0 +1,9 @@
+npm error code ENOTFOUND
+npm error syscall getaddrinfo
+npm error errno ENOTFOUND
+npm error network request to https://registry.doesnotexist.invalid/opencode-ai failed, reason: getaddrinfo ENOTFOUND registry.doesnotexist.invalid
+npm error network This is a problem related to network connectivity.
+npm error network In most cases you are behind a proxy or have bad network settings.
+npm error network
+npm error network If you are behind a proxy, please make sure that the 'proxy' config is set properly.  See: 'npm help config'
+npm error A complete log of this run can be found in: /Users/example/.npm/_logs/2026-08-29T17_42_38_973Z-debug-0.log

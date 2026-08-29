@@ -1,0 +1,97 @@
+{
+  "name": "lib",
+  "dependencies": {
+    "@colbymchenry/codegraph": {
+      "version": "1.1.1",
+      "overridden": false
+    },
+    "@earendil-works/pi-coding-agent": {
+      "version": "0.82.1",
+      "overridden": false
+    },
+    "@fission-ai/openspec": {
+      "version": "1.1.1",
+      "overridden": false
+    },
+    "@google/gemini-cli": {
+      "version": "0.49.0",
+      "overridden": false
+    },
+    "@houtini/gemini-mcp": {
+      "version": "2.3.0",
+      "overridden": false
+    },
+    "@juicesharp/rpiv-ask-user-question": {
+      "version": "1.9.1",
+      "overridden": false
+    },
+    "@juicesharp/rpiv-todo": {
+      "version": "1.9.1",
+      "overridden": false
+    },
+    "@openai/codex": {
+      "version": "0.149.0",
+      "overridden": false
+    },
+    "@playwright/cli": {
+      "version": "0.1.8",
+      "overridden": false
+    },
+    "@qwen-code/qwen-code": {
+      "version": "0.19.7",
+      "overridden": false
+    },
+    "@upstash/context7-mcp": {
+      "version": "2.1.7",
+      "overridden": false
+    },
+    "gentle-engram": {
+      "version": "0.1.7",
+      "overridden": false
+    },
+    "gentle-pi": {
+      "version": "0.3.8",
+      "overridden": false
+    },
+    "opencode-ai": {
+      "version": "1.18.23",
+      "overridden": false
+    },
+    "pi-btw": {
+      "version": "0.4.0",
+      "overridden": false
+    },
+    "pi-intercom": {
+      "version": "0.6.0",
+      "overridden": false
+    },
+    "pi-lens": {
+      "version": "3.8.44",
+      "overridden": false
+    },
+    "pi-mcp-adapter": {
+      "version": "2.6.1",
+      "overridden": false
+    },
+    "pi-subagents": {
+      "version": "0.24.3",
+      "overridden": false
+    },
+    "pi-web-access": {
+      "version": "0.10.7",
+      "overridden": false
+    },
+    "pnpm": {
+      "version": "10.13.1",
+      "overridden": false
+    },
+    "skillui": {
+      "version": "1.3.3",
+      "overridden": false
+    },
+    "uipro-cli": {
+      "version": "2.2.3",
+      "overridden": false
+    }
+  }
+}

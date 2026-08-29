@@ -4,6 +4,7 @@
 //
 
 import BrewClient
+import BrewProcess
 import Catalog
 import SwiftUI
 
@@ -22,6 +23,15 @@ struct InstalledFilterBar: View {
     /// M2-2 defect this closes (installed-inventory II14).
     let upgradableCount: Int
     let state: InstalledLoadState
+    /// `nil` shows every source. Its own dimension beside the kind chips: npm is
+    /// not a kind of Homebrew package.
+    @Binding var source: PackageSource?
+    /// Whether the Source chips may be used, and why not when they may not.
+    ///
+    /// Defaulted to `disabled`, which is what every existing call site means and
+    /// what a build with the switch off renders: the chips are absent entirely
+    /// rather than present and inert.
+    var npmSource: NpmSourceAvailability = .disabled
 
     var body: some View {
         HStack(spacing: 5) {
@@ -37,6 +47,10 @@ struct InstalledFilterBar: View {
                 kind = .cask
             }
             .disabled(isDisabled)
+
+            if npmSource.isAvailable {
+                sourceChips
+            }
 
             FilterChip(label: "Dependencies", isOn: includeDependencies) {
                 includeDependencies.toggle()
@@ -60,6 +74,24 @@ struct InstalledFilterBar: View {
         .padding(EdgeInsets(top: 10, leading: 13, bottom: 10, trailing: 13))
     }
 
+    /// All / Homebrew / npm, rendered only when npm is genuinely available.
+    ///
+    /// Absent rather than disabled when it is not. A greyed-out control that
+    /// changes nothing is the shape `SettingsView`'s own rule already refuses,
+    /// and the reason a user would want is in Settings, not on a chip they
+    /// cannot press. `NpmSourceUnavailableReason.guidance` carries that sentence
+    /// for the surfaces that do want to say it.
+    @ViewBuilder
+    private var sourceChips: some View {
+        FilterChip(label: "Any source", isOn: source == nil) { source = nil }
+            .disabled(isDisabled)
+        FilterChip(label: "Homebrew", isOn: source == .homebrew) { source = .homebrew }
+            .disabled(isDisabled)
+        FilterChip(label: "npm", isOn: source == .npm) { source = .npm }
+            .disabled(isDisabled)
+            .accessibilityIdentifier("installed-source-npm")
+    }
+
     private var isDisabled: Bool {
         if case .brewAbsent = state { return true }
         return false
@@ -68,11 +100,14 @@ struct InstalledFilterBar: View {
 
 #Preview {
     @Previewable @State var kind: PackageKind?
+    @Previewable @State var source: PackageSource?
     @Previewable @State var includeDependencies = false
     return InstalledFilterBar(
         kind: $kind,
         includeDependencies: $includeDependencies,
         upgradableCount: 3,
-        state: .loaded
+        state: .loaded,
+        source: $source,
+        npmSource: .available
     )
 }

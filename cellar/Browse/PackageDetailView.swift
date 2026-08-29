@@ -462,7 +462,9 @@ struct PackageDetailView: View {
                             .foregroundStyle(Theme.textSecondary)
                         Circle().fill(Color.white.opacity(0.25)).frame(width: 3, height: 3)
                     }
-                    Text(id.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
+                    // The header and the fact pane below must not describe the
+                    // same package differently, so both read the one projection.
+                    Text(InstalledDetailProjection.typeCopy(id.kind))
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.textSecondary)
                     statusBadge(installed: installedPackage)
@@ -604,7 +606,11 @@ struct PackageDetailView: View {
                 // presentation beside the tap it belongs to — never as a field
                 // of the catalog projection, whose field set PD7 keeps closed.
                 fact("Tap", package.tap, mono: true, note: grantMarker(for: package))
-                fact("Type", package.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)")
+                // `package` is a `CatalogPackage`, which is never npm — the
+                // catalog publishes two namespaces and npm is in neither. Read
+                // through the projection anyway, so this cannot become the one
+                // place that disagrees if that ever changes.
+                fact("Type", InstalledDetailProjection.typeCopy(package.kind))
                 if let license = package.license {
                     fact("License", license)
                 }

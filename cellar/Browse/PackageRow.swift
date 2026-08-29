@@ -124,22 +124,55 @@ struct UpdateTag: View {
     }
 }
 
+/// The pill beside a row's name, or nothing.
+///
+/// Which pill is `PackageKindTag`'s decision, in `CellarCore`, derived from
+/// `kind` and nowhere else: a formula is the unmarked case, a cask reads CASK
+/// and an npm global reads NPM. This view chooses colours and does no deciding,
+/// so the Installed list, the Updates lens and both search surfaces cannot drift
+/// apart about what a row is.
 struct KindTag: View {
     let kind: PackageKind
 
     var body: some View {
-        if kind == .cask {
-            Text("CASK")
+        if let tag = PackageKindTag(kind: kind) {
+            Text(tag.label)
                 .font(.system(size: 8.5, weight: .bold))
                 .kerning(0.3)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1.5)
                 .background(
-                    Theme.caskTint(0.18),
+                    tint(tag),
                     in: RoundedRectangle(cornerRadius: 4, style: .continuous)
                 )
-                .foregroundStyle(Theme.caskText)
-                .accessibilityLabel("Cask")
+                .foregroundStyle(foreground(tag))
+                .accessibilityLabel(label(tag))
+                // Derived from the tag rather than passed in, so a row cannot be
+                // identified as something other than what it is. macOS does not
+                // surface a plain `Text`'s label to `XCUIApplication.staticTexts`
+                // reliably, so the UI pass queries this instead.
+                .accessibilityIdentifier("kind-tag-\(tag.rawValue)")
+        }
+    }
+
+    private func tint(_ tag: PackageKindTag) -> Color {
+        switch tag {
+        case .cask: Theme.caskTint(0.18)
+        case .npm: Theme.infoTint(0.18)
+        }
+    }
+
+    private func foreground(_ tag: PackageKindTag) -> Color {
+        switch tag {
+        case .cask: Theme.caskText
+        case .npm: Theme.infoText
+        }
+    }
+
+    private func label(_ tag: PackageKindTag) -> String {
+        switch tag {
+        case .cask: "Cask"
+        case .npm: "npm package"
         }
     }
 }

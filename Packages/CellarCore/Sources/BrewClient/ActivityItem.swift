@@ -60,6 +60,17 @@ public final class ActivityItem: Identifiable {
     /// outside it, with no handle, means no runner ever existed (design D10).
     @ObservationIgnored internal var isStartInFlight = false
 
+    /// True while this item is waiting its turn in the **centre's** cross-source
+    /// chain, before it has been handed to any runner at all.
+    ///
+    /// Distinct from `isStartInFlight`, and the distinction is what makes a
+    /// cancel honest. A chain-queued item has no process, no operation id and no
+    /// entry in any runner's queue, so cancelling it can settle immediately and
+    /// guarantee nothing is ever spawned. `isStartInFlight` means the opposite:
+    /// a handle is moments away, so a cancel is replayed rather than settled
+    /// (design D13).
+    @ObservationIgnored internal var isChainQueued = false
+
     /// The typed command, erased to its projections. Everything displayed is
     /// rendered from this, never from bytes the subprocess wrote.
     ///
@@ -124,6 +135,14 @@ public final class ActivityItem: Identifiable {
     /// names none and no non-package family ever does, which is why this is
     /// optional rather than defaulted.
     public var packageID: PackageID? { command.packageID }
+
+    /// Which package manager is running this operation.
+    ///
+    /// Read off the erased command, never recovered by downcast or by looking
+    /// at the verb string: cancel, log streaming and terminal enumeration are
+    /// offered on identical terms for both sources, and this is the only thing
+    /// that distinguishes them (`operation-activity`).
+    public var source: PackageSource { command.source }
 
     /// The one sentence to show for the current state.
     public var message: String {

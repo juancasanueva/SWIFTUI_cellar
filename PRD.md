@@ -216,6 +216,9 @@ Health dashboard + score; pre-install cask inspection; release notes preview; Br
 **M6 — Ship**
 Menu bar extra; background checks + notifications (SMAppService); Settings; Spanish localization; accessibility pass; Sparkle integration; CI signing/notarization pipeline; self-hosted tap; landing page. (Tip jar was M6's first slice — built, then removed by decision; §6. The CI signing/notarization pipeline landed as M6's second slice — `RELEASING.md`. Sparkle 2 in-app updates landed as the third — `openspec/specs/app-updates/`. The self-hosted Homebrew tap landed as the fourth — `juancasanueva/homebrew-cellar`, §6.) *Exit: 1.0 public release.*
 
+**M13 — npm package source**
+A second package source beside Homebrew, scoped to globally installed npm packages (`npm -g`): detection of the npm binary and its global prefix (Homebrew node, Node.pkg, Volta, fnm, nvm, mise) with a Settings toggle that defaults to off; a read-only global inventory with outdated detection surfaced in Installed/Updates behind a Source filter and an NPM tag; upgrade and uninstall through the shared operation queue, activity log and history; source-aware copy on Home, menu bar and Health. Per-project `node_modules` is out of scope. *Exit: a user with Homebrew and npm sees and applies both sets of updates from one Updates list.*
+
 ---
 
 ## 8. Risks & mitigations

@@ -60,9 +60,14 @@ struct ReceiptDetailCompositionTests {
         // here.
         let projection = try ReceiptDetailSources.projection(in: sources)
         #expect(projection.code.contains("public init(_ package: InstalledPackage)"))
+        // Five, not four: `NpmState` joined `Fact`, `FormulaState`, `CaskState`
+        // and the projection itself when npm became a second source. The number
+        // is deliberately exact rather than a lower bound — the guard exists so
+        // a *second* way to construct the projection cannot arrive unnoticed,
+        // and the line below states the shape that would actually be dangerous.
         #expect(
-            projection.code.components(separatedBy: "public init(").count == 5,
-            "the projection grew an initializer beyond the four value types' own"
+            projection.code.components(separatedBy: "public init(").count == 6,
+            "the projection grew an initializer beyond the five value types' own"
         )
         #expect(projection.code.contains("public init(_ package: InstalledPackage, ") == false)
         #expect(InstalledDetailProjection(Self.receipt()).orderedFacts.isEmpty == false)

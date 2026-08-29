@@ -150,8 +150,13 @@ struct TrustGrantRefreshTests {
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { $0.hasPrefix("public static let ") && $0.contains("InvalidationScope(rawValue:") }
-        #expect(members.count == 4, "InvalidationScope grew a member: \(members)")
-        for name in ["installedInventory", "services", "taps", "diskUsage"] {
+        // Five since the npm source landed. The fifth is `npmInventory`, and it
+        // is deliberately outside the brew union asserted above: a `brew info`
+        // re-snapshot cannot observe an npm change, so npm declares a domain of
+        // its own rather than widening one of brew's (design D11). The census
+        // stays exact so a *sixth*, undeclared member is still a failure.
+        #expect(members.count == 5, "InvalidationScope grew a member: \(members)")
+        for name in ["installedInventory", "services", "taps", "diskUsage", "npmInventory"] {
             #expect(members.contains { $0.contains("let \(name) =") })
         }
         for absent in ["TrustGrant", "packageTrust", "perPackage", "grantsIndividually"] {

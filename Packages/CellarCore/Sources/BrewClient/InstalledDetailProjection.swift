@@ -94,9 +94,25 @@ public struct InstalledDetailProjection: Sendable, Hashable {
         }
     }
 
+    /// npm-only state, and deliberately almost empty.
+    ///
+    /// A global npm package has one installed version and nothing else this pane
+    /// can state as a fact: no keg list, no link state, no pin, no tap and no
+    /// auto-updates declaration. Giving it its own case rather than borrowing
+    /// `FormulaState` is what keeps those four absent members unrepresentable
+    /// instead of set to plausible defaults nobody would notice were wrong.
+    public struct NpmState: Sendable, Hashable {
+        public let installedVersion: String
+
+        public init(installedVersion: String) {
+            self.installedVersion = installedVersion
+        }
+    }
+
     public enum KindState: Sendable, Hashable {
         case formula(FormulaState)
         case cask(CaskState)
+        case npm(NpmState)
     }
 
     /// The published description, absence preserved. Presented as its own block
@@ -151,6 +167,12 @@ public struct InstalledDetailProjection: Sendable, Hashable {
                     value: autoUpdates ? "Updates itself" : "Updated by Homebrew"
                 )
             ]
+        case .npm(let state):
+            // One row, and no "latest": the same rule the formula branch follows
+            // (DD-5). The offered version is the Installed row's business, not
+            // this pane's, and asserting it here would restate a claim the npm
+            // listing on its own never makes.
+            return [Fact(label: "Version", value: state.installedVersion, style: .mono)]
         }
     }
 
@@ -167,10 +189,7 @@ public struct InstalledDetailProjection: Sendable, Hashable {
         description = Self.present(package.desc)
 
         var identity = [
-            Fact(
-                label: "Type",
-                value: package.kind == .formula ? "Formula (CLI)" : "Cask (GUI app)"
-            )
+            Fact(label: "Type", value: Self.typeCopy(package.kind))
         ]
         if let homepage = package.homepage {
             identity.append(
@@ -201,10 +220,29 @@ public struct InstalledDetailProjection: Sendable, Hashable {
             ))
         case .cask:
             kindState = .cask(CaskState(autoUpdates: package.declaresAutoUpdates))
+        case .npm:
+            // The single keg the npm projection synthesises. Its version is the
+            // whole install state an npm global has.
+            kindState = .npm(NpmState(installedVersion: package.primaryKeg.version))
         }
     }
 
     // MARK: - Copy
+
+    /// A switch rather than the two-way ternary this used to be: with three
+    /// kinds a ternary would have labelled every npm package "Cask (GUI app)",
+    /// and it would have compiled.
+    ///
+    /// `public` so the detail header renders the same sentence this pane does:
+    /// the two sat beside each other with the same ternary written twice, and
+    /// one copy of the rule is what stops them disagreeing.
+    public static func typeCopy(_ kind: PackageKind) -> String {
+        switch kind {
+        case .formula: "Formula (CLI)"
+        case .cask: "Cask (GUI app)"
+        case .npm: "npm package"
+        }
+    }
 
     private static func copy(_ state: FormulaState.LinkState) -> String {
         switch state {

@@ -61,19 +61,34 @@ struct MenuBarPopoverView: View {
     /// what makes the popover and the status item literally unable to disagree,
     /// and it carries the zero case for free: the title is absent when nothing
     /// is outdated, so there is no `0` for this surface to decide how to draw.
+    /// The reassuring sentence is the projection's, not this view's. A popover
+    /// that owned the literal could still print it over an npm nobody managed to
+    /// check; reading `upToDateCopy` means the sentence is simply absent
+    /// whenever it may not be said (`menu-bar`: offline npm is stated, not
+    /// hidden).
     private var countRow: some View {
-        HStack(spacing: 9) {
-            if let title = projection.statusItemTitle {
-                StatusPill(label: title, background: theme.tint(0.22), foreground: theme.light)
-                Text("outdated")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Theme.textPrimary)
-            } else {
-                Text("Everything is up to date")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Theme.textPrimary)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 9) {
+                if let title = projection.statusItemTitle {
+                    StatusPill(label: title, background: theme.tint(0.22), foreground: theme.light)
+                    Text("outdated")
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(Theme.textPrimary)
+                } else if let upToDate = projection.upToDateCopy {
+                    Text(upToDate)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(Theme.textPrimary)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            // Absent when npm answered, and absent entirely when the source is
+            // off — so a brew-only Mac sees the shipped row byte for byte.
+            if let notChecked = projection.npmNotCheckedCopy {
+                Text(notChecked)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Color.white.opacity(0.45))
+                    .accessibilityIdentifier("menu-bar-npm-not-checked")
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -129,18 +144,29 @@ struct MenuBarPopoverView: View {
     /// The disclosed command is the shipped command's own, so the popover and
     /// the installed list cannot word one submission two ways.
     private var upgradeRow: some View {
-        HStack(spacing: 8) {
-            Button("Upgrade all") { operations.submit(.upgradeAll) }
-                .buttonStyle(ActionPillStyle())
-                .accessibilityIdentifier("menu-bar-upgrade-all")
-                .accessibilityLabel("Upgrade all outdated packages")
-            Text(MutationCommand.upgradeAll.displayCommand)
-                .font(Theme.mono(10.5))
-                .foregroundStyle(Color.white.opacity(0.45))
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            CopyCommandButton(text: MutationCommand.upgradeAll.displayCommand)
-                .accessibilityIdentifier("menu-bar-copy-command")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Button("Upgrade all") { operations.submit(.upgradeAll) }
+                    .buttonStyle(ActionPillStyle())
+                    .accessibilityIdentifier("menu-bar-upgrade-all")
+                    .accessibilityLabel("Upgrade all outdated packages")
+                Text(MutationCommand.upgradeAll.displayCommand)
+                    .font(Theme.mono(10.5))
+                    .foregroundStyle(Color.white.opacity(0.45))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                CopyCommandButton(text: MutationCommand.upgradeAll.displayCommand)
+                    .accessibilityIdentifier("menu-bar-copy-command")
+            }
+            // The verb is unchanged and stays unchanged: it submits bare
+            // `brew upgrade` and fans out to nothing. What it does *not* cover
+            // is said here rather than by widening it (`menu-bar` MB4).
+            if let disclosure = projection.npmUpgradeDisclosure {
+                Text(disclosure)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.4))
+                    .accessibilityIdentifier("menu-bar-npm-disclosure")
+            }
         }
         .disabled(!operations.isAvailable)
         .help(operations.unavailableGuidance ?? "Upgrade every outdated package")

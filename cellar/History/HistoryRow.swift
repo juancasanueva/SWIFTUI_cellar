@@ -43,6 +43,18 @@ struct HistoryRow: View {
                     Text(title)
                         .font(Theme.mono(12.5, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
+                    Text(record.sourceLabel)
+                        .font(.system(size: 10, weight: .semibold))
+                        .kerning(0.3)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Color.white.opacity(0.45))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 1.5)
+                        .background(
+                            Color.white.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        )
+                        .accessibilityIdentifier("history-source-badge")
                     Text(record.verb)
                         .font(.system(size: 10, weight: .semibold))
                         .kerning(0.3)
@@ -55,9 +67,12 @@ struct HistoryRow: View {
                             in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                         )
                 }
-                // The exact argv that ran, verbatim — the same projection the
-                // copy button produces, and display only either way.
-                Text(record.commandText)
+                // The exact argv that ran, verbatim, behind the executable that
+                // ran it — the same projection the copy button produces, and
+                // display only either way. The prefix is derived from the row's
+                // own stored kind, so an npm row reads as an npm command and can
+                // never read as a brew one (`installation-history`).
+                Text(record.displayCommand)
                     .font(Theme.mono(11))
                     .foregroundStyle(Color.white.opacity(0.4))
                     .textSelection(.enabled)
@@ -89,14 +104,14 @@ struct HistoryRow: View {
             }
             if record.controls.contains(.copyCommand) {
                 Button {
-                    copy(record.commandText)
+                    copy(record.displayCommand)
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.white.opacity(0.5))
                 }
                 .buttonStyle(.borderless)
-                .help("Copy \(record.commandText)")
+                .help("Copy \(record.displayCommand)")
             }
         }
     }

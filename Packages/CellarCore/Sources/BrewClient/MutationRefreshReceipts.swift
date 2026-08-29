@@ -14,6 +14,13 @@ public enum RefreshDomain: Sendable, Hashable {
     case installedInventory
     case services
     case diskUsage
+    /// npm's global listing and its outdated report.
+    ///
+    /// A domain of its own for the reason `InvalidationScope.npmInventory` is a
+    /// bit of its own: a `brew info` re-snapshot cannot observe an npm change,
+    /// so a receipt that folded the two together would confirm a refresh that
+    /// never looked at what the mutation actually altered (design D11).
+    case npmInventory
 }
 
 public struct MutationTerminalEvent: Sendable, Equatable {

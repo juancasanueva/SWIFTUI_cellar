@@ -49,8 +49,25 @@ public struct MenuBarProjection: Sendable, Equatable {
     /// Last known, in brew's own order. Never refreshed from here.
     public let services: [ServiceRecord]
     public let runningServiceCount: Int
+    /// The per-source split, and npm's freshness with it.
+    ///
+    /// Composed here rather than by the surface, so the popover reads sentences
+    /// instead of deciding them — which is what makes "an unchecked npm is never
+    /// presented as up to date" a property of one value rather than a review
+    /// note on one view.
+    public let updates: InstalledUpdatesSummary
 
-    public init(browse: InstalledBrowse, metadata: MetadataLookup?, services: [ServiceRecord]) {
+    /// - Parameter npmFreshness: how current npm's own answer is. A **value**,
+    ///   not a store: the fourth input keeps this projection exactly as pure as
+    ///   the first three (MB1 as modified). Defaulted so every brew-only call
+    ///   site keeps composing the projection it always did — with the source off
+    ///   the browse carries no npm half, and the freshness is ignored outright.
+    public init(
+        browse: InstalledBrowse,
+        metadata: MetadataLookup?,
+        services: [ServiceRecord],
+        npmFreshness: NpmOutdatedState = .notChecked(.notYetChecked)
+    ) {
         let outdated = browse.outdatedIDs(metadata: metadata)
         outdatedIDs = outdated
         outdatedCount = browse.outdatedCount(metadata: metadata)
@@ -71,6 +88,9 @@ public struct MenuBarProjection: Sendable, Equatable {
             }
         self.services = services
         runningServiceCount = services.filter { $0.status == .started }.count
+        updates = InstalledUpdatesSummary(
+            browse: browse, metadata: metadata, npmFreshness: npmFreshness
+        )
     }
 
     /// The status item's title, **absent** when nothing is outdated.
@@ -93,4 +113,27 @@ public struct MenuBarProjection: Sendable, Equatable {
     public var andMoreLabel: String? {
         remainingOutdatedCount.map { $0 == 1 ? "and 1 more" : "and \($0) more" }
     }
+
+    /// What the popover may say when nothing is outdated, **absent** whenever it
+    /// may not be said.
+    ///
+    /// Absent is the whole point. An npm that was never checked, or whose check
+    /// failed, leaves this `nil`, so a surface cannot fall back on "nothing
+    /// outdated therefore everything is current" — the one claim this capability
+    /// must never make.
+    public var upToDateCopy: String? { updates.upToDateCopy }
+
+    /// npm's disclosure, absent when npm answered and absent entirely when the
+    /// source is off.
+    public var npmNotCheckedCopy: String? { updates.npmNotCheckedCopy }
+
+    /// What `Upgrade all` does *not* cover, stated beside it exactly when it
+    /// would otherwise mislead.
+    ///
+    /// That button submits bare `brew upgrade` and fans out to nothing, so a
+    /// popover listing an outdated npm package next to it would be promising
+    /// something the verb does not do. The line appears only when there is an
+    /// npm entry to explain, so a brew-only machine — and every machine with the
+    /// source off — sees the shipped row unchanged.
+    public var npmUpgradeDisclosure: String? { updates.npmUpgradeScopeCopy }
 }

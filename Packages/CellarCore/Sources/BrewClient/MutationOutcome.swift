@@ -32,6 +32,17 @@ public enum MutationOutcome: Sendable, Equatable {
     case busy
     /// The command needs privileges Cellar will not acquire.
     case needsPrivileges
+    /// A non-zero exit whose output names a network failure.
+    ///
+    /// A typed case rather than a `.failed` whose *message* quotes the payload,
+    /// for the reason the file header states: every sentence this type renders
+    /// is built from Cellar's own vocabulary, never from bytes the subprocess
+    /// wrote. Classification is what decides the sentence, so "we could not
+    /// reach the registry" has to be a classification (`npm-source`).
+    ///
+    /// Produced only by npm's classifier today. Brew's is unchanged, and
+    /// `NpmClassificationTests` asserts that containment in both directions.
+    case networkUnavailable
     /// It exited 0, and said so in words: nothing changed, because the thing
     /// was already in the state that was asked for.
     ///
@@ -173,7 +184,8 @@ public enum MutationOutcome: Sendable, Equatable {
     public var isFailure: Bool {
         switch self {
         // The command did not run, so the refusal is a failure.
-        case .failed, .busy, .needsPrivileges, .launchFailed, .refusedUntrustedTap: true
+        case .failed, .busy, .needsPrivileges, .networkUnavailable,
+             .launchFailed, .refusedUntrustedTap: true
         case .succeeded, .noChange, .cancelled, .abandoned, .authorizationDenied: false
         }
     }
@@ -198,7 +210,12 @@ public enum MutationOutcome: Sendable, Equatable {
         case .succeeded:
             "Done."
         case .failed(let status):
-            "Homebrew exited with status \(status). The full output is below."
+            "\(command.source.displayName) exited with status \(status). The full output is below."
+        case .networkUnavailable:
+            """
+            \(command.source.displayName) could not reach the network. Check your \
+            connection and try again.
+            """
         case .busy:
             """
             Homebrew is busy with another operation, probably in a Terminal \
@@ -216,15 +233,20 @@ public enum MutationOutcome: Sendable, Equatable {
             """
         case .cancelled:
             """
-            Cancelled. Homebrew may have left a partial change; refreshing now.
+            Cancelled. \(command.source.displayName) may have left a partial \
+            change; refreshing now.
             """
         case .abandoned:
             """
-            Cancelled, but Homebrew ignored the request and is still running \
-            outside Cellar. It may leave a partial change; refreshing now.
+            Cancelled, but \(command.source.displayName) ignored the request and \
+            is still running outside Cellar. It may leave a partial change; \
+            refreshing now.
             """
         case .launchFailed:
-            "Homebrew could not be started. Check the brew location in Settings."
+            """
+            \(command.source.displayName) could not be started. Check the \
+            \(command.source.commandName) location in Settings.
+            """
         case .authorizationDenied(.evidenceChanged):
             "The affected packages changed. Review them and confirm again."
         case .authorizationDenied(.evidenceUnavailable):
@@ -249,6 +271,7 @@ public enum MutationOutcome: Sendable, Equatable {
         case .failed: "Failed"
         case .busy: "Homebrew busy"
         case .needsPrivileges: "Needs Terminal"
+        case .networkUnavailable: "No network"
         case .cancelled: "Cancelled"
         case .abandoned: "Cancelled, still running"
         case .launchFailed: "Could not start"
