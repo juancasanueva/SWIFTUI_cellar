@@ -34,6 +34,22 @@ struct InstalledFilterBar: View {
     var npmSource: NpmSourceAvailability = .disabled
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            kindRow
+            // Its own row: two filter dimensions side by side wrap the chips
+            // mid-word once the source chips appear.
+            if npmSource.isAvailable {
+                HStack(spacing: 5) {
+                    sourceChips
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(EdgeInsets(top: 10, leading: 13, bottom: 10, trailing: 13))
+    }
+
+    /// All / Formulae / Casks, the dependency toggle and the outdated count.
+    private var kindRow: some View {
         HStack(spacing: 5) {
             FilterChip(label: "All", isOn: kind == nil) {
                 kind = nil
@@ -47,10 +63,6 @@ struct InstalledFilterBar: View {
                 kind = .cask
             }
             .disabled(isDisabled)
-
-            if npmSource.isAvailable {
-                sourceChips
-            }
 
             FilterChip(label: "Dependencies", isOn: includeDependencies) {
                 includeDependencies.toggle()
@@ -71,7 +83,6 @@ struct InstalledFilterBar: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .padding(EdgeInsets(top: 10, leading: 13, bottom: 10, trailing: 13))
     }
 
     /// All / Homebrew / npm, rendered only when npm is genuinely available.
