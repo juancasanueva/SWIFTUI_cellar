@@ -19,6 +19,9 @@ public struct HistoryRecord: Sendable, Identifiable, Hashable {
     public let argv: [String]
     /// What the copy affordance produces, character for character.
     public let commandText: String
+    /// The newest log lines of a plain failure, verbatim; empty everywhere
+    /// else — including every row written before the field existed.
+    public let failureTail: [String]
 
     /// The version transition Cellar intended at submission, when both ends
     /// were known.
@@ -55,6 +58,7 @@ public struct HistoryRecord: Sendable, Identifiable, Hashable {
         exitStatus = entry.exitStatus
         argv = entry.argv
         commandText = entry.commandText
+        failureTail = entry.failureTail
     }
 }
 

@@ -38,7 +38,58 @@ public enum SchemaV1: VersionedSchema {
     public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
     public static var models: [any PersistentModel.Type] {
-        [PackageMeta.self, Snooze.self, HistoryEntry.self]
+        [Persistence.PackageMeta.self, Persistence.Snooze.self, HistoryEntry.self]
+    }
+
+    /// The `HistoryEntry` shape V1 and V2 actually wrote, frozen.
+    ///
+    /// The live class below gained `failureTail` in V3, and a versioned schema
+    /// must keep describing the store its version stamped — SwiftData locates a
+    /// store's current version by matching these shapes, so an old version
+    /// declaring the new column would make every existing store unrecognisable
+    /// (the exact `SwiftDataError` V3's first cut shipped). Archival only:
+    /// nothing constructs one outside the migration proof.
+    @Model
+    public final class HistoryEntry {
+        public var id: UUID
+        public var date: Date
+        public var kindRaw: String
+        public var name: String
+        public var verb: String
+        public var versionFrom: String
+        public var versionTo: String
+        public var outcomeRaw: String
+        public var exitStatus: Int?
+        public var argv: [String]
+        public var commandText: String
+
+        #Unique<HistoryEntry>([\.id])
+
+        public init(
+            id: UUID,
+            date: Date,
+            kindRaw: String,
+            name: String,
+            verb: String,
+            versionFrom: String,
+            versionTo: String,
+            outcomeRaw: String,
+            exitStatus: Int?,
+            argv: [String],
+            commandText: String
+        ) {
+            self.id = id
+            self.date = date
+            self.kindRaw = kindRaw
+            self.name = name
+            self.verb = verb
+            self.versionFrom = versionFrom
+            self.versionTo = versionTo
+            self.outcomeRaw = outcomeRaw
+            self.exitStatus = exitStatus
+            self.argv = argv
+            self.commandText = commandText
+        }
     }
 }
 
@@ -103,6 +154,10 @@ public final class Snooze {
 ///
 /// `id` is the `ActivityItem`'s id, and `#Unique` on it means a replayed write
 /// cannot double-log.
+///
+/// This is the **live** shape, shipped by `SchemaV3`: it gained `failureTail`
+/// there, and the shape V1/V2 stamped into stores lives on as the archival
+/// `SchemaV1.HistoryEntry` above.
 @Model
 public final class HistoryEntry {
     public var id: UUID
@@ -119,6 +174,10 @@ public final class HistoryEntry {
     public var argv: [String]
     /// `argv.joined(separator: " ")`, denormalised so search can reach it.
     public var commandText: String
+    /// The newest log lines of a plain failure, verbatim; `[]` everywhere
+    /// else. Display-only, like the argv. Defaulted so rows written before
+    /// the field existed decode as "no tail" rather than as a migration.
+    public var failureTail: [String] = []
 
     #Unique<HistoryEntry>([\.id])
 
@@ -133,7 +192,8 @@ public final class HistoryEntry {
         outcomeRaw: String,
         exitStatus: Int?,
         argv: [String],
-        commandText: String
+        commandText: String,
+        failureTail: [String] = []
     ) {
         self.id = id
         self.date = date
@@ -146,6 +206,7 @@ public final class HistoryEntry {
         self.exitStatus = exitStatus
         self.argv = argv
         self.commandText = commandText
+        self.failureTail = failureTail
     }
 
     public var packageID: PackageID? { PackageIdentity.id(kindRaw: kindRaw, name: name) }

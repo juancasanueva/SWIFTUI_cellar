@@ -53,7 +53,8 @@ struct HistoryRecorderTests {
         verb: String = "upgrade",
         versions: VersionTransition? = VersionTransition(from: "1.2.2", to: "1.2.3"),
         outcome: MutationOutcome = .succeeded,
-        argv: [String] = ["upgrade", "--formula", "wget"]
+        argv: [String] = ["upgrade", "--formula", "wget"],
+        failureTail: [String] = []
     ) -> HistoryDraft {
         HistoryDraft(
             id: id,
@@ -62,7 +63,8 @@ struct HistoryRecorderTests {
             verb: verb,
             versions: versions,
             outcome: outcome,
-            argv: argv
+            argv: argv,
+            failureTail: failureTail
         )
     }
 
@@ -97,6 +99,30 @@ struct HistoryRecorderTests {
         #expect(record.argv == ["upgrade", "--formula", "wget"])
         #expect(record.commandText == "upgrade --formula wget")
         #expect(store.lastError == nil)
+    }
+
+    /// The tail is display-only text riding along with a failure, and it must
+    /// survive the same close-and-reopen every other field does.
+    @Test("A failed draft's log tail persists and survives a reopen")
+    func aFailureTailPersistsAcrossAReopen() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("Metadata.store", isDirectory: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let tail = ["==> Downloading google-chrome", "Error: Download failed"]
+        do {
+            let (recorder, store) = Self.recorder(try PersistenceContainer.onDisk(at: url))
+            recorder.record(Self.draft(outcome: .failed(status: 1), failureTail: tail))
+            recorder.record(Self.draft(id: UUID(), outcome: .succeeded))
+            #expect(store.records.count == 2)
+        }
+
+        let reopened = HistoryStore(container: try PersistenceContainer.onDisk(at: url))
+        let failed = try #require(reopened.records.first(where: { $0.outcomeRaw == "failed" }))
+        #expect(failed.failureTail == tail)
+        let succeeded = try #require(reopened.records.first(where: { $0.outcomeRaw == "succeeded" }))
+        #expect(succeeded.failureTail.isEmpty)
     }
 
     /// A grouped `upgradeAll` names no package, and "no package" is the empty

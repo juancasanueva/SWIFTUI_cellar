@@ -120,6 +120,32 @@ struct OperationCenterHistoryTests {
         #expect(byID[cancelled.id]?.argv == ["install", "--cask", "iterm2"])
     }
 
+    // MARK: - The failure tail rides the draft
+
+    @Test("A failed mutation's draft carries the newest log lines; a success carries none")
+    func aFailureDraftCarriesItsLogTail() async throws {
+        let harness = CenterHarness(honoursInterrupt: false)
+
+        let failing = harness.center.submit(.install(try Self.target(CenterHarness.wget)))
+        await harness.launcher.waitForLaunches(atLeast: 1)
+        harness.launcher.launchedProcesses[0].emitStderr("Error: wget: download failed")
+        await harness.settle()
+        try await harness.finish(call: 0, status: 1)
+
+        let succeeding = harness.center.submit(.install(try Self.target(CenterHarness.iterm)))
+        await harness.launcher.waitForLaunches(atLeast: 2)
+        try await harness.finish(call: 1, status: 0)
+
+        #expect(failing.outcome == .failed(status: 1))
+        #expect(succeeding.outcome == .succeeded)
+        let byID = Dictionary(
+            harness.recorder.drafts.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        #expect(byID[failing.id]?.failureTail.contains("Error: wget: download failed") == true)
+        #expect(byID[succeeding.id]?.failureTail.isEmpty == true)
+    }
+
     // MARK: - OA6 sc3, IH1 sc3 — nothing before the terminal outcome
 
     @Test("A pending mutation and a running mutation each write nothing")

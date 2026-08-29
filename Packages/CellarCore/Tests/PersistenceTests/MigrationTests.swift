@@ -24,7 +24,7 @@ struct MigrationTests {
     @Test("Neither the stored configuration nor the public surface declares a remote destination")
     func noSyncOrNetworkSurfaceExists() throws {
         for file in [
-            "PersistenceContainer.swift", "SchemaV1.swift", "SchemaV2.swift",
+            "PersistenceContainer.swift", "SchemaV1.swift", "SchemaV2.swift", "SchemaV3.swift",
             "MetadataStore.swift", "HistoryStore.swift", "MetadataMigrationPlan.swift",
             "DismissalStore.swift"
         ] {
@@ -41,7 +41,7 @@ struct MigrationTests {
     @Test("Persistence links no networking framework at all")
     func persistenceImportsNoNetworking() throws {
         for file in [
-            "PersistenceContainer.swift", "SchemaV1.swift", "SchemaV2.swift",
+            "PersistenceContainer.swift", "SchemaV1.swift", "SchemaV2.swift", "SchemaV3.swift",
             "MetadataStore.swift", "HistoryStore.swift", "MetadataMigrationPlan.swift"
         ] {
             let imports = SchemaTests.code(in: try Self.source(of: file))
@@ -98,12 +98,12 @@ struct MigrationTests {
             }
 
             let upgraded = try ModelContainer(
-                for: Schema(versionedSchema: ThrowawaySchemaV3.self),
+                for: Schema(versionedSchema: ThrowawaySchemaV4.self),
                 migrationPlan: ThrowawayMigrationPlan.self,
                 configurations: ModelConfiguration(url: url)
             )
 
-            let metas = try upgraded.mainContext.fetch(FetchDescriptor<ThrowawaySchemaV3.PackageMeta>())
+            let metas = try upgraded.mainContext.fetch(FetchDescriptor<ThrowawaySchemaV4.PackageMeta>())
             let meta = try #require(metas.first)
             #expect(meta.name == "wget")
             #expect(meta.isFavorite)
@@ -111,34 +111,93 @@ struct MigrationTests {
             // The added property is present and defaulted, not a decode failure.
             #expect(meta.colorTag == nil)
 
-            let snoozes = try upgraded.mainContext.fetch(FetchDescriptor<ThrowawaySchemaV3.Snooze>())
+            let snoozes = try upgraded.mainContext.fetch(FetchDescriptor<ThrowawaySchemaV4.Snooze>())
             #expect(snoozes.first?.snoozedVersion == "1.2.3")
         }
     }
 
-    @Test("The shipped plan declares both versions and exactly one lightweight stage")
-    func theShippedPlanDeclaresTheV1ToV2Stage() {
+    @Test("The shipped plan declares every version and one lightweight stage per step")
+    func theShippedPlanDeclaresEveryStage() {
         // V1 was genesis and the plan was wired from the first commit precisely
-        // so that this milestone is a stage rather than a rewrite. This is the
-        // moment that claim is cashed in.
-        #expect(MetadataMigrationPlan.schemas.count == 2)
-        #expect(ThrowawayMigrationPlan.stages.count == 2, "the throwaway plan lost a stage")
+        // so that each later milestone is a stage rather than a rewrite.
+        #expect(MetadataMigrationPlan.schemas.count == 3)
+        #expect(MetadataMigrationPlan.stages.count == 2)
+        #expect(ThrowawayMigrationPlan.stages.count == 3, "the throwaway plan lost a stage")
 
-        // Counting the stages says only that *a* stage exists. `MigrationStage` is
-        // a pattern-matchable enum, so the claim worth making is which stage it
-        // is: lightweight, from V1, to V2. A count of one survives a stage that
-        // migrates the wrong pair or the wrong way, and SwiftData performs
-        // implicit lightweight migration anyway — so this test is the only thing
-        // standing between the plan and a stage that is silently decorative.
-        let stage = try? #require(MetadataMigrationPlan.stages.first)
-        guard case .lightweight(let fromVersion, let toVersion) = stage else {
-            Issue.record("the V1 to V2 stage is not a lightweight stage")
-            return
+        // Counting the stages says only that stages exist. `MigrationStage` is
+        // a pattern-matchable enum, so the claim worth making is which stages
+        // they are: lightweight, and each bridging the right adjacent pair.
+        // SwiftData performs implicit lightweight migration anyway — so this
+        // test is the only thing standing between the plan and a stage that is
+        // silently decorative.
+        let pairs: [(any VersionedSchema.Type, any VersionedSchema.Type)] = [
+            (SchemaV1.self, SchemaV2.self),
+            (SchemaV2.self, SchemaV3.self)
+        ]
+        for (index, expected) in pairs.enumerated() {
+            guard index < MetadataMigrationPlan.stages.count,
+                  case .lightweight(let fromVersion, let toVersion) = MetadataMigrationPlan.stages[index]
+            else {
+                Issue.record("stage \(index) is missing or not lightweight")
+                continue
+            }
+            #expect(ObjectIdentifier(fromVersion) == ObjectIdentifier(expected.0))
+            #expect(ObjectIdentifier(toVersion) == ObjectIdentifier(expected.1))
+            #expect(fromVersion.versionIdentifier == expected.0.versionIdentifier)
+            #expect(toVersion.versionIdentifier == expected.1.versionIdentifier)
         }
-        #expect(ObjectIdentifier(fromVersion) == ObjectIdentifier(SchemaV1.self))
-        #expect(ObjectIdentifier(toVersion) == ObjectIdentifier(SchemaV2.self))
-        #expect(fromVersion.versionIdentifier == SchemaV1.versionIdentifier)
-        #expect(toVersion.versionIdentifier == SchemaV2.versionIdentifier)
+    }
+
+    // MARK: - The second real migration: V2 → V3
+
+    /// A store written by the code that shipped V2 — the archival `HistoryEntry`
+    /// shape, no `failureTail` column — opened by the shipped V3 container.
+    ///
+    /// This is the exact store every user of the previous release has on disk,
+    /// and the exact open that threw `SwiftDataError` when the field was first
+    /// added to the shared class in place instead of behind a version bump.
+    @Test("A store written under V2 opens under V3 with the failure tail defaulted")
+    func aStoreWrittenUnderV2OpensUnderV3WithTheTailDefaulted() throws {
+        let stamp = Date(timeIntervalSince1970: 1_770_000_000)
+        let entryID = UUID()
+
+        try withTemporaryStore { url in
+            do {
+                let written = try ModelContainer(
+                    for: Schema(versionedSchema: SchemaV2.self),
+                    migrationPlan: ShippedV2Plan.self,
+                    configurations: ModelConfiguration(url: url)
+                )
+                written.mainContext.insert(
+                    SchemaV1.HistoryEntry(
+                        id: entryID,
+                        date: stamp,
+                        kindRaw: "cask",
+                        name: "google-chrome",
+                        verb: "install",
+                        versionFrom: "",
+                        versionTo: "",
+                        outcomeRaw: "failed",
+                        exitStatus: 1,
+                        argv: ["install", "--cask", "google-chrome"],
+                        commandText: "install --cask google-chrome"
+                    )
+                )
+                try written.mainContext.save()
+            }
+
+            let upgraded = try PersistenceContainer.onDisk(at: url)
+            let entry = try #require(
+                try upgraded.mainContext.fetch(FetchDescriptor<HistoryEntry>()).first
+            )
+            #expect(entry.id == entryID)
+            #expect(entry.name == "google-chrome")
+            #expect(entry.outcomeRaw == "failed")
+            #expect(entry.exitStatus == 1)
+            #expect(entry.argv == ["install", "--cask", "google-chrome"])
+            // Present and defaulted, not a decode failure — and not invented.
+            #expect(entry.failureTail.isEmpty)
+        }
     }
 
     // MARK: - The first real migration: V1 → V2
@@ -248,7 +307,7 @@ struct MigrationTests {
             Snooze(kindRaw: "cask", name: "iterm2", snoozedVersion: "3.5.0", createdAt: stamp)
         )
         context.insert(
-            HistoryEntry(
+            SchemaV1.HistoryEntry(
                 id: entryID,
                 date: stamp,
                 kindRaw: "formula",
@@ -283,6 +342,9 @@ struct MigrationTests {
         #expect(entry.exitStatus == 0)
         #expect(entry.argv == ["brew", "install", "wget"])
         #expect(entry.commandText == "brew install wget")
+        // The V3 column, present and defaulted on a row written two versions
+        // before it existed.
+        #expect(entry.failureTail.isEmpty)
     }
 
     private static func propertyNames(of entity: String, in schema: Schema) throws -> [String] {

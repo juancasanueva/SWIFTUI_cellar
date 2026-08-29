@@ -388,7 +388,8 @@ public final class OperationCenter {
                 verb: item.command.verb,
                 versions: item.versions,
                 outcome: outcome,
-                argv: item.arguments
+                argv: item.arguments,
+                failureTail: HistoryDraft.failureTail(of: item.log, for: outcome)
             )
         )
         // Emit refresh work only after the terminal and its durable history draft

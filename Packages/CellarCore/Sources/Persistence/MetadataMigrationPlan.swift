@@ -9,15 +9,20 @@ import SwiftData
 /// lines, exactly as promised, because a container opened without a plan cannot
 /// grow one without re-pointing every call site.
 ///
-/// The stage is `.lightweight` because V2 adds one entity and changes nothing
-/// else — no renamed property, no changed type, no new non-optional column on an
-/// existing model. `MigrationTests` proves both halves: that a V1-written store
-/// opens under V2 with every field intact, and that the three V1 models are
-/// property-for-property identical.
+/// Both stages are `.lightweight` because each version changes the least it
+/// can: V2 adds one entity, V3 adds one defaulted column — no renamed property,
+/// no changed type, no new non-optional column without a default.
+/// `MigrationTests` proves it: a store written at each shipped version opens
+/// under the current one with every field intact.
 public enum MetadataMigrationPlan: SchemaMigrationPlan {
-    public static var schemas: [any VersionedSchema.Type] { [SchemaV1.self, SchemaV2.self] }
+    public static var schemas: [any VersionedSchema.Type] {
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self]
+    }
 
     public static var stages: [MigrationStage] {
-        [.lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self)]
+        [
+            .lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self),
+            .lightweight(fromVersion: SchemaV2.self, toVersion: SchemaV3.self)
+        ]
     }
 }

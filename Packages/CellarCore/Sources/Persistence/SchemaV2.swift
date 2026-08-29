@@ -25,11 +25,15 @@ import SwiftData
 /// silent drift `MigrationTests.theThreeV1ModelsAreUnchangedInV2` exists to
 /// catch. The migration is therefore one added entity and nothing else, which is
 /// what makes `.lightweight` correct rather than merely convenient.
+///
+/// `HistoryEntry` is the archival `SchemaV1` shape, shared with V1: V3 grew the
+/// live class a column, and this version must keep describing the store its
+/// stamp actually wrote.
 public enum SchemaV2: VersionedSchema {
     public static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
 
     public static var models: [any PersistentModel.Type] {
-        [PackageMeta.self, Snooze.self, HistoryEntry.self, DismissedCVE.self]
+        [PackageMeta.self, Snooze.self, SchemaV1.HistoryEntry.self, DismissedCVE.self]
     }
 }
 

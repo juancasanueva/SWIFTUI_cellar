@@ -1,3 +1,4 @@
+import BrewProcess
 import Catalog
 import Foundation
 import Testing
@@ -78,6 +79,28 @@ struct HistoryRecordingTests {
         #expect(draft.commandText == "upgrade")
         #expect(draft.verb == "upgradeAll")
         #expect(draft.versions == nil)
+    }
+
+    // MARK: - The failure tail
+
+    /// Only `.failed` keeps log lines: its own doc says "the log is the
+    /// explanation", while every other outcome already names its cause. The
+    /// tail is verbatim, display-only, and bounded to the newest lines.
+    @Test("Only a plain failure carries a log tail, capped to the newest lines")
+    func onlyAFailureCarriesABoundedTail() {
+        let log = (0..<30).map {
+            LogLine(stream: $0.isMultiple(of: 2) ? .stdout : .stderr, text: "line \($0)", sequence: $0)
+        }
+
+        let tail = HistoryDraft.failureTail(of: log, for: .failed(status: 1))
+        #expect(tail.count == HistoryDraft.failureTailLimit)
+        #expect(tail.first == "line \(30 - HistoryDraft.failureTailLimit)")
+        #expect(tail.last == "line 29")
+
+        #expect(HistoryDraft.failureTail(of: log, for: .succeeded).isEmpty)
+        #expect(HistoryDraft.failureTail(of: log, for: .cancelled).isEmpty)
+        #expect(HistoryDraft.failureTail(of: log, for: .needsPrivileges).isEmpty)
+        #expect(HistoryDraft.failureTail(of: [], for: .failed(status: 1)).isEmpty)
     }
 
     @Test("A transition is only carried when both ends are known")

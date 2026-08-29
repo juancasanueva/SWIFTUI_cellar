@@ -42,9 +42,22 @@ enum ShippedV1Plan: SchemaMigrationPlan {
     static var stages: [MigrationStage] { [] }
 }
 
-// MARK: - A throwaway V2, for the migration proof only
+/// The plan V2 actually shipped with: two schemas, one stage.
+///
+/// Kept for the same reason `ShippedV1Plan` is: the V2 → V3 migration proof
+/// writes its fixture with the code that wrote real V2 stores — the stores the
+/// shipped V3 container must open.
+enum ShippedV2Plan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [SchemaV1.self, SchemaV2.self] }
 
-/// Adds one optional property to `PackageMeta`, on top of the shipped V2.
+    static var stages: [MigrationStage] {
+        [.lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self)]
+    }
+}
+
+// MARK: - A throwaway V4, for the migration proof only
+
+/// Adds one optional property to `PackageMeta`, on top of the shipped V3.
 /// Exists purely so "`MetadataMigrationPlan` really is a plan, and adding a
 /// field really is `.lightweight`" is proven rather than asserted. Nothing
 /// ships it.
@@ -53,8 +66,8 @@ enum ShippedV1Plan: SchemaMigrationPlan {
 /// only needs to differ from the shipped schema in the one property under test,
 /// and a fourth redeclaration would be three more places for the stored shape to
 /// drift without anyone noticing.
-enum ThrowawaySchemaV3: VersionedSchema {
-    static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
+enum ThrowawaySchemaV4: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(4, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [PackageMeta.self, Snooze.self, HistoryEntry.self, DismissedCVE.self]
@@ -103,6 +116,9 @@ enum ThrowawaySchemaV3: VersionedSchema {
         var exitStatus: Int?
         var argv: [String] = []
         var commandText: String = ""
+        /// Shipped by V3; the throwaway must carry it to differ from V3 only
+        /// in the one property under test.
+        var failureTail: [String] = []
 
         init(id: UUID) { self.id = id }
     }
@@ -110,13 +126,14 @@ enum ThrowawaySchemaV3: VersionedSchema {
 
 enum ThrowawayMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self, ThrowawaySchemaV3.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self, ThrowawaySchemaV4.self]
     }
 
     static var stages: [MigrationStage] {
         [
             .lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self),
-            .lightweight(fromVersion: SchemaV2.self, toVersion: ThrowawaySchemaV3.self)
+            .lightweight(fromVersion: SchemaV2.self, toVersion: SchemaV3.self),
+            .lightweight(fromVersion: SchemaV3.self, toVersion: ThrowawaySchemaV4.self)
         ]
     }
 }

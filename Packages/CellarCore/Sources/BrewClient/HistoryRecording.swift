@@ -1,3 +1,4 @@
+import BrewProcess
 import Catalog
 import Foundation
 
@@ -39,6 +40,9 @@ public struct HistoryDraft: Sendable {
     public let versions: VersionTransition?
     public let outcome: MutationOutcome
     public let argv: [String]
+    /// The newest log lines of a plain failure, verbatim — empty for every
+    /// other outcome. Display-only, like the argv: nothing ever parses it.
+    public let failureTail: [String]
 
     public init(
         id: UUID,
@@ -47,7 +51,8 @@ public struct HistoryDraft: Sendable {
         verb: String,
         versions: VersionTransition?,
         outcome: MutationOutcome,
-        argv: [String]
+        argv: [String],
+        failureTail: [String] = []
     ) {
         self.id = id
         self.date = date
@@ -56,6 +61,20 @@ public struct HistoryDraft: Sendable {
         self.versions = versions
         self.outcome = outcome
         self.argv = argv
+        self.failureTail = failureTail
+    }
+
+    /// How many log lines a failure keeps in its durable record.
+    public static let failureTailLimit = 20
+
+    /// The tail a terminal outcome earns: the newest lines for `.failed` —
+    /// the one outcome whose only explanation is the log — and nothing for
+    /// every other, which already names its own cause. Verbatim on purpose:
+    /// classification happened before this, so nothing brew wrote can change
+    /// what the row says happened, only explain it.
+    public static func failureTail(of log: [LogLine], for outcome: MutationOutcome) -> [String] {
+        guard case .failed = outcome else { return [] }
+        return log.suffix(failureTailLimit).map(\.text)
     }
 
     /// The argv as one string, for search and for the copy affordance.

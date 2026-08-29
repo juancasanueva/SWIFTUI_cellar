@@ -17,7 +17,21 @@ import SwiftUI
 struct HistoryRow: View {
     let record: HistoryRecord
 
+    /// Collapsed by default: the tail is an explanation on demand, not a
+    /// second row competing with the list.
+    @State private var showsFailureTail = false
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header
+            if showsFailureTail {
+                failureTail
+            }
+        }
+        .padding(.vertical, 5)
+    }
+
+    private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: verbSymbol)
                 .font(.system(size: 10, weight: .semibold))
@@ -61,6 +75,17 @@ struct HistoryRow: View {
                 Text(record.date, format: .dateTime.day().month().hour().minute())
                     .font(.system(size: 11.5))
                     .foregroundStyle(Color.white.opacity(0.34))
+                // Only rows that stored a tail offer one — entries written
+                // before the field existed have nothing to disclose.
+                if !record.failureTail.isEmpty {
+                    Button(showsFailureTail ? "Hide error" : "Show error") {
+                        showsFailureTail.toggle()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.dangerText)
+                    .accessibilityIdentifier("history-failure-disclosure")
+                }
             }
             if record.controls.contains(.copyCommand) {
                 Button {
@@ -74,7 +99,22 @@ struct HistoryRow: View {
                 .help("Copy \(record.commandText)")
             }
         }
-        .padding(.vertical, 5)
+    }
+
+    /// The failure's own words, verbatim and display-only — the same newest
+    /// lines the Activity log showed while the run was alive.
+    private var failureTail: some View {
+        Text(record.failureTail.joined(separator: "\n"))
+            .font(Theme.mono(11))
+            .foregroundStyle(Color.white.opacity(0.65))
+            .textSelection(.enabled)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Theme.dangerTint(0.07),
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
+            .accessibilityIdentifier("history-failure-tail")
     }
 
     private var verbSymbol: String {

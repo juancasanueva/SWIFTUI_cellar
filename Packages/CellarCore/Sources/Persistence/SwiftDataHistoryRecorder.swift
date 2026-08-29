@@ -51,7 +51,8 @@ public final class SwiftDataHistoryRecorder: HistoryRecording {
             outcomeRaw: classified.raw,
             exitStatus: classified.exitStatus,
             argv: draft.argv,
-            commandText: draft.commandText
+            commandText: draft.commandText,
+            failureTail: draft.failureTail
         )
     }
 
