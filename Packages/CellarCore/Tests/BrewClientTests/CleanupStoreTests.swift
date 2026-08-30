@@ -25,6 +25,15 @@ struct CleanupStoreTests {
         #expect(spec.executableURL == TestInstallation.appleSilicon.executableURL)
     }
 
+    /// The row opens itself on the idle → anything edge, so only `idle` may
+    /// answer false: a loading preview already has a sentence to show.
+    @Test("Only the idle state has nothing to reveal")
+    func onlyIdleHasNothingToReveal() {
+        #expect(CleanupPreviewState.idle.isIdle)
+        #expect(!CleanupPreviewState.loading(stale: nil).isIdle)
+        #expect(!CleanupPreviewState.cancelled(stale: nil).isIdle)
+    }
+
     @Test("Absent and invalid brew return typed guidance without spawning")
     func unavailableBrewSpawnsNothing() async {
         let launcher = RecordingProcessLauncher()
