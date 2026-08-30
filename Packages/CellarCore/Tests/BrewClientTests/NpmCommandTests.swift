@@ -95,14 +95,19 @@ struct NpmCommandTests {
 
     // MARK: - Spine projections
 
-    @Test("The npm family declares the npm inventory domain and nothing else")
-    func npmCommandsDeclareOnlyTheNpmDomain() throws {
+    /// Both commands rewrite the global prefix, so both declare the npm disk
+    /// area alongside the npm inventory — and neither touches brew's inventory,
+    /// which is the domain a brew re-snapshot would be paid for (design D11).
+    @Test("The npm family declares the npm inventory and the npm disk area, and no brew domain")
+    func npmCommandsDeclareOnlyTheNpmDomains() throws {
         let target = try #require(NpmPackageTarget(Self.typescript))
 
         for command in [NpmCommand.upgrade(target), .uninstall(target)] {
-            #expect(command.invalidates == .npmInventory)
+            #expect(command.invalidates == [.npmInventory, .diskUsage])
             #expect(command.invalidates.contains(.installedInventory) == false)
-            #expect(command.diskAreas.isEmpty)
+            #expect(command.invalidates.contains(.taps) == false)
+            #expect(command.invalidates.contains(.services) == false)
+            #expect(command.diskAreas == [.npm])
             #expect(command.source == .npm)
             #expect(command.packageID == Self.typescript)
         }

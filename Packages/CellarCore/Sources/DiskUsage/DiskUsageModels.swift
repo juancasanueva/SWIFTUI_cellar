@@ -5,6 +5,10 @@ public enum DiskArea: String, Codable, CaseIterable, Sendable, Hashable {
     case cellar
     case caskroom
     case cache
+    /// The global npm package directory. Unlike the three Homebrew areas it is
+    /// only measured when npm is detected, so `allCases` is not the set of
+    /// areas a given scan covers: `DiskRootsIdentity.measuredAreas` is.
+    case npm
 }
 
 public enum DiskRootState: Codable, Sendable, Hashable {
@@ -92,6 +96,9 @@ public struct DiskUsageSnapshot: Codable, Sendable, Hashable {
     public let rootStates: [DiskArea: DiskRootState]
     public let packages: [DiskPackageUsage]
     public let cache: DiskObservation
+    /// The global npm package directory, `.zero` whenever `roots.npmGlobals` is
+    /// nil or the directory is absent.
+    public let npmGlobals: DiskObservation
     public let warnings: [DiskUsageWarning]
 
     public init(
@@ -101,6 +108,7 @@ public struct DiskUsageSnapshot: Codable, Sendable, Hashable {
         rootStates: [DiskArea: DiskRootState],
         packages: [DiskPackageUsage],
         cache: DiskObservation,
+        npmGlobals: DiskObservation = .zero,
         warnings: [DiskUsageWarning] = []
     ) {
         self.schemaVersion = schemaVersion
@@ -109,7 +117,39 @@ public struct DiskUsageSnapshot: Codable, Sendable, Hashable {
         self.rootStates = rootStates
         self.packages = Self.sorted(packages)
         self.cache = cache
+        self.npmGlobals = npmGlobals
         self.warnings = warnings
+    }
+
+    /// Hand-written for one key. `npmGlobals` was added after cache files were
+    /// already on disk, and `DiskUsageCache.load()` throws on a decode failure
+    /// rather than degrading to a cold start, so a missing key has to read as
+    /// `.zero` instead of `keyNotFound`. Encoding stays synthesized.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            schemaVersion: try container.decode(Int.self, forKey: .schemaVersion),
+            roots: try container.decode(DiskRootsIdentity.self, forKey: .roots),
+            generatedAt: try container.decode(Date.self, forKey: .generatedAt),
+            rootStates: try container.decode([DiskArea: DiskRootState].self, forKey: .rootStates),
+            packages: try container.decode([DiskPackageUsage].self, forKey: .packages),
+            cache: try container.decode(DiskObservation.self, forKey: .cache),
+            npmGlobals: try container.decodeIfPresent(DiskObservation.self, forKey: .npmGlobals) ?? .zero,
+            warnings: try container.decode([DiskUsageWarning].self, forKey: .warnings)
+        )
+    }
+
+    /// Whether the npm globals directory sits inside the Cellar, which is where
+    /// a Homebrew-installed node keeps it (`<prefix>/lib/node_modules` resolves
+    /// into the node keg). When it does, the same bytes are counted once under
+    /// the node formula and once under `npmGlobals`, and whoever adds the two
+    /// has to subtract the overlap. Compared on standardized paths so a trailing
+    /// slash or a `..` cannot hide the containment.
+    public var npmGlobalsLiesInsideCellar: Bool {
+        guard let npmGlobals = roots.npmGlobals else { return false }
+        let cellar = URL(fileURLWithPath: roots.cellar).standardizedFileURL.pathComponents
+        let globals = URL(fileURLWithPath: npmGlobals).standardizedFileURL.pathComponents
+        return globals.count > cellar.count && globals.prefix(cellar.count).elementsEqual(cellar)
     }
 
     public var isComplete: Bool {
