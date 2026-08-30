@@ -69,7 +69,12 @@ final class NpmSourceToggleUITests: XCTestCase {
             npmChip(in: app).waitForExistence(timeout: 30),
             "the npm Source chip never appeared after the switch was turned on"
         )
-        npmChip(in: app).click()
+        // The kind chips are toggles, all on by default. Turning the two
+        // Homebrew kinds off leaves only npm rows, which puts an npm global
+        // within the visible window regardless of how many brew packages this
+        // machine carries.
+        app.descendants(matching: .any)["installed-kind-formula"].click()
+        app.descendants(matching: .any)["installed-kind-cask"].click()
         XCTAssertTrue(
             npmTag(in: app).waitForExistence(timeout: 30),
             "no row carries the NPM tag, so no npm global reached the one inventory"

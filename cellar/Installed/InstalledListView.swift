@@ -69,13 +69,15 @@ struct InstalledListView: View {
     /// the ride. The Updates lens seeds it on instead — see
     /// `InstalledLens.includesDependenciesByDefault`.
     @State private var includeDependencies: Bool
-    /// The kind narrowing, `nil` for both — the Search catalog's three-way
-    /// choice, applied here as a display filter like the in-pane query.
-    @State private var kind: PackageKind?
-    /// The source narrowing, `nil` for all. Its own dimension rather than a
-    /// fourth kind chip: "npm" is not a kind of Homebrew package, and folding it
-    /// into `kind` would make "Formulae + npm" unrepresentable.
-    @State private var source: PackageSource?
+    /// Which kinds are shown — every one by default — applied here as a display
+    /// filter like the in-pane query. `effectiveKinds` is what the list obeys.
+    @State private var kinds = InstalledKindSelection()
+
+    /// The kinds actually in effect, with a stale npm selection collapsed while
+    /// the npm source is off (see `InstalledKindSelection.effective`).
+    private var effectiveKinds: Set<PackageKind> {
+        kinds.effective(npmEnabled: browse.isSourceFilterEnabled)
+    }
 
     /// The native multi-select binding. A `Set` cannot carry order.
     @State private var selected: Set<PackageID> = []
@@ -117,11 +119,10 @@ struct InstalledListView: View {
             PaneSearchField(text: $query, prompt: "Filter…")
                 .padding(EdgeInsets(top: 11, leading: 13, bottom: 0, trailing: 13))
             InstalledFilterBar(
-                kind: $kind,
+                kinds: $kinds,
                 includeDependencies: $includeDependencies,
                 upgradableCount: upgradableIDs.count,
                 state: installed.state,
-                source: $source,
                 npmSource: NpmSourceAvailability(npmDetection.state)
             )
             if !bulk.isEmpty {
@@ -175,7 +176,7 @@ struct InstalledListView: View {
                     InstalledEmptyState(
                         state: installed.state,
                         lens: lens,
-                        source: browse.effectiveSource(source),
+                        source: kinds.effectiveSource(npmEnabled: browse.isSourceFilterEnabled),
                         isNpmContributing: browse.isSourceFilterEnabled
                     )
                 }
@@ -325,16 +326,8 @@ struct InstalledListView: View {
             metadata: lookup,
             favoritesOnly: lens == .favorites
         )
-        var narrowed = base
-        if let kind {
-            narrowed = narrowed.filter { $0.id.kind == kind }
-        }
-        // Through `effectiveSource`, so a selection left over from before the
-        // npm switch was turned off narrows to nothing rather than emptying the
-        // list — the same rule `effectiveMode` follows for the state filters.
-        if let source = browse.effectiveSource(source) {
-            narrowed = narrowed.filter { $0.id.kind.source == source }
-        }
+        let kinds = effectiveKinds
+        var narrowed = base.filter { kinds.contains($0.id.kind) }
         if lens == .updates {
             let outdated = browse.outdatedIDs(metadata: lookup)
             narrowed = narrowed.filter { outdated.contains($0.id) }
