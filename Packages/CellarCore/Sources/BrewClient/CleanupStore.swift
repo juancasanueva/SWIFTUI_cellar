@@ -10,6 +10,12 @@ public enum CleanupPreviewState: Sendable, Equatable {
     case error(CleanupPreviewError, stale: CleanupPreviewResult?)
     case cancelled(stale: CleanupPreviewResult?)
     case stale(CleanupPreviewResult)
+    /// Whether nothing has been asked of this scope yet. Every other state,
+    /// including a preview still loading, carries something to show.
+    public var isIdle: Bool {
+        if case .idle = self { return true }
+        return false
+    }
     public var result: CleanupPreviewResult? {
         switch self {
         case .content(let result), .empty(let result), .partial(let result), .stale(let result): result

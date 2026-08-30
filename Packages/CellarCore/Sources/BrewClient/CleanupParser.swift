@@ -308,7 +308,7 @@ public enum CleanupParser {
         guard let context,
               context.snapshot.roots == context.expectedRoots,
               context.snapshot.isComplete,
-              Set(context.snapshot.rootStates.keys) == Set(DiskArea.allCases)
+              Set(context.snapshot.rootStates.keys) == context.snapshot.roots.measuredAreas
         else { return nil }
         let packages = Dictionary(uniqueKeysWithValues: context.snapshot.packages.map { ($0.id, $0) })
         var total: Int64 = 0

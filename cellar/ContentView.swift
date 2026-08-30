@@ -456,6 +456,7 @@ struct ContentView: View {
         case .cleanup:
             CleanupView(
                 detection: brewDetection,
+                npmDetection: npmDetection,
                 installed: installed,
                 diskUsage: diskUsage,
                 cleanup: cleanup,

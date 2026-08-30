@@ -48,6 +48,8 @@ struct RootsAccountingTests {
         #expect(states[.cellar] == .present)
         #expect(states[.caskroom] == .absent)
         #expect(states[.cache] == .absent)
+        // An unconfigured npm root is not a missing one: it has no state at all.
+        #expect(states[.npm] == nil)
     }
 
     @Test("Cask application bundle descendants contribute their allocation")

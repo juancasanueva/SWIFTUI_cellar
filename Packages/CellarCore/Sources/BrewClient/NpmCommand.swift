@@ -163,14 +163,21 @@ extension NpmCommand: BrewMutating {
         }
     }
 
-    /// The npm inventory and **nothing else**. A brew re-snapshot could not
-    /// observe an npm change, and paying for one would be 1.27 s and 663 KB
-    /// spent on a guaranteed no-op (design D11).
-    public var invalidates: InvalidationScope { .npmInventory }
+    /// The npm inventory and the disk measurement, and **no brew domain**. A
+    /// brew re-snapshot could not observe an npm change, and paying for one
+    /// would be 1.27 s and 663 KB spent on a guaranteed no-op (design D11).
+    /// The disk domain spawns nothing: it only re-measures directories, and
+    /// both npm mutations rewrite one of them.
+    public var invalidates: InvalidationScope { [.npmInventory, .diskUsage] }
 
-    /// npm globals live under npm's own prefix, which is not a Homebrew root and
-    /// is not measured by the disk-usage capability.
-    public var diskAreas: Set<DiskArea> { [] }
+    /// Both cases rewrite the global prefix's `lib/node_modules` — `install -g`
+    /// replaces a package's tree in place, `uninstall -g` removes it — so both
+    /// stale the npm area and neither touches a Homebrew root.
+    public var diskAreas: Set<DiskArea> {
+        switch self {
+        case .upgrade, .uninstall: [.npm]
+        }
+    }
 
     public var source: PackageSource { .npm }
 

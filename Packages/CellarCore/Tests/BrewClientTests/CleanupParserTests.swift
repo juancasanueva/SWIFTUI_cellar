@@ -200,6 +200,42 @@ struct CleanupParserTests {
         #expect(first.evidence.fingerprint.version == 2)
         #expect(first.evidence.fingerprint.hexadecimal.count == 64)
     }
+    /// An npm global that shares a name with a brew orphan is a different
+    /// package on a different root; its bytes must never be read as the
+    /// orphan's, and its presence must not make the snapshot look incomplete.
+    @Test("npm packages in the snapshot are never attributed to brew orphans")
+    func npmPackagesAreNeverOrphanBytes() {
+        let roots = DiskRootsIdentity(
+            cellar: "/a/Cellar", caskroom: "/a/Caskroom", cache: "/a/Cache", npmGlobals: "/a/npm/lib/node_modules"
+        )
+        let npmPango = DiskPackageUsage(
+            id: PackageID(kind: .npm, name: "pango"),
+            versions: [.init(
+                id: .init(package: PackageID(kind: .npm, name: "pango"), rawVersion: "9.9.9"),
+                observation: .init(allocatedBytes: 1_000, logicalBytes: 1_000),
+                linkState: .notApplicable
+            )]
+        )
+        let snapshot = DiskUsageSnapshot(
+            roots: roots,
+            generatedAt: Date(timeIntervalSince1970: 1),
+            rootStates: [.cellar: .present, .caskroom: .present, .cache: .present, .npm: .present],
+            packages: [package("libthai", bytes: 12), npmPango],
+            cache: .zero,
+            npmGlobals: .init(allocatedBytes: 1_000, logicalBytes: 1_000)
+        )
+        let both = autoremove(
+            Data("==> Would autoremove 2 unneeded formulae:\nlibthai\npango\n".utf8), snapshot: snapshot, roots: roots
+        )
+        let onlyBrew = autoremove(
+            Data("==> Would autoremove 1 unneeded formula:\nlibthai\n".utf8), snapshot: snapshot, roots: roots
+        )
+        // The formula `pango` is not on disk, so the total is unknown rather
+        // than the npm package's 1000 bytes.
+        #expect(both.evidence.orphans.currentlyOnDiskBytes == nil)
+        // And a snapshot that carries npm packages still attributes brew's.
+        #expect(onlyBrew.evidence.orphans.currentlyOnDiskBytes == 12)
+    }
     @Test("Only a complete same-root snapshot supplies currently-on-disk orphan allocation")
     func allocationRequiresCompleteSameRootSnapshot() {
         let roots = DiskRootsIdentity(cellar: "/a/Cellar", caskroom: "/a/Caskroom", cache: "/a/Cache")
