@@ -290,23 +290,42 @@ struct NpmGlobalsMeasurementTests {
         #expect(last.completedUnits == 7)
     }
 
-    @Test("A globals directory that cannot be enumerated fails the root")
-    func unreadableGlobalsFailTheRoot() async throws {
-        let tree = try TemporaryTree(npmGlobals: .present)
+    /// The failure is a regular file where the directory should be: it exists,
+    /// so the root is not absent, and it cannot be enumerated, so the root
+    /// fails. Deterministic on every host, unlike a permission bit that root
+    /// ignores.
+    @Test("A globals path that cannot be enumerated fails the root and names it")
+    func unenumerableGlobalsFailTheRoot() async throws {
+        let tree = try TemporaryTree(npmGlobals: .file)
         defer { tree.remove() }
         let globals = try #require(tree.roots.npmGlobals)
-        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: globals.path)
-        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: globals.path) }
+        let measurer = RecordingMeasurer(bytes: 1)
 
-        let events = try await collect(await DiskUsageEngine(measurer: RecordingMeasurer(bytes: 1)).scan(roots: tree.roots))
+        let events = try await collect(await DiskUsageEngine(measurer: measurer).scan(roots: tree.roots))
 
         let state = events.compactMap { event -> DiskRootState? in
             guard case .rootCompleted(.npm, let state) = event else { return nil }
             return state
         }.first
-        if case .failed = state {} else {
+        guard case .failed(let message) = state else {
             Issue.record("expected .failed, got \(String(describing: state))")
+            return
         }
+        #expect(message.isEmpty == false)
+        let warnings = events.compactMap { event -> DiskUsageWarning? in
+            guard case .warning(let value) = event, value.area == .npm else { return nil }
+            return value
+        }
+        #expect(warnings.map(\.path) == [globals.path])
+        #expect(warnings.first?.message == message)
+        #expect(measurer.measured(area: .npm).isEmpty, "nothing under a failed root is measured")
+        let snapshot = try #require(events.compactMap { event -> DiskUsageSnapshot? in
+            guard case .completed(let value) = event else { return nil }
+            return value
+        }.first)
+        #expect(snapshot.rootStates[.npm] == .failed(message))
+        #expect(snapshot.npmGlobals == .zero)
+        #expect(snapshot.isComplete == false)
     }
 
     private func collect(_ stream: DiskUsageEventStream) async throws -> [DiskUsageEvent] {
@@ -339,7 +358,7 @@ private final class RecordingMeasurer: DirectoryMeasuring, @unchecked Sendable {
 }
 
 private struct TemporaryTree {
-    enum NpmGlobals { case present, missing, unconfigured }
+    enum NpmGlobals { case present, missing, unconfigured, file }
 
     let base: URL
     let roots: HomebrewRoots
@@ -349,11 +368,20 @@ private struct TemporaryTree {
         try FileManager.default.createDirectory(at: base.appendingPathComponent("bin"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: base.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let npmPrefix = base.appendingPathComponent("npm", isDirectory: true)
-        if npmGlobals == .present {
+        switch npmGlobals {
+        case .present:
             try FileManager.default.createDirectory(
                 at: npmPrefix.appendingPathComponent("lib/node_modules"),
                 withIntermediateDirectories: true
             )
+        case .file:
+            try FileManager.default.createDirectory(
+                at: npmPrefix.appendingPathComponent("lib"),
+                withIntermediateDirectories: true
+            )
+            try Data("not a directory".utf8).write(to: npmPrefix.appendingPathComponent("lib/node_modules"))
+        case .missing, .unconfigured:
+            break
         }
         let installation = BrewInstallation(
             executableURL: base.appendingPathComponent("bin/brew"),

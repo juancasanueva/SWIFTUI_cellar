@@ -108,6 +108,56 @@ struct CleanupStorageBytesTests {
         #expect(bytes.unlinked == 200)
     }
 
+    /// The overlap has to leave whichever bucket the node keg is in. A
+    /// keg-only or unlinked node puts its bytes in `unlinked`, and subtracting
+    /// them from `cellar` would shrink the wrong segment — or clamp it to
+    /// zero when the Cellar is smaller than the globals.
+    @Test("Globals inside an unlinked node keg leave the unlinked bucket, not the Cellar")
+    func globalsInsideAnUnlinkedKegLeaveTheUnlinkedBucket() {
+        let packages = [
+            Self.formula("wget", bytes: 100),
+            Self.formula("node", bytes: 1_000, linkState: .unlinked),
+        ]
+        let bytes = CleanupStorageBytes(
+            packages: packages,
+            snapshot: Self.snapshot(npmGlobals: "\(Self.cellar)/node/1/lib/node_modules", npmBytes: 300, packages: packages)
+        )
+
+        #expect(bytes.cellar == 100)
+        #expect(bytes.unlinked == 700)
+        #expect(bytes.npmGlobals == 300)
+    }
+
+    @Test("Globals inside a linked node keg leave the Cellar bucket, as before")
+    func globalsInsideALinkedKegLeaveTheCellarBucket() {
+        let packages = [
+            Self.formula("node", bytes: 1_000),
+            Self.formula("openssl", bytes: 200, linkState: .unlinked),
+        ]
+        let bytes = CleanupStorageBytes(
+            packages: packages,
+            snapshot: Self.snapshot(npmGlobals: "\(Self.cellar)/node/1/lib/node_modules", npmBytes: 300, packages: packages)
+        )
+
+        #expect(bytes.cellar == 700)
+        #expect(bytes.unlinked == 200)
+    }
+
+    /// A keg the path names but the packages do not carry — a snapshot mid
+    /// refresh — falls back to the linked bucket, which is where a node keg
+    /// ordinarily sits.
+    @Test("Globals inside a keg the packages do not list fall back to the Cellar bucket")
+    func globalsInsideAnUnlistedKegFallBackToTheCellar() {
+        let packages = [Self.formula("wget", bytes: 1_000)]
+        let bytes = CleanupStorageBytes(
+            packages: packages,
+            snapshot: Self.snapshot(npmGlobals: "\(Self.cellar)/node/1/lib/node_modules", npmBytes: 300, packages: packages)
+        )
+
+        #expect(bytes.cellar == 700)
+        #expect(bytes.unlinked == 0)
+    }
+
     @Test("Without npm configured the npm segment is zero and nothing else changes")
     func unconfiguredNpmIsZero() {
         let packages = [Self.formula("node", bytes: 1_000)]

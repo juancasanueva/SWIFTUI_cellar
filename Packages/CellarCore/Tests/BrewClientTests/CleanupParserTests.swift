@@ -236,6 +236,37 @@ struct CleanupParserTests {
         // And a snapshot that carries npm packages still attributes brew's.
         #expect(onlyBrew.evidence.orphans.currentlyOnDiskBytes == 12)
     }
+    /// The guard asks for every area the roots say were measured. With npm
+    /// configured that includes `.npm`, so a snapshot that never reported the
+    /// npm root is as incomplete as one that never reported the cache.
+    @Test("Roots that name an npm root need an npm root state before orphans are attributed")
+    func npmRootMustBeStatedWhenConfigured() {
+        let roots = DiskRootsIdentity(
+            cellar: "/a/Cellar", caskroom: "/a/Caskroom", cache: "/a/Cache", npmGlobals: "/a/npm/lib/node_modules"
+        )
+        func snapshot(states: [DiskArea: DiskRootState]) -> DiskUsageSnapshot {
+            DiskUsageSnapshot(
+                roots: roots,
+                generatedAt: Date(timeIntervalSince1970: 1),
+                rootStates: states,
+                packages: [package("libthai", bytes: 12)],
+                cache: .zero
+            )
+        }
+        let stdout = Data("==> Would autoremove 1 unneeded formula:\nlibthai\n".utf8)
+        let brewOnly: [DiskArea: DiskRootState] = [.cellar: .present, .caskroom: .present, .cache: .present]
+        let missingNpm = autoremove(stdout, snapshot: snapshot(states: brewOnly), roots: roots)
+        let statedNpm = autoremove(
+            stdout, snapshot: snapshot(states: brewOnly.merging([.npm: .present]) { $1 }), roots: roots
+        )
+        let absentNpm = autoremove(
+            stdout, snapshot: snapshot(states: brewOnly.merging([.npm: .absent]) { $1 }), roots: roots
+        )
+        #expect(missingNpm.evidence.orphans.currentlyOnDiskBytes == nil)
+        #expect(statedNpm.evidence.orphans.currentlyOnDiskBytes == 12)
+        // Absent is a reported state, not a missing one.
+        #expect(absentNpm.evidence.orphans.currentlyOnDiskBytes == 12)
+    }
     @Test("Only a complete same-root snapshot supplies currently-on-disk orphan allocation")
     func allocationRequiresCompleteSameRootSnapshot() {
         let roots = DiskRootsIdentity(cellar: "/a/Cellar", caskroom: "/a/Caskroom", cache: "/a/Cache")

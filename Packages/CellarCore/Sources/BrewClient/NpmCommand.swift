@@ -172,10 +172,17 @@ extension NpmCommand: BrewMutating {
 
     /// Both cases rewrite the global prefix's `lib/node_modules` — `install -g`
     /// replaces a package's tree in place, `uninstall -g` removes it — so both
-    /// stale the npm area and neither touches a Homebrew root.
+    /// stale the npm area.
+    ///
+    /// The Cellar is declared too. A Homebrew-installed node keeps that prefix
+    /// inside its own keg, so the same write also moves Cellar bytes, and a
+    /// command has no way of knowing which node it is running under. Naming
+    /// the Cellar when it may be untouched costs nothing the store does not
+    /// already pay: any invalidation rescans every root. Leaving it out when
+    /// it was touched would leave a stale keg total on screen.
     public var diskAreas: Set<DiskArea> {
         switch self {
-        case .upgrade, .uninstall: [.npm]
+        case .upgrade, .uninstall: [.npm, .cellar]
         }
     }
 
