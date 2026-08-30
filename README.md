@@ -7,12 +7,13 @@
 <p align="center"><img src="docs/images/hero.png" alt="Home-Cellar screenshot" width="100%"></p>
 
 Home-Cellar is a full-featured visual layer over the `brew` binary already on your Mac. It surfaces everything that is tedious from the command line — searching 14,000+ formulae and casks, pending updates, per-package disk usage, service status, dependency trees, CVE exposure — and executes the same `brew` commands you would type, with real-time progress and logs.
+It can also manage your global npm packages alongside them, opt-in.
 
 ## Principles
 
 1. **Native or nothing.** Pure SwiftUI, feels like part of macOS. No web views, no Electron.
-2. **brew is the source of truth.** Home-Cellar never manipulates the Cellar/Caskroom directories directly; every mutation shells out to `brew`. The CLI and the GUI can coexist mid-task.
-3. **Local-first, private.** No accounts, no telemetry, no backend. Network calls are limited to package metadata (formulae.brew.sh), cask artwork (CaskFlow / App-Fair), release notes (GitHub), and CVE feeds (OSV/NVD).
+2. **brew is the source of truth.** Home-Cellar never manipulates the Cellar/Caskroom directories directly; every mutation shells out to `brew` (and, for global npm packages, to `npm`). The CLI and the GUI can coexist mid-task.
+3. **Local-first, private.** No accounts, no telemetry, no backend. Network calls are limited to package metadata (formulae.brew.sh), cask artwork (CaskFlow / App-Fair), release notes (GitHub), CVE feeds (OSV/NVD), and — only when the npm source is on — the npm registry for outdated checks.
 4. **Free forever.** All features free, ad-free.
 
 ## Features
@@ -21,6 +22,7 @@ Home-Cellar is a full-featured visual layer over the `brew` binary already on yo
 - **Search catalog** — instant search over the full formula and cask catalog, with kind, deprecation, and installed-state filters.
 - **Discover** — App Store-style browse pages for casks *and* formulae: Featured, Top Charts (per-period install rankings), Recently Added, and curated Categories, with real app icons.
 - **Installed / Favorites / Updates** — the inventory with lenses, bulk actions, and honest treatment of self-updating apps (they are never nagged as "outdated").
+- **Global npm packages** — opt-in second source (**Settings → npm**). Your `npm -g` globals appear in Installed with an `NPM` tag and their own filter chip, count toward Updates, and can be upgraded or uninstalled from the same row menu and bulk actions as Homebrew packages. Home-Cellar detects `npm` on `PATH` or uses the binary you point it at, and never installs Node or npm itself.
 - **Services** — `brew services` status and control.
 - **Health** — a weighted health score over outdated packages, advisories, orphans, cache size, and `brew doctor`.
 - **Security** — CVE advisory coverage for installed packages, opt-in.
@@ -32,6 +34,7 @@ Home-Cellar is a full-featured visual layer over the `brew` binary already on yo
 
 - macOS 26 (Tahoe) or later, Apple Silicon
 - [Homebrew](https://brew.sh) installed — Home-Cellar detects it and guides you if it is missing; it never installs Homebrew itself
+- Optional: [npm](https://www.npmjs.com) for the global npm packages source
 
 ## Install
 
