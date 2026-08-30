@@ -780,9 +780,17 @@ struct cellarApp: App {
               let installation = brewDetection.state.installation
         else { return }
         hasStartedDiskMeasurement = true
+        // npm detection has already settled by the time `refreshEverything`
+        // reaches this call, so the prefix here is the same one `CleanupView`
+        // will build its roots from; a later toggle changes the identity and
+        // the Cleanup page rescans on entry.
         let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let roots = HomebrewRoots(installation: installation, userCacheDirectory: cacheDirectory)
+        let roots = HomebrewRoots(
+            installation: installation,
+            userCacheDirectory: cacheDirectory,
+            npmPrefix: npmDetection.state.environment?.prefix
+        )
         let links = Dictionary(
             uniqueKeysWithValues: installed.inventory.packages.map { ($0.id, $0.formulaLinkState) }
         )

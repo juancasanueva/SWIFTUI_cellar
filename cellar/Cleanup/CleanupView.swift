@@ -13,6 +13,10 @@ import SwiftUI
 /// discipline the state machine below renders.
 struct CleanupView: View {
     let detection: BrewDetectionStore
+    /// Read for one thing: the detected npm prefix, which decides whether the
+    /// scan has an npm globals root at all. With the source off it is nil and
+    /// the page is what it was before npm existed.
+    let npmDetection: NpmDetectionStore
     let installed: InstalledStore
     let diskUsage: DiskUsageStore
     let cleanup: CleanupStore
@@ -39,10 +43,25 @@ struct CleanupView: View {
                 storageRows
             }
             .scrollContentBackground(.hidden)
+            // `contentMargins` is a no-op on a macOS `List`, so the list itself
+            // is inset by the difference between its own default edge and the
+            // 34pt the title sits at, keeping the rows flush with it.
+            .padding(.horizontal, 20)
             .accessibilityIdentifier("disk-usage-list")
         }
         .background(Theme.windowBackground)
-        .task(id: detection.state.installation?.executableURL) { await refreshStorageOnEntry() }
+        // Keyed on both inputs the roots are built from, so flipping npm while
+        // this page is open re-enters exactly as arriving would.
+        .task(id: RootsInputs(
+            brew: detection.state.installation?.executableURL,
+            npmPrefix: npmDetection.state.environment?.prefix
+        )) { await refreshStorageOnEntry() }
+    }
+
+    /// Everything `currentRoots` depends on, as one task identity.
+    private struct RootsInputs: Hashable {
+        let brew: URL?
+        let npmPrefix: URL?
     }
 
     /// The design's one-sentence summary: how much Homebrew is using, and how
@@ -76,27 +95,17 @@ struct CleanupView: View {
     /// kegs split out of the Cellar segment because "on disk but not linked"
     /// is worth seeing — labelled with keg-only in mind, since formulae brew
     /// deliberately never links are the segment's ordinary residents, not a
-    /// problem to fix.
+    /// problem to fix. npm globals appear only when npm is on and has
+    /// something installed: the zero filter hides the segment otherwise, and
+    /// the totals already account for globals that live inside a node keg.
     private var segments: [UsageSegment] {
-        let packages = diskUsage.visiblePackages
-        let formulaVersions = packages
-            .filter { $0.id.kind == .formula }
-            .flatMap(\.versions)
-        let cellar = formulaVersions
-            .filter { $0.linkState != .unlinked }
-            .reduce(Int64(0)) { $0 + $1.observation.allocatedBytes }
-        let unlinked = formulaVersions
-            .filter { $0.linkState == .unlinked }
-            .reduce(Int64(0)) { $0 + $1.observation.allocatedBytes }
-        let caskroom = packages
-            .filter { $0.id.kind == .cask }
-            .reduce(Int64(0)) { $0 + $1.observation.allocatedBytes }
-        let cache = diskUsage.visibleSnapshot?.cache.allocatedBytes ?? 0
+        let bytes = CleanupStorageBytes(packages: diskUsage.visiblePackages, snapshot: diskUsage.visibleSnapshot)
         return [
-            UsageSegment(name: "Cellar", bytes: cellar, color: theme.base),
-            UsageSegment(name: "Download cache", bytes: cache, color: Color.blue.opacity(0.8)),
-            UsageSegment(name: "Caskroom", bytes: caskroom, color: Color.purple.opacity(0.8)),
-            UsageSegment(name: "Keg-only & unlinked", bytes: unlinked, color: Color.white.opacity(0.35)),
+            UsageSegment(name: "Cellar", bytes: bytes.cellar, color: theme.base),
+            UsageSegment(name: "Download cache", bytes: bytes.cache, color: Color.blue.opacity(0.8)),
+            UsageSegment(name: "Caskroom", bytes: bytes.caskroom, color: Color.purple.opacity(0.8)),
+            UsageSegment(name: "npm globals", bytes: bytes.npmGlobals, color: Color.red.opacity(0.8)),
+            UsageSegment(name: "Keg-only & unlinked", bytes: bytes.unlinked, color: Color.white.opacity(0.35)),
         ].filter { $0.bytes > 0 }
     }
 
@@ -228,7 +237,7 @@ struct CleanupView: View {
 
     @ViewBuilder
     private var storageRows: some View {
-        Section("Packages currently on disk") {
+        Section {
             if diskUsage.visiblePackages.isEmpty {
                 Text("No Homebrew package storage found.")
                     .foregroundStyle(.secondary)
@@ -237,6 +246,11 @@ struct CleanupView: View {
                     storageRow(package)
                 }
             }
+        } header: {
+            Text("Packages currently on disk")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .padding(.top, 8)
         }
     }
 
@@ -250,6 +264,7 @@ struct CleanupView: View {
             let scope = CleanupScope.package(target)
             CleanupRow(
                 package: package,
+                roots: diskUsage.visibleSnapshot?.roots,
                 accessory: AnyView(
                     CleanupScopePills(
                         scope: scope,
@@ -261,11 +276,17 @@ struct CleanupView: View {
                     )
                 ),
                 detailHeader: AnyView(
-                    CleanupStateLines(state: cleanup.state(for: scope), isAvailable: true)
-                )
+                    CleanupStateLines(
+                        state: cleanup.state(for: scope),
+                        isAvailable: true,
+                        emptyMessage: "Nothing to prune: only the current version is installed"
+                            + " and no stale downloads are cached for it."
+                    )
+                ),
+                revealsDetail: !cleanup.state(for: scope).isIdle
             )
         } else {
-            CleanupRow(package: package)
+            CleanupRow(package: package, roots: diskUsage.visibleSnapshot?.roots)
         }
     }
 
@@ -323,15 +344,23 @@ struct CleanupView: View {
         guard let installation = detection.state.installation,
               !AppTestFixtures.isEnabled
         else { return nil }
+        // The npm prefix is part of the roots identity, so switching npm on or
+        // off is "roots moved" to `refreshStorageOnEntry` and rescans.
         let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return HomebrewRoots(installation: installation, userCacheDirectory: cacheDirectory)
+        return HomebrewRoots(
+            installation: installation,
+            userCacheDirectory: cacheDirectory,
+            npmPrefix: npmDetection.state.environment?.prefix
+        )
     }
 
     /// Arrival only scans when the store has nothing fresh to show — a first
-    /// visit, an invalidated snapshot, or roots that moved under it. A fresh
-    /// snapshot renders as-is: mutations already invalidate the areas they
-    /// touch, and the manual Rescan button covers everything else.
+    /// visit, an invalidated snapshot, or roots that moved under it (which
+    /// includes npm being switched on or off, since the prefix is in the
+    /// identity). A fresh snapshot renders as-is: mutations already invalidate
+    /// the areas they touch, and the manual Rescan button covers everything
+    /// else.
     private func refreshStorageOnEntry() async {
         guard let roots = currentRoots else { return }
         guard diskUsage.needsEntryScan || diskUsage.visibleSnapshot?.roots != roots.identity
@@ -459,6 +488,11 @@ private struct CleanupScopePills: View {
 private struct CleanupStateLines: View {
     let state: CleanupPreviewState
     let isAvailable: Bool
+    /// What an empty preview *means* here. The shared sentence is right for
+    /// the three page-level scopes; for one package it reads as a shrug, when
+    /// the honest answer is that brew only prunes old kegs and stale
+    /// downloads, and this package has neither.
+    var emptyMessage = "Homebrew reported nothing to clean for this scope."
 
     var body: some View {
         if !isAvailable {
@@ -473,7 +507,7 @@ private struct CleanupStateLines: View {
                 stateText("Preview ready. Review the evidence before continuing.", "content")
                 evidence(result)
             case .empty:
-                stateText("Homebrew reported nothing to clean for this scope.", "empty")
+                stateText(emptyMessage, "empty")
             case .partial(let result):
                 stateText("The preview is partial or contains unknown Homebrew output. Cleanup is unavailable.", "partial")
                 evidence(result)
