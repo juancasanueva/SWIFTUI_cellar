@@ -98,7 +98,9 @@ struct NpmCommandTests {
     /// Both commands rewrite the global prefix, so both declare the npm disk
     /// area alongside the npm inventory — and neither touches brew's inventory,
     /// which is the domain a brew re-snapshot would be paid for (design D11).
-    @Test("The npm family declares the npm inventory and the npm disk area, and no brew domain")
+    /// The Cellar rides along because a Homebrew node keeps the prefix inside
+    /// its keg, and the command cannot know whether that is the case.
+    @Test("The npm family declares the npm inventory and the npm and Cellar disk areas, and no brew domain")
     func npmCommandsDeclareOnlyTheNpmDomains() throws {
         let target = try #require(NpmPackageTarget(Self.typescript))
 
@@ -107,7 +109,9 @@ struct NpmCommandTests {
             #expect(command.invalidates.contains(.installedInventory) == false)
             #expect(command.invalidates.contains(.taps) == false)
             #expect(command.invalidates.contains(.services) == false)
-            #expect(command.diskAreas == [.npm])
+            #expect(command.diskAreas == [.npm, .cellar])
+            #expect(command.diskAreas.contains(.caskroom) == false)
+            #expect(command.diskAreas.contains(.cache) == false)
             #expect(command.source == .npm)
             #expect(command.packageID == Self.typescript)
         }
