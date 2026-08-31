@@ -31,8 +31,11 @@ struct ShellToolbarItems: ToolbarContent {
                     .foregroundStyle(Theme.textPrimary)
             }
             // Pushes the actions to the trailing edge; without it every item
-            // packs in beside the title.
-            ToolbarSpacer(.flexible)
+            // packs in beside the title. A plain Spacer in a ToolbarItem
+            // rather than ToolbarSpacer, which needs macOS 26.
+            ToolbarItem {
+                Spacer()
+            }
             ToolbarItem(placement: .primaryAction) {
                 ShellHeaderControls(refresh: refresh, isActivityExpanded: $isActivityExpanded)
             }
