@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Platform** | macOS 26 Tahoe+, Apple Silicon only (arm64) |
+| **Platform** | macOS 15 Sequoia+, Apple Silicon only (arm64) |
 | **Stack** | Swift 6.x, SwiftUI (Liquid Glass design system), SwiftData, local SPM core package (`CellarCore`) |
 | **Distribution** | Direct download, delivered by CI (`.github/workflows/release.yml`: Developer ID + notarized, on `v*` tags — see [`RELEASING.md`](RELEASING.md)); Sparkle 2 in-app updates from an EdDSA-signed appcast published to GitHub Pages by the same job (`m6-sparkle-updates`); Homebrew cask from the self-hosted tap `juancasanueva/cellar` — `brew install --cask home-cellar` (`m6-cask-tap`) |
 | **Monetization** | Free, ad-free, no tip jar (decision at M6 — §6) |
@@ -160,7 +160,7 @@ Cellar.xcodeproj
 - **CVE matching.** OSV batch endpoint with `{package name, version}`; enrich with NVD CVSS where missing. Cache per (name, version) with TTL. All matching logic pure + unit-tested against fixture responses.
 - **Persistence (SwiftData).** Models: `PackageMeta` (favorites, notes), `Snooze`, `HistoryEntry`, `DismissedCVE`, `Settings`. No CloudKit in v1 (data is machine-specific).
 - **Sandbox: off.** Hardened runtime on, sandbox off (required to exec brew). Entitlements kept minimal; document why in-repo for notarization sanity. **Obligation discharged (M6):** the rationale lives in [`RELEASING.md`](RELEASING.md) §6 — no `.entitlements` file exists in the repository, `allow-jit` / `allow-unsigned-executable-memory` / `disable-library-validation` are deliberately absent because brew is spawned as a separate process, and the section quotes real `codesign` output rather than asserting a belief.
-- **Concurrency.** Swift 6 language mode with strict concurrency; `@Observable` view models; all Process and disk-size work off the main actor. macOS 26 minimum means the latest SwiftUI/SwiftData APIs can be used unconditionally — no `#available` branches anywhere.
+- **Concurrency.** Swift 6 language mode with strict concurrency; `@Observable` view models; all Process and disk-size work off the main actor. The macOS 15 minimum (lowered from 26 in v1.8.3) means any macOS 26-only API needs an `#available` branch — currently none are used.
 
 ### 4.3 External services (all optional to core operation)
 
@@ -179,7 +179,7 @@ Failure of any external service degrades gracefully (feature shows cached/empty 
 ## 5. UI/UX
 
 - **Navigation**: `NavigationSplitView` — sidebar (Discover, Browse, Installed, Outdated, Services, Health, Security, Cleanup, Taps, History) → list → detail. Toolbar search scoped per section. ⌘K quick-open for any package.
-- **Design language**: macOS 26 Liquid Glass throughout — standard glass toolbars/sidebars, `.glassEffect` only where system components don't provide it, no custom chrome. SF Symbols, accent-colored status chips (green running / orange outdated / red vulnerable), monospaced log views. Light/dark. Targeting 26+ exclusively means no availability checks or dual design paths.
+- **Design language**: Cellar's own theme throughout (the `Cellar.dc.html` design port) — themed toolbars, sidebar, cards, and chips drawn by the app rather than system Liquid Glass, so the same look renders identically on macOS 15 through 26 with no availability checks or dual design paths. SF Symbols, accent-colored status chips (green running / orange outdated / red vulnerable), monospaced log views.
 - **Long operations**: bottom activity bar with progress + expandable log drawer; operations survive view navigation; app quit with active operations prompts (operation continues in brew if user force-quits — warn accordingly).
 - **Destructive actions**: uninstall/cleanup/quarantine-clear always show scope + reclaimed bytes + exact command; require confirmation; no "don't ask again" for uninstalls.
 - **Empty/error states**: every section designed for brew-missing, offline, and zero-results states.
@@ -232,7 +232,7 @@ A second package source beside Homebrew, scoped to globally installed npm packag
 | Notarization + no-sandbox friction | Release delays | The "set up CI in M1" mitigation was **not** taken; the debt was absorbed at M6 instead. Residual risk is notarization latency, mitigated by `--wait` and by gating every check before the publish step, so a slow or rejected submission delays a release rather than shipping a broken one |
 | Cask notability rejection | Discoverability | Self-hosted tap from day one; pursue main tap post-traction |
 | TapHouse similarity | Perception | Clone features, not assets/copy/name; original icon, UI layout, and text throughout |
-| macOS 26+ / arm64-only floor excludes Sonoma–Sequoia and all Intel users (TapHouse supports 14+ Universal) | Smaller addressable market at launch | Accepted trade-off for a single modern codebase and simpler CI; brew users skew current hardware; Tahoe's Intel base is ~4 legacy models anyway. **`ARCHS = arm64` is now pinned (M6):** the arm64-only claim was being contradicted by the build — Cellar was shipping universal (`x86_64 arm64`) by accident until the pin landed |
+| macOS 15+ / arm64-only floor excludes Sonoma and earlier and all Intel users (TapHouse supports 14+ Universal) | Smaller addressable market at launch | Accepted trade-off for a single modern codebase and simpler CI; brew users skew current hardware. **Floor lowered from 26 to 15 in v1.8.3** — the custom theme never depended on Liquid Glass, and `ToolbarSpacer` was the only 26-only API. **`ARCHS = arm64` is now pinned (M6):** the arm64-only claim was being contradicted by the build — Cellar was shipping universal (`x86_64 arm64`) by accident until the pin landed |
 
 ---
 

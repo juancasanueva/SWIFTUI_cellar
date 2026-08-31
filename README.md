@@ -32,7 +32,7 @@ It can also manage your global npm packages alongside them, opt-in.
 
 ## Requirements
 
-- macOS 26 (Tahoe) or later, Apple Silicon
+- macOS 15 (Sequoia) or later, Apple Silicon
 - [Homebrew](https://brew.sh) installed — Home-Cellar detects it and guides you if it is missing; it never installs Homebrew itself
 - Optional: [npm](https://www.npmjs.com) for the global npm packages source
 
@@ -79,7 +79,7 @@ Or download the latest `Home-Cellar-<version>.zip` from
 
 The build is notarized and stapled, so the first launch is a single ordinary
 "Open" confirmation — no right-click workaround, and no network access needed to
-get past Gatekeeper. Apple Silicon and macOS 26 only.
+get past Gatekeeper. Apple Silicon and macOS 15 or later only.
 
 To remove a cask install, `brew uninstall --cask --zap home-cellar` also deletes
 Home-Cellar's caches, catalog, metadata and preferences. It cannot delete the two

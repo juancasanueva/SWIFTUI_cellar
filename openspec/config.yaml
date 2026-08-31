@@ -9,7 +9,7 @@ review_budget_lines: 8000
 
 context: |
   Cellar! is a native macOS SwiftUI GUI for Homebrew; product scope and milestones live in PRD.md.
-  Stack: Apple Swift 6.3.3, Xcode 26.6, SwiftUI, SwiftData, macOS 26.0, arm64.
+  Stack: Apple Swift 6.3.3, Xcode 26.6, SwiftUI, SwiftData, macOS 15.0, arm64.
   Layout: thin `cellar` app target plus local SwiftPM package `Packages/CellarCore`.
   Core targets: BrewProcess, Catalog, BrewClient, and Persistence; dependencies point inward and external effects use protocols.
   Concurrency: Swift 6 mode; the app defaults to MainActor while CellarCore uses SwiftPM nonisolated defaults.
@@ -49,7 +49,7 @@ rules:
     - Keep all logic in Packages/CellarCore; the app target holds views, scenes, and DI wiring only.
     - Define protocol boundaries for every external dependency (Process, FileManager, network).
     - Document actor isolation and Sendable conformance for anything crossing a concurrency domain.
-    - No `#available` branches — macOS 26 is the floor.
+    - macOS 15.0 is the floor; gate any macOS 26-only API behind `#available` (currently none are used).
   tasks:
     - Group by phase with hierarchical numbering; each task completable in one session.
     - Sequence RED (failing test) before GREEN (implementation) for every behavioral task.

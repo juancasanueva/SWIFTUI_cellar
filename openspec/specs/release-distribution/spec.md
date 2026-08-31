@@ -657,12 +657,14 @@ exclusivity clause, and the inventory's independence from the bundle name was un
   `m6-cask-tap` binds its cask `url` to
   `https://github.com/juancasanueva/SWIFTUI_cellar/releases/download/v<version>/Home-Cellar-<version>.zip`;
   the cask's `app` stanza must name `Home-Cellar.app` exactly, its token is `home-cellar`, and the
-  arm64 pin plus the macOS 26.0 floor become `depends_on arch: :arm64` and
-  `depends_on macos: ">= :tahoe"`.
+  arm64 pin plus the macOS 15.0 floor become `depends_on arch: :arm64` and
+  `depends_on macos: ">= :sequoia"`.
   Those slices inherit these facts from this spec rather than re-deriving them.
   *(Superseded in part by `m8-bundle-rename`: this clause read `cellar.app` when it was written, and
   it states a **live** requirement rather than a historical measurement, so it was updated in place
-  to match the merged requirement. Everything else in this paragraph is unchanged.)*
+  to match the merged requirement. Updated in place again for v1.8.3, which lowered the deployment
+  floor from macOS 26.0 to 15.0 — the floor and `depends_on macos` above read `26.0` / `:tahoe`
+  before that release. Everything else in this paragraph is unchanged.)*
 - **Amended by change `m6-sparkle-updates`** (archived `2026-08-23`, PRD milestone **M6 "Ship"**,
   slice 3 of 3 — Sparkle 2 in-app updates), MODIFIED-only delta — **3 requirements replaced in full,
   0 added, 0 removed, 0 renamed**, taking the capability from **8 requirements / 29 scenarios** to

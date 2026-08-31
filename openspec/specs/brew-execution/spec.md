@@ -219,7 +219,7 @@ see one change per real transition rather than one per yield.
 
 The capability MUST build under Swift 6 language mode with strict concurrency and no warnings.
 Every type crossing an isolation boundary (`LogLine`, results, errors, configuration) MUST be
-`Sendable`. The deployment floor is macOS 26.0, Apple Silicon only; no `#available` branches.
+`Sendable`. The deployment floor is macOS 15.0, Apple Silicon only; APIs newer than macOS 15 MUST be gated with `#available` (currently none are used).
 
 #### Scenario: Package builds and tests headlessly under Swift 6
 
