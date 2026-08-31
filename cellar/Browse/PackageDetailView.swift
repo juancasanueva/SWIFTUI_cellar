@@ -243,6 +243,12 @@ struct PackageDetailView: View {
                         }
                     }
                     .disabled(!operations.isAvailable(for: .npm))
+                    // Outside the npm-availability gate, like the bulk bar:
+                    // snooze spawns nothing and submits nothing, so a missing
+                    // npm is no reason to withhold it. The offered version an
+                    // npm entry carries is `latest`, the exact string
+                    // npm-source requires snooze equality to use.
+                    snoozeButton(for: entry)
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 8) {

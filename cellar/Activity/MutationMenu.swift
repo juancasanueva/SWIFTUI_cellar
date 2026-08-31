@@ -5,6 +5,7 @@
 
 import BrewClient
 import Catalog
+import Persistence
 import SwiftUI
 
 /// Every mutation affordance for one package, in one place.
@@ -18,6 +19,11 @@ import SwiftUI
 struct MutationMenu: View {
     let center: OperationCenter
     let entry: PackageEntry
+    /// The metadata store, when the hosting surface has one. Snooze is a
+    /// metadata write rather than a mutation, so it rides in this menu only
+    /// where installed packages live (`InstalledRow`); the catalog surfaces
+    /// pass nothing and the item is simply absent.
+    var metadata: MetadataStore? = nil
 
     /// The entry's identity, proven safe to put in argv.
     ///
@@ -77,6 +83,32 @@ struct MutationMenu: View {
             }
             Button(command.title) { submit(command) }
         }
+        snoozeItem
+    }
+
+    /// The same eligibility and toggle as the detail pane's snooze button:
+    /// outdated, with an offered version to name, through the shipped store
+    /// API only (LPM5). Exact string equality decides snoozed-ness — no
+    /// comparator, same as everywhere else in the capability.
+    @ViewBuilder
+    private var snoozeItem: some View {
+        if let metadata, metadata.availability.isAvailable,
+           let installed = entry.installed, installed.isOutdated {
+            let offered = installed.catalogVersion
+            if offered.isEmpty == false {
+                let isSnoozed = PackageMetadata.isSnoozed(
+                    offering: offered,
+                    snoozedVersion: metadata.snapshot[entry.id]?.snoozedVersion
+                )
+                Button(isSnoozed ? "Unsnooze" : "Snooze \(offered)") {
+                    if isSnoozed {
+                        metadata.unsnooze(entry.id)
+                    } else {
+                        metadata.snooze(entry.id, offering: offered)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -93,6 +125,8 @@ struct MutationMenu: View {
                 action("Pin", .pin(formula))
             }
         }
+
+        snoozeItem
 
         Divider()
 

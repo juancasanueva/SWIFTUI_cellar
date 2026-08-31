@@ -39,38 +39,38 @@ struct PaneSearchField: View {
     }
 }
 
-/// The design's action button: accent (or danger) tint on the shell controls'
-/// 6-point rounded rectangle, for the compact command rows above a list.
+/// The design's action button, in the detail page Actions section's dress:
+/// the quiet tone's solid neutral fill (or the danger tone's tinted fill and
+/// hairline) on a 7-point rounded rectangle, 29 points tall.
 ///
-/// A contained shape rather than bare accent text, so a command reads as
-/// pressable next to the inert counts that share these rows — and squarer
-/// than `FilterChip`'s capsule on purpose, so a command never reads as a
-/// filter.
+/// Deliberately **not** an accent-tinted pill: the earlier accent-tint version
+/// sat above lists whose `FilterChip` row wears the same tint at the same text
+/// size, and users read the commands as a second row of filters. Sharing the
+/// detail buttons' height, weight and neutral fill is what makes a command
+/// read as pressable — and as a different species from the capsule chips.
 struct ActionPillStyle: ButtonStyle {
     var isDestructive = false
-    @Environment(ThemeStore.self) private var theme
     @Environment(\.isEnabled) private var isEnabled
 
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
     }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11.5, weight: .medium))
-            .foregroundStyle(isDestructive ? Theme.dangerText : theme.light)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
+            .font(.system(size: 12.5, weight: .medium))
+            .foregroundStyle(isDestructive ? Theme.dangerText : Theme.textPrimary)
+            .padding(.horizontal, 13)
+            .frame(height: 29)
             .background(
-                isDestructive ? Theme.dangerTint(0.16) : theme.tint(0.16),
+                isDestructive ? Theme.dangerTint(0.12) : Theme.controlFillLoud,
                 in: shape
             )
-            .overlay(
-                shape.strokeBorder(
-                    isDestructive ? Theme.dangerTint(0.3) : theme.tint(0.3),
-                    lineWidth: 0.5
-                )
-            )
+            .overlay {
+                if isDestructive {
+                    shape.strokeBorder(Theme.dangerTint(0.28), lineWidth: 0.5)
+                }
+            }
             .contentShape(shape)
             .opacity(configuration.isPressed ? 0.7 : (isEnabled ? 1 : 0.4))
     }

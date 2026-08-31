@@ -65,7 +65,7 @@ struct InstalledRow: View {
             Spacer(minLength: 0)
             releaseNotes
             if showsFavoriteHeart, metadata != nil { heart }
-            MutationMenu(center: operations, entry: entry)
+            MutationMenu(center: operations, entry: entry, metadata: metadata)
         }
         .padding(.vertical, 3)
         // `.contain` keeps descendants' own identifiers reachable from XCUITest:
