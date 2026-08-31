@@ -605,12 +605,12 @@ struct PackageDetailView: View {
             metadata.setFavorite(!isFavorite, for: id)
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(isFavorite ? Color.red : Color.white.opacity(0.55))
-                .frame(width: 28, height: 28)
+                .frame(width: 48, height: 48)
                 .background(
                     isFavorite ? Color.red.opacity(0.16) : Theme.controlFill,
-                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
                 )
         }
         .buttonStyle(.plain)
