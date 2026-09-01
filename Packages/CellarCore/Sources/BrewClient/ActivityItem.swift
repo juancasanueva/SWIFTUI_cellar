@@ -154,6 +154,24 @@ public final class ActivityItem: Identifiable {
         outcome?.summaryLabel ?? (isRunning ? "Running" : "Queued")
     }
 
+    /// The action area's in-flight sentence — what a row shows in the place of
+    /// the verb it just submitted.
+    ///
+    /// Matched by erased-command equality — equality of *what will run* —
+    /// rather than by inspecting the verb string, exactly as
+    /// `isHomebrewUpdateInFlight` does. A command outside the action areas'
+    /// vocabulary reads as generic work rather than as a wrong verb.
+    public var progressLabel: String {
+        guard let packageID, let target = PackageTarget(packageID) else { return "Working…" }
+        if command == AnyBrewMutation(MutationCommand.install(target)) { return "Installing…" }
+        if command == AnyBrewMutation(MutationCommand.upgrade(target)) { return "Updating…" }
+        if command == AnyBrewMutation(MutationCommand.uninstall(target)) { return "Uninstalling…" }
+        if let cask = CaskID(packageID), command == AnyBrewMutation(MutationCommand.zap(cask)) {
+            return "Uninstalling…"
+        }
+        return "Working…"
+    }
+
     private var inFlightMessage: String {
         isRunning ? "Running \(displayCommand)" : "Queued behind another operation."
     }

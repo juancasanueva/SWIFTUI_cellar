@@ -1,3 +1,4 @@
+import Catalog
 import Foundation
 
 /// What an always-visible indicator needs, and nothing more
@@ -45,5 +46,15 @@ extension OperationCenter {
     public var isHomebrewUpdateInFlight: Bool {
         let update = AnyBrewMutation(MutationCommand.update)
         return items.contains { $0.command == update && !$0.isTerminal }
+    }
+
+    /// The unsettled mutation acting on `id`, when one exists.
+    ///
+    /// What a package's action area reads to replace its verb with progress
+    /// feedback from submit until the terminal — and, being read off the same
+    /// items the listing shows, what keeps that area from offering a second
+    /// submission while the first is still running.
+    public func activeMutation(naming id: PackageID) -> ActivityItem? {
+        items.first { $0.packageID == id && !$0.isTerminal }
     }
 }

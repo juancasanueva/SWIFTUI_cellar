@@ -322,26 +322,48 @@ struct CaskListRow: View {
     /// column lines up row over row.
     @ViewBuilder
     private var actionPill: some View {
-        switch CaskActionState.resolve(package, installed: installed) {
-        case .update(let target):
-            pillButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
-                submit(.upgrade(target))
+        if let busy = operations.activeMutation(naming: package.id) {
+            busyPill(busy)
+        } else {
+            switch CaskActionState.resolve(package, installed: installed) {
+            case .update(let target):
+                pillButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
+                    submit(.upgrade(target))
+                }
+                uninstallPill(target)
+            case .installed(let target):
+                // The state pill's place went to the launch verb; the installed
+                // fact moved beside the title as `CaskInstalledTag`.
+                if let appURL = CaskAppLauncher.installedAppURL(for: package) {
+                    openPill(appURL)
+                }
+                uninstallPill(target)
+            case .install(let target):
+                pillButton("↓ Install", identifier: "cask-install-\(package.name)") {
+                    submit(.install(target))
+                }
+            case nil:
+                EmptyView()
             }
-            uninstallPill(target)
-        case .installed(let target):
-            // The state pill's place went to the launch verb; the installed
-            // fact moved beside the title as `CaskInstalledTag`.
-            if let appURL = CaskAppLauncher.installedAppURL(for: package) {
-                openPill(appURL)
-            }
-            uninstallPill(target)
-        case .install(let target):
-            pillButton("↓ Install", identifier: "cask-install-\(package.name)") {
-                submit(.install(target))
-            }
-        case nil:
-            EmptyView()
         }
+    }
+
+    /// The in-flight state at pill density: inert progress feedback in the
+    /// verbs' place, from submit until the terminal, so a running package
+    /// cannot be submitted a second time mid-flight.
+    private func busyPill(_ item: ActivityItem) -> some View {
+        HStack(spacing: 5) {
+            ProgressView()
+                .controlSize(.mini)
+            Text(item.progressLabel)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+        }
+        .frame(width: 100, height: 25)
+        .background(Theme.controlFill, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
+        .accessibilityIdentifier("cask-busy-\(package.name)")
     }
 
     /// Launches the installed app — a local open, not a brew verb, so it is

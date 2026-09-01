@@ -219,6 +219,43 @@ struct OperationCenterProjectionTests {
         try await harness.finish(call: 0)
     }
 
+    /// The rule the Discover action areas read: from submit until the terminal,
+    /// the package the command names has an active mutation — and no other
+    /// package does. It is what lets a row replace its verb with progress
+    /// feedback instead of offering a second submission mid-flight.
+    @Test("A package's action area reads its unsettled mutation, from submit to terminal")
+    func aPackagesActionAreaReadsItsUnsettledMutation() async throws {
+        let harness = CenterHarness()
+        #expect(harness.center.activeMutation(naming: CenterHarness.wget) == nil)
+
+        let item = harness.center.submit(.install(PackageTarget(CenterHarness.wget)!))
+        #expect(harness.center.activeMutation(naming: CenterHarness.wget) === item)
+        #expect(harness.center.activeMutation(naming: CenterHarness.git) == nil)
+
+        try await harness.finish(call: 0)
+        #expect(item.isTerminal)
+        #expect(harness.center.activeMutation(naming: CenterHarness.wget) == nil)
+    }
+
+    /// Matched by erased-command equality, never by inspecting the verb string,
+    /// which the mutation spine's structural scan forbids.
+    @Test("The progress label names the verb that is in flight")
+    func theProgressLabelNamesTheInFlightVerb() async throws {
+        let formula = PackageTarget(CenterHarness.wget)!
+        let cask = CaskID(CenterHarness.iterm)!
+
+        func label(_ command: MutationCommand) -> String {
+            ActivityItem(id: UUID(), command: command).progressLabel
+        }
+
+        #expect(label(.install(formula)) == "Installing…")
+        #expect(label(.upgrade(formula)) == "Updating…")
+        #expect(label(.uninstall(formula)) == "Uninstalling…")
+        #expect(label(.zap(cask)) == "Uninstalling…")
+        #expect(label(.reinstall(formula)) == "Working…")
+        #expect(label(.update) == "Working…")
+    }
+
     // MARK: - Summary and detail agree (OA5 sc1–3)
 
     @Test("The summary reports the running operation and the pending count")

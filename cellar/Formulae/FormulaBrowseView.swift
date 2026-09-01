@@ -123,7 +123,22 @@ struct FormulaBrowseView: View {
 
     @ViewBuilder
     private func heroAction(for housePick: CatalogPackage) -> some View {
-        if let target = PackageTarget(housePick.id) {
+        // In-flight first: inert progress feedback in the verb's place, so
+        // the hero cannot submit the same package a second time mid-flight.
+        if let busy = operations.activeMutation(naming: housePick.id) {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(busy.progressLabel)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 30)
+            .background(Theme.controlFill, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
+            .accessibilityIdentifier("formula-hero-busy")
+        } else if let target = PackageTarget(housePick.id) {
             let installedPackage = installed.inventory.package(housePick.id)
             if let installedPackage, installedPackage.isOutdated {
                 heroButton("Update", fill: theme.tint(0.22)) { submit(.upgrade(target)) }

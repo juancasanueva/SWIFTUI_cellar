@@ -109,32 +109,61 @@ struct CaskCardView: View {
     /// and **no** affordance at all for an identity brew cannot target.
     @ViewBuilder
     private var actionRow: some View {
-        switch CaskActionState.resolve(package, installed: installed) {
-        case .update(let target):
-            HStack(spacing: 8) {
-                // Louder than Install: an update is the verb that most often
-                // brings a user here, the sidebar badge's own rule.
-                actionButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
-                    submit(.upgrade(target))
+        if let busy = operations.activeMutation(naming: package.id) {
+            busyRow(busy)
+        } else {
+            switch CaskActionState.resolve(package, installed: installed) {
+            case .update(let target):
+                HStack(spacing: 8) {
+                    // Louder than Install: an update is the verb that most often
+                    // brings a user here, the sidebar badge's own rule.
+                    actionButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
+                        submit(.upgrade(target))
+                    }
+                    uninstallButton(target)
                 }
-                uninstallButton(target)
-            }
-        case .installed(let target):
-            HStack(spacing: 8) {
-                // The state pill's place went to the launch verb; the
-                // installed fact moved beside the title as `CaskInstalledTag`.
-                if let appURL = CaskAppLauncher.installedAppURL(for: package) {
-                    openButton(appURL)
+            case .installed(let target):
+                HStack(spacing: 8) {
+                    // The state pill's place went to the launch verb; the
+                    // installed fact moved beside the title as `CaskInstalledTag`.
+                    if let appURL = CaskAppLauncher.installedAppURL(for: package) {
+                        openButton(appURL)
+                    }
+                    uninstallButton(target)
                 }
-                uninstallButton(target)
+            case .install(let target):
+                actionButton("↓ Install", identifier: "cask-install-\(package.name)") {
+                    submit(.install(target))
+                }
+            case nil:
+                EmptyView()
             }
-        case .install(let target):
-            actionButton("↓ Install", identifier: "cask-install-\(package.name)") {
-                submit(.install(target))
-            }
-        case nil:
-            EmptyView()
         }
+    }
+
+    /// The in-flight state at the card's action density: inert progress
+    /// feedback in the verbs' place, from submit until the terminal, so a
+    /// running package cannot be submitted a second time mid-flight.
+    private func busyRow(_ item: ActivityItem) -> some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.mini)
+            Text(item.progressLabel)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 28)
+        .background(
+            Theme.controlFill,
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Theme.border, lineWidth: 0.5)
+        )
+        .accessibilityIdentifier("cask-busy-\(package.name)")
     }
 
     /// Launches the installed app — a local open, not a brew verb, so it is
