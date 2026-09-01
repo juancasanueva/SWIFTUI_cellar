@@ -236,15 +236,18 @@ struct HealthView: View {
 
     /// Nothing new is constructed here, and no confirmation is skipped.
     ///
-    /// Upgrade-all is submitted the same way the Installed list submits it.
-    /// Cleanup and autoremove go through the **shipped** preview-then-review
-    /// sequence, so the confirmation that appears is `CleanupConfirmationDisclosure`
-    /// carrying the same evidence it carries on the Cleanup surface — a health row
-    /// cannot present a weaker disclosure, because it does not build one.
+    /// Upgrade-all is submitted the same way the Installed list submits it:
+    /// through the centre's ask-first `submitUpgradeAll()`, so the same
+    /// Upgrade-everything confirmation appears here (bulk-confirmation ruling
+    /// 2026-09-01). Cleanup and autoremove go through the **shipped**
+    /// preview-then-review sequence, so the confirmation that appears is
+    /// `CleanupConfirmationDisclosure` carrying the same evidence it carries on
+    /// the Cleanup surface — a health row cannot present a weaker disclosure,
+    /// because it does not build one.
     private func remediate(_ command: HealthComposition.Command) {
         switch command {
-        case .mutation(let mutation):
-            operations.submit(mutation)
+        case .upgradeAll:
+            operations.submitUpgradeAll()
         case .cleanup(let cleanupCommand):
             review(cleanupCommand.scope)
         case .runDoctor:

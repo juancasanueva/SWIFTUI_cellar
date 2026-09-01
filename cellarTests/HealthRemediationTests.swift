@@ -32,7 +32,7 @@ struct HealthRemediationTests {
         #expect(HealthRemediation.allCases.count == 5)
 
         let expected: [HealthRemediation: HealthComposition.Command?] = [
-            .upgradeAll: .mutation(.upgradeAll),
+            .upgradeAll: .upgradeAll,
             .autoremove: .cleanup(CleanupCommand(scope: .autoremove)),
             .cleanupCache: .cleanup(CleanupCommand(scope: .global)),
             .runDoctor: .runDoctor,
@@ -76,22 +76,26 @@ struct HealthRemediationTests {
         }
     }
 
-    /// Upgrade-all is submitted exactly as the Installed list submits it — which
-    /// means Health neither drops a gate nor invents one it has no standing to add.
-    @Test("Upgrade-all is Installed's own command, with Installed's own gate")
-    func upgradeAllIsInstalledsOwnCommandWithItsOwnGate() throws {
-        guard case .mutation(let offered)? = HealthComposition.command(for: .upgradeAll) else {
-            Issue.record("the outdated row no longer offers Installed's own upgrade-all")
-            return
-        }
+    /// Upgrade-all is submitted exactly as the Installed list submits it — since
+    /// the bulk-confirmation ruling 2026-09-01, that is the centre's ask-first
+    /// `submitUpgradeAll()`, whose `.upgradeEverything` confirmation Health
+    /// therefore inherits rather than drops or invents. The row hands no command
+    /// value at all: the centre constructs the one `.upgradeAll`, so a health
+    /// row cannot vary what runs.
+    @Test("Upgrade-all travels the centre's own ask-first path, as Installed does")
+    func upgradeAllTravelsTheCentresOwnAskFirstPath() throws {
+        #expect(HealthComposition.command(for: .upgradeAll) == .upgradeAll)
 
-        #expect(offered == MutationCommand.upgradeAll)
-        #expect(offered.arguments == ["upgrade"])
-        #expect(offered.verb == "upgradeAll")
-        #expect(offered.requiresConfirmation == MutationCommand.upgradeAll.requiresConfirmation)
-        // Absolutely as well as relatively: upgrade-all destroys nothing, and
-        // inventing a gate here would deviate as much as dropping one.
-        #expect(offered.requiresConfirmation == false)
+        // The routing really reaches the ask-first entry point, and does not
+        // keep a direct `submit` beside it for the same verb.
+        let view = try #require(HealthSources.load().first { $0.name == "HealthView.swift" }?.code)
+        #expect(view.contains("operations.submitUpgradeAll()"))
+        #expect(view.contains("operations.submit(.upgradeAll)") == false)
+
+        // The command stays non-destructive (product Q2): the ask lives in the
+        // centre's bulk gate, never on the command.
+        #expect(MutationCommand.upgradeAll.requiresConfirmation == false)
+        #expect(MutationCommand.upgradeAll.arguments == ["upgrade"])
     }
 
     // MARK: - The structural half — nothing leaves the spine
@@ -106,7 +110,7 @@ struct HealthRemediationTests {
         // anything, or the sweep below is equally green over a group that submits
         // nothing.
         #expect(view.contains("HealthComposition.command(for:"))
-        #expect(view.contains("operations.submit("))
+        #expect(view.contains("operations.submitUpgradeAll("))
         #expect(view.contains("operations.requestCleanup("))
 
         for source in group {
@@ -126,7 +130,7 @@ struct HealthRemediationTests {
         }
         """
         #expect(HealthRemediationScan.bypasses(in: offender) == ["Process(", "requiresConfirmation"])
-        #expect(HealthRemediationScan.bypasses(in: "operations.submit(mutation)").isEmpty)
+        #expect(HealthRemediationScan.bypasses(in: "operations.submitUpgradeAll()").isEmpty)
     }
 }
 

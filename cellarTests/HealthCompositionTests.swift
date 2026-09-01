@@ -750,7 +750,7 @@ struct HealthNpmCompositionTests {
     /// widening a verb this capability has no business widening.
     @Test("The remediation stays Homebrew's and its copy claims nothing about npm")
     func remediationStaysHomebrewsAndClaimsNothingAboutNpm() throws {
-        #expect(HealthComposition.command(for: .upgradeAll) == .mutation(.upgradeAll))
+        #expect(HealthComposition.command(for: .upgradeAll) == .upgradeAll)
         #expect(MutationCommand.upgradeAll.displayCommand == "brew upgrade")
 
         let title = try #require(HealthCopy.remediationTitle(.upgradeAll))

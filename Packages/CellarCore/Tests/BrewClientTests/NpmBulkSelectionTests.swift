@@ -63,11 +63,15 @@ struct NpmBulkSelectionTests {
         #expect(commands.map(\.verb) == ["uninstall", "npmUninstall", "uninstall"])
     }
 
-    @Test("A mixed bulk upgrade enqueues exactly three operations through the one queue")
+    @Test("A confirmed mixed bulk upgrade enqueues exactly three operations through the one queue")
     func mixedUpgradeEnqueuesThroughOneQueue() async throws {
         let harness = Self.attached()
 
-        harness.center.submitBulk(.upgrade, over: Self.mixed)
+        // Every bulk action asks first (bulk-confirmation ruling 2026-09-01);
+        // what this test pins is that the *confirmed* batch crosses sources
+        // through the one queue.
+        let request = try #require(harness.center.submitBulk(.upgrade, over: Self.mixed))
+        harness.center.confirm(request)
         await harness.settle()
 
         #expect(harness.center.items.count == 3)

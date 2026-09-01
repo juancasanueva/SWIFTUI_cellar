@@ -221,7 +221,7 @@ struct HomeView: View {
                     systemImage: "arrow.up.circle",
                     tone: .accent(theme),
                     buttonLabel: "Upgrade all",
-                    buttonAction: { operations.submit(.upgradeAll) },
+                    buttonAction: { operations.submitUpgradeAll() },
                     isButtonEnabled: operations.isAvailable,
                     open: { section = .updates }
                 )

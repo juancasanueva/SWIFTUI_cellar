@@ -181,8 +181,10 @@ struct BulkActionBar: View {
                 // dimmed one makes the whole row read like a summary line.
                 if let control = presentation.control(for: action), control.count > 0 {
                     Button(control.label, role: action == .uninstall ? .destructive : nil) {
-                        // Confirming is decided by the centre, not here: a `nil`
-                        // request means it was already submitted.
+                        // Confirming is decided by the centre, not here — every
+                        // bulk batch asks first (bulk-confirmation ruling
+                        // 2026-09-01), and a `nil` request means there was
+                        // nothing to submit.
                         operations.submitBulk(
                             action,
                             over: selection.ids(for: action),

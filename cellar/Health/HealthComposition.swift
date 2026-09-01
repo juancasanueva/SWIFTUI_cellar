@@ -308,7 +308,13 @@ nonisolated enum HealthComposition {
     /// actions, so `.lastUpdate` and `.vulnerable` offer `.none` rather than
     /// something invented for the occasion.
     enum Command: Sendable, Equatable {
-        case mutation(MutationCommand)
+        /// The grouped upgrade, named as a route rather than carried as a
+        /// value: the view forwards it to the centre's ask-first
+        /// `submitUpgradeAll()`, which constructs the one `.upgradeAll`
+        /// itself — so a health row cannot vary what runs, and the
+        /// `.upgradeEverything` confirmation is the centre's, not this
+        /// capability's (bulk-confirmation ruling 2026-09-01).
+        case upgradeAll
         case cleanup(CleanupCommand)
         /// Not a mutation at all — the same read the section already owns.
         case runDoctor
@@ -316,7 +322,7 @@ nonisolated enum HealthComposition {
 
     static func command(for remediation: HealthRemediation) -> Command? {
         switch remediation {
-        case .upgradeAll: .mutation(.upgradeAll)
+        case .upgradeAll: .upgradeAll
         case .autoremove: .cleanup(CleanupCommand(scope: .autoremove))
         case .cleanupCache: .cleanup(CleanupCommand(scope: .global))
         case .runDoctor: .runDoctor

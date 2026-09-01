@@ -196,17 +196,25 @@ struct BulkFanOutTests {
         #expect(harness.center.commands(for: .uninstall, over: [CenterHarness.iterm]).count == 1)
     }
 
-    /// Bulk pin and bulk unpin are reversible, so neither raises a confirmation
-    /// and `submitBulk` submits directly — the same rule the single-command path
-    /// applies, not a bulk-specific exception.
-    @Test("Bulk pin and bulk unpin submit directly, asking nothing")
-    func pinAndUnpinAskNothing() async throws {
+    /// Bulk pin and bulk unpin are reversible, but they are still one click
+    /// covering N operations, so `submitBulk` asks first like every other bulk
+    /// verb (bulk-confirmation ruling 2026-09-01). The single-command
+    /// `request()` gate is untouched: a lone pin still asks nothing.
+    @Test("A bulk pin asks once, and confirming submits exactly what it showed")
+    func aBulkPinAsksOnceAndConfirmingSubmitsIt() async throws {
         let harness = CenterHarness()
         let formulae = [CenterHarness.wget, CenterHarness.git]
 
-        #expect(harness.center.submitBulk(.pin, over: formulae) == nil, "bulk pin raised a confirmation")
+        let request = try #require(
+            harness.center.submitBulk(.pin, over: formulae),
+            "a bulk pin submitted without asking"
+        )
+        #expect(harness.center.items.isEmpty, "an operation was enqueued before the confirmation")
+        #expect(request.disclosure == .bulkAction(.pin, count: 2))
+
+        harness.center.confirm(request)
         await harness.settle()
-        #expect(harness.center.pendingConfirmation == nil)
+
         #expect(harness.center.items.map(\.arguments) == [
             ["pin", "--formula", "wget"],
             ["pin", "--formula", "git"]
@@ -256,19 +264,40 @@ struct BulkFanOutTests {
         #expect(harness.recorder.drafts.isEmpty)
     }
 
-    /// A bulk upgrade is not destructive, so it is submitted directly — the same
-    /// rule the single-command path applies, not a bulk-specific exception.
-    @Test("A bulk upgrade needs no confirmation and submits directly, in selection order")
-    func aBulkUpgradeSubmitsDirectly() async throws {
+    /// A bulk upgrade is not destructive, but one click still covers N
+    /// operations, so it asks once and confirming fans out in selection order
+    /// (bulk-confirmation ruling 2026-09-01). Declining keeps the PM3 sc6
+    /// shape: none of it is submitted, never a subset.
+    @Test("A bulk upgrade asks once, and confirming fans out in selection order")
+    func aBulkUpgradeAsksOnceAndConfirmingFansOut() async throws {
         let harness = CenterHarness()
+        let inventory = InstalledFixture.inventory(outdated: [
+            CenterHarness.wget: "1.2.3",
+            CenterHarness.git: "2.44.0",
+            CenterHarness.iterm: "3.5.0"
+        ])
 
-        #expect(harness.center.submitBulk(.upgrade, over: Self.selection) == nil)
+        let declined = try #require(harness.center.submitBulk(.upgrade, over: Self.selection, in: inventory))
+        harness.center.decline(declined)
+        await harness.settle()
+        #expect(harness.center.items.isEmpty, "a declined bulk upgrade enqueued a partial subset")
+
+        let request = try #require(harness.center.submitBulk(.upgrade, over: Self.selection, in: inventory))
+        #expect(request.disclosure == .bulkAction(.upgrade, count: 3))
+        let items = harness.center.confirm(request)
         await harness.settle()
 
-        #expect(harness.center.items.map(\.arguments) == [
+        #expect(items.map(\.arguments) == [
             ["upgrade", "--formula", "wget"],
             ["upgrade", "--formula", "git"],
             ["upgrade", "--cask", "iterm2"]
+        ])
+        // The confirmed path records the same from→to a direct submission
+        // records — routing through the sheet loses no version transition.
+        #expect(items.map(\.versions) == [
+            VersionTransition(from: InstalledFixture.installedVersion, to: "1.2.3"),
+            VersionTransition(from: InstalledFixture.installedVersion, to: "2.44.0"),
+            VersionTransition(from: InstalledFixture.installedVersion, to: "3.5.0")
         ])
         for index in 0..<3 { try await harness.finish(call: index) }
     }

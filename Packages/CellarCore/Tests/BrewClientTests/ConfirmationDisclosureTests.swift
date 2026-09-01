@@ -32,15 +32,16 @@ struct ConfirmationDisclosureTests {
     private static let git = PackageTarget(PackageID(kind: .formula, name: "git"))!
     private static let iterm = PackageTarget(PackageID(kind: .cask, name: "iterm2"))!
 
-    // MARK: - II13 — bulk pin and bulk unpin raise no confirmation
+    // MARK: - II13 — the destructive gate still passes pin and unpin through
 
-    /// `request(_:)` already returned `nil` for pin and unpin before they had a
-    /// bulk form, because neither destroys anything and both are reversible in
-    /// one click. So `submitBulk` submits them directly, and DD1's
-    /// `first.disclosure` fix — which is what makes an erased mixed batch
-    /// disclose the *right* warning — is untouched by the widening.
-    @Test("Bulk pin and bulk unpin present no confirmation at all")
-    func bulkPinAndUnpinRaiseNoConfirmation() {
+    /// `request(_:)` returns `nil` for pin and unpin because neither destroys
+    /// anything (product Q2) — that gate is about a command's *nature*, and it
+    /// is untouched. `submitBulk` now asks for a different reason — one click
+    /// covering N operations (bulk-confirmation ruling 2026-09-01) — and that
+    /// rule lives in `submitBulk`, never here. DD1's `first.disclosure` fix is
+    /// untouched by both.
+    @Test("The destructive gate passes pin and unpin, single and batched")
+    func theDestructiveGatePassesPinAndUnpin() {
         let harness = CenterHarness()
 
         for command in [MutationCommand.pin(FormulaID(Self.wget.id)!), .unpin(FormulaID(Self.git.id)!)] {
@@ -48,7 +49,8 @@ struct ConfirmationDisclosureTests {
             #expect(command.requiresConfirmation == false)
         }
 
-        // And as a batch, which is the shape `submitBulk` actually hands it.
+        // And as a batch: the destructive gate reads the commands, not the
+        // click that produced them.
         let batch: [MutationCommand] = [
             .pin(FormulaID(Self.wget.id)!),
             .pin(FormulaID(Self.git.id)!)
@@ -59,6 +61,75 @@ struct ConfirmationDisclosureTests {
         // The control: the destructive verb still does ask, so "no confirmation"
         // is about pinning rather than about a gate that stopped working.
         #expect(harness.center.request(MutationCommand.uninstall(Self.wget)) != nil)
+    }
+
+    // MARK: - Bulk-confirmation ruling 2026-09-01 — one click, many operations
+
+    /// Every bulk action asks first, and the non-destructive ones disclose what
+    /// they actually do rather than borrowing the removal warning. A disclosure
+    /// claiming "this removes installed software" over an upgrade is the same
+    /// class of wrong sentence D2 banned from the tap copy.
+    @Test("Every non-destructive bulk action asks with an honest, non-removal disclosure")
+    func everyNonDestructiveBulkActionAsksHonestly() throws {
+        for action in [BulkSelection.Action.upgrade, .pin, .unpin] {
+            let harness = CenterHarness()
+            let ids = [CenterHarness.wget, CenterHarness.git]
+
+            let request = try #require(
+                harness.center.submitBulk(action, over: ids),
+                "\(action) submitted without asking"
+            )
+            #expect(request.disclosure == .bulkAction(action, count: request.commands.count))
+            #expect(
+                request.warningText.localizedCaseInsensitiveContains("remove") == false,
+                "\(action) borrowed the removal warning: \(request.warningText)"
+            )
+            #expect(harness.center.items.isEmpty, "\(action) enqueued before the confirmation")
+            #expect(harness.launcher.launchCount == 0)
+
+            // Declining submits none of it — the PM3 sc6 shape, kept.
+            harness.center.decline(request)
+            #expect(harness.center.pendingConfirmation == nil)
+            #expect(harness.center.items.isEmpty)
+        }
+    }
+
+    /// The bulk uninstall keeps the disclosure it always had: the widening adds
+    /// confirmations, it re-words none.
+    @Test("The bulk uninstall keeps its removal disclosure under the widened rule")
+    func theBulkUninstallKeepsItsRemovalDisclosure() throws {
+        let harness = CenterHarness()
+        let request = try #require(
+            harness.center.submitBulk(.uninstall, over: [CenterHarness.wget, CenterHarness.git])
+        )
+        #expect(request.disclosure == .packageRemoval)
+        #expect(request.warningText == "This removes installed software.")
+    }
+
+    /// The grouped `brew upgrade` moves every outdated package in one
+    /// operation, so it asks first wherever a sheet can be shown. The command
+    /// itself stays non-destructive (product Q2) and the menu-bar popover —
+    /// which has no sheet host — still submits it directly.
+    @Test("The grouped upgrade asks first and disclosures the bare command")
+    func theGroupedUpgradeAsksFirst() async throws {
+        let harness = CenterHarness()
+
+        let request = harness.center.submitUpgradeAll()
+        #expect(request.disclosure == .upgradeEverything)
+        #expect(request.displayCommands == ["brew upgrade"])
+        #expect(harness.center.items.isEmpty, "the grouped upgrade enqueued before the confirmation")
+        #expect(MutationCommand.upgradeAll.requiresConfirmation == false)
+
+        // Confirming submits exactly the bare command the sheet showed.
+        let items = harness.center.confirm(request)
+        await harness.settle()
+        #expect(items.map(\.arguments) == [["upgrade"]])
+
+        // And declining a fresh one submits nothing.
+        let second = harness.center.submitUpgradeAll()
+        harness.center.decline(second)
+        #expect(harness.center.pendingConfirmation == nil)
+        #expect(harness.center.items.count == 1)
     }
 
     // MARK: - PM1 — an erased mixed batch still discloses tap trust

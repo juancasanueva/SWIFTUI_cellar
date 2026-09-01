@@ -140,12 +140,19 @@ extension OperationCenter {
         }
     }
 
-    /// Runs a bulk action, asking first when the action requires it.
+    /// Runs a bulk action, asking first — always.
     ///
-    /// Returns the pending request when one is owed and `nil` when the batch was
-    /// submitted directly — the same "no request means already submitted" shape
-    /// the single-command path uses, so a caller restates no rule about which
-    /// verbs are destructive.
+    /// Every bulk action asks, not only the destructive ones: one click
+    /// covering N operations is agreed on the whole of what it will do before
+    /// anything is enqueued (bulk-confirmation ruling 2026-09-01). The
+    /// destructive gate `request(_:)` is deliberately not widened — it reads a
+    /// command's *nature*, and a lone pin still asks nothing — so the sequence
+    /// paths below confirm exactly what they confirmed before.
+    ///
+    /// Returns `nil` only for an empty batch, keeping the "no request means
+    /// nothing left to ask about" shape callers already treat as submitted.
+    /// The request carries each package's intended version transition, so the
+    /// confirmed path records the same from→to a direct submission records.
     @discardableResult
     public func submitBulk(
         _ action: BulkSelection.Action,
@@ -153,11 +160,55 @@ extension OperationCenter {
         in inventory: InstalledInventory? = nil
     ) -> ConfirmationRequest? {
         let commands = commands(for: action, over: ids)
-        if let request = request(commands) { return request }
-        for command in commands {
-            submit(command, versions: Self.transition(for: command.packageID, in: inventory))
+        guard let first = commands.first else { return nil }
+
+        // The uninstall batch keeps the lead-disclosure rule (PM1); every
+        // other action states what it actually does, never the removal text.
+        let request = ConfirmationRequest(
+            id: UUID(),
+            command: first,
+            additional: Array(commands.dropFirst()),
+            disclosure: action == .uninstall
+                ? commands.leadDisclosure
+                : .bulkAction(action, count: commands.count),
+            transitions: Self.transitions(for: commands, in: inventory)
+        )
+        setPendingConfirmation(request)
+        return request
+    }
+
+    /// Asks before the grouped bare `brew upgrade`.
+    ///
+    /// Always asks, so the return is not optional — there is no direct path
+    /// from this call. The command itself stays non-destructive (product Q2):
+    /// the menu-bar popover, which has no sheet host and would latch an
+    /// unanswered request on the shared channel, still submits `.upgradeAll`
+    /// directly through `submit`.
+    @discardableResult
+    public func submitUpgradeAll() -> ConfirmationRequest {
+        let request = ConfirmationRequest(
+            id: UUID(),
+            command: AnyBrewMutation(MutationCommand.upgradeAll),
+            additional: [],
+            disclosure: .upgradeEverything
+        )
+        setPendingConfirmation(request)
+        return request
+    }
+
+    /// The intended moves for every package the batch names, out of the
+    /// snapshot the caller is already holding — the same derivation the direct
+    /// path used, keyed so `confirm` can reunite each command with its own.
+    private static func transitions(
+        for commands: [AnyBrewMutation],
+        in inventory: InstalledInventory?
+    ) -> [PackageID: VersionTransition] {
+        guard let inventory else { return [:] }
+        var moves: [PackageID: VersionTransition] = [:]
+        for id in commands.compactMap(\.packageID) {
+            if let move = transition(for: id, in: inventory) { moves[id] = move }
         }
-        return nil
+        return moves
     }
 
     /// Submits an ordered sequence of commands as **one** user action, asking
@@ -307,7 +358,11 @@ extension OperationCenter {
     public func confirm(_ request: ConfirmationRequest) -> [ActivityItem] {
         guard pendingConfirmation == request else { return [] }
         confirmations.consume(request)
-        guard request.dependsOnLead else { return request.commands.map { submit($0) } }
+        guard request.dependsOnLead else {
+            return request.commands.map { command in
+                submit(command, versions: command.packageID.flatMap { request.transitions[$0] })
+            }
+        }
         return submitDependent(request.commands)
     }
 
@@ -359,6 +414,12 @@ extension OperationCenter {
         /// existing construction — and every shipped test that builds one —
         /// keeps the fan-out it already had.
         public let dependsOnLead: Bool
+        /// The version move each named package is expected to make, so a
+        /// confirmed batch records the same from→to a direct submission
+        /// records. Empty for every batch that derives none — the sheet reads
+        /// nothing from it, and `confirm(_:)` alone reunites each command with
+        /// its own.
+        public let transitions: [PackageID: VersionTransition]
 
         public init(
             id: UUID,
@@ -366,7 +427,8 @@ extension OperationCenter {
             additional: [AnyBrewMutation],
             disclosure: ConfirmationDisclosure = .packageRemoval,
             cleanupDisclosure: CleanupConfirmationDisclosure? = nil,
-            dependsOnLead: Bool = false
+            dependsOnLead: Bool = false,
+            transitions: [PackageID: VersionTransition] = [:]
         ) {
             self.id = id
             self.command = command
@@ -374,6 +436,7 @@ extension OperationCenter {
             self.disclosure = disclosure
             self.cleanupDisclosure = cleanupDisclosure
             self.dependsOnLead = dependsOnLead
+            self.transitions = transitions
         }
 
         /// Every command this confirmation will submit, in order.
@@ -396,7 +459,7 @@ extension OperationCenter {
         public var tapIdentity: TapName? {
             switch disclosure {
             case .tapAdd(let tap), .tapTrustGrant(let tap), .forceUntap(let tap, _): tap
-            case .packageRemoval: nil
+            case .packageRemoval, .bulkAction, .upgradeEverything: nil
             }
         }
 

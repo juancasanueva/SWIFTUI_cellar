@@ -55,11 +55,48 @@ public enum ConfirmationDisclosure: Sendable, Hashable {
     /// gave (tap-management TM13).
     case tapTrustGrant(TapName)
     case forceUntap(tap: TapName, affected: Set<PackageID>)
+    /// One click covering N operations (bulk-confirmation ruling 2026-09-01).
+    /// Its own case per action rather than a reuse of `packageRemoval`: a
+    /// disclosure claiming removal over an upgrade is the same class of wrong
+    /// sentence D2 banned from the tap copy.
+    case bulkAction(BulkSelection.Action, count: Int)
+    /// The grouped bare `brew upgrade`, which names no package and moves every
+    /// outdated one.
+    case upgradeEverything
 
     public var warningText: String {
         switch self {
         case .packageRemoval:
             "This removes installed software."
+        case .bulkAction(let action, let count):
+            switch action {
+            case .upgrade:
+                """
+                This starts \(count) upgrade \(count == 1 ? "operation" : "operations") \
+                at once. Each runs separately and can be cancelled from Activity.
+                """
+            case .uninstall:
+                // Unreachable through `submitBulk`, which routes uninstall
+                // batches to `packageRemoval` — kept honest for totality.
+                "This removes installed software."
+            case .pin:
+                """
+                This pins \(count) \(count == 1 ? "formula" : "formulae") at \
+                \(count == 1 ? "its" : "their") installed \
+                \(count == 1 ? "version" : "versions") until you unpin \
+                \(count == 1 ? "it" : "them").
+                """
+            case .unpin:
+                """
+                This unpins \(count) \(count == 1 ? "formula" : "formulae"), \
+                so upgrades can move \(count == 1 ? "it" : "them") again.
+                """
+            }
+        case .upgradeEverything:
+            """
+            This upgrades every outdated Homebrew formula and cask in one \
+            operation, including any not shown by the current filters.
+            """
         case .tapAdd(let tap):
             """
             Adding \(tap.rawValue) clones a third-party repository. Homebrew \

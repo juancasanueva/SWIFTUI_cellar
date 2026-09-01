@@ -7,7 +7,9 @@ import BrewClient
 import Catalog
 import SwiftUI
 
-/// The confirmation for the two destructive commands.
+/// The confirmation for the destructive commands and for one-click batches —
+/// a bulk verb over a selection, or the grouped bare `brew upgrade`
+/// (bulk-confirmation ruling 2026-09-01).
 ///
 /// It renders `displayCommand` **verbatim** — the same string the copy
 /// affordance produces, and character for character the argv that will run. The
@@ -104,7 +106,7 @@ private struct MutationConfirmationSheet: View {
                     }
                     .keyboardShortcut(.cancelAction)
                 }
-                Button(confirmLabel, role: .destructive) {
+                Button(confirmLabel, role: confirmRole) {
                     confirm()
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -153,6 +155,9 @@ private struct MutationConfirmationSheet: View {
         case .tapAdd: return "Add this tap?"
         case .tapTrustGrant: return "Trust this tap?"
         case .forceUntap: return "Force-remove this tap?"
+        case .upgradeEverything: return "Upgrade everything?"
+        case .bulkAction(let action, let count):
+            return "\(action.title) \(count) \(Self.noun(for: action, count: count))?"
         case .packageRemoval: break
         }
         if request.isBulk {
@@ -169,10 +174,31 @@ private struct MutationConfirmationSheet: View {
         case .tapAdd: return "Add Tap"
         case .tapTrustGrant: return "Trust"
         case .forceUntap: return "Force Untap"
+        case .upgradeEverything: return "Upgrade All"
+        case .bulkAction(let action, let count): return "\(action.title) \(count)"
         case .packageRemoval: break
         }
         if request.isBulk { return "Uninstall \(request.commands.count)" }
         return request.isZap ? "Uninstall and Zap" : "Uninstall"
+    }
+
+    /// A destructive role only where something is destroyed: a red "Upgrade 3"
+    /// would claim a danger the disclosure explicitly denies.
+    private var confirmRole: ButtonRole? {
+        switch request.disclosure {
+        case .bulkAction(.uninstall, _): .destructive
+        case .bulkAction, .upgradeEverything: nil
+        case .packageRemoval, .tapAdd, .tapTrustGrant, .forceUntap: .destructive
+        }
+    }
+
+    /// What the bulk count counts. Pin and unpin are formula-only by
+    /// construction, so their sheets say so.
+    private static func noun(for action: BulkSelection.Action, count: Int) -> String {
+        switch action {
+        case .upgrade, .uninstall: count == 1 ? "package" : "packages"
+        case .pin, .unpin: count == 1 ? "formula" : "formulae"
+        }
     }
 
     private func confirm() {

@@ -211,7 +211,11 @@ struct MenuBarCompositionTests {
         // The verbs the surface actually offers, and their confirmation
         // requirement read rather than assumed. A request raised with no window
         // open would latch unanswered on the shared channel and block every
-        // later confirmation in the app, so none of these may need one.
+        // later confirmation in the app, so none of these may need one. That is
+        // also why the popover submits `.upgradeAll` directly while the main
+        // window asks through `submitUpgradeAll()` — the ask lives in the
+        // centre's separate bulk gate, never on the command (bulk-confirmation
+        // ruling 2026-09-01), so this flag stays false.
         let target = try #require(ServiceTarget(name: "atuin"))
         #expect(MutationCommand.upgradeAll.requiresConfirmation == false)
         for command in ServiceCommand.allVerbs(for: target) {

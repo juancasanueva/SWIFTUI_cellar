@@ -295,6 +295,12 @@ public enum MutationCommand: Sendable, Equatable {
     ///
     /// Exactly `uninstall` and `zap` (product Q2). `upgradeAll` is the only bulk
     /// command and is non-destructive, so no bulk destructive path exists.
+    ///
+    /// This flag is about a single command's *nature*. The centre separately
+    /// asks before one click that covers many operations — `submitBulk` and
+    /// `submitUpgradeAll` (bulk-confirmation ruling 2026-09-01) — without any
+    /// command here becoming "destructive": the menu-bar popover, which has no
+    /// sheet host, depends on `upgradeAll` staying `false` here.
     public var requiresConfirmation: Bool {
         switch self {
         case .uninstall, .zap: true

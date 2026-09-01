@@ -279,6 +279,9 @@ struct InstalledListView: View {
     /// its own log, cancel and terminal outcome; "Upgrade all" is the single
     /// bare `brew upgrade` with brew's own defaults. Both refuse to name a
     /// pinned package, and neither unpins anything (package-mutation PM2).
+    /// Both ask first — one click covering many operations is agreed before
+    /// anything is enqueued, and the centre decides that, not this view
+    /// (bulk-confirmation ruling 2026-09-01).
     ///
     /// The label counts `upgradableIDs` and the button submits `upgradableIDs`
     /// — one projection, read twice, so the number announced and the set
@@ -286,11 +289,11 @@ struct InstalledListView: View {
     private var bulkUpgradeBar: some View {
         HStack(spacing: 8) {
             Button("Upgrade outdated (\(upgradableIDs.count))") {
-                operations.submitUpgrades(for: upgradableIDs, in: installed.inventory)
+                operations.submitBulk(.upgrade, over: upgradableIDs, in: installed.inventory)
             }
             .buttonStyle(ActionPillStyle())
             Button("Upgrade all") {
-                operations.submit(.upgradeAll)
+                operations.submitUpgradeAll()
             }
             .buttonStyle(ActionPillStyle())
             Spacer(minLength: 0)
