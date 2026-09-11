@@ -308,7 +308,7 @@ change without a coordinated change there:
 
 `release.yml` carried a named extension point immediately after the publish step.
 Appcast publication now occupies it, and the cask bump **declined** it: the tap
-is kept current by a scheduled workflow in `juancasanueva/homebrew-cellar` that
+is kept current by a scheduled workflow in `juancasanueva/homebrew-tap` that
 pulls this repository's `releases/latest` (§8). The release job therefore gains
 no cross-repository write, no eighth secret, and no way for a successful,
 notarized release to report failure because of a channel that is not on the
@@ -328,22 +328,39 @@ at the same `Home-Cellar-<version>.zip` §7 specifies.
 
 | Thing | Value |
 |---|---|
-| Tap repository | `juancasanueva/homebrew-cellar` (public) |
-| Tap name | `juancasanueva/cellar` |
+| Tap repository | `juancasanueva/homebrew-tap` (public) |
+| Tap name | `juancasanueva/tap` |
 | Cask token | `home-cellar` |
-| Canonical install | `brew tap juancasanueva/cellar`, then `brew trust juancasanueva/cellar`, then `brew install --cask home-cellar` |
-| Unambiguous form | `brew install --cask juancasanueva/cellar/home-cellar` |
+| Canonical install | `brew trust juancasanueva/tap`, then `brew tap juancasanueva/tap`, then `brew install --cask home-cellar` |
+| Unambiguous form | `brew install --cask juancasanueva/tap/home-cellar` |
 | Installed path | `/Applications/Home-Cellar.app` — the same bundle name the zip carries |
 
-Four files plus a `LICENSE` live there: `Casks/home-cellar.rb`,
-`.github/workflows/ci.yml`, `.github/workflows/bump.yml`, and a user-facing
-`README.md`.
+Five files plus a `LICENSE` live there: `Casks/home-cellar.rb`,
+`Casks/system-monitor.rb`, `.github/workflows/ci.yml`,
+`.github/workflows/bump.yml`, and a user-facing `README.md`.
 
-**Homebrew 6 requires tap trust.** It refuses to load a cask from a non-official
-tap until the tap is trusted, so the short install form needs `brew trust
-juancasanueva/cellar` first. Naming the tap or the fully-qualified cask on the
-command line is itself the grant, which is why every command in this section and
-in both tap workflows is fully qualified and needs no stored trust entry.
+The tap is **shared**: `juancasanueva/tap` carries this cask and `system-monitor`
+for [System Monitor](https://github.com/juancasanueva/SWIFTUI_system_monitor). One
+trust grant and one `brew upgrade` cover both. Its `ci.yml` installs, verifies and
+zaps both casks on every change, and its `bump.yml` is a serialised matrix with
+one entry per app, so a bump to one cask never rewrites the other.
+
+**`juancasanueva/cellar` is now a migration pointer.** That repository carries no
+cask any more — only a `tap_migrations.json` mapping the `home-cellar` token to
+`juancasanueva/tap`. Homebrew honours the mapping on `brew upgrade`, but only into
+a tap the user already has and trusts, so the documented path for an existing
+installation is `brew trust juancasanueva/tap`, `brew tap juancasanueva/tap`,
+`brew upgrade`, then `brew untap juancasanueva/cellar`. The cask file had to be
+deleted there: `brew audit` errors with "home-cellar is listed in
+tap_migrations.json" while the token is both listed and present in the same tap.
+
+**Homebrew 6 requires tap trust, before tapping.** Since 6.0.22 `brew tap` itself
+refuses, and rolls back, a non-official tap that carries a cask until the tap is
+trusted, so the short install form needs `brew trust juancasanueva/tap` first.
+Naming the tap or the fully-qualified cask on the command line is itself the
+grant, which is why every command in this section and in both tap workflows is
+fully qualified and needs no stored trust entry. Trust is per tap, so the grant
+on the old tap does not carry over to the new one.
 
 **A direct-download copy blocks a plain install.** A user who dragged the zip
 already has `/Applications/Home-Cellar.app` — the same path and the same bundle
@@ -391,9 +408,9 @@ gh release view --repo juancasanueva/SWIFTUI_cellar --json tagName --jq .tagName
 curl -fsSLO https://github.com/juancasanueva/SWIFTUI_cellar/releases/download/v<version>/Home-Cellar-<version>.zip
 shasum -a 256 Home-Cellar-<version>.zip
 # edit version and sha256 in Casks/home-cellar.rb, then, from a checkout tapped
-# into $(brew --repository)/Library/Taps/juancasanueva/homebrew-cellar:
-brew style juancasanueva/cellar
-brew audit --cask --online --strict juancasanueva/cellar/home-cellar
+# into $(brew --repository)/Library/Taps/juancasanueva/homebrew-tap:
+brew style juancasanueva/tap
+brew audit --cask --online --strict juancasanueva/tap/home-cellar
 git commit -am "chore(cask): home-cellar <version>" && git push
 ```
 

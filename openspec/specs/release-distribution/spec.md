@@ -14,7 +14,7 @@ that no test or gate could ever check:
 | Class | Meaning | Count |
 |---|---|---|
 | `unit` | RED-first assertion in `cellarTests`, in the shipped `AppSecuritySources` / `#filePath` idiom (reads the repository or the test host's bundle information off disk), run by `xcodebuild test … -only-testing:cellarTests` in **this** repository | **18** |
-| `ci-gate` | a hard gate whose failure fails its job and commits or publishes nothing. The runner is named per scenario: the release run in `.github/workflows/release.yml` **here**, or `ci.yml` / `bump.yml` in **`juancasanueva/homebrew-cellar`** on `macos-26` for the cask channel | **18** |
+| `ci-gate` | a hard gate whose failure fails its job and commits or publishes nothing. The runner is named per scenario: the release run in `.github/workflows/release.yml` **here**, or `ci.yml` / `bump.yml` in **`juancasanueva/homebrew-tap`** on `macos-26` for the cask channel | **18** |
 | `manual-evidence` | no harness can exist — no runner may install into a real `/Applications` or observe a self-updated app — so the maintainer's observed output is recorded verbatim in `design.md` and the verify report | **6** |
 
 What stays **design-owned and is deliberately absent here**: the runner image and Xcode pinning, the
@@ -481,7 +481,7 @@ it; the update-continuity, no-migration-mechanism and atomic-tap-commit ordering
 - AND the install resolves the cask's `app` artifact against a bundle the downloaded asset actually
   contains, rather than passing on audit alone
 - AND a failing gate leaves nothing committed and nothing published
-- Verification: `ci-gate` — `ci.yml` in `juancasanueva/homebrew-cellar`
+- Verification: `ci-gate` — `ci.yml` in `juancasanueva/homebrew-tap`
 
 #### Scenario: The rename ships no migration mechanism
 
@@ -490,7 +490,7 @@ it; the update-continuity, no-migration-mechanism and atomic-tap-commit ordering
 - THEN its `app` artifact names `Home-Cellar.app` and declares no `target:`
 - AND neither its zap inventory nor any `uninstall delete:` names `/Applications/cellar.app`, so a zap
   can only remove what the cask itself placed
-- Verification: `ci-gate` — `ci.yml` in `juancasanueva/homebrew-cellar`
+- Verification: `ci-gate` — `ci.yml` in `juancasanueva/homebrew-tap`
 
 #### Scenario: A self-updated app does not fight `brew upgrade`
 
@@ -731,7 +731,7 @@ exclusivity clause, and the inventory's independence from the bundle name was un
   (total **41**). Two edits were required, not one: the counts, **and** the `ci-gate` meaning, which
   read "a hard gate inside **the release run**" and is now "a hard gate whose failure fails its job
   and commits or publishes nothing". Three of the delta's `ci-gate` scenarios execute in
-  `juancasanueva/homebrew-cellar` rather than in this repository's release run, so updating the
+  `juancasanueva/homebrew-tap` rather than in this repository's release run, so updating the
   counts alone would have left the table stating something false. The runner is now named per class.
   The arithmetic was confirmed against the merged file by counting `- Verification:` lines
   (18 / 17 / 6 = 41), not by trusting the delta's note.
@@ -830,7 +830,7 @@ exclusivity clause, and the inventory's independence from the bundle name was un
     the product/module divergence is accepted and documented (**rejected:** 22 mechanical import
     edits to align them).
   - **+1 scenario** — *The rename ships no migration mechanism*, `ci-gate`, run by `ci.yml` in
-    `juancasanueva/homebrew-cellar`. It asserts the **absence** of every migration mechanism rather
+    `juancasanueva/homebrew-tap`. It asserts the **absence** of every migration mechanism rather
     than behaviour for an installed base of zero. This is the one deliberate divergence from the
     proposal's "counts are unchanged" line: the scenario count moves by one while the binding
     Capabilities contract — **zero ADDED requirements** — is honoured exactly.

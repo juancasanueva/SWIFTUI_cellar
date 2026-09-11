@@ -41,17 +41,24 @@ It can also manage your global npm packages alongside them, opt-in.
 With Homebrew:
 
 ```sh
-brew tap juancasanueva/cellar
-brew trust juancasanueva/cellar
+brew trust juancasanueva/tap
+brew tap juancasanueva/tap
 brew install --cask home-cellar
 ```
 
 That installs `/Applications/Home-Cellar.app`, the same notarized build the releases
-page serves. Homebrew 6 refuses to load a cask from a third-party tap until the
-tap is trusted, which is what the middle line does; it grants nothing beyond
-this tap.
+page serves. Homebrew 6 refuses to load, and since 6.0.22 even to tap, a
+third-party tap that carries a cask until the tap is trusted, which is what the
+first line does; it grants nothing beyond this tap.
 
-A word about the fully-qualified form, `juancasanueva/cellar/home-cellar`: on
+**Moved from `juancasanueva/cellar`.** The cask used to ship from a tap of its
+own; it now lives in `juancasanueva/tap` alongside
+[System Monitor](https://github.com/juancasanueva/SWIFTUI_system_monitor). If you
+installed from the old tap, trust and tap the new one, then `brew upgrade`
+follows the migration and `brew untap juancasanueva/cellar` retires the old
+pointer.
+
+A word about the fully-qualified form, `juancasanueva/tap/home-cellar`: on
 Homebrew 6, naming a qualified token on a command line **is** a per-package
 trust grant, so it is not a neutral way to disambiguate a token collision. The
 tap line above is. Home-Cellar never builds a qualified token — every command it

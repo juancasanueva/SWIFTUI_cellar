@@ -320,7 +320,7 @@ struct CaskZapInventoryTests {
             .map { $0.trimmingCharacters(in: .whitespaces) }
 
         for command in [
-            "brew tap juancasanueva/cellar",
+            "brew tap juancasanueva/tap",
             "brew install --cask home-cellar"
         ] {
             #expect(
@@ -337,7 +337,7 @@ struct CaskZapInventoryTests {
         // `"Home-Cellar.app"` contains `"Cellar.app"` but not `"cellar.app"`, so
         // a widened assertion would pass on a README that still documented the
         // old name. The capital `C` is the assertion.
-        #expect(readme.contains("juancasanueva/cellar/home-cellar"))
+        #expect(readme.contains("juancasanueva/tap/home-cellar"))
         #expect(readme.contains("Home-Cellar.app"))
     }
 

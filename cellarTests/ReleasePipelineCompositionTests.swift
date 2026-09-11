@@ -813,7 +813,7 @@ struct ReleaseWorkflowContractTests {
             )
         }
 
-        for name in ["homebrew-cellar", "juancasanueva/cellar"] {
+        for name in ["homebrew-tap", "juancasanueva/tap"] {
             #expect(!workflow.contains(name), "the workflow must not name \(name)")
         }
     }
