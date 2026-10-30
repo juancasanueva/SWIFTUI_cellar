@@ -176,7 +176,7 @@ struct AppcastScriptContractTests {
             "sparkle:version",
             "sparkle:shortVersionString",
             "sparkle:minimumSystemVersion",
-            "26.0",
+            "15.0",
             "<enclosure"
         ]
 
