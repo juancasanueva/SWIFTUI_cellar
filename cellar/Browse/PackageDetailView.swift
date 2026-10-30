@@ -313,8 +313,12 @@ struct PackageDetailView: View {
                                 }
                             }
                         } else {
-                            accentButton("Install", identifier: "detail-action-install") {
-                                submit(.install(target))
+                            if let busy = operations.activeMutation(naming: entry.id) {
+                                busyButton(busy, identifier: "detail-action-busy")
+                            } else {
+                                accentButton("Install", identifier: "detail-action-install") {
+                                    submit(.install(target))
+                                }
                             }
                         }
                     }
@@ -433,7 +437,7 @@ struct PackageDetailView: View {
         .accessibilityIdentifier(identifier)
     }
 
-    /// The in-flight state in an Upgrade button's place: inert progress feedback
+    /// The in-flight state in an Upgrade or Install button's place: inert progress feedback
     /// from submit until the terminal, so a running package cannot be submitted
     /// a second time mid-flight. The same rule the Discover action areas follow.
     private func busyButton(_ item: ActivityItem, identifier: String) -> some View {
@@ -586,10 +590,14 @@ struct PackageDetailView: View {
     private func headerPrimaryButton(package: CatalogPackage, installed: InstalledPackage?) -> some View {
         if let target = PackageTarget(package.id) {
             if installed == nil {
-                accentButton("Install", identifier: "detail-primary-install") {
-                    submit(.install(target))
+                if let busy = operations.activeMutation(naming: package.id) {
+                    busyButton(busy, identifier: "detail-primary-busy")
+                } else {
+                    accentButton("Install", identifier: "detail-primary-install") {
+                        submit(.install(target))
+                    }
+                    .disabled(!operations.isAvailable)
                 }
-                .disabled(!operations.isAvailable)
             } else if installed?.isOutdated == true {
                 if let busy = operations.activeMutation(naming: package.id) {
                     busyButton(busy, identifier: "detail-primary-busy")
