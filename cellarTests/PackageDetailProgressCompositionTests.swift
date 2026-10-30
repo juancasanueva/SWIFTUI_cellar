@@ -6,12 +6,33 @@
 import Foundation
 import Testing
 
-/// The detail pane's Upgrade buttons give way to progress feedback while the
-/// package has an unsettled mutation. The rule itself is proven on
+/// The detail pane's Upgrade and Install buttons give way to progress feedback
+/// while the package has an unsettled mutation. The rule itself is proven on
 /// `OperationCenter.activeMutation(naming:)`; what only the composition can
 /// claim is that each button actually reads it, in the shipped structural idiom.
-@Suite("Package detail upgrade progress")
+@Suite("Package detail mutation progress")
 struct PackageDetailProgressCompositionTests {
+    @Test("Every Install button in the detail pane is replaced by progress while busy")
+    func everyInstallButtonIsReplacedByProgressWhileBusy() throws {
+        let detail = try ReceiptDetailSources.source(at: "cellar/Browse/PackageDetailView.swift")
+        let lines = detail.code.components(separatedBy: "\n")
+
+        let buttons = lines.indices.filter { index in
+            lines[index].contains("identifier: \"detail-primary-install\"")
+                || lines[index].contains("identifier: \"detail-action-install\"")
+        }
+        // Header primary, Actions row.
+        #expect(buttons.count == 2)
+
+        for button in buttons {
+            let guardLine = lines[max(0, button - 3)..<button].joined(separator: "\n")
+            #expect(
+                guardLine.contains("operations.activeMutation(naming:"),
+                "line \(button + 1) offers Install without checking for an in-flight mutation"
+            )
+        }
+    }
+
     @Test("Every Upgrade button in the detail pane is replaced by progress while busy")
     func everyUpgradeButtonIsReplacedByProgressWhileBusy() throws {
         let detail = try ReceiptDetailSources.source(at: "cellar/Browse/PackageDetailView.swift")

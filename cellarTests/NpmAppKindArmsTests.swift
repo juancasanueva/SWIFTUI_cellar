@@ -7,6 +7,7 @@ import BrewClient
 import Catalog
 import DiskUsage
 import Foundation
+import SecurityKit
 import Testing
 
 @testable import cellar
