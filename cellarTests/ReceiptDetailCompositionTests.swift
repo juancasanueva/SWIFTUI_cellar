@@ -427,17 +427,32 @@ nonisolated enum ReceiptDetailSources {
     ]
 
     /// The shared Actions section's own body, extracted by brace matching from
-    /// its declaration.
+    /// its declaration and from the two per-source sections it dispatches to.
     ///
     /// Extracted rather than scanned whole-file, so a claim about "the section"
     /// is a claim about the section: `PackageDetailView.swift` legitimately
     /// carries a trust marker and a catalog type elsewhere, and a whole-file
     /// sweep would report the section guilty of both.
     static func actionsSection(in detail: Source) throws -> String {
+        let dispatcher = try block(declaredBy: "func actionsSection(for entry: PackageEntry)", in: detail)
+        #expect(dispatcher.contains("brewActionsSection(for: entry)"))
+        #expect(dispatcher.contains("npmActionsSection(for: entry)"))
+
+        let brew = try block(declaredBy: "func brewActionsSection(for entry: PackageEntry)", in: detail)
+        let npm = try block(declaredBy: "func npmActionsSection(for entry: PackageEntry)", in: detail)
+        let section = [dispatcher, brew, npm].joined(separator: "\n")
+        #expect(
+            section.components(separatedBy: "\n").count > 20,
+            "the extracted Actions section is too small to be it"
+        )
+        return section
+    }
+
+    private static func block(declaredBy declaration: String, in detail: Source) throws -> String {
         let lines = detail.code.components(separatedBy: "\n")
         let start = try #require(
-            lines.firstIndex { $0.contains("func actionsSection(for entry: PackageEntry)") },
-            "the shared Actions section moved, so every claim about it anchors on nothing"
+            lines.firstIndex { $0.contains(declaration) },
+            "\(declaration) moved, so every claim about the Actions section anchors on nothing"
         )
         var depth = 0
         var body: [String] = []
@@ -447,8 +462,7 @@ nonisolated enum ReceiptDetailSources {
             depth -= lines[index].filter { $0 == "}" }.count
             if depth == 0, index > start { break }
         }
-        #expect(depth == 0, "the shared Actions section's block never closes")
-        #expect(body.count > 20, "the extracted Actions section is too small to be it")
+        #expect(depth == 0, "\(declaration)'s block never closes")
         return body.joined(separator: "\n")
     }
 
