@@ -233,8 +233,12 @@ struct PackageDetailView: View {
                     ForEach(commands, id: \.displayCommand) { command in
                         switch command {
                         case .upgrade:
-                            accentButton(command.title, identifier: "detail-action-upgrade") {
-                                submit(command)
+                            if let busy = operations.activeMutation(naming: entry.id) {
+                                busyButton(busy, identifier: "detail-action-busy")
+                            } else {
+                                accentButton(command.title, identifier: "detail-action-upgrade") {
+                                    submit(command)
+                                }
                             }
                         case .uninstall:
                             dangerButton(command.title, identifier: "detail-action-uninstall") {
@@ -280,8 +284,12 @@ struct PackageDetailView: View {
                     Group {
                         if let installedPackage {
                             if installedPackage.isOutdated {
-                                quietButton("Upgrade", identifier: "detail-action-upgrade") {
-                                    submit(.upgrade(target))
+                                if let busy = operations.activeMutation(naming: entry.id) {
+                                    busyButton(busy, identifier: "detail-action-busy")
+                                } else {
+                                    quietButton("Upgrade", identifier: "detail-action-upgrade") {
+                                        submit(.upgrade(target))
+                                    }
                                 }
                             }
                             quietButton("Reinstall", identifier: "detail-action-reinstall") {
@@ -425,6 +433,32 @@ struct PackageDetailView: View {
         .accessibilityIdentifier(identifier)
     }
 
+    /// The in-flight state in an Upgrade button's place: inert progress feedback
+    /// from submit until the terminal, so a running package cannot be submitted
+    /// a second time mid-flight. The same rule the Discover action areas follow.
+    private func busyButton(_ item: ActivityItem, identifier: String) -> some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.small)
+            Text(item.progressLabel)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 13)
+        .frame(height: 29)
+        .background(
+            Theme.controlFill,
+            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Theme.border, lineWidth: 0.5)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
+    }
+
     /// Launches the installed app, in the Discover surfaces' informational
     /// blue — a local open, not a brew verb, so it sits outside the mutation
     /// row's `.disabled`.
@@ -557,10 +591,14 @@ struct PackageDetailView: View {
                 }
                 .disabled(!operations.isAvailable)
             } else if installed?.isOutdated == true {
-                accentButton("Upgrade", identifier: "detail-primary-upgrade") {
-                    submit(.upgrade(target))
+                if let busy = operations.activeMutation(naming: package.id) {
+                    busyButton(busy, identifier: "detail-primary-busy")
+                } else {
+                    accentButton("Upgrade", identifier: "detail-primary-upgrade") {
+                        submit(.upgrade(target))
+                    }
+                    .disabled(!operations.isAvailable)
                 }
-                .disabled(!operations.isAvailable)
             }
         }
     }
