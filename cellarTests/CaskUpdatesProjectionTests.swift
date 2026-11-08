@@ -107,6 +107,35 @@ struct CaskUpdatesProjectionTests {
         #expect(CaskAppVersion.isBehind(shortVersion: nil, bundleVersion: nil, catalogVersion: "42") == nil)
     }
 
+    // MARK: - Formulae
+
+    @Test("The formula page lists outdated formulae only")
+    func theFormulaPageListsOutdatedFormulaeOnly() {
+        let inventory = InstalledInventory(packages: [
+            Self.installed(.formula, "wget", outdated: true),
+            Self.installed(.formula, "jq", outdated: false),
+            Self.installed(.cask, "vlc", outdated: true),
+            Self.installed(.formula, "git", outdated: true),
+        ])
+
+        let formulae = CaskUpdatesProjection.packages(of: .formula, in: inventory, catalog: { _ in nil })
+
+        #expect(formulae.map(\.name) == ["git", "wget"])
+        #expect(formulae.allSatisfy { $0.kind == .formula })
+    }
+
+    @Test("A pinned formula is not listed: brew upgrade refuses it")
+    func aPinnedFormulaIsNotListed() {
+        let inventory = InstalledInventory(packages: [
+            Self.installed(.formula, "node", outdated: true, pinned: true),
+            Self.installed(.formula, "wget", outdated: true),
+        ])
+
+        let formulae = CaskUpdatesProjection.packages(of: .formula, in: inventory, catalog: { _ in nil })
+
+        #expect(formulae.map(\.name) == ["wget"])
+    }
+
     // MARK: - Fixtures
 
     private static func installed(
@@ -116,13 +145,14 @@ struct CaskUpdatesProjectionTests {
         autoUpdates: Bool? = nil,
         displayName: String? = nil,
         desc: String? = nil,
-        tap: String? = "homebrew/cask"
+        tap: String? = "homebrew/cask",
+        pinned: Bool = false
     ) -> InstalledPackage {
         let keg = InstalledKeg(version: "1.0", installedAt: nil, installedOnRequest: true)
         return InstalledPackage(
             kind: kind, name: name, displayName: displayName ?? name, desc: desc,
             homepage: nil, tap: tap, catalogVersion: "2.0", kegs: [keg], primaryKeg: keg,
-            snapshotOutdated: outdated, isPinned: false, pinnedVersion: nil,
+            snapshotOutdated: outdated, isPinned: pinned, pinnedVersion: nil,
             declaresAutoUpdates: autoUpdates
         )
     }

@@ -69,6 +69,9 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     case formulaFeatured
     /// Every eligible formula ranked by one analytics window's installs.
     case formulaTopCharts
+    /// `caskUpdates` on the other kind: the installed formulae that have an
+    /// update, closing Discover Formulae as Cask Updates closes its group.
+    case formulaUpdates
     case installed
     /// The favorited slice of Installed, promoted to a place of its own by the
     /// design document. The filter chip on Installed remains; this is the same
@@ -128,6 +131,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .formulaBrowse: "Browse"
         case .formulaFeatured: "Featured"
         case .formulaTopCharts: "Top Charts"
+        case .formulaUpdates: "Formula Updates"
         case .installed: "Installed"
         case .favorites: "Favorites"
         case .updates: "Updates"
@@ -156,7 +160,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         // wording in the sidebar without anyone deciding that.
         case .health, .home, .caskBrowse, .caskFeatured, .caskTopCharts,
              .caskRecentlyAdded, .caskUpdates, .caskCategory, .formulaBrowse, .formulaFeatured,
-             .formulaTopCharts, .installed, .favorites, .updates, .taps, .services,
+             .formulaTopCharts, .formulaUpdates, .installed, .favorites, .updates, .taps, .services,
              .cleanup, .security, .brewfile, .history, .settings:
             title
         }
@@ -180,6 +184,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .formulaBrowse: "terminal"
         case .formulaFeatured: "star"
         case .formulaTopCharts: "chart.line.uptrend.xyaxis"
+        case .formulaUpdates: "arrow.triangle.2.circlepath"
         case .installed: "shippingbox"
         case .favorites: "heart"
         case .updates: "arrow.up.circle"
@@ -201,7 +206,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
         ("Overview", [.home, .browse, .tapSearch]),
         ("Discover Casks", [.caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory, .caskUpdates]),
-        ("Discover Formulae", [.formulaBrowse, .formulaFeatured, .formulaTopCharts]),
+        ("Discover Formulae", [.formulaBrowse, .formulaFeatured, .formulaTopCharts, .formulaUpdates]),
         ("Packages", [.installed, .favorites, .updates, .services]),
         ("Insights", [.health, .security, .cleanup]),
         ("Manage", [.taps, .brewfile, .history]),
