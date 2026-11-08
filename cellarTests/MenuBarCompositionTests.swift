@@ -411,11 +411,11 @@ struct MenuBarCompositionTests {
 
     @Test("The menu bar adds no section and no shell literal moves")
     func theMenuBarAddsNoSectionAndNoShellLiteralMoves() throws {
-        #expect(AppSection.allCases.count == 22)
+        #expect(AppSection.allCases.count == 23)
         #expect(
             AppSection.allCases.map(\.rawValue) == [
                 "home", "browse", "tapSearch", "caskBrowse", "caskFeatured", "caskTopCharts",
-                "caskRecentlyAdded", "caskCategory", "formulaBrowse", "formulaFeatured",
+                "caskRecentlyAdded", "caskUpdates", "caskCategory", "formulaBrowse", "formulaFeatured",
                 "formulaTopCharts", "installed", "favorites", "updates", "taps", "services",
                 "cleanup", "health", "security", "brewfile", "history", "settings"
             ]

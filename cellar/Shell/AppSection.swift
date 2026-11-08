@@ -46,6 +46,10 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// The casks this catalog has seen arrive most recently. Placeholder page
     /// until the added-dates ledger reaches the app.
     case caskRecentlyAdded
+    /// The installed casks that have an update, as the same card grid the
+    /// other Discover Casks pages draw. The cask slice of Updates, filed beside
+    /// the storefront so updating an app happens where apps are browsed.
+    case caskUpdates
     /// One case standing for every category page: *which* category is showing
     /// is data the shell holds beside the section, not a case of this enum —
     /// eighteen cases for eighteen rows of vendored JSON would put the asset's
@@ -117,6 +121,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         case .caskFeatured: "Featured"
         case .caskTopCharts: "Top Charts"
         case .caskRecentlyAdded: "Recently Added"
+        case .caskUpdates: "Cask Updates"
         // The list-pane header and the capsule bar's fallback; the bar shows
         // the selected category's display name whenever one is resolved.
         case .caskCategory: "Categories"
@@ -150,7 +155,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         // a `default:` is what would let a new section ship with the toolbar's
         // wording in the sidebar without anyone deciding that.
         case .health, .home, .caskBrowse, .caskFeatured, .caskTopCharts,
-             .caskRecentlyAdded, .caskCategory, .formulaBrowse, .formulaFeatured,
+             .caskRecentlyAdded, .caskUpdates, .caskCategory, .formulaBrowse, .formulaFeatured,
              .formulaTopCharts, .installed, .favorites, .updates, .taps, .services,
              .cleanup, .security, .brewfile, .history, .settings:
             title
@@ -170,6 +175,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
         // `clock.badge.plus` does not exist in this SDK's SF Symbols; the
         // calendar variant is the verified nearest match.
         case .caskRecentlyAdded: "calendar.badge.plus"
+        case .caskUpdates: "arrow.triangle.2.circlepath"
         case .caskCategory: "square.grid.3x3"
         case .formulaBrowse: "terminal"
         case .formulaFeatured: "star"
@@ -194,7 +200,7 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     /// any group: it lives in the sidebar's footer.
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
         ("Overview", [.home, .browse, .tapSearch]),
-        ("Discover Casks", [.caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory]),
+        ("Discover Casks", [.caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory, .caskUpdates]),
         ("Discover Formulae", [.formulaBrowse, .formulaFeatured, .formulaTopCharts]),
         ("Packages", [.installed, .favorites, .updates, .services]),
         ("Insights", [.health, .security, .cleanup]),

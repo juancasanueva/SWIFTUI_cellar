@@ -373,6 +373,16 @@ struct ContentView: View {
                 onSelectCategory: openCategory,
                 shellControls: shellHeaderControls
             )
+        case .caskUpdates:
+            CaskUpdatesView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                onSelectCategory: openCategory,
+                shellControls: shellHeaderControls
+            )
         case .caskCategory:
             CaskCategoriesListView(catalog: catalog, selection: $caskCategoryID)
         case .formulaBrowse:
@@ -507,7 +517,7 @@ struct ContentView: View {
     /// The right-hand pane, or `nil` for a section the design draws full-width.
     private var detailPane: AnyView? {
         switch section {
-        case .home, .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded,
+        case .home, .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskUpdates,
              .formulaBrowse, .formulaFeatured, .formulaTopCharts,
              .cleanup, .brewfile, .history, .settings:
             // The collection pages are full-width like CaskHub's own; nothing
@@ -623,7 +633,7 @@ struct ContentView: View {
     private static let pinnedHeaderSections: Set<AppSection> = [
         .home, .browse, .tapSearch, .installed, .favorites, .updates, .services, .health, .security,
         .cleanup, .taps, .brewfile, .history, .settings,
-        .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
+        .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskUpdates, .caskCategory,
         .formulaBrowse, .formulaFeatured, .formulaTopCharts,
     ]
 
@@ -679,7 +689,7 @@ struct ContentView: View {
             AnyView(UpdatesShellAccessories(operations: operations))
         case .health, .home, .browse, .tapSearch, .installed, .favorites, .taps, .services,
              .cleanup, .security, .brewfile, .settings,
-             .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
+             .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskUpdates, .caskCategory,
              .formulaBrowse, .formulaFeatured, .formulaTopCharts:
             nil
         }

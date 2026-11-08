@@ -619,14 +619,14 @@ struct BrewfilePlacementTests {
             AppSection.allCases.map(\.rawValue) == [
                 "home", "browse", "tapSearch",
                 "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
-                "caskCategory",
+                "caskUpdates", "caskCategory",
                 "formulaBrowse", "formulaFeatured", "formulaTopCharts",
                 "installed", "favorites", "updates",
                 "taps", "services", "cleanup", "health", "security", "brewfile",
                 "history", "settings"
             ]
         )
-        #expect(AppSection.allCases.count == 22)
+        #expect(AppSection.allCases.count == 23)
     }
 
     @Test("Both affordances live in the Brewfile section, and the sheets are presented nowhere else")
