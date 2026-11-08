@@ -182,6 +182,12 @@ struct SidebarView: View {
             let count = outdatedCount
             guard count > 0 else { return nil }
             return Badge(count: String(count), background: theme.tint(0.22), foreground: theme.light)
+        case .caskUpdates:
+            // The page's own projection, counted: the badge and the cards it
+            // announces cannot drift apart.
+            let count = CaskUpdatesProjection.casks(in: installed.inventory, catalog: { _ in nil }).count
+            guard count > 0 else { return nil }
+            return Badge(count: String(count), background: theme.tint(0.22), foreground: theme.light)
         case .services:
             return neutralBadge(runningServicesCount)
         case .security:

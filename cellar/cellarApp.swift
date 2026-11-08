@@ -178,7 +178,7 @@ struct cellarApp: App {
     /// The cask artwork pipeline. Constructed here and nowhere else, so the
     /// session is a composition decision — and a UI-test launch disables it
     /// outright, which is what keeps those runs at zero network.
-    @State private var caskIcons = CaskIconLoader(isDisabled: AppTestFixtures.isEnabled)
+    @State private var caskIcons: CaskIconLoader
     /// Per-period Top Charts rankings. The HTTP source is constructed here and
     /// nowhere else, like every other network seam; a UI-test launch swaps in
     /// the no-network stub and an empty per-launch cache directory, so those
@@ -284,7 +284,30 @@ struct cellarApp: App {
         _caskAssets = State(initialValue: CaskBrowseAssets(publishesCask: { token in
             catalog.package(PackageID(kind: .cask, name: token)) != nil
         }))
-        _brewDetection = State(initialValue: BrewDetectionStore(locator: locator))
+        let brewDetection = BrewDetectionStore(locator: locator)
+        _brewDetection = State(initialValue: brewDetection)
+        // An installed cask wears its own app's icon, found through the link
+        // Homebrew wrote into the Caskroom — the only artwork a third-party
+        // tap's cask can have, and no request for anyone's.
+        _caskIcons = State(initialValue: CaskIconLoader(
+            isDisabled: AppTestFixtures.isEnabled,
+            installedApp: { token in
+                guard
+                    let installation = brewDetection.state.installation,
+                    let package = installed.inventory.package(PackageID(kind: .cask, name: token))
+                else { return nil }
+                let roots = HomebrewRoots(
+                    installation: installation,
+                    userCacheDirectory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                        ?? FileManager.default.temporaryDirectory
+                )
+                return CaskInstalledApp.url(
+                    token: token,
+                    version: package.primaryKeg.version,
+                    caskroom: roots.caskroom
+                )
+            }
+        ))
         _installed = State(initialValue: installed)
         // Constructed unconditionally and *inert* until the preference is on:
         // the store publishes `.disabled` and probes nothing, so a build with

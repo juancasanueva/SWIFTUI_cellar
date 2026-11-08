@@ -33,7 +33,7 @@ struct AppSectionPlacementTests {
         // live analytics rather than a static curated list, plus the tap
         // search surface the 2026-08-25 scope change gave its own row beside
         // Search catalog.
-        #expect(order.count == 22)
+        #expect(order.count == 23)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -54,7 +54,7 @@ struct AppSectionPlacementTests {
         #expect(order.map(\.rawValue) == [
             "home", "browse", "tapSearch",
             "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
-            "caskCategory",
+            "caskUpdates", "caskCategory",
             "formulaBrowse", "formulaFeatured", "formulaTopCharts",
             "installed", "favorites", "updates",
             "taps", "services", "cleanup", "health", "security", "brewfile",
@@ -87,10 +87,11 @@ struct AppSectionPlacementTests {
             "Overview", "Discover Casks", "Discover Formulae", "Packages", "Insights", "Manage"
         ])
         #expect(AppSection.sidebarFooter == [.settings])
-        // Categories closes Discover Casks, after Recently Added — the row
-        // that reclaimed the data-driven CATEGORIES group's vertical space.
+        // Categories follows Recently Added — the row that reclaimed the
+        // data-driven CATEGORIES group's vertical space — and Cask Updates
+        // closes the group.
         #expect(AppSection.sidebarGroups[1].sections == [
-            .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory,
+            .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskCategory, .caskUpdates,
         ])
         // The formula mirror carries only the pages its data can honestly
         // fill: no added dates and no categories exist for formulae, so

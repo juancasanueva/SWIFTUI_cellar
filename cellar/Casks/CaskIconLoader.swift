@@ -41,9 +41,21 @@ final class CaskIconLoader {
     @ObservationIgnored
     private let isDisabled: Bool
 
-    init(session: URLSession = CaskIconLoader.defaultSession(), isDisabled: Bool = false) {
+    /// Where an installed cask's app lives on disk, or `nil` for a cask that
+    /// is not installed. Wired in `cellarApp` to the Caskroom links; the
+    /// default answers `nil`, so a preview or a loader nobody wired only ever
+    /// takes the remote ladder.
+    @ObservationIgnored
+    private let installedApp: @MainActor (String) -> URL?
+
+    init(
+        session: URLSession = CaskIconLoader.defaultSession(),
+        isDisabled: Bool = false,
+        installedApp: @escaping @MainActor (String) -> URL? = { _ in nil }
+    ) {
         self.session = session
         self.isDisabled = isDisabled
+        self.installedApp = installedApp
     }
 
     /// Ephemeral on purpose: the disk cache below is the persistence, and a
@@ -54,14 +66,20 @@ final class CaskIconLoader {
         return URLSession(configuration: configuration)
     }
 
-    /// The icon for a token, from memory, disk, or the network — or `nil`,
-    /// which the views answer with the letter tile.
+    /// The icon for a token: the installed app's own icon first, then memory,
+    /// disk, or the network — or `nil`, which the views answer with the letter
+    /// tile.
     ///
-    /// A cask no `homebrew/cask` record publishes answers `nil` before the
-    /// disk or the network is consulted: neither registry can hold it, so
-    /// there is nothing to fetch, nothing to cache and no miss to stamp.
+    /// The installed app comes first because it is the artwork the user
+    /// actually sees in the Dock, needs no request, and exists for a
+    /// third-party tap's cask too. A cask no `homebrew/cask` record publishes
+    /// and that is not installed answers `nil` before the disk or the network
+    /// is consulted: neither registry can hold it, so there is nothing to
+    /// fetch, nothing to cache and no miss to stamp.
     func icon(for token: String, isKnownToken: Bool, isPublishedByHomebrew: Bool) async -> NSImage? {
-        guard !isDisabled, isPublishedByHomebrew else { return nil }
+        guard !isDisabled else { return nil }
+        if let appIcon = installedAppIcon(for: token) { return appIcon }
+        guard isPublishedByHomebrew else { return nil }
         if let cached = memory.object(forKey: token as NSString) { return cached }
         if let running = inFlight[token] { return await running.value }
 
@@ -78,6 +96,17 @@ final class CaskIconLoader {
         let image = await task.value
         inFlight[token] = nil
         if let image { memory.setObject(image, forKey: token as NSString) }
+        return image
+    }
+
+    /// The installed app's Finder icon, cached under its own key so an icon
+    /// fetched before the install never shadows the app's real one.
+    private func installedAppIcon(for token: String) -> NSImage? {
+        let key = "app:\(token)" as NSString
+        if let cached = memory.object(forKey: key) { return cached }
+        guard let appURL = installedApp(token) else { return nil }
+        let image = NSWorkspace.shared.icon(forFile: appURL.path)
+        memory.setObject(image, forKey: key)
         return image
     }
 
