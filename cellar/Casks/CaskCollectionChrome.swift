@@ -172,6 +172,8 @@ struct CaskCollectionView: View {
     /// `false` renders every icon as the letter tile with no remote lookup —
     /// the formula pages' setting; see `CaskIconView.loadsRemote`.
     var remoteIcons: Bool = true
+    /// See `CaskActionState.resolve(_:installed:offersUpdate:)`.
+    var offersUpdate: Set<PackageID> = []
 
     var body: some View {
         if viewMode == .grid {
@@ -189,7 +191,8 @@ struct CaskCollectionView: View {
                         iconLoader: iconLoader,
                         counts: counts,
                         onSelectCategory: onSelectCategory,
-                        remoteIcons: remoteIcons
+                        remoteIcons: remoteIcons,
+                        offersUpdate: offersUpdate
                     )
                 }
             }
@@ -207,7 +210,8 @@ struct CaskCollectionView: View {
                         iconLoader: iconLoader,
                         counts: counts,
                         onSelectCategory: onSelectCategory,
-                        remoteIcons: remoteIcons
+                        remoteIcons: remoteIcons,
+                        offersUpdate: offersUpdate
                     )
                 }
             }
@@ -226,10 +230,20 @@ enum CaskActionState {
     case installed(PackageTarget)
     case install(PackageTarget)
 
-    static func resolve(_ package: CatalogPackage, installed: InstalledStore) -> CaskActionState? {
+    /// `offersUpdate` names installed casks a page has already judged to
+    /// have an update the outdated flag does not carry — the Cask Updates
+    /// page's self-updating apps. Every other page passes none.
+    static func resolve(
+        _ package: CatalogPackage,
+        installed: InstalledStore,
+        offersUpdate: Set<PackageID> = []
+    ) -> CaskActionState? {
         guard let target = PackageTarget(package.id) else { return nil }
         let installedPackage = installed.inventory.package(package.id)
-        if let installedPackage, installedPackage.isOutdated { return .update(target) }
+        if let installedPackage,
+           installedPackage.isOutdated || offersUpdate.contains(package.id) {
+            return .update(target)
+        }
         if installedPackage != nil { return .installed(target) }
         return .install(target)
     }
@@ -271,6 +285,8 @@ struct CaskListRow: View {
     var onSelectCategory: ((String) -> Void)? = nil
     /// See `CaskCollectionView.remoteIcons`.
     var remoteIcons: Bool = true
+    /// See `CaskActionState.resolve(_:installed:offersUpdate:)`.
+    var offersUpdate: Set<PackageID> = []
 
     var body: some View {
         HStack(spacing: 12) {
@@ -325,7 +341,7 @@ struct CaskListRow: View {
         if let busy = operations.activeMutation(naming: package.id) {
             busyPill(busy)
         } else {
-            switch CaskActionState.resolve(package, installed: installed) {
+            switch CaskActionState.resolve(package, installed: installed, offersUpdate: offersUpdate) {
             case .update(let target):
                 pillButton("Update", identifier: "cask-update-\(package.name)", fill: theme.tint(0.22)) {
                     submit(.upgrade(target))

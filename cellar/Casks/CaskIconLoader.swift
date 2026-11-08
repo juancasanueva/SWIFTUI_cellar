@@ -99,6 +99,13 @@ final class CaskIconLoader {
         return image
     }
 
+    /// Where an installed cask's app lives, through the same lookup the
+    /// artwork uses — so the Cask Updates page reads the very bundle whose
+    /// icon it shows.
+    func installedAppURL(for token: String) -> URL? {
+        installedApp(token)
+    }
+
     /// The installed app's Finder icon, cached under its own key so an icon
     /// fetched before the install never shadows the app's real one.
     private func installedAppIcon(for token: String) -> NSImage? {
