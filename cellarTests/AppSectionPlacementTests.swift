@@ -33,7 +33,7 @@ struct AppSectionPlacementTests {
         // live analytics rather than a static curated list, plus the tap
         // search surface the 2026-08-25 scope change gave its own row beside
         // Search catalog.
-        #expect(order.count == 23)
+        #expect(order.count == 24)
 
         let health = try #require(order.firstIndex(of: .health))
         let cleanup = try #require(order.firstIndex(of: .cleanup))
@@ -55,7 +55,7 @@ struct AppSectionPlacementTests {
             "home", "browse", "tapSearch",
             "caskBrowse", "caskFeatured", "caskTopCharts", "caskRecentlyAdded",
             "caskUpdates", "caskCategory",
-            "formulaBrowse", "formulaFeatured", "formulaTopCharts",
+            "formulaBrowse", "formulaFeatured", "formulaTopCharts", "formulaUpdates",
             "installed", "favorites", "updates",
             "taps", "services", "cleanup", "health", "security", "brewfile",
             "history", "settings"
@@ -97,7 +97,7 @@ struct AppSectionPlacementTests {
         // fill: no added dates and no categories exist for formulae, so
         // Recently Added and Categories have no formula siblings.
         #expect(AppSection.sidebarGroups[2].sections == [
-            .formulaBrowse, .formulaFeatured, .formulaTopCharts,
+            .formulaBrowse, .formulaFeatured, .formulaTopCharts, .formulaUpdates,
         ])
         // Health leads Insights, which is the design's placement of PRD §5's
         // "between Services and Security": Services closes the group before it,

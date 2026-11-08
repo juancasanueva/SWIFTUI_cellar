@@ -37,9 +37,22 @@ nonisolated enum CaskUpdatesProjection {
         catalog: (PackageID) -> CatalogPackage?,
         selfUpdatingBehind: ((InstalledPackage) -> Bool)? = nil
     ) -> [CatalogPackage] {
+        packages(of: .cask, in: inventory, catalog: catalog, selfUpdatingBehind: selfUpdatingBehind)
+    }
+
+    /// The same rule for either kind — the Formula Updates page reads it with
+    /// `.formula`. A pinned package is left off: `brew upgrade` refuses it, so
+    /// an Update verb on its card could only fail (package-mutation PM2, the
+    /// rule `upgradableIDs` already applies).
+    static func packages(
+        of kind: PackageKind,
+        in inventory: InstalledInventory,
+        catalog: (PackageID) -> CatalogPackage?,
+        selfUpdatingBehind: ((InstalledPackage) -> Bool)? = nil
+    ) -> [CatalogPackage] {
         inventory.packages
             .filter { package in
-                guard package.kind == .cask else { return false }
+                guard package.kind == kind, !package.isPinned else { return false }
                 if package.isOutdated { return true }
                 guard package.isSelfUpdating, let selfUpdatingBehind else { return false }
                 return selfUpdatingBehind(package)
@@ -187,20 +200,14 @@ struct CaskUpdatesView: View {
         .accessibilityIdentifier("cask-updates-page")
     }
 
-    /// Upgrades the casks on screen — the search narrows the batch, so the
-    /// count announced and the set submitted are one projection — through the
-    /// centre's bulk path, which asks before anything is enqueued.
     private var updateAllButton: some View {
-        Button {
-            operations.submitBulk(.upgrade, over: displayedCasks.map(\.id), in: installed.inventory)
-        } label: {
-            Label("Update All (\(displayedCasks.count))", systemImage: "arrow.triangle.2.circlepath")
-        }
-        .buttonStyle(ActionPillStyle())
-        .disabled(!operations.isAvailable)
-        .help(operations.unavailableGuidance ?? "Update every cask listed")
-        .padding(.bottom, 16)
-        .accessibilityIdentifier("cask-update-all")
+        UpdateAllPill(
+            ids: displayedCasks.map(\.id),
+            installed: installed,
+            operations: operations,
+            help: "Update every cask listed",
+            identifier: "cask-update-all"
+        )
     }
 
     private var selfUpdatingToggle: some View {
@@ -237,5 +244,30 @@ struct CaskUpdatesView: View {
             .foregroundStyle(Theme.textSecondary)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 40)
+    }
+}
+
+/// Upgrades the packages on screen — the search narrows the batch, so the
+/// count announced and the set submitted are one projection — through the
+/// centre's bulk path, which asks before anything is enqueued. Shared by the
+/// Cask Updates and Formula Updates pages.
+struct UpdateAllPill: View {
+    let ids: [PackageID]
+    let installed: InstalledStore
+    let operations: OperationCenter
+    let help: String
+    let identifier: String
+
+    var body: some View {
+        Button {
+            operations.submitBulk(.upgrade, over: ids, in: installed.inventory)
+        } label: {
+            Label("Update All (\(ids.count))", systemImage: "arrow.triangle.2.circlepath")
+        }
+        .buttonStyle(ActionPillStyle())
+        .disabled(!operations.isAvailable)
+        .help(operations.unavailableGuidance ?? help)
+        .padding(.bottom, 16)
+        .accessibilityIdentifier(identifier)
     }
 }

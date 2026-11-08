@@ -414,6 +414,15 @@ struct ContentView: View {
                 charts: formulaCharts,
                 shellControls: shellHeaderControls
             )
+        case .formulaUpdates:
+            FormulaUpdatesView(
+                catalog: catalog,
+                installed: installed,
+                operations: operations,
+                assets: caskAssets,
+                iconLoader: caskIcons,
+                shellControls: shellHeaderControls
+            )
         case .installed:
             InstalledListView(
                 installed: installed,
@@ -518,7 +527,7 @@ struct ContentView: View {
     private var detailPane: AnyView? {
         switch section {
         case .home, .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskUpdates,
-             .formulaBrowse, .formulaFeatured, .formulaTopCharts,
+             .formulaBrowse, .formulaFeatured, .formulaTopCharts, .formulaUpdates,
              .cleanup, .brewfile, .history, .settings:
             // The collection pages are full-width like CaskHub's own; nothing
             // here drives the shared package detail column.
@@ -634,7 +643,7 @@ struct ContentView: View {
         .home, .browse, .tapSearch, .installed, .favorites, .updates, .services, .health, .security,
         .cleanup, .taps, .brewfile, .history, .settings,
         .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskUpdates, .caskCategory,
-        .formulaBrowse, .formulaFeatured, .formulaTopCharts,
+        .formulaBrowse, .formulaFeatured, .formulaTopCharts, .formulaUpdates,
     ]
 
     /// The subset whose bar the shell itself pins — the sections with no
@@ -690,7 +699,7 @@ struct ContentView: View {
         case .health, .home, .browse, .tapSearch, .installed, .favorites, .taps, .services,
              .cleanup, .security, .brewfile, .settings,
              .caskBrowse, .caskFeatured, .caskTopCharts, .caskRecentlyAdded, .caskUpdates, .caskCategory,
-             .formulaBrowse, .formulaFeatured, .formulaTopCharts:
+             .formulaBrowse, .formulaFeatured, .formulaTopCharts, .formulaUpdates:
             nil
         }
     }
