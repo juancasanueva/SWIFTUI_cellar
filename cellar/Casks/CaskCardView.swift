@@ -21,6 +21,8 @@ struct CaskCardView: View {
     var onSelectCategory: ((String) -> Void)? = nil
     /// See `CaskCollectionView.remoteIcons`.
     var remoteIcons: Bool = true
+    /// See `CaskActionState.resolve(_:installed:offersUpdate:)`.
+    var offersUpdate: Set<PackageID> = []
 
     @Environment(ThemeStore.self) private var theme
 
@@ -112,7 +114,7 @@ struct CaskCardView: View {
         if let busy = operations.activeMutation(naming: package.id) {
             busyRow(busy)
         } else {
-            switch CaskActionState.resolve(package, installed: installed) {
+            switch CaskActionState.resolve(package, installed: installed, offersUpdate: offersUpdate) {
             case .update(let target):
                 HStack(spacing: 8) {
                     // Louder than Install: an update is the verb that most often

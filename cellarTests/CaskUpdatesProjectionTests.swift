@@ -67,6 +67,46 @@ struct CaskUpdatesProjectionTests {
         #expect(cask.installCount365d == nil)
     }
 
+    // MARK: - Self-updating apps
+
+    @Test("Self-updating casks join only when asked, and only when behind")
+    func selfUpdatingCasksJoinOnlyWhenAskedAndBehind() {
+        let inventory = InstalledInventory(packages: [
+            Self.installed(.cask, "chrome", outdated: true, autoUpdates: true),
+            Self.installed(.cask, "ghostty", outdated: true, autoUpdates: true),
+            Self.installed(.cask, "vlc", outdated: true),
+        ])
+        let behind: (InstalledPackage) -> Bool = { $0.name == "chrome" }
+
+        let without = CaskUpdatesProjection.casks(in: inventory, catalog: { _ in nil }, selfUpdatingBehind: nil)
+        let with = CaskUpdatesProjection.casks(in: inventory, catalog: { _ in nil }, selfUpdatingBehind: behind)
+
+        #expect(without.map(\.name) == ["vlc"])
+        #expect(with.map(\.name) == ["chrome", "vlc"])
+    }
+
+    @Test("An app on disk at the latest version is current, whatever brew recorded")
+    func anAppAtTheLatestVersionIsCurrent() {
+        #expect(CaskAppVersion.isBehind(shortVersion: "1.4.0", bundleVersion: "12345", catalogVersion: "1.4.0") == false)
+        #expect(CaskAppVersion.isBehind(shortVersion: "5.2.7", bundleVersion: "32913", catalogVersion: "5.2.7.32913") == false)
+        #expect(CaskAppVersion.isBehind(shortVersion: "2.0", bundleVersion: nil, catalogVersion: "2.0,345") == false)
+        #expect(CaskAppVersion.isBehind(shortVersion: "158.0", bundleVersion: nil, catalogVersion: "157.0.8103.39") == false)
+    }
+
+    @Test("An app on disk below the latest version is behind")
+    func anAppBelowTheLatestVersionIsBehind() {
+        #expect(CaskAppVersion.isBehind(shortVersion: "156.0.8078.48", bundleVersion: "8078.48", catalogVersion: "157.0.8103.39") == true)
+        #expect(CaskAppVersion.isBehind(shortVersion: "5.2.5", bundleVersion: "32528", catalogVersion: "5.2.7.32913") == true)
+        #expect(CaskAppVersion.isBehind(shortVersion: "1.9", bundleVersion: nil, catalogVersion: "1.10") == true)
+    }
+
+    @Test("With no short version the bundle version decides; with neither, nothing does")
+    func theBundleVersionDecidesAlone() {
+        #expect(CaskAppVersion.isBehind(shortVersion: nil, bundleVersion: "41", catalogVersion: "42") == true)
+        #expect(CaskAppVersion.isBehind(shortVersion: nil, bundleVersion: "42", catalogVersion: "42") == false)
+        #expect(CaskAppVersion.isBehind(shortVersion: nil, bundleVersion: nil, catalogVersion: "42") == nil)
+    }
+
     // MARK: - Fixtures
 
     private static func installed(
